@@ -1,7 +1,17 @@
 import axios, { type AxiosInstance } from 'axios';
 
-// Base API configuration
-const API_BASE_URL = 'http://localhost:7000'; // Adjust this to match your API URL
+// Base API configuration - automatically detects environment
+const getApiBaseUrl = (): string => {
+    // Check if we're running in a container (Docker environment)
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+        // In Docker, use the service name from docker-compose
+        return 'http://backend:7000';
+    }
+    // Default to localhost for local development
+    return 'http://localhost:7000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 class ApiService {
     private api: AxiosInstance;
