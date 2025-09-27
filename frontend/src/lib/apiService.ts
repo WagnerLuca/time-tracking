@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance } from 'axios';
 
 // Base API configuration
-const API_BASE_URL = 'http://localhost:5000'; // Adjust this to match your API URL
+const API_BASE_URL = 'http://localhost:7000'; // Adjust this to match your API URL
 
 class ApiService {
     private api: AxiosInstance;

@@ -122,5 +122,5 @@ The frontend is configured to connect to your .NET Web API. Make sure:
 
 ### Swagger Generation Issues
 - Ensure the API is running before generating the client
-- Check if Swagger UI is accessible at `http://localhost:5000/swagger`
-- Verify the Swagger JSON endpoint: `http://localhost:5000/swagger/v1/swagger.json`
+- Check if Swagger UI is accessible at `http://localhost:7000/swagger`
+- Verify the Swagger JSON endpoint: `http://localhost:7000/swagger/v1/swagger.json`

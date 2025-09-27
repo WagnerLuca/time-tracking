@@ -16,7 +16,7 @@ import { execSync } from 'child_process';
 import { existsSync, mkdirSync } from 'fs';
 import path from 'path';
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:7000';
 const SWAGGER_URL = `${API_BASE_URL}/swagger/v1/swagger.json`;
 const OUTPUT_DIR = 'src/lib/api';
 
