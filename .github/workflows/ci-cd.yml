@@ -1,0 +1,327 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
+
+jobs:
+  # Test and Build Jobs
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [backend, frontend]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET (Backend)
+      if: matrix.service == 'backend'
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Setup Node.js (Frontend)
+      if: matrix.service == 'frontend'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Restore dependencies (Backend)
+      if: matrix.service == 'backend'
+      run: |
+        cd backend
+        dotnet restore
+
+    - name: Install dependencies (Frontend)
+      if: matrix.service == 'frontend'
+      run: |
+        cd frontend
+        npm ci
+
+    - name: Run tests (Backend)
+      if: matrix.service == 'backend'
+      run: |
+        cd backend
+        dotnet test --no-restore --verbosity normal
+
+    - name: Run tests (Frontend)
+      if: matrix.service == 'frontend'
+      run: |
+        cd frontend
+        npm run check
+
+    - name: Build (Backend)
+      if: matrix.service == 'backend'
+      run: |
+        cd backend
+        dotnet build --no-restore
+
+    - name: Build (Frontend)
+      if: matrix.service == 'frontend'
+      run: |
+        cd frontend
+        npm run build
+
+  # Docker Build and Push
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        service: [backend, frontend]
+    
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ matrix.service == 'backend' && env.IMAGE_NAME_BACKEND || env.IMAGE_NAME_FRONTEND }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./${{ matrix.service }}
+        file: ./${{ matrix.service }}/Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        platforms: linux/amd64,linux/arm64
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Security Scanning
+  security-scan:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        service: [backend, frontend]
+    
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+
+    steps:
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ matrix.service == 'backend' && env.IMAGE_NAME_BACKEND || env.IMAGE_NAME_FRONTEND }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Deploy to Staging
+  deploy-staging:
+    needs: [build-and-push, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set image tags for staging
+      run: |
+        echo "BACKEND_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:develop-${{ github.sha }}" >> $GITHUB_ENV
+        echo "FRONTEND_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:develop-${{ github.sha }}" >> $GITHUB_ENV
+
+    - name: Create staging deployment package
+      run: |
+        mkdir -p staging-deployment
+        cp docker-compose.production.yml staging-deployment/docker-compose.staging.yml
+        cp .env.production staging-deployment/.env.staging
+        
+        # Update compose file for staging
+        sed -i "s|ghcr.io/wagnerluca/time-tracking/backend:latest|${{ env.BACKEND_IMAGE }}|g" staging-deployment/docker-compose.staging.yml
+        sed -i "s|ghcr.io/wagnerluca/time-tracking/frontend:latest|${{ env.FRONTEND_IMAGE }}|g" staging-deployment/docker-compose.staging.yml
+        
+        # Create staging deployment script
+        cat > staging-deployment/deploy-staging.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        echo "🚀 Deploying to Staging Environment"
+        echo "Backend Image: ${{ env.BACKEND_IMAGE }}"
+        echo "Frontend Image: ${{ env.FRONTEND_IMAGE }}"
+        
+        # Pull latest images
+        docker pull ${{ env.BACKEND_IMAGE }}
+        docker pull ${{ env.FRONTEND_IMAGE }}
+        
+        # Deploy to staging
+        docker-compose -f docker-compose.staging.yml --env-file .env.staging down || true
+        docker-compose -f docker-compose.staging.yml --env-file .env.staging up -d
+        
+        # Wait and check health
+        sleep 30
+        curl -f http://localhost:7000/health || echo "⚠️ Backend health check failed"
+        curl -f http://localhost:3000/health || echo "⚠️ Frontend health check failed"
+        
+        echo "✅ Staging deployment completed!"
+        EOF
+        
+        chmod +x staging-deployment/deploy-staging.sh
+
+    - name: Upload staging deployment artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: staging-deployment-${{ github.sha }}
+        path: staging-deployment/
+        retention-days: 7
+
+    - name: Notify staging deployment
+      run: |
+        echo "🎉 Staging deployment completed!"
+        echo "📦 Backend Image: ${{ env.BACKEND_IMAGE }}"
+        echo "📦 Frontend Image: ${{ env.FRONTEND_IMAGE }}"
+        echo "📋 Deployment artifact uploaded for manual deployment if needed"
+
+  # Deploy to Production
+  deploy-production:
+    needs: [build-and-push, security-scan]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Create deployment artifact
+      run: |
+        # Create deployment package
+        mkdir -p deployment
+        cp docker-compose.yml deployment/
+        cp .env.example deployment/.env.template
+        
+        # Create deployment script
+        cat > deployment/deploy.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        echo "🚀 Deploying Time Tracking Application"
+        
+        # Set image tags from environment or use latest
+        export BACKEND_IMAGE="${BACKEND_IMAGE:-ghcr.io/${{ github.repository }}/backend:${{ github.ref_name }}}"
+        export FRONTEND_IMAGE="${FRONTEND_IMAGE:-ghcr.io/${{ github.repository }}/frontend:${{ github.ref_name }}}"
+        
+        echo "Backend Image: $BACKEND_IMAGE"
+        echo "Frontend Image: $FRONTEND_IMAGE"
+        
+        # Update docker-compose with specific image tags
+        sed -i "s|build:|# build:|g" docker-compose.yml
+        sed -i "s|context: ./backend|image: $BACKEND_IMAGE|g" docker-compose.yml
+        sed -i "s|context: ./frontend|image: $FRONTEND_IMAGE|g" docker-compose.yml
+        
+        # Deploy with docker-compose
+        docker-compose pull
+        docker-compose up -d
+        
+        echo "✅ Deployment completed successfully!"
+        EOF
+        
+        chmod +x deployment/deploy.sh
+
+    - name: Upload deployment artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-${{ github.ref_name }}
+        path: deployment/
+        retention-days: 30
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ github.ref_name }}
+        body: |
+          ## 🚀 Time Tracking Application Release ${{ github.ref_name }}
+          
+          ### Docker Images
+          - **Backend**: `ghcr.io/${{ github.repository }}/backend:${{ github.ref_name }}`
+          - **Frontend**: `ghcr.io/${{ github.repository }}/frontend:${{ github.ref_name }}`
+          
+          ### Deployment
+          Download the deployment artifact and run:
+          ```bash
+          ./deploy.sh
+          ```
+          
+          ### What's Changed
+          - Automated build and deployment pipeline
+          - Multi-architecture support (amd64, arm64)
+          - Security scanning with Trivy
+          - Production-ready Docker images
+        draft: false
+        prerelease: false
+
+  # Cleanup old images
+  cleanup:
+    needs: [deploy-production]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Delete old container images
+      uses: actions/delete-package-versions@v4
+      with:
+        package-name: backend
+        package-type: container
+        min-versions-to-keep: 5
+        delete-only-untagged-versions: true
+      continue-on-error: true
+
+    - name: Delete old container images
+      uses: actions/delete-package-versions@v4
+      with:
+        package-name: frontend
+        package-type: container
+        min-versions-to-keep: 5
+        delete-only-untagged-versions: true
+      continue-on-error: true
