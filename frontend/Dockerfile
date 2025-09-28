@@ -8,10 +8,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all dependencies (including @sveltejs/adapter-node)
-RUN npm install
+RUN npm ci
 
 # Copy source code
 COPY . ./
+
+# Sync SvelteKit to generate .svelte-kit directory and tsconfig and check
+RUN npm run check
 
 # Build the SvelteKit application with adapter-node
 RUN npm run build
