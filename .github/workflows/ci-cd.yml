@@ -9,8 +9,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
-  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
+  IMAGE_NAME_BACKEND: ${{ github.repository }}-backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository }}-frontend
 
 jobs:
   # Test and Build Jobs
@@ -213,8 +213,8 @@ jobs:
         cp .env.production staging-deployment/.env.staging
         
         # Update compose file for staging
-        sed -i "s|ghcr.io/wagnerluca/time-tracking/backend:latest|${{ env.BACKEND_IMAGE }}|g" staging-deployment/docker-compose.staging.yml
-        sed -i "s|ghcr.io/wagnerluca/time-tracking/frontend:latest|${{ env.FRONTEND_IMAGE }}|g" staging-deployment/docker-compose.staging.yml
+        sed -i "s|ghcr.io/wagnerluca/time-tracking-backend:latest|${{ env.BACKEND_IMAGE }}|g" staging-deployment/docker-compose.staging.yml
+        sed -i "s|ghcr.io/wagnerluca/time-tracking-frontend:latest|${{ env.FRONTEND_IMAGE }}|g" staging-deployment/docker-compose.staging.yml
         
         # Create staging deployment script
         cat > staging-deployment/deploy-staging.sh << 'EOF'

@@ -19,7 +19,7 @@ services:
       retries: 5
 
   backend:
-    image: ${BACKEND_IMAGE:-ghcr.io/wagnerluca/time-tracking/backend:latest}
+    image: ${BACKEND_IMAGE:-ghcr.io/wagnerluca/time-tracking-backend:latest}
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-timetrack_user}:${POSTGRES_PASSWORD:-timetrack_pass}@db:5432/${POSTGRES_DB:-timetracking_db}
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
@@ -38,7 +38,7 @@ services:
       start_period: 40s
 
   frontend:
-    image: ${FRONTEND_IMAGE:-ghcr.io/wagnerluca/time-tracking/frontend:latest}
+    image: ${FRONTEND_IMAGE:-ghcr.io/wagnerluca/time-tracking-frontend:latest}
     environment:
       PORT: 3000
       HOST: 0.0.0.0
