@@ -114,6 +114,11 @@ jobs:
           type=sha,prefix={{branch}}-
           type=raw,value=latest,enable={{is_default_branch}}
 
+    - name: Debug metadata output
+      run: |
+        echo "Generated tags: ${{ steps.meta.outputs.tags }}"
+        echo "Generated labels: ${{ steps.meta.outputs.labels }}"
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
@@ -141,17 +146,49 @@ jobs:
       security-events: write
 
     steps:
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ matrix.service == 'backend' && env.IMAGE_NAME_BACKEND || env.IMAGE_NAME_FRONTEND }}:${{ github.sha }}
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata (for consistent tagging)
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ matrix.service == 'backend' && env.IMAGE_NAME_BACKEND || env.IMAGE_NAME_FRONTEND }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Get primary tag for security scan
+      id: primary-tag
+      run: |
+        # Extract the first tag from the metadata output
+        FIRST_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+        echo "tag=${FIRST_TAG##*:}" >> $GITHUB_OUTPUT
+        echo "Scanning image: $FIRST_TAG"
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@0.28.0
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ matrix.service == 'backend' && env.IMAGE_NAME_BACKEND || env.IMAGE_NAME_FRONTEND }}:${{ steps.primary-tag.outputs.tag }}
         format: 'sarif'
-        output: 'trivy-results.sarif'
+        output: 'trivy-results-${{ matrix.service }}.sarif'
+        skip-files: '/usr/local/bin/docker-entrypoint.sh'
+        skip-dirs: '/tmp,/var/tmp'
 
     - name: Upload Trivy scan results
       uses: github/codeql-action/upload-sarif@v3
+      if: always()
       with:
-        sarif_file: 'trivy-results.sarif'
+        sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+        category: 'trivy-${{ matrix.service }}'
 
   # Deploy to Staging
   deploy-staging:
