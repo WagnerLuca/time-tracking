@@ -1,4 +1,4 @@
-namespace TimeTracking.Api;
+namespace TimeTracking.Api.DataModels;
 
 public class WeatherForecast
 {

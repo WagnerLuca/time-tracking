@@ -34,8 +34,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:7000/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
 
   frontend:
     image: ${FRONTEND_IMAGE:-ghcr.io/wagnerluca/time-tracking-frontend:latest}
@@ -54,8 +53,7 @@ services:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1))"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 10s
+      retries: 5
 
 volumes:
   db_data:

@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using TimeTracking.Api.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -5,10 +8,18 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Add Entity Framework and PostgreSQL
+builder.Services.AddDbContext<TimeTrackingDbContext>(options =>
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+    options.UseNpgsql(connectionString);
+});
+
 // Add CORS for frontend communication
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowLocalhost", policy =>
+    options.AddPolicy("AllowOrigins", policy =>
     {
         policy.AllowAnyOrigin()
               .AllowAnyHeader()
@@ -23,7 +34,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 // Enable CORS
-app.UseCors("AllowLocalhost");
+app.UseCors("AllowOrigins");
 
 app.UseHttpsRedirection();
 
