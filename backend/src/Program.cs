@@ -11,8 +11,32 @@ builder.Services.AddSwaggerGen();
 // Add Entity Framework and PostgreSQL
 builder.Services.AddDbContext<TimeTrackingDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+    // Check for DATABASE_URL environment variable first (Docker/production)
+    var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL");
+    
+    // If DATABASE_URL is in postgres:// format, convert it to EF Core format
+    if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgres://"))
+    {
+        var uri = new Uri(connectionString);
+        var host = uri.Host;
+        var port = uri.Port;
+        var database = uri.AbsolutePath.TrimStart('/');
+        var username = uri.UserInfo.Split(':')[0];
+        var password = uri.UserInfo.Split(':')[1];
+        
+        connectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password}";
+    }
+    else
+    {
+        // Fallback to appsettings.json (local development)
+        connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    }
+    
+    if (string.IsNullOrEmpty(connectionString))
+    {
+        throw new InvalidOperationException("Database connection string not found. Set DATABASE_URL or ConnectionStrings:DefaultConnection.");
+    }
+    
     options.UseNpgsql(connectionString);
 });
 
