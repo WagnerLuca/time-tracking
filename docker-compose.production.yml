@@ -2,9 +2,9 @@ services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-timetrack_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-timetrack_pass}
-      POSTGRES_DB: ${POSTGRES_DB:-timetracking_db}
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pass}
+      POSTGRES_DB: ${POSTGRES_DB:-mydb}
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
@@ -19,7 +19,7 @@ services:
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/wagnerluca/time-tracking-backend:latest}
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-timetrack_user}:${POSTGRES_PASSWORD:-timetrack_pass}@db:5432/${POSTGRES_DB:-timetracking_db}
+      DATABASE_URL: postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-pass}@db:5432/${POSTGRES_DB:-mydb}
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_URLS: http://+:7000
     ports:
