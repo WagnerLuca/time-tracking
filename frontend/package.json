@@ -10,8 +10,8 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"generate-api": "openapi-generator-cli generate -i http://backend:7000/swagger/v1/swagger.json -g typescript-axios -o src/lib/api",
-		"generate-api-local": "openapi-generator-cli generate -i http://localhost:7000/swagger/v1/swagger.json -g typescript-axios -o src/lib/api"
+		"generate-api-specific-api": "API_BASE_URL=http://backend:7000 node ./scripts/generate-api.mjs",
+		"generate-api": "node ./scripts/generate-api.mjs"
 	},
 	"devDependencies": {
 		"@openapitools/openapi-generator-cli": "^2.23.4",
