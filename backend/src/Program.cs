@@ -63,11 +63,14 @@ using (var scope = app.Services.CreateScope())
         
         // Apply all pending migrations (this will also create the database if needed)
         context.Database.Migrate();
+        
+        // Seed the database with test data
+        await DbSeeder.SeedAsync(context);
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while migrating the database.");
+        logger.LogError(ex, "An error occurred while migrating or seeding the database.");
     }
 }
 
