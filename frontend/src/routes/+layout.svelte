@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth.svelte';
+	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
@@ -11,6 +12,7 @@
 
 	onMount(() => {
 		auth.init();
+		orgContext.init();
 	});
 
 	$effect(() => {
@@ -22,9 +24,21 @@
 		}
 	});
 
+	// Load orgs when user becomes authenticated
+	$effect(() => {
+		if (auth.isAuthenticated && auth.user) {
+			orgContext.loadOrganizations(auth.user.id);
+		}
+	});
+
 	async function handleLogout() {
 		await auth.logout();
 		goto('/login');
+	}
+
+	function handleOrgChange(e: Event) {
+		const value = (e.target as HTMLSelectElement).value;
+		orgContext.select(value ? parseInt(value) : null);
 	}
 </script>
 
@@ -40,10 +54,19 @@
 	<nav class="top-nav">
 		<div class="nav-left">
 			<a href="/" class="nav-brand">Time Tracking</a>
+			<a href="/time" class="nav-link">Timer</a>
 			<a href="/organizations" class="nav-link">Organizations</a>
 		</div>
 		<div class="nav-right">
-			<span class="nav-user">{auth.user?.firstName} {auth.user?.lastName}</span>
+			{#if orgContext.organizations.length > 0}
+				<select class="org-switcher" value={orgContext.selectedOrgId ?? ''} onchange={handleOrgChange}>
+					<option value="">Personal</option>
+					{#each orgContext.organizations as org}
+						<option value={org.organizationId}>{org.name}</option>
+					{/each}
+				</select>
+			{/if}
+			<a href="/settings" class="nav-user-link" title="Settings">{auth.user?.firstName} {auth.user?.lastName}</a>
 			<button class="btn-logout" onclick={handleLogout}>Sign Out</button>
 		</div>
 	</nav>
@@ -118,9 +141,36 @@
 		gap: 1rem;
 	}
 
-	.nav-user {
-		color: #6b7280;
+	.nav-user-link {
+		color: #374151;
 		font-size: 0.875rem;
+		font-weight: 500;
+		text-decoration: none;
+		padding: 0.25rem 0.5rem;
+		border-radius: 6px;
+		transition: background 0.15s, color 0.15s;
+	}
+
+	.nav-user-link:hover {
+		background: #f3f4f6;
+		color: #1a1a2e;
+	}
+
+	.org-switcher {
+		padding: 0.375rem 0.625rem;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		font-size: 0.8125rem;
+		background: white;
+		color: #374151;
+		max-width: 200px;
+		cursor: pointer;
+	}
+
+	.org-switcher:focus {
+		outline: none;
+		border-color: #3b82f6;
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 	}
 
 	.btn-logout {

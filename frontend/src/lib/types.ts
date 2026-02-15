@@ -99,3 +99,26 @@ export interface AddMemberRequest {
 export interface UpdateMemberRoleRequest {
 	role: number;
 }
+
+// Time Tracking types
+export interface StartTimeEntryRequest {
+	description?: string;
+	organizationId?: number;
+}
+
+export interface StopTimeEntryRequest {
+	description?: string;
+}
+
+export interface TimeEntryResponse {
+	id: number;
+	userId: number;
+	organizationId?: number;
+	organizationName?: string;
+	description?: string;
+	startTime: string;
+	endTime?: string;
+	isRunning: boolean;
+	durationMinutes?: number;
+	createdAt: string;
+}
