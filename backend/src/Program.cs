@@ -107,7 +107,6 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Add Entity Framework - PostgreSQL or InMemory
 var useInMemory = builder.Configuration.GetValue<bool>("UseInMemoryDatabase");
-
 builder.Services.AddDbContext<TimeTrackingDbContext>(options =>
 {
     if (useInMemory)

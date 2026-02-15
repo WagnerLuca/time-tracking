@@ -64,3 +64,14 @@ public record UpdateOrganizationRequest
     public string? Website { get; init; }
     public string? LogoUrl { get; init; }
 }
+
+public record AddMemberRequest
+{
+    public int UserId { get; init; }
+    public OrganizationRole Role { get; init; } = OrganizationRole.Member;
+}
+
+public record UpdateMemberRoleRequest
+{
+    public OrganizationRole Role { get; init; }
+}
