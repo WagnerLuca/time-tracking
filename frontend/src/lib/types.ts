@@ -51,8 +51,11 @@ export interface OrganizationDetailResponse {
 	slug: string;
 	website?: string;
 	logoUrl?: string;
+	autoPauseEnabled: boolean;
+	allowEditPastEntries: boolean;
 	createdAt: string;
 	members: OrganizationMemberResponse[];
+	pauseRules?: PauseRuleResponse[];
 }
 
 export interface OrganizationMemberResponse {
@@ -120,5 +123,39 @@ export interface TimeEntryResponse {
 	endTime?: string;
 	isRunning: boolean;
 	durationMinutes?: number;
+	pauseDurationMinutes: number;
+	netDurationMinutes?: number;
 	createdAt: string;
+}
+
+export interface UpdateTimeEntryRequest {
+	startTime?: string;
+	endTime?: string;
+	description?: string;
+	organizationId?: number;
+}
+
+// Pause Rule types
+export interface PauseRuleResponse {
+	id: number;
+	organizationId: number;
+	minHours: number;
+	pauseMinutes: number;
+	createdAt: string;
+}
+
+export interface CreatePauseRuleRequest {
+	minHours: number;
+	pauseMinutes: number;
+}
+
+export interface UpdatePauseRuleRequest {
+	minHours: number;
+	pauseMinutes: number;
+}
+
+// Organization Settings types
+export interface UpdateOrganizationSettingsRequest {
+	autoPauseEnabled?: boolean;
+	allowEditPastEntries?: boolean;
 }

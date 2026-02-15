@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { apiService } from '$lib/apiService';
-	import type { TimeEntryResponse, StartTimeEntryRequest } from '$lib/types';
+	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest } from '$lib/types';
 
 	let current = $state<TimeEntryResponse | null>(null);
 	let weekEntries = $state<TimeEntryResponse[]>([]);
@@ -59,7 +59,8 @@
 			const entryDate = new Date(entry.startTime);
 			const dayIndex = (entryDate.getDay() + 6) % 7; // Mon=0 ... Sun=6
 			if (dayIndex >= 0 && dayIndex < 7) {
-				totals[dayIndex].minutes += entry.durationMinutes ?? 0;
+				// Use net duration (after pause deduction) when available
+				totals[dayIndex].minutes += entry.netDurationMinutes ?? entry.durationMinutes ?? 0;
 				totals[dayIndex].entryCount++;
 			}
 		}
@@ -196,6 +197,51 @@
 			date.getMonth() === now.getMonth() &&
 			date.getDate() === now.getDate();
 	}
+
+	// Edit entry
+	let editingEntryId = $state<number | null>(null);
+	let editStartTime = $state('');
+	let editEndTime = $state('');
+	let editDescription = $state('');
+	let editError = $state('');
+	let editSaving = $state(false);
+
+	function toLocalDateTimeInput(iso: string): string {
+		const d = new Date(iso);
+		const pad = (n: number) => String(n).padStart(2, '0');
+		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+	}
+
+	function startEditEntry(entry: TimeEntryResponse) {
+		editingEntryId = entry.id;
+		editStartTime = toLocalDateTimeInput(entry.startTime);
+		editEndTime = entry.endTime ? toLocalDateTimeInput(entry.endTime) : '';
+		editDescription = entry.description ?? '';
+		editError = '';
+	}
+
+	function cancelEditEntry() {
+		editingEntryId = null;
+		editError = '';
+	}
+
+	async function saveEditEntry(entryId: number) {
+		editError = '';
+		editSaving = true;
+		try {
+			const payload: UpdateTimeEntryRequest = {};
+			if (editStartTime) payload.startTime = new Date(editStartTime).toISOString();
+			if (editEndTime) payload.endTime = new Date(editEndTime).toISOString();
+			payload.description = editDescription.trim() || undefined;
+			await apiService.put(`/api/TimeTracking/${entryId}`, payload);
+			await loadWeek();
+			editingEntryId = null;
+		} catch (err: any) {
+			editError = err.response?.data?.message || err.response?.data || 'Failed to update entry.';
+		} finally {
+			editSaving = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -280,35 +326,78 @@
 			{:else}
 				<div class="entries-list">
 					{#each weekEntries as entry}
-						<div class="entry-row" class:is-running={entry.isRunning}>
-							<div class="entry-time">
-								<span class="entry-time-range">
-									{formatTime(entry.startTime)}{entry.endTime ? ` – ${formatTime(entry.endTime)}` : ''}
-								</span>
-								<span class="entry-date">{formatDateShort(new Date(entry.startTime))}</span>
-							</div>
-							<div class="entry-middle">
-								{#if entry.organizationName}
-									<span class="entry-org-tag">{entry.organizationName}</span>
+						{#if editingEntryId === entry.id}
+							<!-- Inline edit form -->
+							<div class="entry-edit-row">
+								{#if editError}
+									<div class="edit-error">{editError}</div>
 								{/if}
-								{#if entry.description}
-									<span class="entry-note">{entry.description}</span>
-								{/if}
-								{#if entry.isRunning}
-									<span class="running-badge">Running</span>
-								{/if}
-							</div>
-							<div class="entry-dur">
-								{entry.isRunning ? elapsed : formatDuration(entry.durationMinutes)}
-							</div>
-							<div class="entry-actions">
-								{#if !entry.isRunning}
-									<button class="btn-icon-danger" title="Delete" onclick={() => deleteEntry(entry.id)}>
-										&times;
+								<div class="edit-fields">
+									<div class="edit-field">
+										<!-- svelte-ignore a11y_label_has_associated_control -->
+										<label>Start</label>
+										<input type="datetime-local" bind:value={editStartTime} disabled={editSaving} />
+									</div>
+									<div class="edit-field">
+										<!-- svelte-ignore a11y_label_has_associated_control -->
+										<label>End</label>
+										<input type="datetime-local" bind:value={editEndTime} disabled={editSaving} />
+									</div>
+									<div class="edit-field edit-field-desc">
+										<!-- svelte-ignore a11y_label_has_associated_control -->
+										<label>Note</label>
+										<input type="text" bind:value={editDescription} placeholder="Optional note" disabled={editSaving} />
+									</div>
+								</div>
+								<div class="edit-actions">
+									<button class="btn-save-sm" onclick={() => saveEditEntry(entry.id)} disabled={editSaving}>
+										{editSaving ? 'Saving...' : 'Save'}
 									</button>
-								{/if}
+									<button class="btn-cancel-sm" onclick={cancelEditEntry}>Cancel</button>
+								</div>
 							</div>
-						</div>
+						{:else}
+							<div class="entry-row" class:is-running={entry.isRunning}>
+								<div class="entry-time">
+									<span class="entry-time-range">
+										{formatTime(entry.startTime)}{entry.endTime ? ` – ${formatTime(entry.endTime)}` : ''}
+									</span>
+									<span class="entry-date">{formatDateShort(new Date(entry.startTime))}</span>
+								</div>
+								<div class="entry-middle">
+									{#if entry.organizationName}
+										<span class="entry-org-tag">{entry.organizationName}</span>
+									{/if}
+									{#if entry.description}
+										<span class="entry-note">{entry.description}</span>
+									{/if}
+									{#if entry.isRunning}
+										<span class="running-badge">Running</span>
+									{/if}
+									{#if entry.pauseDurationMinutes > 0}
+										<span class="pause-badge">-{entry.pauseDurationMinutes}m pause</span>
+									{/if}
+								</div>
+								<div class="entry-dur">
+									{#if entry.isRunning}
+										{elapsed}
+									{:else if entry.pauseDurationMinutes > 0}
+										<span class="net-dur">{formatDuration(entry.netDurationMinutes ?? undefined)}</span>
+										<span class="gross-dur">({formatDuration(entry.durationMinutes)})</span>
+									{:else}
+										{formatDuration(entry.durationMinutes)}
+									{/if}
+								</div>
+								<div class="entry-actions">
+									{#if !entry.isRunning}
+										<button class="btn-icon-edit" title="Edit" onclick={() => startEditEntry(entry)}>&#9998;</button>
+										<button class="btn-icon-danger" title="Delete" onclick={() => deleteEntry(entry.id)}>
+											&times;
+										</button>
+									{/if}
+								</div>
+							</div>
+						{/if}
 					{/each}
 				</div>
 			{/if}
@@ -647,5 +736,140 @@
 	.btn-icon-danger:hover {
 		opacity: 1;
 		background: #fef2f2;
+	}
+
+	/* Edit entry inline */
+	.entry-edit-row {
+		padding: 1rem;
+		background: #f9fafb;
+		border-bottom: 1px solid #e5e7eb;
+	}
+
+	.edit-error {
+		background: #fef2f2;
+		color: #dc2626;
+		padding: 0.5rem 0.75rem;
+		border-radius: 6px;
+		margin-bottom: 0.75rem;
+		font-size: 0.8125rem;
+		border-left: 3px solid #dc2626;
+	}
+
+	.edit-fields {
+		display: flex;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		margin-bottom: 0.75rem;
+	}
+
+	.edit-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.edit-field label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.025em;
+	}
+
+	.edit-field input {
+		padding: 0.5rem 0.625rem;
+		border: 1px solid #d1d5db;
+		border-radius: 6px;
+		font-size: 0.8125rem;
+		font-family: inherit;
+	}
+
+	.edit-field input:focus {
+		outline: none;
+		border-color: #3b82f6;
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+	}
+
+	.edit-field-desc {
+		flex: 1;
+		min-width: 150px;
+	}
+
+	.edit-field-desc input {
+		width: 100%;
+	}
+
+	.edit-actions {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.btn-save-sm {
+		background: #3b82f6;
+		color: white;
+		padding: 0.375rem 0.875rem;
+		border-radius: 6px;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		border: none;
+		cursor: pointer;
+		transition: background 0.15s;
+	}
+
+	.btn-save-sm:hover:not(:disabled) { background: #2563eb; }
+	.btn-save-sm:disabled { opacity: 0.6; cursor: not-allowed; }
+
+	.btn-cancel-sm {
+		background: white;
+		color: #4b5563;
+		padding: 0.375rem 0.875rem;
+		border-radius: 6px;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		border: 1px solid #d1d5db;
+		cursor: pointer;
+		transition: background 0.15s;
+	}
+
+	.btn-cancel-sm:hover { background: #f9fafb; }
+
+	/* Pause badge */
+	.pause-badge {
+		font-size: 0.6875rem;
+		background: #fff7ed;
+		color: #c2410c;
+		padding: 0.0625rem 0.5rem;
+		border-radius: 999px;
+		font-weight: 500;
+	}
+
+	.net-dur {
+		display: block;
+	}
+
+	.gross-dur {
+		display: block;
+		font-size: 0.6875rem;
+		color: #9ca3af;
+		font-weight: 400;
+	}
+
+	/* Edit icon */
+	.btn-icon-edit {
+		background: none;
+		border: none;
+		color: #3b82f6;
+		font-size: 0.9375rem;
+		cursor: pointer;
+		padding: 0.125rem 0.375rem;
+		border-radius: 4px;
+		line-height: 1;
+		opacity: 0.4;
+		transition: opacity 0.15s;
+	}
+
+	.btn-icon-edit:hover {
+		opacity: 1;
+		background: #eff6ff;
 	}
 </style>

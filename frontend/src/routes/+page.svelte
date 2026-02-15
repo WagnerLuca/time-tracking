@@ -79,8 +79,8 @@
 			]);
 
 			const sumMinutes = (entries: TimeEntryResponse[]) =>
-				entries.filter(e => !e.isRunning && e.durationMinutes)
-					.reduce((s, e) => s + (e.durationMinutes ?? 0), 0);
+				entries.filter(e => !e.isRunning && (e.netDurationMinutes ?? e.durationMinutes))
+					.reduce((s, e) => s + (e.netDurationMinutes ?? e.durationMinutes ?? 0), 0);
 
 			todayMinutes = sumMinutes(todayEntries);
 			weekMinutes = sumMinutes(weekEntries);

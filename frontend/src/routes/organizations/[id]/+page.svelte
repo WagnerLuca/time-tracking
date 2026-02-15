@@ -7,7 +7,10 @@
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationRequest,
-		AddMemberRequest
+		AddMemberRequest,
+		UpdateOrganizationSettingsRequest,
+		PauseRuleResponse,
+		CreatePauseRuleRequest
 	} from '$lib/types';
 
 	let org = $state<OrganizationDetailResponse | null>(null);
@@ -166,6 +169,120 @@
 			default: return 'Member';
 		}
 	}
+
+	// Settings
+	let settingsSaving = $state(false);
+	let settingsError = $state('');
+
+	async function toggleAutoPause() {
+		if (!org) return;
+		settingsSaving = true;
+		settingsError = '';
+		try {
+			const payload: UpdateOrganizationSettingsRequest = {
+				autoPauseEnabled: !org.autoPauseEnabled
+			};
+			await apiService.put(`/api/Organizations/${orgId}/settings`, payload);
+			await loadOrg();
+		} catch (err: any) {
+			settingsError = err.response?.data?.message || 'Failed to update setting.';
+		} finally {
+			settingsSaving = false;
+		}
+	}
+
+	async function toggleAllowEditPast() {
+		if (!org) return;
+		settingsSaving = true;
+		settingsError = '';
+		try {
+			const payload: UpdateOrganizationSettingsRequest = {
+				allowEditPastEntries: !org.allowEditPastEntries
+			};
+			await apiService.put(`/api/Organizations/${orgId}/settings`, payload);
+			await loadOrg();
+		} catch (err: any) {
+			settingsError = err.response?.data?.message || 'Failed to update setting.';
+		} finally {
+			settingsSaving = false;
+		}
+	}
+
+	// Pause Rules
+	function getPauseRules(): import('$lib/types').PauseRuleResponse[] {
+		return org?.pauseRules ? [...org.pauseRules].sort((a, b) => a.minHours - b.minHours) : [];
+	}
+	let showAddRule = $state(false);
+	let newRuleMinHours = $state(6);
+	let newRulePauseMinutes = $state(30);
+	let addRuleError = $state('');
+	let addingRule = $state(false);
+
+	// Edit rule
+	let editingRuleId = $state<number | null>(null);
+	let editRuleMinHours = $state(0);
+	let editRulePauseMinutes = $state(0);
+	let editRuleError = $state('');
+	let editingRuleSaving = $state(false);
+
+	async function addPauseRule(e: Event) {
+		e.preventDefault();
+		addRuleError = '';
+		addingRule = true;
+		try {
+			const payload: CreatePauseRuleRequest = {
+				minHours: newRuleMinHours,
+				pauseMinutes: newRulePauseMinutes
+			};
+			await apiService.post(`/api/Organizations/${orgId}/pause-rules`, payload);
+			await loadOrg();
+			showAddRule = false;
+			newRuleMinHours = 6;
+			newRulePauseMinutes = 30;
+		} catch (err: any) {
+			addRuleError = err.response?.data?.message || err.response?.data || 'Failed to add rule.';
+		} finally {
+			addingRule = false;
+		}
+	}
+
+	function startEditRule(rule: PauseRuleResponse) {
+		editingRuleId = rule.id;
+		editRuleMinHours = rule.minHours;
+		editRulePauseMinutes = rule.pauseMinutes;
+		editRuleError = '';
+	}
+
+	function cancelEditRule() {
+		editingRuleId = null;
+	}
+
+	async function saveEditRule(ruleId: number) {
+		editRuleError = '';
+		editingRuleSaving = true;
+		try {
+			await apiService.put(`/api/Organizations/${orgId}/pause-rules/${ruleId}`, {
+				minHours: editRuleMinHours,
+				pauseMinutes: editRulePauseMinutes
+			});
+			await loadOrg();
+			editingRuleId = null;
+		} catch (err: any) {
+			editRuleError = err.response?.data?.message || err.response?.data || 'Failed to update rule.';
+		} finally {
+			editingRuleSaving = false;
+		}
+	}
+
+	async function deleteRule(ruleId: number) {
+		if (!confirm('Delete this pause rule?')) return;
+		try {
+			await apiService.delete(`/api/Organizations/${orgId}/pause-rules/${ruleId}`);
+			await loadOrg();
+		} catch (err: any) {
+			settingsError = err.response?.data?.message || 'Failed to delete rule.';
+		}
+	}
 </script>
 
 <svelte:head>
@@ -318,6 +435,129 @@
 					{/each}
 				</div>
 			</section>
+
+			<!-- Settings section (Admin+) -->
+			{#if canEdit}
+				<section class="settings-section">
+					<h2>Organization Settings</h2>
+					{#if settingsError}
+						<div class="error-banner">{settingsError}</div>
+					{/if}
+
+					<div class="settings-grid">
+						<div class="setting-row">
+							<div class="setting-info">
+								<div class="setting-label">Auto-Pause Tracking</div>
+								<div class="setting-desc">Automatically deduct break time from tracked hours based on configurable rules.</div>
+							</div>
+							<button
+								class="toggle-switch"
+								class:active={org.autoPauseEnabled}
+								onclick={toggleAutoPause}
+								disabled={settingsSaving}
+								aria-label="Toggle auto-pause"
+							>
+								<span class="toggle-knob"></span>
+							</button>
+						</div>
+
+						<div class="setting-row">
+							<div class="setting-info">
+								<div class="setting-label">Allow Editing Past Entries</div>
+								<div class="setting-desc">Let members edit start/end times of completed time entries (e.g. if they forgot to track).</div>
+							</div>
+							<button
+								class="toggle-switch"
+								class:active={org.allowEditPastEntries}
+								onclick={toggleAllowEditPast}
+								disabled={settingsSaving}
+								aria-label="Toggle edit past entries"
+							>
+								<span class="toggle-knob"></span>
+							</button>
+						</div>
+					</div>
+
+					<!-- Pause Rules (only when auto-pause is enabled) -->
+					{#if org.autoPauseEnabled}
+						<div class="pause-rules-section">
+							<div class="section-header">
+								<h3>Pause Rules</h3>
+								<button class="btn-primary-sm" onclick={() => (showAddRule = !showAddRule)}>
+									{showAddRule ? 'Cancel' : '+ Add Rule'}
+								</button>
+							</div>
+
+							{#if showAddRule}
+								<div class="add-rule-form">
+									{#if addRuleError}
+										<div class="error-banner">{addRuleError}</div>
+									{/if}
+									<form onsubmit={addPauseRule} class="inline-form">
+										<div class="rule-field">
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label>When tracked &ge;</label>
+											<input type="number" step="0.5" min="0.5" bind:value={newRuleMinHours} required disabled={addingRule} />
+											<span>hours</span>
+										</div>
+										<div class="rule-field">
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label>deduct</label>
+											<input type="number" min="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
+											<span>min pause</span>
+										</div>
+										<button type="submit" class="btn-primary-sm" disabled={addingRule}>
+											{addingRule ? 'Adding...' : 'Add Rule'}
+										</button>
+									</form>
+								</div>
+							{/if}
+
+							{#if getPauseRules().length === 0}
+								<p class="muted">No pause rules configured. Add rules to automatically deduct break time.</p>
+							{:else}
+								<div class="rules-list">
+									{#each getPauseRules() as rule}
+										<div class="rule-row">
+											{#if editingRuleId === rule.id}
+												{#if editRuleError}
+													<div class="error-banner" style="width:100%">{editRuleError}</div>
+												{/if}
+												<div class="rule-edit-form">
+													<div class="rule-field">
+														<!-- svelte-ignore a11y_label_has_associated_control -->
+														<label>&ge;</label>
+														<input type="number" step="0.5" min="0.5" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
+														<span>h</span>
+													</div>
+													<div class="rule-field">
+														<!-- svelte-ignore a11y_label_has_associated_control -->
+														<label>&rarr;</label>
+														<input type="number" min="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
+														<span>min</span>
+													</div>
+													<div class="rule-actions">
+														<button class="btn-primary-sm" onclick={() => saveEditRule(rule.id)} disabled={editingRuleSaving}>Save</button>
+														<button class="btn-secondary-sm" onclick={cancelEditRule}>Cancel</button>
+													</div>
+												</div>
+											{:else}
+												<div class="rule-text">
+													<strong>&ge; {rule.minHours}h</strong> tracked &rarr; <strong>{rule.pauseMinutes} min</strong> pause deducted
+												</div>
+												<div class="rule-actions">
+													<button class="btn-secondary-sm" onclick={() => startEditRule(rule)}>Edit</button>
+													<button class="btn-icon-danger" title="Delete rule" onclick={() => deleteRule(rule.id)}>&times;</button>
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					{/if}
+				</section>
+			{/if}
 		{/if}
 	{/if}
 </div>
@@ -659,5 +899,189 @@
 		gap: 0.75rem;
 		justify-content: flex-end;
 		margin-top: 1.5rem;
+	}
+
+	/* Settings section */
+	.settings-section {
+		margin-top: 2.5rem;
+	}
+
+	.settings-section h2 {
+		font-size: 1.25rem;
+		color: #374151;
+		margin: 0 0 1rem;
+	}
+
+	.settings-grid {
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 12px;
+		overflow: hidden;
+	}
+
+	.setting-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 1rem 1.25rem;
+		border-bottom: 1px solid #f3f4f6;
+	}
+
+	.setting-row:last-child {
+		border-bottom: none;
+	}
+
+	.setting-label {
+		font-weight: 600;
+		color: #1a1a2e;
+		margin-bottom: 0.125rem;
+	}
+
+	.setting-desc {
+		font-size: 0.8125rem;
+		color: #6b7280;
+		max-width: 400px;
+	}
+
+	/* Toggle switch */
+	.toggle-switch {
+		position: relative;
+		width: 48px;
+		height: 26px;
+		background: #d1d5db;
+		border: none;
+		border-radius: 999px;
+		cursor: pointer;
+		transition: background 0.2s;
+		flex-shrink: 0;
+		padding: 0;
+	}
+
+	.toggle-switch.active {
+		background: #3b82f6;
+	}
+
+	.toggle-switch:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.toggle-knob {
+		position: absolute;
+		top: 3px;
+		left: 3px;
+		width: 20px;
+		height: 20px;
+		background: white;
+		border-radius: 50%;
+		transition: transform 0.2s;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+	}
+
+	.toggle-switch.active .toggle-knob {
+		transform: translateX(22px);
+	}
+
+	/* Pause rules */
+	.pause-rules-section {
+		margin-top: 1.5rem;
+	}
+
+	.pause-rules-section h3 {
+		margin: 0;
+		font-size: 1.05rem;
+		color: #374151;
+	}
+
+	.add-rule-form {
+		background: #f9fafb;
+		padding: 1rem;
+		border-radius: 8px;
+		margin-bottom: 1rem;
+		border: 1px solid #e5e7eb;
+	}
+
+	.rule-field {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+	}
+
+	.rule-field label {
+		font-size: 0.875rem;
+		color: #4b5563;
+		font-weight: 500;
+		white-space: nowrap;
+	}
+
+	.rule-field input {
+		width: 70px;
+		padding: 0.375rem 0.5rem;
+		border: 1px solid #d1d5db;
+		border-radius: 6px;
+		font-size: 0.875rem;
+		text-align: center;
+	}
+
+	.rule-field span {
+		font-size: 0.8125rem;
+		color: #6b7280;
+		white-space: nowrap;
+	}
+
+	.rules-list {
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 12px;
+		overflow: hidden;
+	}
+
+	.rule-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.75rem 1rem;
+		border-bottom: 1px solid #f3f4f6;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+	}
+
+	.rule-row:last-child {
+		border-bottom: none;
+	}
+
+	.rule-text {
+		font-size: 0.9375rem;
+		color: #374151;
+	}
+
+	.rule-edit-form {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		width: 100%;
+	}
+
+	.rule-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+	}
+
+	.btn-secondary-sm {
+		background: white;
+		color: #4b5563;
+		padding: 0.375rem 0.75rem;
+		border-radius: 6px;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		border: 1px solid #d1d5db;
+		cursor: pointer;
+		transition: background 0.15s;
+	}
+
+	.btn-secondary-sm:hover {
+		background: #f9fafb;
 	}
 </style>
