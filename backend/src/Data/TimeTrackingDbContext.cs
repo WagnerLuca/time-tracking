@@ -14,6 +14,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<Organization> Organizations { get; set; }
     public DbSet<UserOrganization> UserOrganizations { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<TimeEntry> TimeEntries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -105,6 +106,34 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure TimeEntry entity
+        modelBuilder.Entity<TimeEntry>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.StartTime).IsRequired();
+            entity.Property(e => e.IsRunning).IsRequired().HasDefaultValue(false);
+
+            if (isInMemory)
+                entity.Property(e => e.CreatedAt).IsRequired();
+            else
+                entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Index for quick lookup of running entries per user
+            entity.HasIndex(e => new { e.UserId, e.IsRunning });
+
+            // Configure relationships
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }
