@@ -20,7 +20,6 @@ const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:7000';
 const SWAGGER_URL = `${API_BASE_URL}/swagger/v1/swagger.json`;
 const OUTPUT_DIR = 'src/lib/api';
 const DOCS_MD_DIR = 'docs';
-const DOCS_HTML_DIR = 'static/api-docs';
 
 console.log('🚀 Generating API client...');
 console.log(`📡 Swagger URL: ${SWAGGER_URL}`);
@@ -34,26 +33,12 @@ try {
     if (!existsSync(DOCS_MD_DIR)) {
         mkdirSync(DOCS_MD_DIR, { recursive: true });
     }
-    if (!existsSync(DOCS_HTML_DIR)) {
-        mkdirSync(DOCS_HTML_DIR, { recursive: true });
-    }
-
     // Generate the API client
     const generateTypescriptCommand = `npx @openapitools/openapi-generator-cli generate -i ${SWAGGER_URL} -g typescript-axios -o ${OUTPUT_DIR} --additional-properties=supportsES6=true,withInterfaces=true,modelPropertyNaming=camelCase`;
     
     console.log('⏳ Running OpenAPI Generator for TypeScript client...');
     execSync(generateTypescriptCommand, { stdio: 'inherit' });
 
-    // Generate HTML documentation with dynamic-html (better styling)
-    const generateHtmlCommand = `npx @openapitools/openapi-generator-cli generate -i ${SWAGGER_URL} -g html2 -o ${DOCS_HTML_DIR}`;
-    
-    console.log('⏳ Generating HTML documentation...');
-    execSync(generateHtmlCommand, { stdio: 'inherit' });
-    
-    
-    console.log(`📄 HTML documentation moved to: ${DOCS_HTML_DIR}/index.html`);
-    console.log(`🌐 Access in app at: /docs route`);
-    
     // Move docs folder to project root and organize
     const docsSourceDir = path.join(OUTPUT_DIR, 'docs');
     const docsTargetDir = 'docs';
@@ -146,8 +131,6 @@ const users = await usersApi.apiUsersGet();
 ## Documentation Formats
 
 - **Markdown**: Browse the [API](docs/api/) and [Models](docs/models/) folders
-- **HTML**: Launch application with \`npm run dev\` and navigate to \`/docs\` route
-
 ## Generated
 
 This client was auto-generated using OpenAPI Generator.
