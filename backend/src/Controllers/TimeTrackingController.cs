@@ -34,6 +34,10 @@ public class TimeTrackingController : ControllerBase
                 ? (DateTime.UtcNow - entry.StartTime).TotalMinutes
                 : (double?)null;
 
+        var netDuration = duration.HasValue
+            ? Math.Max(0, duration.Value - entry.PauseDurationMinutes)
+            : (double?)null;
+
         return new TimeEntryResponse
         {
             Id = entry.Id,
@@ -45,6 +49,8 @@ public class TimeTrackingController : ControllerBase
             EndTime = entry.EndTime,
             IsRunning = entry.IsRunning,
             DurationMinutes = duration.HasValue ? Math.Round(duration.Value, 2) : null,
+            PauseDurationMinutes = entry.PauseDurationMinutes,
+            NetDurationMinutes = netDuration.HasValue ? Math.Round(netDuration.Value, 2) : null,
             CreatedAt = entry.CreatedAt
         };
     }
@@ -127,9 +133,37 @@ public class TimeTrackingController : ControllerBase
         if (request?.Description != null)
             running.Description = request.Description;
 
+        // Apply auto-pause rules if organization has them enabled
+        await ApplyPauseRules(running);
+
         await _context.SaveChangesAsync();
 
         return Ok(ToResponse(running));
+    }
+
+    /// <summary>
+    /// Calculate and apply pause deduction based on organization pause rules
+    /// </summary>
+    private async Task ApplyPauseRules(TimeEntry entry)
+    {
+        if (entry.OrganizationId == null || !entry.EndTime.HasValue) return;
+
+        var org = await _context.Organizations
+            .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId && o.AutoPauseEnabled);
+        if (org == null) return;
+
+        var workHours = (entry.EndTime.Value - entry.StartTime).TotalHours;
+
+        // Get the highest-threshold matching rule
+        var rule = await _context.PauseRules
+            .Where(pr => pr.OrganizationId == entry.OrganizationId && pr.MinHours <= workHours)
+            .OrderByDescending(pr => pr.MinHours)
+            .FirstOrDefaultAsync();
+
+        if (rule != null)
+        {
+            entry.PauseDurationMinutes = rule.PauseMinutes;
+        }
     }
 
     // ── GET /api/timetracking/current ──
@@ -191,6 +225,62 @@ public class TimeTrackingController : ControllerBase
             .ToListAsync();
 
         return Ok(entries.Select(ToResponse));
+    }
+
+    // ── PUT /api/timetracking/{id} ──
+    /// <summary>
+    /// Edit a past time entry. Requires AllowEditPastEntries if in an organization.
+    /// </summary>
+    [HttpPut("{id}")]
+    [ProducesResponseType(typeof(TimeEntryResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<TimeEntryResponse>> Update(int id, [FromBody] UpdateTimeEntryRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var entry = await _context.TimeEntries
+            .Include(e => e.Organization)
+            .FirstOrDefaultAsync(e => e.Id == id && e.UserId == userId.Value);
+
+        if (entry == null)
+            return NotFound(new { message = "Time entry not found." });
+
+        if (entry.IsRunning)
+            return BadRequest(new { message = "Cannot edit a running time entry. Stop it first." });
+
+        // Check if editing is allowed for org entries
+        if (entry.OrganizationId.HasValue)
+        {
+            var org = await _context.Organizations
+                .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId && o.IsActive);
+            if (org != null && !org.AllowEditPastEntries)
+                return StatusCode(403, new { message = "Editing past entries is not allowed in this organization." });
+        }
+
+        if (request.StartTime.HasValue)
+            entry.StartTime = request.StartTime.Value;
+        if (request.EndTime.HasValue)
+            entry.EndTime = request.EndTime.Value;
+        if (request.Description != null)
+            entry.Description = request.Description;
+        if (request.OrganizationId.HasValue)
+            entry.OrganizationId = request.OrganizationId.Value == 0 ? null : request.OrganizationId.Value;
+
+        // Validate times
+        if (entry.EndTime.HasValue && entry.EndTime.Value <= entry.StartTime)
+            return BadRequest(new { message = "End time must be after start time." });
+
+        entry.UpdatedAt = DateTime.UtcNow;
+
+        // Re-apply pause rules for the updated entry
+        entry.PauseDurationMinutes = 0;
+        await ApplyPauseRules(entry);
+
+        await _context.SaveChangesAsync();
+
+        return Ok(ToResponse(entry));
     }
 
     // ── DELETE /api/timetracking/{id} ──

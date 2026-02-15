@@ -15,6 +15,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<UserOrganization> UserOrganizations { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<TimeEntry> TimeEntries { get; set; }
+    public DbSet<PauseRule> PauseRules { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -134,6 +135,26 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.OrganizationId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Configure PauseRule entity
+        modelBuilder.Entity<PauseRule>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.MinHours).IsRequired();
+            entity.Property(e => e.PauseMinutes).IsRequired();
+
+            if (isInMemory)
+                entity.Property(e => e.CreatedAt).IsRequired();
+            else
+                entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasIndex(e => new { e.OrganizationId, e.MinHours }).IsUnique();
+
+            entity.HasOne(e => e.Organization)
+                .WithMany(o => o.PauseRules)
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

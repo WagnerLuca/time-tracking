@@ -20,6 +20,11 @@ public class TimeEntry
     
     public bool IsRunning { get; set; }
     
+    /// <summary>
+    /// Auto-deducted pause duration in minutes (based on org pause rules)
+    /// </summary>
+    public int PauseDurationMinutes { get; set; } = 0;
+    
     public DateTime CreatedAt { get; set; }
     
     public DateTime UpdatedAt { get; set; }

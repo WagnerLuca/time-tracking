@@ -85,6 +85,8 @@ public class OrganizationsController : ControllerBase
                 Slug = o.Slug,
                 Website = o.Website,
                 LogoUrl = o.LogoUrl,
+                AutoPauseEnabled = o.AutoPauseEnabled,
+                AllowEditPastEntries = o.AllowEditPastEntries,
                 CreatedAt = o.CreatedAt,
                 Members = o.UserOrganizations
                     .Where(uo => uo.IsActive)
@@ -97,6 +99,16 @@ public class OrganizationsController : ControllerBase
                         ProfileImageUrl = uo.User.ProfileImageUrl,
                         Role = uo.Role.ToString(),
                         JoinedAt = uo.JoinedAt
+                    })
+                    .ToList(),
+                PauseRules = o.PauseRules
+                    .OrderBy(pr => pr.MinHours)
+                    .Select(pr => new PauseRuleResponse
+                    {
+                        Id = pr.Id,
+                        OrganizationId = pr.OrganizationId,
+                        MinHours = pr.MinHours,
+                        PauseMinutes = pr.PauseMinutes
                     })
                     .ToList()
             })
@@ -456,6 +468,161 @@ public class OrganizationsController : ControllerBase
         }
 
         membership.IsActive = false;
+        await _context.SaveChangesAsync();
+
+        return NoContent();
+    }
+
+    // ────────────────────────────────────────────────────
+    //  PUT  /api/organizations/{id}/settings
+    // ────────────────────────────────────────────────────
+    /// <summary>
+    /// Update organization settings (Admin+ only)
+    /// </summary>
+    [HttpPut("{id}/settings")]
+    public async Task<IActionResult> UpdateSettings(int id, [FromBody] UpdateOrganizationSettingsRequest request)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+
+        var callerRole = await GetCallerRole(id);
+        if (callerRole == null || callerRole < OrganizationRole.Admin)
+            return Forbid();
+
+        var org = await _context.Organizations.FirstOrDefaultAsync(o => o.Id == id && o.IsActive);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
+        if (request.AutoPauseEnabled.HasValue)
+            org.AutoPauseEnabled = request.AutoPauseEnabled.Value;
+        if (request.AllowEditPastEntries.HasValue)
+            org.AllowEditPastEntries = request.AllowEditPastEntries.Value;
+
+        org.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return Ok(new { org.AutoPauseEnabled, org.AllowEditPastEntries });
+    }
+
+    // ────────────────────────────────────────────────────
+    //  GET  /api/organizations/{id}/pause-rules
+    // ────────────────────────────────────────────────────
+    [HttpGet("{id}/pause-rules")]
+    public async Task<ActionResult<IEnumerable<PauseRuleResponse>>> GetPauseRules(int id)
+    {
+        var rules = await _context.PauseRules
+            .Where(pr => pr.OrganizationId == id)
+            .OrderBy(pr => pr.MinHours)
+            .Select(pr => new PauseRuleResponse
+            {
+                Id = pr.Id,
+                OrganizationId = pr.OrganizationId,
+                MinHours = pr.MinHours,
+                PauseMinutes = pr.PauseMinutes
+            })
+            .ToListAsync();
+
+        return Ok(rules);
+    }
+
+    // ────────────────────────────────────────────────────
+    //  POST  /api/organizations/{id}/pause-rules
+    // ────────────────────────────────────────────────────
+    /// <summary>
+    /// Create a pause rule (Admin+ only)
+    /// </summary>
+    [HttpPost("{id}/pause-rules")]
+    public async Task<ActionResult<PauseRuleResponse>> CreatePauseRule(int id, [FromBody] CreatePauseRuleRequest request)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+
+        var callerRole = await GetCallerRole(id);
+        if (callerRole == null || callerRole < OrganizationRole.Admin)
+            return Forbid();
+
+        if (request.MinHours <= 0)
+            return BadRequest(new { message = "MinHours must be greater than 0." });
+        if (request.PauseMinutes <= 0)
+            return BadRequest(new { message = "PauseMinutes must be greater than 0." });
+
+        // Check for duplicate min hours
+        var exists = await _context.PauseRules
+            .AnyAsync(pr => pr.OrganizationId == id && Math.Abs(pr.MinHours - request.MinHours) < 0.01);
+        if (exists)
+            return BadRequest(new { message = "A pause rule with this threshold already exists." });
+
+        var rule = new PauseRule
+        {
+            OrganizationId = id,
+            MinHours = request.MinHours,
+            PauseMinutes = request.PauseMinutes,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.PauseRules.Add(rule);
+        await _context.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetPauseRules), new { id }, new PauseRuleResponse
+        {
+            Id = rule.Id,
+            OrganizationId = rule.OrganizationId,
+            MinHours = rule.MinHours,
+            PauseMinutes = rule.PauseMinutes
+        });
+    }
+
+    // ────────────────────────────────────────────────────
+    //  PUT  /api/organizations/{id}/pause-rules/{ruleId}
+    // ────────────────────────────────────────────────────
+    [HttpPut("{id}/pause-rules/{ruleId}")]
+    public async Task<ActionResult<PauseRuleResponse>> UpdatePauseRule(int id, int ruleId, [FromBody] UpdatePauseRuleRequest request)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+
+        var callerRole = await GetCallerRole(id);
+        if (callerRole == null || callerRole < OrganizationRole.Admin)
+            return Forbid();
+
+        var rule = await _context.PauseRules
+            .FirstOrDefaultAsync(pr => pr.Id == ruleId && pr.OrganizationId == id);
+
+        if (rule == null)
+            return NotFound(new { message = "Pause rule not found." });
+
+        rule.MinHours = request.MinHours;
+        rule.PauseMinutes = request.PauseMinutes;
+        await _context.SaveChangesAsync();
+
+        return Ok(new PauseRuleResponse
+        {
+            Id = rule.Id,
+            OrganizationId = rule.OrganizationId,
+            MinHours = rule.MinHours,
+            PauseMinutes = rule.PauseMinutes
+        });
+    }
+
+    // ────────────────────────────────────────────────────
+    //  DELETE  /api/organizations/{id}/pause-rules/{ruleId}
+    // ────────────────────────────────────────────────────
+    [HttpDelete("{id}/pause-rules/{ruleId}")]
+    public async Task<IActionResult> DeletePauseRule(int id, int ruleId)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+
+        var callerRole = await GetCallerRole(id);
+        if (callerRole == null || callerRole < OrganizationRole.Admin)
+            return Forbid();
+
+        var rule = await _context.PauseRules
+            .FirstOrDefaultAsync(pr => pr.Id == ruleId && pr.OrganizationId == id);
+
+        if (rule == null)
+            return NotFound(new { message = "Pause rule not found." });
+
+        _context.PauseRules.Remove(rule);
         await _context.SaveChangesAsync();
 
         return NoContent();

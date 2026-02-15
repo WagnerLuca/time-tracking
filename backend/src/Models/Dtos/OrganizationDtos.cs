@@ -21,8 +21,11 @@ public record OrganizationDetailResponse
     public required string Slug { get; init; }
     public string? Website { get; init; }
     public string? LogoUrl { get; init; }
+    public bool AutoPauseEnabled { get; init; }
+    public bool AllowEditPastEntries { get; init; }
     public DateTime CreatedAt { get; init; }
     public required List<OrganizationMemberResponse> Members { get; init; }
+    public List<PauseRuleResponse>? PauseRules { get; init; }
 }
 
 public record OrganizationMemberResponse
@@ -74,4 +77,30 @@ public record AddMemberRequest
 public record UpdateMemberRoleRequest
 {
     public OrganizationRole Role { get; init; }
+}
+
+public record UpdateOrganizationSettingsRequest
+{
+    public bool? AutoPauseEnabled { get; init; }
+    public bool? AllowEditPastEntries { get; init; }
+}
+
+public record PauseRuleResponse
+{
+    public int Id { get; init; }
+    public int OrganizationId { get; init; }
+    public double MinHours { get; init; }
+    public int PauseMinutes { get; init; }
+}
+
+public record CreatePauseRuleRequest
+{
+    public double MinHours { get; init; }
+    public int PauseMinutes { get; init; }
+}
+
+public record UpdatePauseRuleRequest
+{
+    public double MinHours { get; init; }
+    public int PauseMinutes { get; init; }
 }
