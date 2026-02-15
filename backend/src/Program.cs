@@ -105,36 +105,45 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-// Add Entity Framework and PostgreSQL
+// Add Entity Framework - PostgreSQL or InMemory
+var useInMemory = builder.Configuration.GetValue<bool>("UseInMemoryDatabase");
+
 builder.Services.AddDbContext<TimeTrackingDbContext>(options =>
 {
-    // Check for DATABASE_URL environment variable first (Docker/production)
-    var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL");
-    
-    // If DATABASE_URL is in postgres:// format, convert it to EF Core format
-    if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgres://"))
+    if (useInMemory)
     {
-        var uri = new Uri(connectionString);
-        var host = uri.Host;
-        var port = uri.Port;
-        var database = uri.AbsolutePath.TrimStart('/');
-        var username = uri.UserInfo.Split(':')[0];
-        var password = uri.UserInfo.Split(':')[1];
-        
-        connectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password}";
+        options.UseInMemoryDatabase("TimeTrackingDb");
     }
     else
     {
-        // Fallback to appsettings.json (local development)
-        connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+        // Check for DATABASE_URL environment variable first (Docker/production)
+        var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL");
+        
+        // If DATABASE_URL is in postgres:// format, convert it to EF Core format
+        if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgres://"))
+        {
+            var uri = new Uri(connectionString);
+            var host = uri.Host;
+            var port = uri.Port;
+            var database = uri.AbsolutePath.TrimStart('/');
+            var username = uri.UserInfo.Split(':')[0];
+            var password = uri.UserInfo.Split(':')[1];
+            
+            connectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password}";
+        }
+        else
+        {
+            // Fallback to appsettings.json (local development)
+            connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+        }
+        
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            throw new InvalidOperationException("Database connection string not found. Set DATABASE_URL, ConnectionStrings:DefaultConnection, or set UseInMemoryDatabase=true.");
+        }
+        
+        options.UseNpgsql(connectionString);
     }
-    
-    if (string.IsNullOrEmpty(connectionString))
-    {
-        throw new InvalidOperationException("Database connection string not found. Set DATABASE_URL or ConnectionStrings:DefaultConnection.");
-    }
-    
-    options.UseNpgsql(connectionString);
 });
 
 // Add CORS for frontend communication
@@ -158,8 +167,16 @@ using (var scope = app.Services.CreateScope())
     {
         var context = services.GetRequiredService<TimeTrackingDbContext>();
         
-        // Apply all pending migrations (this will also create the database if needed)
-        context.Database.Migrate();
+        if (app.Configuration.GetValue<bool>("UseInMemoryDatabase"))
+        {
+            // InMemory database - just ensure created (no migrations)
+            context.Database.EnsureCreated();
+        }
+        else
+        {
+            // Apply all pending migrations (this will also create the database if needed)
+            context.Database.Migrate();
+        }
         
         // Seed the database with test data
         await DbSeeder.SeedAsync(context);

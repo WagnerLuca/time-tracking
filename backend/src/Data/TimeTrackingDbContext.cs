@@ -19,6 +19,8 @@ public class TimeTrackingDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        var isInMemory = Database.IsInMemory();
+
         // Configure User entity
         modelBuilder.Entity<User>(entity =>
         {
@@ -26,8 +28,12 @@ public class TimeTrackingDbContext : DbContext
             entity.Property(e => e.Email).IsRequired().HasMaxLength(255);
             entity.Property(e => e.FirstName).IsRequired().HasMaxLength(100);
             entity.Property(e => e.LastName).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+            
+            if (isInMemory)
+                entity.Property(e => e.CreatedAt).IsRequired();
+            else
+                entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
             
             // Create unique indexes
             entity.HasIndex(e => e.Email).IsUnique();
@@ -40,8 +46,12 @@ public class TimeTrackingDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Slug).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+            
+            if (isInMemory)
+                entity.Property(e => e.CreatedAt).IsRequired();
+            else
+                entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
             
             // Create unique index on Slug
             entity.HasIndex(e => e.Slug).IsUnique();
@@ -52,8 +62,12 @@ public class TimeTrackingDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Role).IsRequired();
-            entity.Property(e => e.JoinedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+            
+            if (isInMemory)
+                entity.Property(e => e.JoinedAt).IsRequired();
+            else
+                entity.Property(e => e.JoinedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
             
             // Create unique index on UserId and OrganizationId combination
             entity.HasIndex(e => new { e.UserId, e.OrganizationId }).IsUnique();
@@ -76,8 +90,12 @@ public class TimeTrackingDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Token).IsRequired();
             entity.Property(e => e.ExpiresAt).IsRequired();
-            entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(e => e.IsRevoked).IsRequired().HasDefaultValue(false);
+            
+            if (isInMemory)
+                entity.Property(e => e.CreatedAt).IsRequired();
+            else
+                entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
             
             // Create unique index on Token
             entity.HasIndex(e => e.Token).IsUnique();
