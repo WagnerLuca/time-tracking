@@ -60,19 +60,12 @@ class ApiService {
     }
 
     private handleUnauthorized(): void {
-        // Clear token and redirect to login
+        // Clear auth state and redirect to login
         localStorage.removeItem('authToken');
-        // You can add navigation logic here
-    }
-
-    // Weather API methods (example from your current API)
-    async getWeatherForecast() {
-        try {
-            const response = await this.api.get('/WeatherForecast');
-            return response.data;
-        } catch (error) {
-            console.error('Error fetching weather forecast:', error);
-            throw error;
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('authUser');
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login';
         }
     }
 
