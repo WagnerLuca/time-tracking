@@ -1,13 +1,91 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { goto } from '$app/navigation';
+	import { apiService } from '$lib/apiService';
+	import type { WorkScheduleResponse, UpdateWorkScheduleRequest } from '$lib/types';
 
 	let changePasswordError = $state('');
 	let changePasswordSuccess = $state('');
 	let currentPassword = $state('');
 	let newPassword = $state('');
 	let saving = $state(false);
+
+	// Work schedule state
+	let weeklyHours = $state<number | null>(null);
+	let distributeEvenly = $state(true);
+	let targetMon = $state(0);
+	let targetTue = $state(0);
+	let targetWed = $state(0);
+	let targetThu = $state(0);
+	let targetFri = $state(0);
+	let scheduleLoading = $state(false);
+	let scheduleSaving = $state(false);
+	let scheduleError = $state('');
+	let scheduleSuccess = $state('');
+
+	// Load work schedule when org changes
+	$effect(() => {
+		if (orgContext.selectedOrgId) {
+			loadWorkSchedule(orgContext.selectedOrgId);
+		} else {
+			weeklyHours = null;
+			targetMon = targetTue = targetWed = targetThu = targetFri = 0;
+		}
+	});
+
+	async function loadWorkSchedule(orgId: number) {
+		scheduleLoading = true;
+		try {
+			const schedule = await apiService.get<WorkScheduleResponse>(`/api/Organizations/${orgId}/work-schedule`);
+			weeklyHours = schedule.weeklyWorkHours ?? null;
+			targetMon = schedule.targetMon;
+			targetTue = schedule.targetTue;
+			targetWed = schedule.targetWed;
+			targetThu = schedule.targetThu;
+			targetFri = schedule.targetFri;
+			// Check if all days are equal -> evenly distributed
+			const allEqual = targetMon === targetTue && targetTue === targetWed && targetWed === targetThu && targetThu === targetFri;
+			distributeEvenly = allEqual;
+		} catch {
+			// Not a member or endpoint error — just use defaults
+		} finally {
+			scheduleLoading = false;
+		}
+	}
+
+	async function saveWorkSchedule() {
+		if (!orgContext.selectedOrgId) return;
+		scheduleSaving = true;
+		scheduleError = '';
+		scheduleSuccess = '';
+		try {
+			const payload: UpdateWorkScheduleRequest = {
+				weeklyWorkHours: weeklyHours ?? undefined,
+				distributeEvenly,
+				targetMon: distributeEvenly ? undefined : targetMon,
+				targetTue: distributeEvenly ? undefined : targetTue,
+				targetWed: distributeEvenly ? undefined : targetWed,
+				targetThu: distributeEvenly ? undefined : targetThu,
+				targetFri: distributeEvenly ? undefined : targetFri
+			};
+			const result = await apiService.put<WorkScheduleResponse>(`/api/Organizations/${orgContext.selectedOrgId}/work-schedule`, payload);
+			// Update local state with server response
+			weeklyHours = result.weeklyWorkHours ?? null;
+			targetMon = result.targetMon;
+			targetTue = result.targetTue;
+			targetWed = result.targetWed;
+			targetThu = result.targetThu;
+			targetFri = result.targetFri;
+			scheduleSuccess = 'Work schedule saved.';
+			setTimeout(() => (scheduleSuccess = ''), 3000);
+		} catch (err: any) {
+			scheduleError = err.response?.data?.message || 'Failed to save work schedule.';
+		} finally {
+			scheduleSaving = false;
+		}
+	}
 
 	function handleOrgSelect(orgId: number | null) {
 		orgContext.select(orgId);
@@ -103,6 +181,75 @@
 			{/if}
 		</div>
 	</section>
+
+	<!-- Work Schedule (when org is selected) -->
+	{#if orgContext.selectedOrgId}
+		<section class="card">
+			<h2>Work Schedule</h2>
+			<p class="card-desc">Set your weekly work hours target for <strong>{orgContext.selectedOrg?.name}</strong>. This helps track your progress.</p>
+
+			{#if scheduleError}
+				<div class="error-msg">{scheduleError}</div>
+			{/if}
+			{#if scheduleSuccess}
+				<div class="success-msg">{scheduleSuccess}</div>
+			{/if}
+
+			{#if scheduleLoading}
+				<p class="muted">Loading schedule...</p>
+			{:else}
+				<div class="form-group">
+					<label for="weeklyHours">Weekly Work Hours</label>
+					<input
+						id="weeklyHours"
+						type="number"
+						step="0.5"
+						min="0"
+						max="80"
+						bind:value={weeklyHours}
+						placeholder="e.g. 40"
+						class="input input-sm"
+					/>
+				</div>
+
+				<div class="form-group">
+					<label class="checkbox-label">
+						<input type="checkbox" bind:checked={distributeEvenly} />
+						Distribute equally (Mon–Fri)
+					</label>
+				</div>
+
+				{#if !distributeEvenly}
+					<div class="day-targets">
+						<div class="day-target">
+							<label for="tMon">Mon</label>
+							<input id="tMon" type="number" step="0.5" min="0" max="24" bind:value={targetMon} class="input input-xs" />
+						</div>
+						<div class="day-target">
+							<label for="tTue">Tue</label>
+							<input id="tTue" type="number" step="0.5" min="0" max="24" bind:value={targetTue} class="input input-xs" />
+						</div>
+						<div class="day-target">
+							<label for="tWed">Wed</label>
+							<input id="tWed" type="number" step="0.5" min="0" max="24" bind:value={targetWed} class="input input-xs" />
+						</div>
+						<div class="day-target">
+							<label for="tThu">Thu</label>
+							<input id="tThu" type="number" step="0.5" min="0" max="24" bind:value={targetThu} class="input input-xs" />
+						</div>
+						<div class="day-target">
+							<label for="tFri">Fri</label>
+							<input id="tFri" type="number" step="0.5" min="0" max="24" bind:value={targetFri} class="input input-xs" />
+						</div>
+					</div>
+				{/if}
+
+				<button class="btn-primary" onclick={saveWorkSchedule} disabled={scheduleSaving || weeklyHours == null}>
+					{scheduleSaving ? 'Saving...' : 'Save Schedule'}
+				</button>
+			{/if}
+		</section>
+	{/if}
 
 	<!-- Change password -->
 	<section class="card">
@@ -350,4 +497,51 @@
 	}
 
 	.btn-danger:hover { background: #dc2626; }
+
+	/* Work schedule */
+	.input-sm {
+		max-width: 120px;
+	}
+
+	.input-xs {
+		max-width: 70px;
+		text-align: center;
+		padding: 0.5rem;
+	}
+
+	.checkbox-label {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.875rem;
+		color: #374151;
+		cursor: pointer;
+	}
+
+	.checkbox-label input[type="checkbox"] {
+		width: 16px;
+		height: 16px;
+		accent-color: #3b82f6;
+	}
+
+	.day-targets {
+		display: flex;
+		gap: 0.75rem;
+		margin-bottom: 1.25rem;
+		flex-wrap: wrap;
+	}
+
+	.day-target {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.day-target label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #6b7280;
+		text-transform: uppercase;
+	}
 </style>

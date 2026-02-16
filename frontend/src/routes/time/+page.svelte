@@ -2,12 +2,15 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { apiService } from '$lib/apiService';
-	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest } from '$lib/types';
+	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest, WorkScheduleResponse } from '$lib/types';
 
 	let current = $state<TimeEntryResponse | null>(null);
 	let weekEntries = $state<TimeEntryResponse[]>([]);
 	let loading = $state(true);
 	let actionError = $state('');
+
+	// Work schedule (target hours)
+	let workSchedule = $state<WorkScheduleResponse | null>(null);
 
 	// Timer display
 	let elapsed = $state('00:00:00');
@@ -22,11 +25,12 @@
 	let weekOffset = $state(0);
 
 	const weekRange = $derived(getWeekRange(weekOffset));
-	const dailyTotals = $derived(computeDailyTotals(weekEntries, weekRange));
+	const dailyTotals = $derived(computeDailyTotals(weekEntries, weekRange, workSchedule));
 	const weekTotal = $derived(dailyTotals.reduce((s, d) => s + d.minutes, 0));
+	const weekTarget = $derived(workSchedule?.weeklyWorkHours ? workSchedule.weeklyWorkHours * 60 : 0);
 
 	onMount(async () => {
-		await Promise.all([loadCurrent(), loadWeek()]);
+		await Promise.all([loadCurrent(), loadWeek(), loadWorkSchedule()]);
 		loading = false;
 	});
 
@@ -46,12 +50,15 @@
 		return { start, end };
 	}
 
-	function computeDailyTotals(entries: TimeEntryResponse[], range: { start: Date; end: Date }) {
+	function computeDailyTotals(entries: TimeEntryResponse[], range: { start: Date; end: Date }, schedule: WorkScheduleResponse | null) {
 		const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+		const targets = schedule
+			? [schedule.targetMon, schedule.targetTue, schedule.targetWed, schedule.targetThu, schedule.targetFri, 0, 0]
+			: [0, 0, 0, 0, 0, 0, 0];
 		const totals = days.map((name, i) => {
 			const date = new Date(range.start);
 			date.setDate(range.start.getDate() + i);
-			return { name, date: new Date(date), minutes: 0, entryCount: 0 };
+			return { name, date: new Date(date), minutes: 0, targetMinutes: targets[i] * 60, entryCount: 0 };
 		});
 
 		for (const entry of entries) {
@@ -112,6 +119,20 @@
 			);
 		} catch {
 			weekEntries = [];
+		}
+	}
+
+	async function loadWorkSchedule() {
+		if (!orgContext.selectedOrgId) {
+			workSchedule = null;
+			return;
+		}
+		try {
+			workSchedule = await apiService.get<WorkScheduleResponse>(
+				`/api/Organizations/${orgContext.selectedOrgId}/work-schedule`
+			);
+		} catch {
+			workSchedule = null;
 		}
 	}
 
@@ -295,7 +316,15 @@
 				<button class="week-nav" onclick={() => changeWeek(-1)}>&lsaquo;</button>
 				<div class="week-title">
 					<span class="week-label">{formatWeekLabel(weekRange)}</span>
-					<span class="week-total">{formatHours(weekTotal)}</span>
+					<span class="week-total">
+						{formatHours(weekTotal)}{#if weekTarget > 0} / {formatHours(weekTarget)}{/if}
+					</span>
+					{#if weekTarget > 0}
+						{@const pctWeek = Math.min((weekTotal / weekTarget) * 100, 100)}
+						<div class="week-progress-track">
+							<div class="week-progress-fill" style="width: {pctWeek}%"></div>
+						</div>
+					{/if}
 				</div>
 				<button class="week-nav" onclick={() => changeWeek(1)} disabled={weekOffset >= 0}>&rsaquo;</button>
 			</div>
@@ -303,15 +332,21 @@
 			<!-- Day bars -->
 			<div class="day-grid">
 				{#each dailyTotals as day}
-					{@const maxMins = Math.max(...dailyTotals.map(d => d.minutes), 480)}
+					{@const maxMins = Math.max(...dailyTotals.map(d => Math.max(d.minutes, d.targetMinutes)), 480)}
 					{@const pct = maxMins > 0 ? Math.min((day.minutes / maxMins) * 100, 100) : 0}
+					{@const targetPct = maxMins > 0 && day.targetMinutes > 0 ? Math.min((day.targetMinutes / maxMins) * 100, 100) : 0}
 					<div class="day-row" class:today={isToday(day.date)}>
 						<span class="day-name">{day.name}</span>
 						<span class="day-date">{formatDateShort(day.date)}</span>
 						<div class="day-bar-track">
+							{#if targetPct > 0}
+								<div class="day-bar-target" style="left: {targetPct}%"></div>
+							{/if}
 							<div class="day-bar-fill" style="width: {pct}%"></div>
 						</div>
-						<span class="day-hours">{formatHours(day.minutes)}</span>
+						<span class="day-hours">
+							{formatHours(day.minutes)}{#if day.targetMinutes > 0}<span class="day-target-label"> / {formatHours(day.targetMinutes)}</span>{/if}
+						</span>
 					</div>
 				{/each}
 			</div>
@@ -611,6 +646,7 @@
 		background: #f3f4f6;
 		border-radius: 4px;
 		overflow: hidden;
+		position: relative;
 	}
 
 	.day-bar-fill {
@@ -619,6 +655,16 @@
 		border-radius: 4px;
 		min-width: 0;
 		transition: width 0.3s ease;
+	}
+
+	.day-bar-target {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 2px;
+		background: #9ca3af;
+		z-index: 1;
+		opacity: 0.7;
 	}
 
 	.today .day-bar-fill {
@@ -630,6 +676,33 @@
 		font-size: 0.8125rem;
 		color: #374151;
 		font-variant-numeric: tabular-nums;
+		min-width: 80px;
+	}
+
+	.day-target-label {
+		color: #9ca3af;
+		font-weight: 400;
+		font-size: 0.6875rem;
+	}
+
+	/* Week progress */
+	.week-progress-track {
+		height: 4px;
+		background: #e5e7eb;
+		border-radius: 2px;
+		overflow: hidden;
+		margin-top: 0.375rem;
+		width: 100%;
+		max-width: 140px;
+		margin-left: auto;
+		margin-right: auto;
+	}
+
+	.week-progress-fill {
+		height: 100%;
+		background: #3b82f6;
+		border-radius: 2px;
+		transition: width 0.3s ease;
 	}
 
 	/* Entries list */

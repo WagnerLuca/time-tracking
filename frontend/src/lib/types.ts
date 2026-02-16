@@ -159,3 +159,25 @@ export interface UpdateOrganizationSettingsRequest {
 	autoPauseEnabled?: boolean;
 	allowEditPastEntries?: boolean;
 }
+
+// Work Schedule types
+export interface WorkScheduleResponse {
+	userId: number;
+	organizationId: number;
+	weeklyWorkHours?: number;
+	targetMon: number;
+	targetTue: number;
+	targetWed: number;
+	targetThu: number;
+	targetFri: number;
+}
+
+export interface UpdateWorkScheduleRequest {
+	weeklyWorkHours?: number;
+	distributeEvenly: boolean;
+	targetMon?: number;
+	targetTue?: number;
+	targetWed?: number;
+	targetThu?: number;
+	targetFri?: number;
+}
