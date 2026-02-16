@@ -31,6 +31,10 @@ function createOrgContext() {
 				selectedOrgId = null;
 				localStorage.removeItem(ORG_KEY);
 			}
+			// Auto-select when user has exactly one org and none is selected
+			if (!selectedOrgId && organizations.length === 1) {
+				select(organizations[0].organizationId);
+			}
 		} catch {
 			organizations = [];
 		} finally {
