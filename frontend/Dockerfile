@@ -1,5 +1,6 @@
 # Multi-stage build for SvelteKit with SSR support
-FROM node:20-alpine AS builder
+# Use BUILDPLATFORM for build stage to avoid QEMU issues with npm
+FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 
 # Set the working directory
 WORKDIR /app
@@ -19,7 +20,7 @@ RUN npm run check
 # Build the SvelteKit application with adapter-node
 RUN npm run build
 
-# Production runtime stage
+# Production runtime stage - uses target platform
 FROM node:20-alpine AS runner
 
 # Install dumb-init for proper signal handling
@@ -35,9 +36,10 @@ RUN adduser -S sveltekit -u 1001
 # Copy the built SvelteKit server from builder stage
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/package-lock.json ./package-lock.json
 
 # Install only production dependencies
-RUN npm install --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Change ownership to non-root user
 RUN chown -R sveltekit:nodejs /app
