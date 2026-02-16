@@ -4,6 +4,7 @@ public record StartTimeEntryRequest
 {
     public string? Description { get; init; }
     public int? OrganizationId { get; init; }
+    public string? OrganizationSlug { get; init; }
 }
 
 public record StopTimeEntryRequest
@@ -17,6 +18,7 @@ public record UpdateTimeEntryRequest
     public DateTime? EndTime { get; init; }
     public string? Description { get; init; }
     public int? OrganizationId { get; init; }
+    public int? PauseDurationMinutes { get; init; }
 }
 
 public record TimeEntryResponse

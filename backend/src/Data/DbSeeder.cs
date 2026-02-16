@@ -50,7 +50,9 @@ public static class DbSeeder
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
             IsActive = true,
-            Website = "https://acme-corp.example.com"
+            Website = "https://acme-corp.example.com",
+            AllowEditPause = true,
+            AllowEditPastEntries = true
         };
 
         var org2 = new Organization

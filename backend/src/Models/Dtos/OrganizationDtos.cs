@@ -23,6 +23,7 @@ public record OrganizationDetailResponse
     public string? LogoUrl { get; init; }
     public bool AutoPauseEnabled { get; init; }
     public bool AllowEditPastEntries { get; init; }
+    public bool AllowEditPause { get; init; }
     public DateTime CreatedAt { get; init; }
     public required List<OrganizationMemberResponse> Members { get; init; }
     public List<PauseRuleResponse>? PauseRules { get; init; }
@@ -83,6 +84,7 @@ public record UpdateOrganizationSettingsRequest
 {
     public bool? AutoPauseEnabled { get; init; }
     public bool? AllowEditPastEntries { get; init; }
+    public bool? AllowEditPause { get; init; }
 }
 
 public record PauseRuleResponse

@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { apiService } from '$lib/apiService';
-	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest, WorkScheduleResponse } from '$lib/types';
+	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/types';
 
 	let current = $state<TimeEntryResponse | null>(null);
 	let weekEntries = $state<TimeEntryResponse[]>([]);
@@ -11,6 +11,8 @@
 
 	// Work schedule (target hours)
 	let workSchedule = $state<WorkScheduleResponse | null>(null);
+	// Org detail (for settings like allowEditPause)
+	let orgDetail = $state<OrganizationDetailResponse | null>(null);
 
 	// Timer display
 	let elapsed = $state('00:00:00');
@@ -20,6 +22,15 @@
 	let note = $state('');
 	let starting = $state(false);
 	let stopping = $state(false);
+	let showNoteSuggestions = $state(false);
+
+	// Previous descriptions for quick pick
+	const previousDescriptions = $derived(() => {
+		const descs = weekEntries
+			.map(e => e.description)
+			.filter((d): d is string => !!d && d.trim().length > 0);
+		return [...new Set(descs)];
+	});
 
 	// Week navigation
 	let weekOffset = $state(0);
@@ -27,7 +38,8 @@
 	const weekRange = $derived(getWeekRange(weekOffset));
 	const dailyTotals = $derived(computeDailyTotals(weekEntries, weekRange, workSchedule));
 	const weekTotal = $derived(dailyTotals.reduce((s, d) => s + d.minutes, 0));
-	const weekTarget = $derived(workSchedule?.weeklyWorkHours ? workSchedule.weeklyWorkHours * 60 : 0);
+	const weekTargetSoFar = $derived(dailyTotals.filter(d => d.isPastOrToday).reduce((s, d) => s + d.targetMinutes, 0));
+	const weekTargetFull = $derived(workSchedule?.weeklyWorkHours ? workSchedule.weeklyWorkHours * 60 : dailyTotals.reduce((s, d) => s + d.targetMinutes, 0));
 
 	onMount(async () => {
 		await Promise.all([loadCurrent(), loadWeek(), loadWorkSchedule()]);
@@ -55,10 +67,13 @@
 		const targets = schedule
 			? [schedule.targetMon, schedule.targetTue, schedule.targetWed, schedule.targetThu, schedule.targetFri, 0, 0]
 			: [0, 0, 0, 0, 0, 0, 0];
+		const now = new Date();
+		now.setHours(23, 59, 59, 999);
 		const totals = days.map((name, i) => {
 			const date = new Date(range.start);
 			date.setDate(range.start.getDate() + i);
-			return { name, date: new Date(date), minutes: 0, targetMinutes: targets[i] * 60, entryCount: 0 };
+			const isPastOrToday = date <= now;
+			return { name, date: new Date(date), minutes: 0, targetMinutes: targets[i] * 60, entryCount: 0, isPastOrToday };
 		});
 
 		for (const entry of entries) {
@@ -125,6 +140,7 @@
 	async function loadWorkSchedule() {
 		if (!orgContext.selectedOrgSlug) {
 			workSchedule = null;
+			orgDetail = null;
 			return;
 		}
 		try {
@@ -134,6 +150,13 @@
 		} catch {
 			workSchedule = null;
 		}
+		try {
+			orgDetail = await apiService.get<OrganizationDetailResponse>(
+				`/api/Organizations/${orgContext.selectedOrgSlug}`
+			);
+		} catch {
+			orgDetail = null;
+		}
 	}
 
 	async function handleStart() {
@@ -142,7 +165,7 @@
 		try {
 			const payload: StartTimeEntryRequest = {
 				description: note.trim() || undefined,
-				organizationId: orgContext.selectedOrgId ?? undefined
+				organizationSlug: orgContext.selectedOrgSlug ?? undefined
 			};
 			current = await apiService.post<TimeEntryResponse>('/api/TimeTracking/start', payload);
 			startTimer();
@@ -224,6 +247,7 @@
 	let editStartTime = $state('');
 	let editEndTime = $state('');
 	let editDescription = $state('');
+	let editPause = $state<number>(0);
 	let editError = $state('');
 	let editSaving = $state(false);
 
@@ -238,6 +262,7 @@
 		editStartTime = toLocalDateTimeInput(entry.startTime);
 		editEndTime = entry.endTime ? toLocalDateTimeInput(entry.endTime) : '';
 		editDescription = entry.description ?? '';
+		editPause = entry.pauseDurationMinutes;
 		editError = '';
 	}
 
@@ -254,6 +279,9 @@
 			if (editStartTime) payload.startTime = new Date(editStartTime).toISOString();
 			if (editEndTime) payload.endTime = new Date(editEndTime).toISOString();
 			payload.description = editDescription.trim() || undefined;
+			if (orgDetail?.allowEditPause) {
+				payload.pauseDurationMinutes = Math.max(0, Number(editPause) || 0);
+			}
 			await apiService.put(`/api/TimeTracking/${entryId}`, payload);
 			await loadWeek();
 			editingEntryId = null;
@@ -301,13 +329,27 @@
 				{/if}
 			</div>
 
-			<input
-				type="text"
-				bind:value={note}
-				placeholder="Optional note..."
-				class="note-input"
-				disabled={stopping}
-			/>
+			<div class="note-wrapper">
+				<input
+					type="text"
+					bind:value={note}
+					placeholder="Optional note..."
+					class="note-input"
+					disabled={stopping}
+					onfocus={() => showNoteSuggestions = true}
+					onblur={() => setTimeout(() => showNoteSuggestions = false, 200)}
+				/>
+				{#if showNoteSuggestions && previousDescriptions().length > 0}
+					<div class="note-suggestions">
+						{#each previousDescriptions() as desc}
+							<button
+								class="note-suggestion"
+								onmousedown={() => { note = desc; showNoteSuggestions = false; }}
+							>{desc}</button>
+						{/each}
+					</div>
+				{/if}
+			</div>
 		</div>
 
 		<!-- Weekly summary -->
@@ -317,10 +359,16 @@
 				<div class="week-title">
 					<span class="week-label">{formatWeekLabel(weekRange)}</span>
 					<span class="week-total">
-						{formatHours(weekTotal)}{#if weekTarget > 0} / {formatHours(weekTarget)}{/if}
+						{formatHours(weekTotal)}{#if weekTargetFull > 0} / {formatHours(weekTargetFull)}{/if}
+						{#if weekTargetSoFar > 0}
+							{@const weekDelta = weekTotal - weekTargetSoFar}
+							<span class="week-delta" class:positive={weekDelta > 0} class:negative={weekDelta < 0}>
+								({weekDelta > 0 ? '+' : ''}{formatHours(weekDelta)})
+							</span>
+						{/if}
 					</span>
-					{#if weekTarget > 0}
-						{@const pctWeek = Math.min((weekTotal / weekTarget) * 100, 100)}
+					{#if weekTargetFull > 0}
+						{@const pctWeek = Math.min((weekTotal / weekTargetFull) * 100, 100)}
 						<div class="week-progress-track">
 							<div class="week-progress-fill" style="width: {pctWeek}%"></div>
 						</div>
@@ -335,7 +383,8 @@
 					{@const maxMins = Math.max(...dailyTotals.map(d => Math.max(d.minutes, d.targetMinutes)), 480)}
 					{@const pct = maxMins > 0 ? Math.min((day.minutes / maxMins) * 100, 100) : 0}
 					{@const targetPct = maxMins > 0 && day.targetMinutes > 0 ? Math.min((day.targetMinutes / maxMins) * 100, 100) : 0}
-					<div class="day-row" class:today={isToday(day.date)}>
+					{@const delta = day.isPastOrToday && day.targetMinutes > 0 ? day.minutes - day.targetMinutes : 0}
+					<div class="day-row" class:today={isToday(day.date)} class:future={!day.isPastOrToday}>
 						<span class="day-name">{day.name}</span>
 						<span class="day-date">{formatDateShort(day.date)}</span>
 						<div class="day-bar-track">
@@ -346,6 +395,11 @@
 						</div>
 						<span class="day-hours">
 							{formatHours(day.minutes)}{#if day.targetMinutes > 0}<span class="day-target-label"> / {formatHours(day.targetMinutes)}</span>{/if}
+							{#if delta !== 0}
+								<span class="day-delta" class:positive={delta > 0} class:negative={delta < 0}>
+									{delta > 0 ? '+' : ''}{formatHours(delta)}
+								</span>
+							{/if}
 						</span>
 					</div>
 				{/each}
@@ -383,6 +437,13 @@
 										<label>Note</label>
 										<input type="text" bind:value={editDescription} placeholder="Optional note" disabled={editSaving} />
 									</div>
+									{#if orgDetail?.allowEditPause}
+										<div class="edit-field edit-field-pause">
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label>Pause (min)</label>
+											<input type="number" min="0" bind:value={editPause} disabled={editSaving} />
+										</div>
+									{/if}
 								</div>
 								<div class="edit-actions">
 									<button class="btn-save-sm" onclick={() => saveEditEntry(entry.id)} disabled={editSaving}>
@@ -410,7 +471,11 @@
 										<span class="running-badge">Running</span>
 									{/if}
 									{#if entry.pauseDurationMinutes > 0}
-										<span class="pause-badge">-{entry.pauseDurationMinutes}m pause</span>
+										{#if orgDetail?.allowEditPause && !entry.isRunning}
+											<button class="pause-badge pause-badge-edit" title="Click to edit pause" onclick={() => startEditEntry(entry)}>-{entry.pauseDurationMinutes}m pause &#9998;</button>
+										{:else}
+											<span class="pause-badge">-{entry.pauseDurationMinutes}m pause</span>
+										{/if}
 									{/if}
 								</div>
 								<div class="entry-dur">
@@ -529,6 +594,54 @@
 
 	.note-input::placeholder { color: #d1d5db; }
 
+	.note-wrapper {
+		position: relative;
+		width: 100%;
+		max-width: 360px;
+		margin: 0 auto;
+	}
+
+	.note-wrapper .note-input {
+		max-width: none;
+		margin: 0;
+	}
+
+	.note-suggestions {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		right: 0;
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+		z-index: 10;
+		max-height: 160px;
+		overflow-y: auto;
+		margin-top: 2px;
+	}
+
+	.note-suggestion {
+		display: block;
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		border: none;
+		background: none;
+		text-align: left;
+		font-size: 0.8125rem;
+		color: #374151;
+		cursor: pointer;
+		transition: background 0.1s;
+	}
+
+	.note-suggestion:hover {
+		background: #f3f4f6;
+	}
+
+	.note-suggestion + .note-suggestion {
+		border-top: 1px solid #f3f4f6;
+	}
+
 	.btn-start {
 		padding: 0.875rem 3rem;
 		background: #22c55e;
@@ -621,7 +734,7 @@
 
 	.day-row {
 		display: grid;
-		grid-template-columns: 36px 64px 1fr 56px;
+		grid-template-columns: 36px 52px 1fr auto;
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.25rem 0;
@@ -629,6 +742,10 @@
 
 	.day-row.today {
 		font-weight: 600;
+	}
+
+	.day-row.future {
+		opacity: 0.5;
 	}
 
 	.day-name {
@@ -676,7 +793,7 @@
 		font-size: 0.8125rem;
 		color: #374151;
 		font-variant-numeric: tabular-nums;
-		min-width: 80px;
+		white-space: nowrap;
 	}
 
 	.day-target-label {
@@ -684,6 +801,25 @@
 		font-weight: 400;
 		font-size: 0.6875rem;
 	}
+
+	.day-delta {
+		display: inline-block;
+		font-size: 0.6875rem;
+		font-weight: 500;
+		margin-left: 0.25rem;
+	}
+
+	.day-delta.positive { color: #16a34a; }
+	.day-delta.negative { color: #dc2626; }
+
+	.week-delta {
+		font-size: 0.75rem;
+		font-weight: 500;
+		margin-left: 0.25rem;
+	}
+
+	.week-delta.positive { color: #16a34a; }
+	.week-delta.negative { color: #dc2626; }
 
 	/* Week progress */
 	.week-progress-track {
@@ -914,6 +1050,21 @@
 		padding: 0.0625rem 0.5rem;
 		border-radius: 999px;
 		font-weight: 500;
+	}
+
+	.pause-badge-edit {
+		border: 1px solid #fed7aa;
+		cursor: pointer;
+		transition: background 0.15s, border-color 0.15s;
+	}
+
+	.pause-badge-edit:hover {
+		background: #fed7aa;
+		border-color: #fb923c;
+	}
+
+	.edit-field-pause input {
+		width: 5rem;
 	}
 
 	.net-dur {

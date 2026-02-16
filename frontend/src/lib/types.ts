@@ -53,6 +53,7 @@ export interface OrganizationDetailResponse {
 	logoUrl?: string;
 	autoPauseEnabled: boolean;
 	allowEditPastEntries: boolean;
+	allowEditPause: boolean;
 	createdAt: string;
 	members: OrganizationMemberResponse[];
 	pauseRules?: PauseRuleResponse[];
@@ -107,6 +108,7 @@ export interface UpdateMemberRoleRequest {
 export interface StartTimeEntryRequest {
 	description?: string;
 	organizationId?: number;
+	organizationSlug?: string;
 }
 
 export interface StopTimeEntryRequest {
@@ -133,6 +135,7 @@ export interface UpdateTimeEntryRequest {
 	endTime?: string;
 	description?: string;
 	organizationId?: number;
+	pauseDurationMinutes?: number;
 }
 
 // Pause Rule types
@@ -158,6 +161,7 @@ export interface UpdatePauseRuleRequest {
 export interface UpdateOrganizationSettingsRequest {
 	autoPauseEnabled?: boolean;
 	allowEditPastEntries?: boolean;
+	allowEditPause?: boolean;
 }
 
 // Work Schedule types

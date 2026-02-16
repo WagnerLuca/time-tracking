@@ -94,6 +94,7 @@ public class OrganizationsController : ControllerBase
                 LogoUrl = o.LogoUrl,
                 AutoPauseEnabled = o.AutoPauseEnabled,
                 AllowEditPastEntries = o.AllowEditPastEntries,
+                AllowEditPause = o.AllowEditPause,
                 CreatedAt = o.CreatedAt,
                 Members = o.UserOrganizations
                     .Where(uo => uo.IsActive)
@@ -511,11 +512,13 @@ public class OrganizationsController : ControllerBase
             org.AutoPauseEnabled = request.AutoPauseEnabled.Value;
         if (request.AllowEditPastEntries.HasValue)
             org.AllowEditPastEntries = request.AllowEditPastEntries.Value;
+        if (request.AllowEditPause.HasValue)
+            org.AllowEditPause = request.AllowEditPause.Value;
 
         org.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        return Ok(new { org.AutoPauseEnabled, org.AllowEditPastEntries });
+        return Ok(new { org.AutoPauseEnabled, org.AllowEditPastEntries, org.AllowEditPause });
     }
 
     // ────────────────────────────────────────────────────

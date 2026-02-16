@@ -208,6 +208,23 @@
 		}
 	}
 
+	async function toggleAllowEditPause() {
+		if (!org) return;
+		settingsSaving = true;
+		settingsError = '';
+		try {
+			const payload: UpdateOrganizationSettingsRequest = {
+				allowEditPause: !org.allowEditPause
+			};
+			await apiService.put(`/api/Organizations/${orgSlug}/settings`, payload);
+			await loadOrg();
+		} catch (err: any) {
+			settingsError = err.response?.data?.message || 'Failed to update setting.';
+		} finally {
+			settingsSaving = false;
+		}
+	}
+
 	// Pause Rules
 	function getPauseRules(): import('$lib/types').PauseRuleResponse[] {
 		return org?.pauseRules ? [...org.pauseRules].sort((a, b) => a.minHours - b.minHours) : [];
@@ -473,6 +490,22 @@
 								onclick={toggleAllowEditPast}
 								disabled={settingsSaving}
 								aria-label="Toggle edit past entries"
+							>
+								<span class="toggle-knob"></span>
+							</button>
+						</div>
+
+						<div class="setting-row">
+							<div class="setting-info">
+								<div class="setting-label">Allow Editing Pause Duration</div>
+								<div class="setting-desc">Let members override the auto-deducted break time on their entries (e.g. if they took a shorter or longer break).</div>
+							</div>
+							<button
+								class="toggle-switch"
+								class:active={org.allowEditPause}
+								onclick={toggleAllowEditPause}
+								disabled={settingsSaving}
+								aria-label="Toggle edit pause duration"
 							>
 								<span class="toggle-knob"></span>
 							</button>

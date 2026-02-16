@@ -31,6 +31,11 @@ public class Organization
     /// </summary>
     public bool AllowEditPastEntries { get; set; } = false;
     
+    /// <summary>
+    /// When true, members can override the auto-deducted pause duration on their entries
+    /// </summary>
+    public bool AllowEditPause { get; set; } = false;
+    
     // Navigation properties
     [JsonIgnore]
     public ICollection<UserOrganization> UserOrganizations { get; set; } = new List<UserOrganization>();

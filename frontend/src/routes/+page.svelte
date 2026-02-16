@@ -3,12 +3,17 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { apiService } from '$lib/apiService';
-	import type { TimeEntryResponse, StartTimeEntryRequest } from '$lib/types';
+	import type { TimeEntryResponse, StartTimeEntryRequest, WorkScheduleResponse } from '$lib/types';
 
 	let currentEntry = $state<TimeEntryResponse | null>(null);
 	let todayMinutes = $state(0);
 	let weekMinutes = $state(0);
 	let monthMinutes = $state(0);
+	let todayTarget = $state(0);
+	let weekTarget = $state(0);
+	let monthTarget = $state(0);
+	let cumulativeOvertime = $state(0);
+	let workSchedule = $state<WorkScheduleResponse | null>(null);
 	let elapsed = $state('00:00:00');
 	let loading = $state(true);
 	let starting = $state(false);
@@ -19,7 +24,8 @@
 	onMount(async () => {
 		if (!auth.user) return;
 		try {
-			await Promise.all([loadCurrentTimer(), loadStats()]);
+			await Promise.all([loadCurrentTimer(), loadWorkSchedule()]);
+			await loadStats(); // depends on workSchedule
 		} catch (err) {
 			console.error(err);
 		} finally {
@@ -41,6 +47,68 @@
 		} catch {
 			currentEntry = null;
 		}
+	}
+
+	async function loadWorkSchedule() {
+		if (!orgContext.selectedOrgSlug) {
+			workSchedule = null;
+			return;
+		}
+		try {
+			workSchedule = await apiService.get<WorkScheduleResponse>(
+				`/api/Organizations/${orgContext.selectedOrgSlug}/work-schedule`
+			);
+		} catch {
+			workSchedule = null;
+		}
+	}
+
+	function getDayTarget(date: Date): number {
+		if (!workSchedule) return 0;
+		const dayOfWeek = date.getDay();
+		const targets: Record<number, number> = {
+			1: workSchedule.targetMon,
+			2: workSchedule.targetTue,
+			3: workSchedule.targetWed,
+			4: workSchedule.targetThu,
+			5: workSchedule.targetFri,
+		};
+		return (targets[dayOfWeek] ?? 0) * 60; // convert hours to minutes
+	}
+
+	function getWeekTargetMinutes(): number {
+		if (!workSchedule) return 0;
+		// Only count target minutes for days up to and including today
+		const now = new Date();
+		const dayOfWeek = now.getDay() || 7;
+		const weekStart = new Date(now);
+		weekStart.setDate(now.getDate() - dayOfWeek + 1);
+		weekStart.setHours(0, 0, 0, 0);
+
+		let total = 0;
+		const cursor = new Date(weekStart);
+		const todayEnd = new Date(now);
+		todayEnd.setHours(23, 59, 59, 999);
+		while (cursor <= todayEnd) {
+			total += getDayTarget(cursor);
+			cursor.setDate(cursor.getDate() + 1);
+		}
+		return total;
+	}
+
+	function getMonthTargetMinutes(year: number, month: number): number {
+		if (!workSchedule) return 0;
+		// Only count target minutes for days up to and including today
+		const now = new Date();
+		let total = 0;
+		const daysInMonth = new Date(year, month + 1, 0).getDate();
+		const todayDate = now.getDate();
+		const isCurrentMonth = now.getFullYear() === year && now.getMonth() === month;
+		const maxDay = isCurrentMonth ? todayDate : daysInMonth;
+		for (let d = 1; d <= maxDay; d++) {
+			total += getDayTarget(new Date(year, month, d));
+		}
+		return total;
 	}
 
 	async function loadStats() {
@@ -66,7 +134,8 @@
 			const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 			const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-			const [todayEntries, weekEntries, monthEntries] = await Promise.all([
+			// Fetch all time entries for cumulative overtime
+			const [todayEntries, weekEntries, monthEntries, allEntries] = await Promise.all([
 				apiService.get<TimeEntryResponse[]>(
 					`/api/TimeTracking?from=${todayStart.toISOString()}&to=${todayEnd.toISOString()}&limit=200`
 				),
@@ -75,6 +144,9 @@
 				),
 				apiService.get<TimeEntryResponse[]>(
 					`/api/TimeTracking?from=${monthStart.toISOString()}&to=${monthEnd.toISOString()}&limit=500`
+				),
+				apiService.get<TimeEntryResponse[]>(
+					`/api/TimeTracking?limit=10000`
 				)
 			]);
 
@@ -85,10 +157,42 @@
 			todayMinutes = sumMinutes(todayEntries);
 			weekMinutes = sumMinutes(weekEntries);
 			monthMinutes = sumMinutes(monthEntries);
+
+			// Compute targets
+			todayTarget = getDayTarget(now);
+			weekTarget = getWeekTargetMinutes();
+			monthTarget = getMonthTargetMinutes(now.getFullYear(), now.getMonth());
+
+			// Compute cumulative overtime since first entry
+			if (workSchedule && allEntries.length > 0) {
+				const sorted = [...allEntries].filter(e => !e.isRunning && e.endTime).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+				if (sorted.length > 0) {
+					const firstDate = new Date(sorted[0].startTime);
+					firstDate.setHours(0, 0, 0, 0);
+					const today = new Date(now);
+					today.setHours(23, 59, 59, 999);
+
+					// Sum actual worked minutes
+					const totalWorked = sumMinutes(sorted);
+
+					// Sum target minutes for each day from first entry through today
+					let totalTargetMins = 0;
+					const cursor = new Date(firstDate);
+					while (cursor <= today) {
+						totalTargetMins += getDayTarget(cursor);
+						cursor.setDate(cursor.getDate() + 1);
+					}
+
+					cumulativeOvertime = totalWorked - totalTargetMins;
+				}
+			} else {
+				cumulativeOvertime = 0;
+			}
 		} catch {
 			todayMinutes = 0;
 			weekMinutes = 0;
 			monthMinutes = 0;
+			cumulativeOvertime = 0;
 		}
 	}
 
@@ -107,7 +211,7 @@
 		starting = true;
 		try {
 			const payload: StartTimeEntryRequest = {
-				organizationId: orgContext.selectedOrgId ?? undefined
+				organizationSlug: orgContext.selectedOrgSlug ?? undefined
 			};
 			currentEntry = await apiService.post<TimeEntryResponse>('/api/TimeTracking/start', payload);
 			timerInterval = setInterval(updateElapsed, 1000);
@@ -137,7 +241,14 @@
 
 	function formatHours(minutes: number): string {
 		if (minutes === 0) return '0h';
-		return (minutes / 60).toFixed(1) + 'h';
+		const sign = minutes < 0 ? '-' : '';
+		return sign + (Math.abs(minutes) / 60).toFixed(1) + 'h';
+	}
+
+	function formatDelta(minutes: number): string {
+		if (minutes === 0) return '±0h';
+		const sign = minutes > 0 ? '+' : '';
+		return sign + (minutes / 60).toFixed(1) + 'h';
 	}
 
 	function getMonthName(): string {
@@ -186,16 +297,40 @@
 		<div class="stat-card">
 			<span class="stat-label">Today</span>
 			<span class="stat-value">{formatHours(todayMinutes)}</span>
+			{#if todayTarget > 0}
+				<span class="stat-target">/ {formatHours(todayTarget)}</span>
+				{@const d = todayMinutes - todayTarget}
+				<span class="stat-delta" class:positive={d > 0} class:negative={d < 0}>{formatDelta(d)}</span>
+			{/if}
 		</div>
 		<div class="stat-card accent">
 			<span class="stat-label">This Week</span>
 			<span class="stat-value">{formatHours(weekMinutes)}</span>
+			{#if weekTarget > 0}
+				<span class="stat-target">/ {formatHours(weekTarget)}</span>
+				{@const d = weekMinutes - weekTarget}
+				<span class="stat-delta" class:positive={d > 0} class:negative={d < 0}>{formatDelta(d)}</span>
+			{/if}
 		</div>
 		<div class="stat-card">
 			<span class="stat-label">{getMonthName()}</span>
 			<span class="stat-value">{formatHours(monthMinutes)}</span>
+			{#if monthTarget > 0}
+				<span class="stat-target">/ {formatHours(monthTarget)}</span>
+				{@const d = monthMinutes - monthTarget}
+				<span class="stat-delta" class:positive={d > 0} class:negative={d < 0}>{formatDelta(d)}</span>
+			{/if}
 		</div>
 	</div>
+
+	<!-- Cumulative overtime -->
+	{#if workSchedule}
+		<div class="overtime-card" class:positive={cumulativeOvertime > 0} class:negative={cumulativeOvertime < 0}>
+			<span class="overtime-label">Cumulative Balance</span>
+			<span class="overtime-value">{formatDelta(cumulativeOvertime)}</span>
+			<span class="overtime-hint">Since first tracked entry</span>
+		</div>
+	{/if}
 
 	<!-- Quick links -->
 	<div class="quick-links">
@@ -374,6 +509,70 @@
 		font-weight: 700;
 		color: #1a1a2e;
 		font-variant-numeric: tabular-nums;
+	}
+
+	.stat-target {
+		display: block;
+		font-size: 0.75rem;
+		color: #9ca3af;
+		margin-top: 0.125rem;
+	}
+
+	.stat-delta {
+		display: block;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		margin-top: 0.25rem;
+	}
+
+	.stat-delta.positive { color: #16a34a; }
+	.stat-delta.negative { color: #dc2626; }
+
+	/* Cumulative overtime card */
+	.overtime-card {
+		background: white;
+		border: 2px solid #e5e7eb;
+		border-radius: 12px;
+		padding: 1.25rem;
+		text-align: center;
+		margin-bottom: 1.5rem;
+	}
+
+	.overtime-card.positive {
+		border-color: #86efac;
+		background: #f0fdf4;
+	}
+
+	.overtime-card.negative {
+		border-color: #fca5a5;
+		background: #fef2f2;
+	}
+
+	.overtime-label {
+		display: block;
+		font-size: 0.75rem;
+		color: #9ca3af;
+		text-transform: uppercase;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		margin-bottom: 0.375rem;
+	}
+
+	.overtime-value {
+		display: block;
+		font-size: 2rem;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.overtime-card.positive .overtime-value { color: #16a34a; }
+	.overtime-card.negative .overtime-value { color: #dc2626; }
+
+	.overtime-hint {
+		display: block;
+		font-size: 0.6875rem;
+		color: #9ca3af;
+		margin-top: 0.25rem;
 	}
 
 	/* Quick links */

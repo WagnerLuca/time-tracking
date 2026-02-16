@@ -78,10 +78,19 @@ public class TimeTrackingController : ControllerBase
         }
 
         // Validate organization if provided
-        if (request?.OrganizationId != null)
+        int? orgId = request?.OrganizationId;
+        if (orgId == null && !string.IsNullOrWhiteSpace(request?.OrganizationSlug))
+        {
+            var orgBySlug = await _context.Organizations
+                .FirstOrDefaultAsync(o => o.Slug == request.OrganizationSlug && o.IsActive);
+            if (orgBySlug == null)
+                return BadRequest(new { message = "Organization not found." });
+            orgId = orgBySlug.Id;
+        }
+        if (orgId != null)
         {
             var orgExists = await _context.Organizations
-                .AnyAsync(o => o.Id == request.OrganizationId && o.IsActive);
+                .AnyAsync(o => o.Id == orgId && o.IsActive);
             if (!orgExists)
                 return BadRequest(new { message = "Organization not found." });
         }
@@ -89,7 +98,7 @@ public class TimeTrackingController : ControllerBase
         var entry = new TimeEntry
         {
             UserId = userId.Value,
-            OrganizationId = request?.OrganizationId,
+            OrganizationId = orgId,
             Description = request?.Description,
             StartTime = DateTime.UtcNow,
             IsRunning = true,
@@ -274,9 +283,25 @@ public class TimeTrackingController : ControllerBase
 
         entry.UpdatedAt = DateTime.UtcNow;
 
-        // Re-apply pause rules for the updated entry
-        entry.PauseDurationMinutes = 0;
-        await ApplyPauseRules(entry);
+        // Handle pause duration editing
+        if (request.PauseDurationMinutes.HasValue)
+        {
+            // Check if org allows editing pause
+            if (entry.OrganizationId.HasValue)
+            {
+                var pauseOrg = await _context.Organizations
+                    .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId && o.IsActive);
+                if (pauseOrg != null && !pauseOrg.AllowEditPause)
+                    return StatusCode(403, new { message = "Editing pause duration is not allowed in this organization." });
+            }
+            entry.PauseDurationMinutes = Math.Max(0, request.PauseDurationMinutes.Value);
+        }
+        else
+        {
+            // Re-apply pause rules for the updated entry (only if pause wasn't manually set)
+            entry.PauseDurationMinutes = 0;
+            await ApplyPauseRules(entry);
+        }
 
         await _context.SaveChangesAsync();
 
