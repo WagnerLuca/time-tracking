@@ -16,9 +16,10 @@ public static class DbSeeder
         // Create test users
         var user1 = new User
         {
-            Email = "john.doe@example.com",
+            Email = "test.user1@example.com",
             FirstName = "John",
             LastName = "Doe",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123"), // Hash the password
             EmailConfirmed = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -27,9 +28,10 @@ public static class DbSeeder
 
         var user2 = new User
         {
-            Email = "jane.smith@example.com",
+            Email = "test.user2@example.com",
             FirstName = "Jane",
             LastName = "Smith",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123"), // Hash the password  
             EmailConfirmed = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
