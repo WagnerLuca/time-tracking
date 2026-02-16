@@ -47,7 +47,7 @@
 				website: website.trim() || undefined
 			};
 			const created = await apiService.post<any>('/api/Organizations', payload);
-			goto(`/organizations/${created.id}`);
+			goto(`/organizations/${created.slug}`);
 		} catch (err: any) {
 			error = err.response?.data?.message || 'Failed to create organization.';
 		} finally {

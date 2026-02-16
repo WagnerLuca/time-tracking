@@ -39,6 +39,13 @@ public class OrganizationsController : ControllerBase
         return membership?.Role;
     }
 
+    // ── Helper: resolve organization by slug ──
+    private async Task<Organization?> GetOrgBySlug(string slug)
+    {
+        return await _context.Organizations
+            .FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+    }
+
     // ────────────────────────────────────────────────────
     //  GET  /api/organizations
     // ────────────────────────────────────────────────────
@@ -67,16 +74,16 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  GET  /api/organizations/{id}
+    //  GET  /api/organizations/{slug}
     // ────────────────────────────────────────────────────
     /// <summary>
-    /// Get organization by ID with members
+    /// Get organization by slug with members
     /// </summary>
-    [HttpGet("{id}")]
-    public async Task<ActionResult<OrganizationDetailResponse>> GetOrganization(int id)
+    [HttpGet("{slug}")]
+    public async Task<ActionResult<OrganizationDetailResponse>> GetOrganization(string slug)
     {
         var organization = await _context.Organizations
-            .Where(o => o.Id == id && o.IsActive)
+            .Where(o => o.Slug == slug && o.IsActive)
             .Select(o => new OrganizationDetailResponse
             {
                 Id = o.Id,
@@ -209,38 +216,38 @@ public class OrganizationsController : ControllerBase
             MemberCount = 1
         };
 
-        return CreatedAtAction(nameof(GetOrganization), new { id = organization.Id }, response);
+        return CreatedAtAction(nameof(GetOrganization), new { slug = organization.Slug }, response);
     }
 
     // ────────────────────────────────────────────────────
-    //  PUT  /api/organizations/{id}
+    //  PUT  /api/organizations/{slug}
     //  Only Owner or Admin can update.
     // ────────────────────────────────────────────────────
     /// <summary>
     /// Update an organization (Owner or Admin only)
     /// </summary>
-    [HttpPut("{id}")]
+    [HttpPut("{slug}")]
     [Authorize]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
-    public async Task<ActionResult<OrganizationResponse>> UpdateOrganization(int id, [FromBody] UpdateOrganizationRequest request)
+    public async Task<ActionResult<OrganizationResponse>> UpdateOrganization(string slug, [FromBody] UpdateOrganizationRequest request)
     {
-        var callerRole = await GetCallerRole(id);
+        var organization = await _context.Organizations
+            .Include(o => o.UserOrganizations)
+            .FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+
+        if (organization == null)
+            return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(organization.Id);
         if (callerRole == null)
             return Forbid();
         if (callerRole < OrganizationRole.Admin)
             return Forbid();
 
-        var organization = await _context.Organizations
-            .Include(o => o.UserOrganizations)
-            .FirstOrDefaultAsync(o => o.Id == id && o.IsActive);
-
-        if (organization == null)
-            return NotFound(new { message = "Organization not found" });
-
         // Check slug uniqueness if changing
         if (request.Slug != null && request.Slug != organization.Slug)
         {
-            if (await _context.Organizations.AnyAsync(o => o.Slug == request.Slug && o.IsActive && o.Id != id))
+            if (await _context.Organizations.AnyAsync(o => o.Slug == request.Slug && o.IsActive && o.Id != organization.Id))
                 return Conflict(new { message = "An organization with this slug already exists" });
         }
 
@@ -267,27 +274,27 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  DELETE  /api/organizations/{id}
+    //  DELETE  /api/organizations/{slug}
     //  Only Owner can delete (soft-delete).
     // ────────────────────────────────────────────────────
     /// <summary>
     /// Delete an organization (Owner only, soft-delete)
     /// </summary>
-    [HttpDelete("{id}")]
+    [HttpDelete("{slug}")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> DeleteOrganization(int id)
+    public async Task<IActionResult> DeleteOrganization(string slug)
     {
-        var callerRole = await GetCallerRole(id);
-        if (callerRole == null || callerRole != OrganizationRole.Owner)
-            return Forbid();
-
         var organization = await _context.Organizations
             .Include(o => o.UserOrganizations)
-            .FirstOrDefaultAsync(o => o.Id == id && o.IsActive);
+            .FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
 
         if (organization == null)
             return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(organization.Id);
+        if (callerRole == null || callerRole != OrganizationRole.Owner)
+            return Forbid();
 
         // Soft-delete organization and all memberships
         organization.IsActive = false;
@@ -302,18 +309,22 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  POST  /api/organizations/{id}/members
+    //  POST  /api/organizations/{slug}/members
     //  Owner or Admin can add members.
     // ────────────────────────────────────────────────────
     /// <summary>
     /// Add a member to the organization (Owner or Admin only)
     /// </summary>
-    [HttpPost("{id}/members")]
+    [HttpPost("{slug}/members")]
     [Authorize]
     [ProducesResponseType(typeof(OrganizationMemberResponse), StatusCodes.Status201Created)]
-    public async Task<ActionResult<OrganizationMemberResponse>> AddMember(int id, [FromBody] AddMemberRequest request)
+    public async Task<ActionResult<OrganizationMemberResponse>> AddMember(string slug, [FromBody] AddMemberRequest request)
     {
-        var callerRole = await GetCallerRole(id);
+        var org = await GetOrgBySlug(slug);
+        if (org == null)
+            return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return Forbid();
 
@@ -321,17 +332,13 @@ public class OrganizationsController : ControllerBase
         if (callerRole == OrganizationRole.Admin && request.Role == OrganizationRole.Owner)
             return Forbid();
 
-        var orgExists = await _context.Organizations.AnyAsync(o => o.Id == id && o.IsActive);
-        if (!orgExists)
-            return NotFound(new { message = "Organization not found" });
-
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == request.UserId && u.IsActive);
         if (user == null)
             return NotFound(new { message = "User not found" });
 
         // Check if already a member
         var existing = await _context.UserOrganizations
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == id && uo.UserId == request.UserId);
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == request.UserId);
 
         if (existing != null)
         {
@@ -348,7 +355,7 @@ public class OrganizationsController : ControllerBase
             existing = new UserOrganization
             {
                 UserId = request.UserId,
-                OrganizationId = id,
+                OrganizationId = org.Id,
                 Role = request.Role,
                 JoinedAt = DateTime.UtcNow,
                 IsActive = true
@@ -358,7 +365,7 @@ public class OrganizationsController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetOrganization), new { id }, new OrganizationMemberResponse
+        return CreatedAtAction(nameof(GetOrganization), new { slug }, new OrganizationMemberResponse
         {
             Id = user.Id,
             Email = user.Email,
@@ -371,25 +378,29 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  PUT  /api/organizations/{id}/members/{userId}
+    //  PUT  /api/organizations/{slug}/members/{userId}
     //  Owner can change any role.
     //  Admin can change Members only (not other Admins/Owners).
     // ────────────────────────────────────────────────────
     /// <summary>
     /// Update a member's role (Owner or Admin)
     /// </summary>
-    [HttpPut("{id}/members/{userId}")]
+    [HttpPut("{slug}/members/{userId}")]
     [Authorize]
     [ProducesResponseType(typeof(OrganizationMemberResponse), StatusCodes.Status200OK)]
-    public async Task<ActionResult<OrganizationMemberResponse>> UpdateMemberRole(int id, int userId, [FromBody] UpdateMemberRoleRequest request)
+    public async Task<ActionResult<OrganizationMemberResponse>> UpdateMemberRole(string slug, int userId, [FromBody] UpdateMemberRoleRequest request)
     {
-        var callerRole = await GetCallerRole(id);
+        var org = await GetOrgBySlug(slug);
+        if (org == null)
+            return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return Forbid();
 
         var membership = await _context.UserOrganizations
             .Include(uo => uo.User)
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == id && uo.UserId == userId && uo.IsActive);
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId && uo.IsActive);
 
         if (membership == null)
             return NotFound(new { message = "Member not found in this organization" });
@@ -423,7 +434,7 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  DELETE  /api/organizations/{id}/members/{userId}
+    //  DELETE  /api/organizations/{slug}/members/{userId}
     //  Owner can remove anyone (except themselves — must delete org instead).
     //  Admin can remove Members only.
     //  Any member can remove themselves (leave).
@@ -431,21 +442,25 @@ public class OrganizationsController : ControllerBase
     /// <summary>
     /// Remove a member from the organization
     /// </summary>
-    [HttpDelete("{id}/members/{userId}")]
+    [HttpDelete("{slug}/members/{userId}")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> RemoveMember(int id, int userId)
+    public async Task<IActionResult> RemoveMember(string slug, int userId)
     {
         var callerId = GetCurrentUserId();
         if (callerId == null)
             return Unauthorized();
 
-        var callerRole = await GetCallerRole(id);
+        var org = await GetOrgBySlug(slug);
+        if (org == null)
+            return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(org.Id);
         if (callerRole == null)
             return Forbid();
 
         var membership = await _context.UserOrganizations
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == id && uo.UserId == userId && uo.IsActive);
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId && uo.IsActive);
 
         if (membership == null)
             return NotFound(new { message = "Member not found in this organization" });
@@ -474,23 +489,23 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  PUT  /api/organizations/{id}/settings
+    //  PUT  /api/organizations/{slug}/settings
     // ────────────────────────────────────────────────────
     /// <summary>
     /// Update organization settings (Admin+ only)
     /// </summary>
-    [HttpPut("{id}/settings")]
-    public async Task<IActionResult> UpdateSettings(int id, [FromBody] UpdateOrganizationSettingsRequest request)
+    [HttpPut("{slug}/settings")]
+    public async Task<IActionResult> UpdateSettings(string slug, [FromBody] UpdateOrganizationSettingsRequest request)
     {
         var callerId = GetCurrentUserId();
         if (callerId == null) return Unauthorized();
 
-        var callerRole = await GetCallerRole(id);
+        var org = await GetOrgBySlug(slug);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return Forbid();
-
-        var org = await _context.Organizations.FirstOrDefaultAsync(o => o.Id == id && o.IsActive);
-        if (org == null) return NotFound(new { message = "Organization not found" });
 
         if (request.AutoPauseEnabled.HasValue)
             org.AutoPauseEnabled = request.AutoPauseEnabled.Value;
@@ -504,13 +519,16 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  GET  /api/organizations/{id}/pause-rules
+    //  GET  /api/organizations/{slug}/pause-rules
     // ────────────────────────────────────────────────────
-    [HttpGet("{id}/pause-rules")]
-    public async Task<ActionResult<IEnumerable<PauseRuleResponse>>> GetPauseRules(int id)
+    [HttpGet("{slug}/pause-rules")]
+    public async Task<ActionResult<IEnumerable<PauseRuleResponse>>> GetPauseRules(string slug)
     {
+        var org = await GetOrgBySlug(slug);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
         var rules = await _context.PauseRules
-            .Where(pr => pr.OrganizationId == id)
+            .Where(pr => pr.OrganizationId == org.Id)
             .OrderBy(pr => pr.MinHours)
             .Select(pr => new PauseRuleResponse
             {
@@ -525,18 +543,21 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  POST  /api/organizations/{id}/pause-rules
+    //  POST  /api/organizations/{slug}/pause-rules
     // ────────────────────────────────────────────────────
     /// <summary>
     /// Create a pause rule (Admin+ only)
     /// </summary>
-    [HttpPost("{id}/pause-rules")]
-    public async Task<ActionResult<PauseRuleResponse>> CreatePauseRule(int id, [FromBody] CreatePauseRuleRequest request)
+    [HttpPost("{slug}/pause-rules")]
+    public async Task<ActionResult<PauseRuleResponse>> CreatePauseRule(string slug, [FromBody] CreatePauseRuleRequest request)
     {
         var callerId = GetCurrentUserId();
         if (callerId == null) return Unauthorized();
 
-        var callerRole = await GetCallerRole(id);
+        var org = await GetOrgBySlug(slug);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return Forbid();
 
@@ -547,13 +568,13 @@ public class OrganizationsController : ControllerBase
 
         // Check for duplicate min hours
         var exists = await _context.PauseRules
-            .AnyAsync(pr => pr.OrganizationId == id && Math.Abs(pr.MinHours - request.MinHours) < 0.01);
+            .AnyAsync(pr => pr.OrganizationId == org.Id && Math.Abs(pr.MinHours - request.MinHours) < 0.01);
         if (exists)
             return BadRequest(new { message = "A pause rule with this threshold already exists." });
 
         var rule = new PauseRule
         {
-            OrganizationId = id,
+            OrganizationId = org.Id,
             MinHours = request.MinHours,
             PauseMinutes = request.PauseMinutes,
             CreatedAt = DateTime.UtcNow
@@ -562,7 +583,7 @@ public class OrganizationsController : ControllerBase
         _context.PauseRules.Add(rule);
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetPauseRules), new { id }, new PauseRuleResponse
+        return CreatedAtAction(nameof(GetPauseRules), new { slug }, new PauseRuleResponse
         {
             Id = rule.Id,
             OrganizationId = rule.OrganizationId,
@@ -572,20 +593,23 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  PUT  /api/organizations/{id}/pause-rules/{ruleId}
+    //  PUT  /api/organizations/{slug}/pause-rules/{ruleId}
     // ────────────────────────────────────────────────────
-    [HttpPut("{id}/pause-rules/{ruleId}")]
-    public async Task<ActionResult<PauseRuleResponse>> UpdatePauseRule(int id, int ruleId, [FromBody] UpdatePauseRuleRequest request)
+    [HttpPut("{slug}/pause-rules/{ruleId}")]
+    public async Task<ActionResult<PauseRuleResponse>> UpdatePauseRule(string slug, int ruleId, [FromBody] UpdatePauseRuleRequest request)
     {
         var callerId = GetCurrentUserId();
         if (callerId == null) return Unauthorized();
 
-        var callerRole = await GetCallerRole(id);
+        var org = await GetOrgBySlug(slug);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return Forbid();
 
         var rule = await _context.PauseRules
-            .FirstOrDefaultAsync(pr => pr.Id == ruleId && pr.OrganizationId == id);
+            .FirstOrDefaultAsync(pr => pr.Id == ruleId && pr.OrganizationId == org.Id);
 
         if (rule == null)
             return NotFound(new { message = "Pause rule not found." });
@@ -604,20 +628,23 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  DELETE  /api/organizations/{id}/pause-rules/{ruleId}
+    //  DELETE  /api/organizations/{slug}/pause-rules/{ruleId}
     // ────────────────────────────────────────────────────
-    [HttpDelete("{id}/pause-rules/{ruleId}")]
-    public async Task<IActionResult> DeletePauseRule(int id, int ruleId)
+    [HttpDelete("{slug}/pause-rules/{ruleId}")]
+    public async Task<IActionResult> DeletePauseRule(string slug, int ruleId)
     {
         var callerId = GetCurrentUserId();
         if (callerId == null) return Unauthorized();
 
-        var callerRole = await GetCallerRole(id);
+        var org = await GetOrgBySlug(slug);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return Forbid();
 
         var rule = await _context.PauseRules
-            .FirstOrDefaultAsync(pr => pr.Id == ruleId && pr.OrganizationId == id);
+            .FirstOrDefaultAsync(pr => pr.Id == ruleId && pr.OrganizationId == org.Id);
 
         if (rule == null)
             return NotFound(new { message = "Pause rule not found." });
@@ -629,18 +656,21 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  GET  /api/organizations/{id}/work-schedule
+    //  GET  /api/organizations/{slug}/work-schedule
     //  Get the current user's work schedule for this org
     // ────────────────────────────────────────────────────
-    [HttpGet("{id}/work-schedule")]
+    [HttpGet("{slug}/work-schedule")]
     [Authorize]
-    public async Task<ActionResult<WorkScheduleResponse>> GetMyWorkSchedule(int id)
+    public async Task<ActionResult<WorkScheduleResponse>> GetMyWorkSchedule(string slug)
     {
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
 
+        var org = await GetOrgBySlug(slug);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
         var membership = await _context.UserOrganizations
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == id && uo.UserId == userId.Value && uo.IsActive);
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId.Value && uo.IsActive);
 
         if (membership == null)
             return NotFound(new { message = "You are not a member of this organization." });
@@ -648,7 +678,7 @@ public class OrganizationsController : ControllerBase
         return Ok(new WorkScheduleResponse
         {
             UserId = userId.Value,
-            OrganizationId = id,
+            OrganizationId = org.Id,
             WeeklyWorkHours = membership.WeeklyWorkHours,
             TargetMon = membership.TargetMon,
             TargetTue = membership.TargetTue,
@@ -659,18 +689,21 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  PUT  /api/organizations/{id}/work-schedule
+    //  PUT  /api/organizations/{slug}/work-schedule
     //  Update the current user's work schedule
     // ────────────────────────────────────────────────────
-    [HttpPut("{id}/work-schedule")]
+    [HttpPut("{slug}/work-schedule")]
     [Authorize]
-    public async Task<ActionResult<WorkScheduleResponse>> UpdateMyWorkSchedule(int id, [FromBody] UpdateWorkScheduleRequest request)
+    public async Task<ActionResult<WorkScheduleResponse>> UpdateMyWorkSchedule(string slug, [FromBody] UpdateWorkScheduleRequest request)
     {
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
 
+        var org = await GetOrgBySlug(slug);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
         var membership = await _context.UserOrganizations
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == id && uo.UserId == userId.Value && uo.IsActive);
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId.Value && uo.IsActive);
 
         if (membership == null)
             return NotFound(new { message = "You are not a member of this organization." });
@@ -714,7 +747,7 @@ public class OrganizationsController : ControllerBase
         return Ok(new WorkScheduleResponse
         {
             UserId = userId.Value,
-            OrganizationId = id,
+            OrganizationId = org.Id,
             WeeklyWorkHours = membership.WeeklyWorkHours,
             TargetMon = membership.TargetMon,
             TargetTue = membership.TargetTue,
@@ -725,18 +758,21 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  GET  /api/organizations/{id}/time-overview
+    //  GET  /api/organizations/{slug}/time-overview
     //  Admin+: Get time tracked by all members in a date range
     // ────────────────────────────────────────────────────
-    [HttpGet("{id}/time-overview")]
+    [HttpGet("{slug}/time-overview")]
     [Authorize]
     public async Task<ActionResult<IEnumerable<MemberTimeOverviewResponse>>> GetTimeOverview(
-        int id, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
+        string slug, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
     {
         var callerId = GetCurrentUserId();
         if (callerId == null) return Unauthorized();
 
-        var callerRole = await GetCallerRole(id);
+        var org = await GetOrgBySlug(slug);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return Forbid();
 
@@ -748,7 +784,7 @@ public class OrganizationsController : ControllerBase
         var weekEnd = to ?? weekStart.AddDays(7);
 
         var members = await _context.UserOrganizations
-            .Where(uo => uo.OrganizationId == id && uo.IsActive)
+            .Where(uo => uo.OrganizationId == org.Id && uo.IsActive)
             .Include(uo => uo.User)
             .ToListAsync();
 
@@ -756,7 +792,7 @@ public class OrganizationsController : ControllerBase
 
         var timeEntries = await _context.TimeEntries
             .Where(te => memberIds.Contains(te.UserId)
-                      && te.OrganizationId == id
+                      && te.OrganizationId == org.Id
                       && !te.IsRunning
                       && te.StartTime >= weekStart
                       && te.StartTime < weekEnd)
@@ -787,18 +823,21 @@ public class OrganizationsController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────
-    //  GET  /api/organizations/{id}/member-entries/{userId}
+    //  GET  /api/organizations/{slug}/member-entries/{userId}
     //  Admin+: Get detailed time entries for a specific member
     // ────────────────────────────────────────────────────
-    [HttpGet("{id}/member-entries/{userId}")]
+    [HttpGet("{slug}/member-entries/{userId}")]
     [Authorize]
     public async Task<ActionResult<IEnumerable<object>>> GetMemberEntries(
-        int id, int userId, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
+        string slug, int userId, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
     {
         var callerId = GetCurrentUserId();
         if (callerId == null) return Unauthorized();
 
-        var callerRole = await GetCallerRole(id);
+        var org = await GetOrgBySlug(slug);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return Forbid();
 
@@ -810,7 +849,7 @@ public class OrganizationsController : ControllerBase
 
         var entries = await _context.TimeEntries
             .Where(te => te.UserId == userId
-                      && te.OrganizationId == id
+                      && te.OrganizationId == org.Id
                       && te.StartTime >= weekStart
                       && te.StartTime < weekEnd)
             .OrderByDescending(te => te.StartTime)

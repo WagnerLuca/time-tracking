@@ -27,18 +27,18 @@
 
 	// Load work schedule when org changes
 	$effect(() => {
-		if (orgContext.selectedOrgId) {
-			loadWorkSchedule(orgContext.selectedOrgId);
+		if (orgContext.selectedOrgSlug) {
+			loadWorkSchedule(orgContext.selectedOrgSlug);
 		} else {
 			weeklyHours = null;
 			targetMon = targetTue = targetWed = targetThu = targetFri = 0;
 		}
 	});
 
-	async function loadWorkSchedule(orgId: number) {
+	async function loadWorkSchedule(orgSlug: string) {
 		scheduleLoading = true;
 		try {
-			const schedule = await apiService.get<WorkScheduleResponse>(`/api/Organizations/${orgId}/work-schedule`);
+			const schedule = await apiService.get<WorkScheduleResponse>(`/api/Organizations/${orgSlug}/work-schedule`);
 			weeklyHours = schedule.weeklyWorkHours ?? null;
 			targetMon = schedule.targetMon;
 			targetTue = schedule.targetTue;
@@ -56,7 +56,7 @@
 	}
 
 	async function saveWorkSchedule() {
-		if (!orgContext.selectedOrgId) return;
+		if (!orgContext.selectedOrgSlug) return;
 		scheduleSaving = true;
 		scheduleError = '';
 		scheduleSuccess = '';
@@ -70,7 +70,7 @@
 				targetThu: distributeEvenly ? undefined : targetThu,
 				targetFri: distributeEvenly ? undefined : targetFri
 			};
-			const result = await apiService.put<WorkScheduleResponse>(`/api/Organizations/${orgContext.selectedOrgId}/work-schedule`, payload);
+			const result = await apiService.put<WorkScheduleResponse>(`/api/Organizations/${orgContext.selectedOrgSlug}/work-schedule`, payload);
 			// Update local state with server response
 			weeklyHours = result.weeklyWorkHours ?? null;
 			targetMon = result.targetMon;

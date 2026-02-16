@@ -12,6 +12,8 @@ function createOrgContext() {
 		organizations.find((o) => o.organizationId === selectedOrgId) ?? null
 	);
 
+	const selectedOrgSlug = $derived(selectedOrg?.slug ?? null);
+
 	function init() {
 		if (typeof window === 'undefined') return;
 		const saved = localStorage.getItem(ORG_KEY);
@@ -54,6 +56,7 @@ function createOrgContext() {
 	return {
 		get organizations() { return organizations; },
 		get selectedOrgId() { return selectedOrgId; },
+		get selectedOrgSlug() { return selectedOrgSlug; },
 		get selectedOrg() { return selectedOrg; },
 		get loading() { return loading; },
 		init,

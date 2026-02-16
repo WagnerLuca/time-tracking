@@ -43,10 +43,10 @@
 	// Action feedback
 	let actionError = $state('');
 
-	let orgId: number;
+	let orgSlug: string;
 
 	onMount(() => {
-		orgId = parseInt($page.params.id ?? '0');
+		orgSlug = $page.params.slug ?? '';
 		loadOrg();
 	});
 
@@ -54,7 +54,7 @@
 		loading = true;
 		error = '';
 		try {
-			org = await apiService.get<OrganizationDetailResponse>(`/api/Organizations/${orgId}`);
+			org = await apiService.get<OrganizationDetailResponse>(`/api/Organizations/${orgSlug}`);
 		} catch (err: any) {
 			error = err.response?.status === 404 ? 'Organization not found.' : 'Failed to load organization.';
 		} finally {
@@ -87,7 +87,7 @@
 				slug: editSlug.trim(),
 				website: editWebsite.trim() || undefined
 			};
-			await apiService.put(`/api/Organizations/${orgId}`, payload);
+			await apiService.put(`/api/Organizations/${orgSlug}`, payload);
 			await loadOrg();
 			editing = false;
 		} catch (err: any) {
@@ -101,7 +101,7 @@
 		if (!confirm('Are you sure you want to delete this organization? This cannot be undone.'))
 			return;
 		try {
-			await apiService.delete(`/api/Organizations/${orgId}`);
+			await apiService.delete(`/api/Organizations/${orgSlug}`);
 			goto('/organizations');
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to delete organization.';
@@ -128,7 +128,7 @@
 				userId: user.id,
 				role: newMemberRole
 			};
-			await apiService.post(`/api/Organizations/${orgId}/members`, payload);
+			await apiService.post(`/api/Organizations/${orgSlug}/members`, payload);
 			await loadOrg();
 			showAddMember = false;
 			newMemberEmail = '';
@@ -143,7 +143,7 @@
 	async function updateMemberRole(userId: number, newRole: number) {
 		actionError = '';
 		try {
-			await apiService.put(`/api/Organizations/${orgId}/members/${userId}`, { role: newRole });
+			await apiService.put(`/api/Organizations/${orgSlug}/members/${userId}`, { role: newRole });
 			await loadOrg();
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to update member role.';
@@ -154,7 +154,7 @@
 		if (!confirm(`Remove ${memberName} from this organization?`)) return;
 		actionError = '';
 		try {
-			await apiService.delete(`/api/Organizations/${orgId}/members/${userId}`);
+			await apiService.delete(`/api/Organizations/${orgSlug}/members/${userId}`);
 			await loadOrg();
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to remove member.';
@@ -182,7 +182,7 @@
 			const payload: UpdateOrganizationSettingsRequest = {
 				autoPauseEnabled: !org.autoPauseEnabled
 			};
-			await apiService.put(`/api/Organizations/${orgId}/settings`, payload);
+			await apiService.put(`/api/Organizations/${orgSlug}/settings`, payload);
 			await loadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to update setting.';
@@ -199,7 +199,7 @@
 			const payload: UpdateOrganizationSettingsRequest = {
 				allowEditPastEntries: !org.allowEditPastEntries
 			};
-			await apiService.put(`/api/Organizations/${orgId}/settings`, payload);
+			await apiService.put(`/api/Organizations/${orgSlug}/settings`, payload);
 			await loadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to update setting.';
@@ -234,7 +234,7 @@
 				minHours: newRuleMinHours,
 				pauseMinutes: newRulePauseMinutes
 			};
-			await apiService.post(`/api/Organizations/${orgId}/pause-rules`, payload);
+			await apiService.post(`/api/Organizations/${orgSlug}/pause-rules`, payload);
 			await loadOrg();
 			showAddRule = false;
 			newRuleMinHours = 6;
@@ -261,7 +261,7 @@
 		editRuleError = '';
 		editingRuleSaving = true;
 		try {
-			await apiService.put(`/api/Organizations/${orgId}/pause-rules/${ruleId}`, {
+			await apiService.put(`/api/Organizations/${orgSlug}/pause-rules/${ruleId}`, {
 				minHours: editRuleMinHours,
 				pauseMinutes: editRulePauseMinutes
 			});
@@ -277,7 +277,7 @@
 	async function deleteRule(ruleId: number) {
 		if (!confirm('Delete this pause rule?')) return;
 		try {
-			await apiService.delete(`/api/Organizations/${orgId}/pause-rules/${ruleId}`);
+			await apiService.delete(`/api/Organizations/${orgSlug}/pause-rules/${ruleId}`);
 			await loadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to delete rule.';
@@ -342,7 +342,7 @@
 				</div>
 				{#if canEdit}
 					<div class="header-actions">
-						<a href="/organizations/{orgId}/time-overview" class="btn-secondary">Time Overview</a>
+						<a href="/organizations/{orgSlug}/time-overview" class="btn-secondary">Time Overview</a>
 						<button class="btn-secondary" onclick={startEdit}>Edit</button>
 						{#if isOwner}
 							<button class="btn-danger" onclick={deleteOrg}>Delete</button>

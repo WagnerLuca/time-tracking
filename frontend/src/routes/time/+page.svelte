@@ -123,13 +123,13 @@
 	}
 
 	async function loadWorkSchedule() {
-		if (!orgContext.selectedOrgId) {
+		if (!orgContext.selectedOrgSlug) {
 			workSchedule = null;
 			return;
 		}
 		try {
 			workSchedule = await apiService.get<WorkScheduleResponse>(
-				`/api/Organizations/${orgContext.selectedOrgId}/work-schedule`
+				`/api/Organizations/${orgContext.selectedOrgSlug}/work-schedule`
 			);
 		} catch {
 			workSchedule = null;

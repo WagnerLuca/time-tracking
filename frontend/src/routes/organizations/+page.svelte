@@ -41,7 +41,7 @@
 	{:else}
 		<div class="org-grid">
 			{#each organizations as org}
-				<a href="/organizations/{org.id}" class="org-card">
+				<a href="/organizations/{org.slug}" class="org-card">
 					<div class="org-name">{org.name}</div>
 					<div class="org-slug">/{org.slug}</div>
 					{#if org.description}

@@ -4,7 +4,7 @@
 	import { apiService } from '$lib/apiService';
 	import type { MemberTimeOverviewResponse, OrganizationDetailResponse } from '$lib/types';
 
-	let orgId: number;
+	let orgSlug: string;
 	let orgName = $state('');
 	let members = $state<MemberTimeOverviewResponse[]>([]);
 	let loading = $state(true);
@@ -20,7 +20,7 @@
 	let entriesLoading = $state(false);
 
 	onMount(() => {
-		orgId = parseInt($page.params.id ?? '0');
+		orgSlug = $page.params.slug ?? '';
 		loadOrg();
 		loadOverview();
 	});
@@ -39,7 +39,7 @@
 
 	async function loadOrg() {
 		try {
-			const org = await apiService.get<OrganizationDetailResponse>(`/api/Organizations/${orgId}`);
+			const org = await apiService.get<OrganizationDetailResponse>(`/api/Organizations/${orgSlug}`);
 			orgName = org.name;
 		} catch {}
 	}
@@ -51,7 +51,7 @@
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
 			members = await apiService.get<MemberTimeOverviewResponse[]>(
-				`/api/Organizations/${orgId}/time-overview?from=${from}&to=${to}`
+				`/api/Organizations/${orgSlug}/time-overview?from=${from}&to=${to}`
 			);
 		} catch (err: any) {
 			if (err.response?.status === 403) {
@@ -83,7 +83,7 @@
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
 			memberEntries = await apiService.get<any[]>(
-				`/api/Organizations/${orgId}/member-entries/${userId}?from=${from}&to=${to}`
+				`/api/Organizations/${orgSlug}/member-entries/${userId}?from=${from}&to=${to}`
 			);
 		} catch {
 			memberEntries = [];
@@ -124,7 +124,7 @@
 </svelte:head>
 
 <div class="page">
-	<a href="/organizations/{orgId}" class="back-link">&larr; Back to {orgName || 'Organization'}</a>
+	<a href="/organizations/{orgSlug}" class="back-link">&larr; Back to {orgName || 'Organization'}</a>
 
 	<h1>Team Time Overview</h1>
 	{#if orgName}<p class="subtitle">{orgName}</p>{/if}
