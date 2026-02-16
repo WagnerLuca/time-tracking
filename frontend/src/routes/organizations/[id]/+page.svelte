@@ -342,6 +342,7 @@
 				</div>
 				{#if canEdit}
 					<div class="header-actions">
+						<a href="/organizations/{orgId}/time-overview" class="btn-secondary">Time Overview</a>
 						<button class="btn-secondary" onclick={startEdit}>Edit</button>
 						{#if isOwner}
 							<button class="btn-danger" onclick={deleteOrg}>Delete</button>

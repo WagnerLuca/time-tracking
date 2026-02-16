@@ -181,3 +181,16 @@ export interface UpdateWorkScheduleRequest {
 	targetThu?: number;
 	targetFri?: number;
 }
+
+// Admin Time Overview types
+export interface MemberTimeOverviewResponse {
+	userId: number;
+	firstName: string;
+	lastName: string;
+	email: string;
+	role: string;
+	weeklyWorkHours?: number;
+	totalTrackedMinutes: number;
+	netTrackedMinutes: number;
+	entryCount: number;
+}
