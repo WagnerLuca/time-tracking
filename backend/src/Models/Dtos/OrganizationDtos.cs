@@ -104,3 +104,45 @@ public record UpdatePauseRuleRequest
     public double MinHours { get; init; }
     public int PauseMinutes { get; init; }
 }
+
+// Work schedule DTOs
+public record WorkScheduleResponse
+{
+    public int UserId { get; init; }
+    public int OrganizationId { get; init; }
+    public double? WeeklyWorkHours { get; init; }
+    public double TargetMon { get; init; }
+    public double TargetTue { get; init; }
+    public double TargetWed { get; init; }
+    public double TargetThu { get; init; }
+    public double TargetFri { get; init; }
+}
+
+public record UpdateWorkScheduleRequest
+{
+    public double? WeeklyWorkHours { get; init; }
+    /// <summary>
+    /// If true, distribute WeeklyWorkHours equally across Mon-Fri.
+    /// If false, use the individual TargetXxx fields.
+    /// </summary>
+    public bool DistributeEvenly { get; init; } = true;
+    public double? TargetMon { get; init; }
+    public double? TargetTue { get; init; }
+    public double? TargetWed { get; init; }
+    public double? TargetThu { get; init; }
+    public double? TargetFri { get; init; }
+}
+
+// Admin time overview
+public record MemberTimeOverviewResponse
+{
+    public int UserId { get; init; }
+    public required string FirstName { get; init; }
+    public required string LastName { get; init; }
+    public required string Email { get; init; }
+    public required string Role { get; init; }
+    public double? WeeklyWorkHours { get; init; }
+    public double TotalTrackedMinutes { get; init; }
+    public double NetTrackedMinutes { get; init; }
+    public int EntryCount { get; init; }
+}

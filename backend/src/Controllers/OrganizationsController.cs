@@ -627,4 +627,100 @@ public class OrganizationsController : ControllerBase
 
         return NoContent();
     }
+
+    // ────────────────────────────────────────────────────
+    //  GET  /api/organizations/{id}/work-schedule
+    //  Get the current user's work schedule for this org
+    // ────────────────────────────────────────────────────
+    [HttpGet("{id}/work-schedule")]
+    [Authorize]
+    public async Task<ActionResult<WorkScheduleResponse>> GetMyWorkSchedule(int id)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var membership = await _context.UserOrganizations
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == id && uo.UserId == userId.Value && uo.IsActive);
+
+        if (membership == null)
+            return NotFound(new { message = "You are not a member of this organization." });
+
+        return Ok(new WorkScheduleResponse
+        {
+            UserId = userId.Value,
+            OrganizationId = id,
+            WeeklyWorkHours = membership.WeeklyWorkHours,
+            TargetMon = membership.TargetMon,
+            TargetTue = membership.TargetTue,
+            TargetWed = membership.TargetWed,
+            TargetThu = membership.TargetThu,
+            TargetFri = membership.TargetFri
+        });
+    }
+
+    // ────────────────────────────────────────────────────
+    //  PUT  /api/organizations/{id}/work-schedule
+    //  Update the current user's work schedule
+    // ────────────────────────────────────────────────────
+    [HttpPut("{id}/work-schedule")]
+    [Authorize]
+    public async Task<ActionResult<WorkScheduleResponse>> UpdateMyWorkSchedule(int id, [FromBody] UpdateWorkScheduleRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var membership = await _context.UserOrganizations
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == id && uo.UserId == userId.Value && uo.IsActive);
+
+        if (membership == null)
+            return NotFound(new { message = "You are not a member of this organization." });
+
+        if (request.WeeklyWorkHours.HasValue)
+        {
+            membership.WeeklyWorkHours = request.WeeklyWorkHours.Value;
+
+            if (request.DistributeEvenly)
+            {
+                // Distribute equally across Mon-Fri
+                var daily = Math.Round(request.WeeklyWorkHours.Value / 5.0, 2);
+                membership.TargetMon = daily;
+                membership.TargetTue = daily;
+                membership.TargetWed = daily;
+                membership.TargetThu = daily;
+                membership.TargetFri = daily;
+            }
+            else
+            {
+                // Use custom per-day targets
+                membership.TargetMon = request.TargetMon ?? membership.TargetMon;
+                membership.TargetTue = request.TargetTue ?? membership.TargetTue;
+                membership.TargetWed = request.TargetWed ?? membership.TargetWed;
+                membership.TargetThu = request.TargetThu ?? membership.TargetThu;
+                membership.TargetFri = request.TargetFri ?? membership.TargetFri;
+            }
+        }
+        else if (!request.DistributeEvenly)
+        {
+            // Just updating individual day targets without changing weekly total
+            if (request.TargetMon.HasValue) membership.TargetMon = request.TargetMon.Value;
+            if (request.TargetTue.HasValue) membership.TargetTue = request.TargetTue.Value;
+            if (request.TargetWed.HasValue) membership.TargetWed = request.TargetWed.Value;
+            if (request.TargetThu.HasValue) membership.TargetThu = request.TargetThu.Value;
+            if (request.TargetFri.HasValue) membership.TargetFri = request.TargetFri.Value;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new WorkScheduleResponse
+        {
+            UserId = userId.Value,
+            OrganizationId = id,
+            WeeklyWorkHours = membership.WeeklyWorkHours,
+            TargetMon = membership.TargetMon,
+            TargetTue = membership.TargetTue,
+            TargetWed = membership.TargetWed,
+            TargetThu = membership.TargetThu,
+            TargetFri = membership.TargetFri
+        });
+    }
 }

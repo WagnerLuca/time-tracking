@@ -20,6 +20,14 @@ public class UserOrganization
     public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
     
     public bool IsActive { get; set; } = true;
+
+    // Work schedule: weekly target hours and per-day distribution (Mon-Fri)
+    public double? WeeklyWorkHours { get; set; }
+    public double TargetMon { get; set; }
+    public double TargetTue { get; set; }
+    public double TargetWed { get; set; }
+    public double TargetThu { get; set; }
+    public double TargetFri { get; set; }
     
     // Navigation properties
     [JsonIgnore]
