@@ -723,4 +723,117 @@ public class OrganizationsController : ControllerBase
             TargetFri = membership.TargetFri
         });
     }
+
+    // ────────────────────────────────────────────────────
+    //  GET  /api/organizations/{id}/time-overview
+    //  Admin+: Get time tracked by all members in a date range
+    // ────────────────────────────────────────────────────
+    [HttpGet("{id}/time-overview")]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<MemberTimeOverviewResponse>>> GetTimeOverview(
+        int id, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+
+        var callerRole = await GetCallerRole(id);
+        if (callerRole == null || callerRole < OrganizationRole.Admin)
+            return Forbid();
+
+        // Default to current week (Mon-Sun)
+        var now = DateTime.UtcNow;
+        var dayOfWeek = (int)now.DayOfWeek;
+        if (dayOfWeek == 0) dayOfWeek = 7;
+        var weekStart = from ?? now.Date.AddDays(-(dayOfWeek - 1));
+        var weekEnd = to ?? weekStart.AddDays(7);
+
+        var members = await _context.UserOrganizations
+            .Where(uo => uo.OrganizationId == id && uo.IsActive)
+            .Include(uo => uo.User)
+            .ToListAsync();
+
+        var memberIds = members.Select(m => m.UserId).ToList();
+
+        var timeEntries = await _context.TimeEntries
+            .Where(te => memberIds.Contains(te.UserId)
+                      && te.OrganizationId == id
+                      && !te.IsRunning
+                      && te.StartTime >= weekStart
+                      && te.StartTime < weekEnd)
+            .ToListAsync();
+
+        var result = members.Select(m =>
+        {
+            var entries = timeEntries.Where(te => te.UserId == m.UserId).ToList();
+            var totalMinutes = entries.Sum(e =>
+                e.EndTime.HasValue ? (e.EndTime.Value - e.StartTime).TotalMinutes : 0);
+            var totalPause = entries.Sum(e => e.PauseDurationMinutes);
+
+            return new MemberTimeOverviewResponse
+            {
+                UserId = m.UserId,
+                FirstName = m.User.FirstName,
+                LastName = m.User.LastName,
+                Email = m.User.Email,
+                Role = m.Role.ToString(),
+                WeeklyWorkHours = m.WeeklyWorkHours,
+                TotalTrackedMinutes = Math.Round(totalMinutes, 1),
+                NetTrackedMinutes = Math.Round(totalMinutes - totalPause, 1),
+                EntryCount = entries.Count
+            };
+        }).ToList();
+
+        return Ok(result);
+    }
+
+    // ────────────────────────────────────────────────────
+    //  GET  /api/organizations/{id}/member-entries/{userId}
+    //  Admin+: Get detailed time entries for a specific member
+    // ────────────────────────────────────────────────────
+    [HttpGet("{id}/member-entries/{userId}")]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<object>>> GetMemberEntries(
+        int id, int userId, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+
+        var callerRole = await GetCallerRole(id);
+        if (callerRole == null || callerRole < OrganizationRole.Admin)
+            return Forbid();
+
+        var now = DateTime.UtcNow;
+        var dayOfWeek = (int)now.DayOfWeek;
+        if (dayOfWeek == 0) dayOfWeek = 7;
+        var weekStart = from ?? now.Date.AddDays(-(dayOfWeek - 1));
+        var weekEnd = to ?? weekStart.AddDays(7);
+
+        var entries = await _context.TimeEntries
+            .Where(te => te.UserId == userId
+                      && te.OrganizationId == id
+                      && te.StartTime >= weekStart
+                      && te.StartTime < weekEnd)
+            .OrderByDescending(te => te.StartTime)
+            .Select(te => new
+            {
+                te.Id,
+                te.UserId,
+                te.OrganizationId,
+                te.Description,
+                te.StartTime,
+                te.EndTime,
+                te.IsRunning,
+                DurationMinutes = te.EndTime.HasValue
+                    ? Math.Round((te.EndTime.Value - te.StartTime).TotalMinutes, 1)
+                    : (double?)null,
+                te.PauseDurationMinutes,
+                NetDurationMinutes = te.EndTime.HasValue
+                    ? Math.Round((te.EndTime.Value - te.StartTime).TotalMinutes - te.PauseDurationMinutes, 1)
+                    : (double?)null,
+                te.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(entries);
+    }
 }
