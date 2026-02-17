@@ -19,7 +19,7 @@
 
 	// My role in this org
 	let myRole = $derived(
-		org?.members.find((m) => m.id === auth.user?.id)?.role ?? null
+		org?.members?.find((m) => m.id === auth.user?.id)?.role ?? null
 	);
 	let canEdit = $derived(myRole === 'Owner' || myRole === 'Admin');
 	let isOwner = $derived(myRole === 'Owner');
@@ -65,9 +65,9 @@
 
 	function startEdit() {
 		if (!org) return;
-		editName = org.name;
+		editName = org.name ?? '';
 		editDescription = org.description ?? '';
-		editSlug = org.slug;
+		editSlug = org.slug ?? '';
 		editWebsite = org.website ?? '';
 		editError = '';
 		editing = true;
@@ -127,7 +127,7 @@
 
 			const payload: AddMemberRequest = {
 				userId: user.id,
-				role: newMemberRole
+				role: newMemberRole as any
 			};
 			await organizationsApi.apiOrganizationsSlugMembersPost(orgSlug, payload);
 			await loadOrg();
@@ -144,7 +144,7 @@
 	async function updateMemberRole(userId: number, newRole: number) {
 		actionError = '';
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersUserIdPut(orgSlug, userId, { role: newRole });
+			await organizationsApi.apiOrganizationsSlugMembersUserIdPut(orgSlug, userId, { role: newRole as any });
 			await loadOrg();
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to update member role.';
@@ -228,7 +228,7 @@
 
 	// Pause Rules
 	function getPauseRules(): PauseRuleResponse[] {
-		return org?.pauseRules ? [...org.pauseRules].sort((a, b) => a.minHours - b.minHours) : [];
+		return org?.pauseRules ? [...org.pauseRules].sort((a, b) => (a.minHours ?? 0) - (b.minHours ?? 0)) : [];
 	}
 	let showAddRule = $state(false);
 	let newRuleMinHours = $state(6);
@@ -265,9 +265,9 @@
 	}
 
 	function startEditRule(rule: PauseRuleResponse) {
-		editingRuleId = rule.id;
-		editRuleMinHours = rule.minHours;
-		editRulePauseMinutes = rule.pauseMinutes;
+		editingRuleId = rule.id ?? null;
+		editRuleMinHours = rule.minHours ?? 0;
+		editRulePauseMinutes = rule.pauseMinutes ?? 0;
 		editRuleError = '';
 	}
 
@@ -380,7 +380,7 @@
 			<!-- Members section -->
 			<section class="members-section">
 				<div class="section-header">
-					<h2>Members ({org.members.length})</h2>
+					<h2>Members ({(org.members ?? []).length})</h2>
 					{#if canEdit}
 						<button class="btn-primary-sm" onclick={() => (showAddMember = !showAddMember)}>
 							{showAddMember ? 'Cancel' : '+ Add Member'}
@@ -416,7 +416,7 @@
 				{/if}
 
 				<div class="members-list">
-					{#each org.members as member}
+					{#each (org.members ?? []) as member}
 						<div class="member-row">
 							<div class="member-info">
 								<div class="member-name">
@@ -431,7 +431,7 @@
 								{#if canEdit && member.role !== 'Owner' && member.id !== auth.user?.id}
 									<select
 										value={member.role === 'Admin' ? 1 : 0}
-										onchange={(e) => updateMemberRole(member.id, parseInt(e.currentTarget.value))}
+										onchange={(e) => updateMemberRole(member.id!, parseInt(e.currentTarget.value))}
 									>
 										<option value={0}>Member</option>
 										<option value={1}>Admin</option>
@@ -442,12 +442,12 @@
 									<button
 										class="btn-icon-danger"
 										title="Remove member"
-										onclick={() => removeMember(member.id, `${member.firstName} ${member.lastName}`)}
+										onclick={() => removeMember(member.id!, `${member.firstName} ${member.lastName}`)}
 									>
 										&times;
 									</button>
 								{:else}
-									<span class="role-badge role-{member.role.toLowerCase()}">{member.role}</span>
+									<span class="role-badge role-{(member.role?.toLowerCase() ?? 'member')}">{member.role}</span>
 								{/if}
 							</div>
 						</div>
@@ -572,7 +572,7 @@
 														<span>min</span>
 													</div>
 													<div class="rule-actions">
-														<button class="btn-primary-sm" onclick={() => saveEditRule(rule.id)} disabled={editingRuleSaving}>Save</button>
+														<button class="btn-primary-sm" onclick={() => saveEditRule(rule.id!)} disabled={editingRuleSaving}>Save</button>
 														<button class="btn-secondary-sm" onclick={cancelEditRule}>Cancel</button>
 													</div>
 												</div>
@@ -582,7 +582,7 @@
 												</div>
 												<div class="rule-actions">
 													<button class="btn-secondary-sm" onclick={() => startEditRule(rule)}>Edit</button>
-													<button class="btn-icon-danger" title="Delete rule" onclick={() => deleteRule(rule.id)}>&times;</button>
+													<button class="btn-icon-danger" title="Delete rule" onclick={() => deleteRule(rule.id!)}>&times;</button>
 												</div>
 											{/if}
 										</div>

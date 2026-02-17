@@ -40,7 +40,7 @@
 	async function loadOrg() {
 		try {
 			const { data: org } = await organizationsApi.apiOrganizationsSlugGet(orgSlug);
-			orgName = org.name;
+			orgName = org.name ?? '';
 		} catch {}
 	}
 
@@ -157,20 +157,20 @@
 
 				{#each members as member}
 					{@const targetMinutes = member.weeklyWorkHours ? member.weeklyWorkHours * 60 : 0}
-					{@const pct = targetMinutes > 0 ? Math.round((member.netTrackedMinutes / targetMinutes) * 100) : 0}
-					<button class="table-row" onclick={() => toggleMemberDetail(member.userId)}>
+					{@const pct = targetMinutes > 0 ? Math.round(((member.netTrackedMinutes ?? 0) / targetMinutes) * 100) : 0}
+					<button class="table-row" onclick={() => toggleMemberDetail(member.userId!)}>
 						<span class="col-name">
 							<span class="member-name">{member.firstName} {member.lastName}</span>
 							<span class="member-email">{member.email}</span>
 						</span>
 						<span class="col-role">
-							<span class="role-badge role-{member.role.toLowerCase()}">{member.role}</span>
+							<span class="role-badge role-{(member.role?.toLowerCase() ?? 'member')}">{member.role}</span>
 						</span>
 						<span class="col-target">
 							{member.weeklyWorkHours ? `${member.weeklyWorkHours}h` : '-'}
 						</span>
-						<span class="col-tracked">{formatHours(member.totalTrackedMinutes)}</span>
-						<span class="col-net">{formatHours(member.netTrackedMinutes)}</span>
+						<span class="col-tracked">{formatHours(member.totalTrackedMinutes ?? 0)}</span>
+						<span class="col-net">{formatHours(member.netTrackedMinutes ?? 0)}</span>
 						<span class="col-entries">{member.entryCount}</span>
 						<span class="col-status">
 							{#if targetMinutes > 0}
@@ -199,15 +199,15 @@
 								<div class="detail-entries">
 									{#each memberEntries as entry}
 										<div class="detail-entry">
-											<span class="de-date">{formatDateShort(entry.startTime)}</span>
+											<span class="de-date">{formatDateShort(entry.startTime!)}</span>
 											<span class="de-time">
-												{formatTime(entry.startTime)}{entry.endTime ? ` – ${formatTime(entry.endTime)}` : ''}
+												{formatTime(entry.startTime!)}{entry.endTime ? ` – ${formatTime(entry.endTime!)}` : ''}
 											</span>
 											<span class="de-desc">{entry.description || ''}</span>
 											<span class="de-dur">
-												{entry.isRunning ? 'Running' : formatDuration(entry.netDurationMinutes ?? entry.durationMinutes)}
+												{entry.isRunning ? 'Running' : formatDuration(entry.netDurationMinutes ?? entry.durationMinutes ?? 0)}
 											</span>
-											{#if entry.pauseDurationMinutes > 0}
+											{#if (entry.pauseDurationMinutes ?? 0) > 0}
 												<span class="de-pause">-{entry.pauseDurationMinutes}m pause</span>
 											{/if}
 										</div>

@@ -67,11 +67,11 @@
 		if (!workSchedule) return 0;
 		const dayOfWeek = date.getDay();
 		const targets: Record<number, number> = {
-			1: workSchedule.targetMon,
-			2: workSchedule.targetTue,
-			3: workSchedule.targetWed,
-			4: workSchedule.targetThu,
-			5: workSchedule.targetFri,
+			1: workSchedule.targetMon ?? 0,
+			2: workSchedule.targetTue ?? 0,
+			3: workSchedule.targetWed ?? 0,
+			4: workSchedule.targetThu ?? 0,
+			5: workSchedule.targetFri ?? 0,
 		};
 		return (targets[dayOfWeek] ?? 0) * 60; // convert hours to minutes
 	}
@@ -161,9 +161,9 @@
 
 			// Compute cumulative overtime since first entry
 			if (workSchedule && allEntries.length > 0) {
-				const sorted = [...allEntries].filter(e => !e.isRunning && e.endTime).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+				const sorted = [...allEntries].filter(e => !e.isRunning && e.endTime).sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime());
 				if (sorted.length > 0) {
-					const firstDate = new Date(sorted[0].startTime);
+					const firstDate = new Date(sorted[0].startTime!);
 					firstDate.setHours(0, 0, 0, 0);
 					const today = new Date(now);
 					today.setHours(23, 59, 59, 999);
@@ -194,7 +194,7 @@
 
 	function updateElapsed() {
 		if (!currentEntry) return;
-		const start = new Date(currentEntry.startTime).getTime();
+		const start = new Date(currentEntry.startTime!).getTime();
 		const diff = Math.floor((Date.now() - start) / 1000);
 		const h = Math.floor(diff / 3600);
 		const m = Math.floor((diff % 3600) / 60);

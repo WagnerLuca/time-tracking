@@ -40,11 +40,11 @@
 		try {
 			const { data: schedule } = await organizationsApi.apiOrganizationsSlugWorkScheduleGet(orgSlug);
 			weeklyHours = schedule.weeklyWorkHours ?? null;
-			targetMon = schedule.targetMon;
-			targetTue = schedule.targetTue;
-			targetWed = schedule.targetWed;
-			targetThu = schedule.targetThu;
-			targetFri = schedule.targetFri;
+			targetMon = schedule.targetMon ?? 0;
+			targetTue = schedule.targetTue ?? 0;
+			targetWed = schedule.targetWed ?? 0;
+			targetThu = schedule.targetThu ?? 0;
+			targetFri = schedule.targetFri ?? 0;
 			// Check if all days are equal -> evenly distributed
 			const allEqual = targetMon === targetTue && targetTue === targetWed && targetWed === targetThu && targetThu === targetFri;
 			distributeEvenly = allEqual;
@@ -73,11 +73,11 @@
 			const { data: result } = await organizationsApi.apiOrganizationsSlugWorkSchedulePut(orgContext.selectedOrgSlug, payload);
 			// Update local state with server response
 			weeklyHours = result.weeklyWorkHours ?? null;
-			targetMon = result.targetMon;
-			targetTue = result.targetTue;
-			targetWed = result.targetWed;
-			targetThu = result.targetThu;
-			targetFri = result.targetFri;
+			targetMon = result.targetMon ?? 0;
+			targetTue = result.targetTue ?? 0;
+			targetWed = result.targetWed ?? 0;
+			targetThu = result.targetThu ?? 0;
+			targetFri = result.targetFri ?? 0;
 			scheduleSuccess = 'Work schedule saved.';
 			setTimeout(() => (scheduleSuccess = ''), 3000);
 		} catch (err: any) {
@@ -165,7 +165,7 @@
 				<button
 					class="org-option"
 					class:selected={orgContext.selectedOrgId === org.organizationId}
-					onclick={() => handleOrgSelect(org.organizationId)}
+					onclick={() => handleOrgSelect(org.organizationId ?? null)}
 				>
 					<span class="org-option-radio" class:checked={orgContext.selectedOrgId === org.organizationId}></span>
 					<div class="org-option-info">

@@ -1,12 +1,14 @@
 import axios from 'axios';
 import { Configuration, AuthApi, OrganizationsApi, TimeTrackingApi, UsersApi } from '$lib/api';
 
-// Automatically detect base URL based on environment
+// Detect base URL: browser uses current hostname, SSR uses Docker service name
 const getApiBaseUrl = (): string => {
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-        return 'http://backend:7000';
+    if (typeof window !== 'undefined') {
+        // Browser: same host, backend on port 7000
+        return `${window.location.protocol}//${window.location.hostname}:7000`;
     }
-    return 'http://localhost:7000';
+    // SSR: Docker internal or fallback
+    return 'http://backend:7000';
 };
 
 // Shared axios instance with interceptors

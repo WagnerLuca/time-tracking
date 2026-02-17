@@ -73,12 +73,12 @@
 			const date = new Date(range.start);
 			date.setDate(range.start.getDate() + i);
 			const isPastOrToday = date <= now;
-			return { name, date: new Date(date), minutes: 0, targetMinutes: targets[i] * 60, entryCount: 0, isPastOrToday };
+			return { name, date: new Date(date), minutes: 0, targetMinutes: (targets[i] ?? 0) * 60, entryCount: 0, isPastOrToday };
 		});
 
 		for (const entry of entries) {
 			if (entry.isRunning) continue;
-			const entryDate = new Date(entry.startTime);
+			const entryDate = new Date(entry.startTime!);
 			const dayIndex = (entryDate.getDay() + 6) % 7; // Mon=0 ... Sun=6
 			if (dayIndex >= 0 && dayIndex < 7) {
 				// Use net duration (after pause deduction) when available
@@ -105,7 +105,7 @@
 
 	function updateElapsed() {
 		if (!current) return;
-		const start = new Date(current.startTime).getTime();
+		const start = new Date(current.startTime!).getTime();
 		const diff = Math.floor((Date.now() - start) / 1000);
 		const h = Math.floor(diff / 3600);
 		const m = Math.floor((diff % 3600) / 60);
@@ -257,11 +257,11 @@
 	}
 
 	function startEditEntry(entry: TimeEntryResponse) {
-		editingEntryId = entry.id;
-		editStartTime = toLocalDateTimeInput(entry.startTime);
+		editingEntryId = entry.id ?? null;
+		editStartTime = toLocalDateTimeInput(entry.startTime!);
 		editEndTime = entry.endTime ? toLocalDateTimeInput(entry.endTime) : '';
 		editDescription = entry.description ?? '';
-		editPause = entry.pauseDurationMinutes;
+		editPause = entry.pauseDurationMinutes ?? 0;
 		editError = '';
 	}
 
@@ -445,7 +445,7 @@
 									{/if}
 								</div>
 								<div class="edit-actions">
-									<button class="btn-save-sm" onclick={() => saveEditEntry(entry.id)} disabled={editSaving}>
+									<button class="btn-save-sm" onclick={() => saveEditEntry(entry.id!)} disabled={editSaving}>
 										{editSaving ? 'Saving...' : 'Save'}
 									</button>
 									<button class="btn-cancel-sm" onclick={cancelEditEntry}>Cancel</button>
@@ -455,9 +455,9 @@
 							<div class="entry-row" class:is-running={entry.isRunning}>
 								<div class="entry-time">
 									<span class="entry-time-range">
-										{formatTime(entry.startTime)}{entry.endTime ? ` – ${formatTime(entry.endTime)}` : ''}
+										{formatTime(entry.startTime!)}{entry.endTime ? ` – ${formatTime(entry.endTime!)}` : ''}
 									</span>
-									<span class="entry-date">{formatDateShort(new Date(entry.startTime))}</span>
+									<span class="entry-date">{formatDateShort(new Date(entry.startTime!))}</span>
 								</div>
 								<div class="entry-middle">
 									{#if entry.organizationName}
@@ -469,7 +469,7 @@
 									{#if entry.isRunning}
 										<span class="running-badge">Running</span>
 									{/if}
-									{#if entry.pauseDurationMinutes > 0}
+									{#if (entry.pauseDurationMinutes ?? 0) > 0}
 										{#if orgDetail?.allowEditPause && !entry.isRunning}
 											<button class="pause-badge pause-badge-edit" title="Click to edit pause" onclick={() => startEditEntry(entry)}>-{entry.pauseDurationMinutes}m pause &#9998;</button>
 										{:else}
@@ -480,17 +480,17 @@
 								<div class="entry-dur">
 									{#if entry.isRunning}
 										{elapsed}
-									{:else if entry.pauseDurationMinutes > 0}
+									{:else if (entry.pauseDurationMinutes ?? 0) > 0}
 										<span class="net-dur">{formatDuration(entry.netDurationMinutes ?? undefined)}</span>
-										<span class="gross-dur">({formatDuration(entry.durationMinutes)})</span>
+										<span class="gross-dur">({formatDuration(entry.durationMinutes ?? undefined)})</span>
 									{:else}
-										{formatDuration(entry.durationMinutes)}
+										{formatDuration(entry.durationMinutes ?? undefined)}
 									{/if}
 								</div>
 								<div class="entry-actions">
 									{#if !entry.isRunning}
 										<button class="btn-icon-edit" title="Edit" onclick={() => startEditEntry(entry)}>&#9998;</button>
-										<button class="btn-icon-danger" title="Delete" onclick={() => deleteEntry(entry.id)}>
+										<button class="btn-icon-danger" title="Delete" onclick={() => deleteEntry(entry.id!)}>
 											&times;
 										</button>
 									{/if}
