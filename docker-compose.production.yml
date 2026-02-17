@@ -19,9 +19,11 @@ services:
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/wagnerluca/time-tracking-backend:latest}
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-pass}@db:5432/${POSTGRES_DB:-mydb}
+      UseInMemoryDatabase: ${USE_INMEMORY_DB:-false}
+      DATABASE_URL: postgres://${POSTGRES_USER:-timetrack}:${POSTGRES_PASSWORD:-timetrack}@db:5432/${POSTGRES_DB:-timetracking}
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_URLS: http://+:7000
+      JwtSettings__Secret: ${JWT_SECRET:-CHANGE_THIS_TO_A_SECURE_SECRET_KEY_AT_LEAST_32_CHARACTERS_LONG_FOR_PRODUCTION}
     ports:
       - "7000:7000"
     depends_on:
