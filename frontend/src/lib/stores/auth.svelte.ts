@@ -1,5 +1,5 @@
-import { apiService } from '$lib/apiService';
-import type { LoginRequest, LoginResponse, RegisterRequest, UserInfo } from '$lib/types';
+import { authApi } from '$lib/apiClient';
+import type { LoginRequest, LoginResponse, RegisterRequest, UserInfo } from '$lib/api';
 
 const TOKEN_KEY = 'authToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
@@ -30,10 +30,10 @@ function createAuthStore() {
 	}
 
 	function setAuth(loginResponse: LoginResponse) {
-		token = loginResponse.accessToken;
-		user = loginResponse.user;
-		localStorage.setItem(TOKEN_KEY, loginResponse.accessToken);
-		localStorage.setItem(REFRESH_TOKEN_KEY, loginResponse.refreshToken);
+		token = loginResponse.accessToken!;
+		user = loginResponse.user!;
+		localStorage.setItem(TOKEN_KEY, loginResponse.accessToken!);
+		localStorage.setItem(REFRESH_TOKEN_KEY, loginResponse.refreshToken!);
 		localStorage.setItem(USER_KEY, JSON.stringify(loginResponse.user));
 	}
 
@@ -46,20 +46,20 @@ function createAuthStore() {
 	}
 
 	async function login(request: LoginRequest): Promise<void> {
-		const response = await apiService.post<LoginResponse>('/api/Auth/login', request);
-		setAuth(response);
+		const { data } = await authApi.apiAuthLoginPost(request);
+		setAuth(data);
 	}
 
 	async function register(request: RegisterRequest): Promise<void> {
-		const response = await apiService.post<LoginResponse>('/api/Auth/register', request);
-		setAuth(response);
+		const { data } = await authApi.apiAuthRegisterPost(request);
+		setAuth(data);
 	}
 
 	async function logout(): Promise<void> {
 		try {
 			const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 			if (refreshToken) {
-				await apiService.post('/api/Auth/logout', { refreshToken });
+				await authApi.apiAuthLogoutPost({ refreshToken });
 			}
 		} catch {
 			// Ignore logout errors
@@ -70,7 +70,7 @@ function createAuthStore() {
 
 	async function fetchCurrentUser(): Promise<void> {
 		try {
-			const userInfo = await apiService.get<UserInfo>('/api/Auth/me');
+			const { data: userInfo } = await authApi.apiAuthMeGet();
 			user = userInfo;
 			localStorage.setItem(USER_KEY, JSON.stringify(userInfo));
 		} catch {

@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { apiService } from '$lib/apiService';
+	import { organizationsApi, usersApi } from '$lib/apiClient';
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationRequest,
@@ -11,7 +11,7 @@
 		UpdateOrganizationSettingsRequest,
 		PauseRuleResponse,
 		CreatePauseRuleRequest
-	} from '$lib/types';
+	} from '$lib/api';
 
 	let org = $state<OrganizationDetailResponse | null>(null);
 	let loading = $state(true);
@@ -54,7 +54,8 @@
 		loading = true;
 		error = '';
 		try {
-			org = await apiService.get<OrganizationDetailResponse>(`/api/Organizations/${orgSlug}`);
+			const { data } = await organizationsApi.apiOrganizationsSlugGet(orgSlug);
+			org = data;
 		} catch (err: any) {
 			error = err.response?.status === 404 ? 'Organization not found.' : 'Failed to load organization.';
 		} finally {
@@ -87,7 +88,7 @@
 				slug: editSlug.trim(),
 				website: editWebsite.trim() || undefined
 			};
-			await apiService.put(`/api/Organizations/${orgSlug}`, payload);
+			await organizationsApi.apiOrganizationsSlugPut(orgSlug, payload);
 			await loadOrg();
 			editing = false;
 		} catch (err: any) {
@@ -101,7 +102,7 @@
 		if (!confirm('Are you sure you want to delete this organization? This cannot be undone.'))
 			return;
 		try {
-			await apiService.delete(`/api/Organizations/${orgSlug}`);
+			await organizationsApi.apiOrganizationsSlugDelete(orgSlug);
 			goto('/organizations');
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to delete organization.';
@@ -114,7 +115,7 @@
 		addingMember = true;
 		try {
 			// First search user by email via the Users endpoint
-			const users = await apiService.get<any[]>('/api/Users');
+			const { data: users } = await usersApi.apiUsersGet();
 			const user = users.find(
 				(u: any) => u.email.toLowerCase() === newMemberEmail.toLowerCase().trim()
 			);
@@ -128,7 +129,7 @@
 				userId: user.id,
 				role: newMemberRole
 			};
-			await apiService.post(`/api/Organizations/${orgSlug}/members`, payload);
+			await organizationsApi.apiOrganizationsSlugMembersPost(orgSlug, payload);
 			await loadOrg();
 			showAddMember = false;
 			newMemberEmail = '';
@@ -143,7 +144,7 @@
 	async function updateMemberRole(userId: number, newRole: number) {
 		actionError = '';
 		try {
-			await apiService.put(`/api/Organizations/${orgSlug}/members/${userId}`, { role: newRole });
+			await organizationsApi.apiOrganizationsSlugMembersUserIdPut(orgSlug, userId, { role: newRole });
 			await loadOrg();
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to update member role.';
@@ -154,7 +155,7 @@
 		if (!confirm(`Remove ${memberName} from this organization?`)) return;
 		actionError = '';
 		try {
-			await apiService.delete(`/api/Organizations/${orgSlug}/members/${userId}`);
+			await organizationsApi.apiOrganizationsSlugMembersUserIdDelete(orgSlug, userId);
 			await loadOrg();
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to remove member.';
@@ -182,7 +183,7 @@
 			const payload: UpdateOrganizationSettingsRequest = {
 				autoPauseEnabled: !org.autoPauseEnabled
 			};
-			await apiService.put(`/api/Organizations/${orgSlug}/settings`, payload);
+			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
 			await loadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to update setting.';
@@ -199,7 +200,7 @@
 			const payload: UpdateOrganizationSettingsRequest = {
 				allowEditPastEntries: !org.allowEditPastEntries
 			};
-			await apiService.put(`/api/Organizations/${orgSlug}/settings`, payload);
+			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
 			await loadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to update setting.';
@@ -216,7 +217,7 @@
 			const payload: UpdateOrganizationSettingsRequest = {
 				allowEditPause: !org.allowEditPause
 			};
-			await apiService.put(`/api/Organizations/${orgSlug}/settings`, payload);
+			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
 			await loadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to update setting.';
@@ -226,7 +227,7 @@
 	}
 
 	// Pause Rules
-	function getPauseRules(): import('$lib/types').PauseRuleResponse[] {
+	function getPauseRules(): PauseRuleResponse[] {
 		return org?.pauseRules ? [...org.pauseRules].sort((a, b) => a.minHours - b.minHours) : [];
 	}
 	let showAddRule = $state(false);
@@ -251,7 +252,7 @@
 				minHours: newRuleMinHours,
 				pauseMinutes: newRulePauseMinutes
 			};
-			await apiService.post(`/api/Organizations/${orgSlug}/pause-rules`, payload);
+			await organizationsApi.apiOrganizationsSlugPauseRulesPost(orgSlug, payload);
 			await loadOrg();
 			showAddRule = false;
 			newRuleMinHours = 6;
@@ -278,7 +279,7 @@
 		editRuleError = '';
 		editingRuleSaving = true;
 		try {
-			await apiService.put(`/api/Organizations/${orgSlug}/pause-rules/${ruleId}`, {
+			await organizationsApi.apiOrganizationsSlugPauseRulesRuleIdPut(orgSlug, ruleId, {
 				minHours: editRuleMinHours,
 				pauseMinutes: editRulePauseMinutes
 			});
@@ -294,7 +295,7 @@
 	async function deleteRule(ruleId: number) {
 		if (!confirm('Delete this pause rule?')) return;
 		try {
-			await apiService.delete(`/api/Organizations/${orgSlug}/pause-rules/${ruleId}`);
+			await organizationsApi.apiOrganizationsSlugPauseRulesRuleIdDelete(orgSlug, ruleId);
 			await loadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to delete rule.';

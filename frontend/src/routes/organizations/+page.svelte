@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { apiService } from '$lib/apiService';
-	import type { OrganizationResponse } from '$lib/types';
+	import { organizationsApi } from '$lib/apiClient';
+	import type { OrganizationResponse } from '$lib/api';
 
 	let organizations = $state<OrganizationResponse[]>([]);
 	let loading = $state(true);
@@ -9,7 +9,8 @@
 
 	onMount(async () => {
 		try {
-			organizations = await apiService.get<OrganizationResponse[]>('/api/Organizations');
+			const { data } = await organizationsApi.apiOrganizationsGet();
+			organizations = data;
 		} catch (err) {
 			error = 'Failed to load organizations.';
 			console.error(err);

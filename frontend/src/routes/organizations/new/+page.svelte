@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth.svelte';
-	import { apiService } from '$lib/apiService';
+	import { organizationsApi } from '$lib/apiClient';
 	import { goto } from '$app/navigation';
-	import type { CreateOrganizationRequest } from '$lib/types';
+	import type { CreateOrganizationRequest } from '$lib/api';
 
 	let name = $state('');
 	let slug = $state('');
@@ -46,7 +46,7 @@
 				description: description.trim() || undefined,
 				website: website.trim() || undefined
 			};
-			const created = await apiService.post<any>('/api/Organizations', payload);
+			const { data: created } = await organizationsApi.apiOrganizationsPost(payload);
 			goto(`/organizations/${created.slug}`);
 		} catch (err: any) {
 			error = err.response?.data?.message || 'Failed to create organization.';

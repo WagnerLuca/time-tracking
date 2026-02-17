@@ -2,8 +2,8 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { apiService } from '$lib/apiService';
-	import type { TimeEntryResponse, StartTimeEntryRequest, WorkScheduleResponse } from '$lib/types';
+	import { timeTrackingApi, organizationsApi } from '$lib/apiClient';
+	import type { TimeEntryResponse, StartTimeEntryRequest, WorkScheduleResponse } from '$lib/api';
 
 	let currentEntry = $state<TimeEntryResponse | null>(null);
 	let todayMinutes = $state(0);
@@ -39,7 +39,8 @@
 
 	async function loadCurrentTimer() {
 		try {
-			currentEntry = await apiService.get<TimeEntryResponse>('/api/TimeTracking/current');
+			const { data } = await timeTrackingApi.apiTimeTrackingCurrentGet();
+			currentEntry = data;
 			if (currentEntry) {
 				timerInterval = setInterval(updateElapsed, 1000);
 				updateElapsed();
@@ -55,9 +56,8 @@
 			return;
 		}
 		try {
-			workSchedule = await apiService.get<WorkScheduleResponse>(
-				`/api/Organizations/${orgContext.selectedOrgSlug}/work-schedule`
-			);
+			const { data } = await organizationsApi.apiOrganizationsSlugWorkScheduleGet(orgContext.selectedOrgSlug!);
+			workSchedule = data;
 		} catch {
 			workSchedule = null;
 		}
@@ -135,20 +135,16 @@
 			const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
 			// Fetch all time entries for cumulative overtime
-			const [todayEntries, weekEntries, monthEntries, allEntries] = await Promise.all([
-				apiService.get<TimeEntryResponse[]>(
-					`/api/TimeTracking?from=${todayStart.toISOString()}&to=${todayEnd.toISOString()}&limit=200`
-				),
-				apiService.get<TimeEntryResponse[]>(
-					`/api/TimeTracking?from=${weekStart.toISOString()}&to=${weekEnd.toISOString()}&limit=200`
-				),
-				apiService.get<TimeEntryResponse[]>(
-					`/api/TimeTracking?from=${monthStart.toISOString()}&to=${monthEnd.toISOString()}&limit=500`
-				),
-				apiService.get<TimeEntryResponse[]>(
-					`/api/TimeTracking?limit=10000`
-				)
+			const [todayRes, weekRes, monthRes, allRes] = await Promise.all([
+				timeTrackingApi.apiTimeTrackingGet(undefined, todayStart.toISOString(), todayEnd.toISOString(), 200),
+				timeTrackingApi.apiTimeTrackingGet(undefined, weekStart.toISOString(), weekEnd.toISOString(), 200),
+				timeTrackingApi.apiTimeTrackingGet(undefined, monthStart.toISOString(), monthEnd.toISOString(), 500),
+				timeTrackingApi.apiTimeTrackingGet(undefined, undefined, undefined, 10000)
 			]);
+			const todayEntries = todayRes.data;
+			const weekEntries = weekRes.data;
+			const monthEntries = monthRes.data;
+			const allEntries = allRes.data;
 
 			const sumMinutes = (entries: TimeEntryResponse[]) =>
 				entries.filter(e => !e.isRunning && (e.netDurationMinutes ?? e.durationMinutes))
@@ -213,7 +209,8 @@
 			const payload: StartTimeEntryRequest = {
 				organizationSlug: orgContext.selectedOrgSlug ?? undefined
 			};
-			currentEntry = await apiService.post<TimeEntryResponse>('/api/TimeTracking/start', payload);
+			const { data } = await timeTrackingApi.apiTimeTrackingStartPost(payload);
+			currentEntry = data;
 			timerInterval = setInterval(updateElapsed, 1000);
 			updateElapsed();
 		} catch (err: any) {
@@ -227,7 +224,7 @@
 		actionError = '';
 		stopping = true;
 		try {
-			await apiService.post('/api/TimeTracking/stop', {});
+			await timeTrackingApi.apiTimeTrackingStopPost({});
 			if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
 			currentEntry = null;
 			elapsed = '00:00:00';

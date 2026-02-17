@@ -3,8 +3,8 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { goto } from '$app/navigation';
-	import { apiService } from '$lib/apiService';
-	import type { WorkScheduleResponse, UpdateWorkScheduleRequest } from '$lib/types';
+	import { organizationsApi, authApi } from '$lib/apiClient';
+	import type { WorkScheduleResponse, UpdateWorkScheduleRequest } from '$lib/api';
 
 	let changePasswordError = $state('');
 	let changePasswordSuccess = $state('');
@@ -38,7 +38,7 @@
 	async function loadWorkSchedule(orgSlug: string) {
 		scheduleLoading = true;
 		try {
-			const schedule = await apiService.get<WorkScheduleResponse>(`/api/Organizations/${orgSlug}/work-schedule`);
+			const { data: schedule } = await organizationsApi.apiOrganizationsSlugWorkScheduleGet(orgSlug);
 			weeklyHours = schedule.weeklyWorkHours ?? null;
 			targetMon = schedule.targetMon;
 			targetTue = schedule.targetTue;
@@ -70,7 +70,7 @@
 				targetThu: distributeEvenly ? undefined : targetThu,
 				targetFri: distributeEvenly ? undefined : targetFri
 			};
-			const result = await apiService.put<WorkScheduleResponse>(`/api/Organizations/${orgContext.selectedOrgSlug}/work-schedule`, payload);
+			const { data: result } = await organizationsApi.apiOrganizationsSlugWorkSchedulePut(orgContext.selectedOrgSlug, payload);
 			// Update local state with server response
 			weeklyHours = result.weeklyWorkHours ?? null;
 			targetMon = result.targetMon;
@@ -104,8 +104,7 @@
 		}
 		saving = true;
 		try {
-			const { apiService } = await import('$lib/apiService');
-			await apiService.post('/api/Auth/change-password', {
+			await authApi.apiAuthChangePasswordPost({
 				currentPassword,
 				newPassword
 			});

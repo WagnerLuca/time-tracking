@@ -1,5 +1,5 @@
-import { apiService } from '$lib/apiService';
-import type { UserOrganizationResponse } from '$lib/types';
+import { organizationsApi } from '$lib/apiClient';
+import type { UserOrganizationResponse } from '$lib/api';
 
 const ORG_KEY = 'selectedOrgId';
 
@@ -25,9 +25,8 @@ function createOrgContext() {
 	async function loadOrganizations(userId: number) {
 		loading = true;
 		try {
-			organizations = await apiService.get<UserOrganizationResponse[]>(
-				`/api/Organizations/user/${userId}`
-			);
+			const { data } = await organizationsApi.apiOrganizationsUserUserIdGet(userId);
+			organizations = data;
 			// Validate that saved org still exists
 			if (selectedOrgId && !organizations.some((o) => o.organizationId === selectedOrgId)) {
 				selectedOrgId = null;

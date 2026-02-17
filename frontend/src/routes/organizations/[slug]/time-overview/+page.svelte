@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { apiService } from '$lib/apiService';
-	import type { MemberTimeOverviewResponse, OrganizationDetailResponse } from '$lib/types';
+	import { organizationsApi } from '$lib/apiClient';
+	import type { MemberTimeOverviewResponse, OrganizationDetailResponse, TimeEntryResponse } from '$lib/api';
 
 	let orgSlug: string;
 	let orgName = $state('');
@@ -16,7 +16,7 @@
 
 	// Expanded member detail
 	let expandedUserId = $state<number | null>(null);
-	let memberEntries = $state<any[]>([]);
+	let memberEntries = $state<TimeEntryResponse[]>([]);
 	let entriesLoading = $state(false);
 
 	onMount(() => {
@@ -39,7 +39,7 @@
 
 	async function loadOrg() {
 		try {
-			const org = await apiService.get<OrganizationDetailResponse>(`/api/Organizations/${orgSlug}`);
+			const { data: org } = await organizationsApi.apiOrganizationsSlugGet(orgSlug);
 			orgName = org.name;
 		} catch {}
 	}
@@ -50,9 +50,8 @@
 		try {
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
-			members = await apiService.get<MemberTimeOverviewResponse[]>(
-				`/api/Organizations/${orgSlug}/time-overview?from=${from}&to=${to}`
-			);
+			const { data } = await organizationsApi.apiOrganizationsSlugTimeOverviewGet(orgSlug, from, to);
+			members = data;
 		} catch (err: any) {
 			if (err.response?.status === 403) {
 				error = 'You need Admin or Owner role to view this page.';
@@ -82,9 +81,8 @@
 		try {
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
-			memberEntries = await apiService.get<any[]>(
-				`/api/Organizations/${orgSlug}/member-entries/${userId}?from=${from}&to=${to}`
-			);
+			const { data } = await organizationsApi.apiOrganizationsSlugMemberEntriesUserIdGet(orgSlug, userId, from, to);
+			memberEntries = data;
 		} catch {
 			memberEntries = [];
 		} finally {

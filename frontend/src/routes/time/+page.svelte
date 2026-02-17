@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { apiService } from '$lib/apiService';
-	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/types';
+	import { timeTrackingApi, organizationsApi } from '$lib/apiClient';
+	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/api';
 
 	let current = $state<TimeEntryResponse | null>(null);
 	let weekEntries = $state<TimeEntryResponse[]>([]);
@@ -115,7 +115,8 @@
 
 	async function loadCurrent() {
 		try {
-			current = await apiService.get<TimeEntryResponse>('/api/TimeTracking/current');
+			const { data } = await timeTrackingApi.apiTimeTrackingCurrentGet();
+			current = data;
 			if (current) {
 				note = current.description ?? '';
 				startTimer();
@@ -129,9 +130,8 @@
 		try {
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
-			weekEntries = await apiService.get<TimeEntryResponse[]>(
-				`/api/TimeTracking?from=${from}&to=${to}&limit=200`
-			);
+			const { data } = await timeTrackingApi.apiTimeTrackingGet(undefined, from, to, 200);
+			weekEntries = data;
 		} catch {
 			weekEntries = [];
 		}
@@ -144,16 +144,14 @@
 			return;
 		}
 		try {
-			workSchedule = await apiService.get<WorkScheduleResponse>(
-				`/api/Organizations/${orgContext.selectedOrgSlug}/work-schedule`
-			);
+			const { data: ws } = await organizationsApi.apiOrganizationsSlugWorkScheduleGet(orgContext.selectedOrgSlug!);
+			workSchedule = ws;
 		} catch {
 			workSchedule = null;
 		}
 		try {
-			orgDetail = await apiService.get<OrganizationDetailResponse>(
-				`/api/Organizations/${orgContext.selectedOrgSlug}`
-			);
+			const { data: od } = await organizationsApi.apiOrganizationsSlugGet(orgContext.selectedOrgSlug!);
+			orgDetail = od;
 		} catch {
 			orgDetail = null;
 		}
@@ -167,7 +165,8 @@
 				description: note.trim() || undefined,
 				organizationSlug: orgContext.selectedOrgSlug ?? undefined
 			};
-			current = await apiService.post<TimeEntryResponse>('/api/TimeTracking/start', payload);
+			const { data } = await timeTrackingApi.apiTimeTrackingStartPost(payload);
+			current = data;
 			startTimer();
 			await loadWeek();
 		} catch (err: any) {
@@ -182,7 +181,7 @@
 		stopping = true;
 		try {
 			const payload = { description: note.trim() || undefined };
-			await apiService.post('/api/TimeTracking/stop', payload);
+			await timeTrackingApi.apiTimeTrackingStopPost(payload);
 			current = null;
 			stopTimer();
 			note = '';
@@ -197,7 +196,7 @@
 	async function deleteEntry(id: number) {
 		if (!confirm('Delete this time entry?')) return;
 		try {
-			await apiService.delete(`/api/TimeTracking/${id}`);
+			await timeTrackingApi.apiTimeTrackingIdDelete(id);
 			weekEntries = weekEntries.filter((e) => e.id !== id);
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to delete entry.';
@@ -282,7 +281,7 @@
 			if (orgDetail?.allowEditPause) {
 				payload.pauseDurationMinutes = Math.max(0, Number(editPause) || 0);
 			}
-			await apiService.put(`/api/TimeTracking/${entryId}`, payload);
+			await timeTrackingApi.apiTimeTrackingIdPut(entryId, payload);
 			await loadWeek();
 			editingEntryId = null;
 		} catch (err: any) {
