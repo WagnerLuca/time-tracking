@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth.svelte';
+	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { organizationsApi } from '$lib/apiClient';
 	import { goto } from '$app/navigation';
 	import type { CreateOrganizationRequest } from '$lib/api';
@@ -47,6 +48,11 @@
 				website: website.trim() || undefined
 			};
 			const { data: created } = await organizationsApi.apiOrganizationsPost(payload);
+			// Refresh org context so the new org appears immediately in the UI
+			if (auth.user?.id) {
+				await orgContext.loadOrganizations(auth.user.id);
+				orgContext.select(created.id!);
+			}
 			goto(`/organizations/${created.slug}`);
 		} catch (err: any) {
 			error = err.response?.data?.message || 'Failed to create organization.';

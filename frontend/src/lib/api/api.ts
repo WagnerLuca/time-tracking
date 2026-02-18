@@ -3568,6 +3568,130 @@ export const WorkScheduleApiAxiosParamCreator = function (configuration?: Config
         /**
          * 
          * @param {string} slug 
+         * @param {SetInitialOvertimeRequest} [setInitialOvertimeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugInitialOvertimePut: async (slug: string, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugInitialOvertimePut', 'slug', slug)
+            const localVarPath = `/api/organizations/{slug}/initial-overtime`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(setInitialOvertimeRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugMembersMemberIdWorkScheduleGet: async (slug: string, memberId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdWorkScheduleGet', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdWorkScheduleGet', 'memberId', memberId)
+            const localVarPath = `/api/organizations/{slug}/members/{memberId}/work-schedule`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {UpdateWorkScheduleRequest} [updateWorkScheduleRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugMembersMemberIdWorkSchedulePut: async (slug: string, memberId: number, updateWorkScheduleRequest?: UpdateWorkScheduleRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdWorkSchedulePut', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdWorkSchedulePut', 'memberId', memberId)
+            const localVarPath = `/api/organizations/{slug}/members/{memberId}/work-schedule`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updateWorkScheduleRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
@@ -3653,6 +3777,46 @@ export const WorkScheduleApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @param {string} slug 
+         * @param {SetInitialOvertimeRequest} [setInitialOvertimeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugInitialOvertimePut(slug: string, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugInitialOvertimePut(slug, setInitialOvertimeRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['WorkScheduleApi.apiOrganizationsSlugInitialOvertimePut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugMembersMemberIdWorkScheduleGet(slug: string, memberId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<WorkScheduleResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugMembersMemberIdWorkScheduleGet(slug, memberId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['WorkScheduleApi.apiOrganizationsSlugMembersMemberIdWorkScheduleGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {UpdateWorkScheduleRequest} [updateWorkScheduleRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugMembersMemberIdWorkSchedulePut(slug: string, memberId: number, updateWorkScheduleRequest?: UpdateWorkScheduleRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<WorkScheduleResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugMembersMemberIdWorkSchedulePut(slug, memberId, updateWorkScheduleRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['WorkScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulePut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
@@ -3687,6 +3851,37 @@ export const WorkScheduleApiFactory = function (configuration?: Configuration, b
         /**
          * 
          * @param {string} slug 
+         * @param {SetInitialOvertimeRequest} [setInitialOvertimeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugInitialOvertimePut(slug: string, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiOrganizationsSlugInitialOvertimePut(slug, setInitialOvertimeRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugMembersMemberIdWorkScheduleGet(slug: string, memberId: number, options?: RawAxiosRequestConfig): AxiosPromise<WorkScheduleResponse> {
+            return localVarFp.apiOrganizationsSlugMembersMemberIdWorkScheduleGet(slug, memberId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {UpdateWorkScheduleRequest} [updateWorkScheduleRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugMembersMemberIdWorkSchedulePut(slug: string, memberId: number, updateWorkScheduleRequest?: UpdateWorkScheduleRequest, options?: RawAxiosRequestConfig): AxiosPromise<WorkScheduleResponse> {
+            return localVarFp.apiOrganizationsSlugMembersMemberIdWorkSchedulePut(slug, memberId, updateWorkScheduleRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
@@ -3710,6 +3905,40 @@ export const WorkScheduleApiFactory = function (configuration?: Configuration, b
  * WorkScheduleApi - object-oriented interface
  */
 export class WorkScheduleApi extends BaseAPI {
+    /**
+     * 
+     * @param {string} slug 
+     * @param {SetInitialOvertimeRequest} [setInitialOvertimeRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugInitialOvertimePut(slug: string, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options?: RawAxiosRequestConfig) {
+        return WorkScheduleApiFp(this.configuration).apiOrganizationsSlugInitialOvertimePut(slug, setInitialOvertimeRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugMembersMemberIdWorkScheduleGet(slug: string, memberId: number, options?: RawAxiosRequestConfig) {
+        return WorkScheduleApiFp(this.configuration).apiOrganizationsSlugMembersMemberIdWorkScheduleGet(slug, memberId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {UpdateWorkScheduleRequest} [updateWorkScheduleRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugMembersMemberIdWorkSchedulePut(slug: string, memberId: number, updateWorkScheduleRequest?: UpdateWorkScheduleRequest, options?: RawAxiosRequestConfig) {
+        return WorkScheduleApiFp(this.configuration).apiOrganizationsSlugMembersMemberIdWorkSchedulePut(slug, memberId, updateWorkScheduleRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
     /**
      * 
      * @param {string} slug 

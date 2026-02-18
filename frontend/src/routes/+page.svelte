@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { timeTrackingApi, organizationsApi } from '$lib/apiClient';
+	import { timeTrackingApi, organizationsApi, workScheduleApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, StartTimeEntryRequest, WorkScheduleResponse } from '$lib/api';
 
 	let currentEntry = $state<TimeEntryResponse | null>(null);
@@ -15,11 +15,13 @@
 	let cumulativeOvertime = $state(0);
 	let workSchedule = $state<WorkScheduleResponse | null>(null);
 	let elapsed = $state('00:00:00');
+	let runningMinutes = $state(0);
 	let loading = $state(true);
 	let starting = $state(false);
 	let stopping = $state(false);
 	let actionError = $state('');
 	let timerInterval: ReturnType<typeof setInterval> | null = null;
+	let prevOrgId: number | null | undefined = undefined;
 
 	onMount(async () => {
 		if (!auth.user) return;
@@ -31,6 +33,15 @@
 		} finally {
 			loading = false;
 		}
+	});
+
+	// Reload when org changes
+	$effect(() => {
+		const currentOrgId = orgContext.selectedOrgId;
+		if (prevOrgId !== undefined && prevOrgId !== currentOrgId) {
+			loadWorkSchedule().then(() => loadStats());
+		}
+		prevOrgId = currentOrgId;
 	});
 
 	onDestroy(() => {
@@ -56,7 +67,7 @@
 			return;
 		}
 		try {
-			const { data } = await organizationsApi.apiOrganizationsSlugWorkScheduleGet(orgContext.selectedOrgSlug!);
+			const { data } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgContext.selectedOrgSlug!);
 			workSchedule = data;
 		} catch {
 			workSchedule = null;
@@ -135,11 +146,12 @@
 			const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
 			// Fetch all time entries for cumulative overtime
+			const orgId = orgContext.selectedOrgId ?? undefined;
 			const [todayRes, weekRes, monthRes, allRes] = await Promise.all([
-				timeTrackingApi.apiTimeTrackingGet(undefined, todayStart.toISOString(), todayEnd.toISOString(), 200),
-				timeTrackingApi.apiTimeTrackingGet(undefined, weekStart.toISOString(), weekEnd.toISOString(), 200),
-				timeTrackingApi.apiTimeTrackingGet(undefined, monthStart.toISOString(), monthEnd.toISOString(), 500),
-				timeTrackingApi.apiTimeTrackingGet(undefined, undefined, undefined, 10000)
+				timeTrackingApi.apiTimeTrackingGet(orgId, todayStart.toISOString(), todayEnd.toISOString(), 200),
+				timeTrackingApi.apiTimeTrackingGet(orgId, weekStart.toISOString(), weekEnd.toISOString(), 200),
+				timeTrackingApi.apiTimeTrackingGet(orgId, monthStart.toISOString(), monthEnd.toISOString(), 500),
+				timeTrackingApi.apiTimeTrackingGet(orgId, undefined, undefined, 10000)
 			]);
 			const todayEntries = todayRes.data;
 			const weekEntries = weekRes.data;
@@ -179,7 +191,9 @@
 						cursor.setDate(cursor.getDate() + 1);
 					}
 
-					cumulativeOvertime = totalWorked - totalTargetMins;
+					const initialOvertimeHours = (workSchedule?.initialOvertimeMode !== 'Disabled' && workSchedule?.initialOvertimeHours) ? workSchedule.initialOvertimeHours * 60 : 0;
+					const initialOvertime = initialOvertimeHours;
+					cumulativeOvertime = totalWorked - totalTargetMins + initialOvertime;
 				}
 			} else {
 				cumulativeOvertime = 0;
@@ -193,9 +207,10 @@
 	}
 
 	function updateElapsed() {
-		if (!currentEntry) return;
+		if (!currentEntry) { runningMinutes = 0; return; }
 		const start = new Date(currentEntry.startTime!).getTime();
 		const diff = Math.floor((Date.now() - start) / 1000);
+		runningMinutes = diff / 60;
 		const h = Math.floor(diff / 3600);
 		const m = Math.floor((diff % 3600) / 60);
 		const s = diff % 60;
@@ -228,6 +243,7 @@
 			if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
 			currentEntry = null;
 			elapsed = '00:00:00';
+			runningMinutes = 0;
 			await loadStats();
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to stop timer.';
@@ -293,28 +309,28 @@
 	<div class="stats-row">
 		<div class="stat-card">
 			<span class="stat-label">Today</span>
-			<span class="stat-value">{formatHours(todayMinutes)}</span>
+			<span class="stat-value">{formatHours(todayMinutes + runningMinutes)}</span>
 			{#if todayTarget > 0}
 				<span class="stat-target">/ {formatHours(todayTarget)}</span>
-				{@const d = todayMinutes - todayTarget}
+				{@const d = todayMinutes + runningMinutes - todayTarget}
 				<span class="stat-delta" class:positive={d > 0} class:negative={d < 0}>{formatDelta(d)}</span>
 			{/if}
 		</div>
 		<div class="stat-card accent">
 			<span class="stat-label">This Week</span>
-			<span class="stat-value">{formatHours(weekMinutes)}</span>
+			<span class="stat-value">{formatHours(weekMinutes + runningMinutes)}</span>
 			{#if weekTarget > 0}
 				<span class="stat-target">/ {formatHours(weekTarget)}</span>
-				{@const d = weekMinutes - weekTarget}
+				{@const d = weekMinutes + runningMinutes - weekTarget}
 				<span class="stat-delta" class:positive={d > 0} class:negative={d < 0}>{formatDelta(d)}</span>
 			{/if}
 		</div>
 		<div class="stat-card">
 			<span class="stat-label">{getMonthName()}</span>
-			<span class="stat-value">{formatHours(monthMinutes)}</span>
+			<span class="stat-value">{formatHours(monthMinutes + runningMinutes)}</span>
 			{#if monthTarget > 0}
 				<span class="stat-target">/ {formatHours(monthTarget)}</span>
-				{@const d = monthMinutes - monthTarget}
+				{@const d = monthMinutes + runningMinutes - monthTarget}
 				<span class="stat-delta" class:positive={d > 0} class:negative={d < 0}>{formatDelta(d)}</span>
 			{/if}
 		</div>
@@ -322,9 +338,9 @@
 
 	<!-- Cumulative overtime -->
 	{#if workSchedule}
-		<div class="overtime-card" class:positive={cumulativeOvertime > 0} class:negative={cumulativeOvertime < 0}>
+		<div class="overtime-card" class:positive={cumulativeOvertime + runningMinutes > 0} class:negative={cumulativeOvertime + runningMinutes < 0}>
 			<span class="overtime-label">Cumulative Balance</span>
-			<span class="overtime-value">{formatDelta(cumulativeOvertime)}</span>
+			<span class="overtime-value">{formatDelta(cumulativeOvertime + runningMinutes)}</span>
 			<span class="overtime-hint">Since first tracked entry</span>
 		</div>
 	{/if}

@@ -3,7 +3,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { goto } from '$app/navigation';
-	import { organizationsApi, authApi } from '$lib/apiClient';
+	import { organizationsApi, authApi, workScheduleApi } from '$lib/apiClient';
 	import type { WorkScheduleResponse, UpdateWorkScheduleRequest } from '$lib/api';
 
 	let changePasswordError = $state('');
@@ -20,10 +20,17 @@
 	let targetWed = $state(0);
 	let targetThu = $state(0);
 	let targetFri = $state(0);
+	let initialOvertimeHours = $state(0);
+	let initialOvertimeMode = $state('Disabled');
 	let scheduleLoading = $state(false);
 	let scheduleSaving = $state(false);
 	let scheduleError = $state('');
 	let scheduleSuccess = $state('');
+
+	// Overtime state (separate from schedule)
+	let overtimeSaving = $state(false);
+	let overtimeError = $state('');
+	let overtimeSuccess = $state('');
 
 	// Load work schedule when org changes
 	$effect(() => {
@@ -32,19 +39,23 @@
 		} else {
 			weeklyHours = null;
 			targetMon = targetTue = targetWed = targetThu = targetFri = 0;
+			initialOvertimeHours = 0;
+			initialOvertimeMode = 'Disabled';
 		}
 	});
 
 	async function loadWorkSchedule(orgSlug: string) {
 		scheduleLoading = true;
 		try {
-			const { data: schedule } = await organizationsApi.apiOrganizationsSlugWorkScheduleGet(orgSlug);
+			const { data: schedule } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgSlug);
 			weeklyHours = schedule.weeklyWorkHours ?? null;
 			targetMon = schedule.targetMon ?? 0;
 			targetTue = schedule.targetTue ?? 0;
 			targetWed = schedule.targetWed ?? 0;
 			targetThu = schedule.targetThu ?? 0;
 			targetFri = schedule.targetFri ?? 0;
+			initialOvertimeHours = schedule.initialOvertimeHours ?? 0;
+			initialOvertimeMode = schedule.initialOvertimeMode ?? 'Disabled';
 			// Check if all days are equal -> evenly distributed
 			const allEqual = targetMon === targetTue && targetTue === targetWed && targetWed === targetThu && targetThu === targetFri;
 			distributeEvenly = allEqual;
@@ -70,7 +81,7 @@
 				targetThu: distributeEvenly ? undefined : targetThu,
 				targetFri: distributeEvenly ? undefined : targetFri
 			};
-			const { data: result } = await organizationsApi.apiOrganizationsSlugWorkSchedulePut(orgContext.selectedOrgSlug, payload);
+			const { data: result } = await workScheduleApi.apiOrganizationsSlugWorkSchedulePut(orgContext.selectedOrgSlug, payload);
 			// Update local state with server response
 			weeklyHours = result.weeklyWorkHours ?? null;
 			targetMon = result.targetMon ?? 0;
@@ -84,6 +95,24 @@
 			scheduleError = err.response?.data?.message || 'Failed to save work schedule.';
 		} finally {
 			scheduleSaving = false;
+		}
+	}
+
+	async function saveInitialOvertime() {
+		if (!orgContext.selectedOrgSlug) return;
+		overtimeSaving = true;
+		overtimeError = '';
+		overtimeSuccess = '';
+		try {
+			await workScheduleApi.apiOrganizationsSlugInitialOvertimePut(orgContext.selectedOrgSlug, {
+				initialOvertimeHours: initialOvertimeHours
+			});
+			overtimeSuccess = 'Initial overtime saved.';
+			setTimeout(() => (overtimeSuccess = ''), 3000);
+		} catch (err: any) {
+			overtimeError = err.response?.data?.message || 'Failed to save initial overtime.';
+		} finally {
+			overtimeSaving = false;
 		}
 	}
 
@@ -248,6 +277,56 @@
 				</button>
 			{/if}
 		</section>
+
+		<!-- Initial Overtime Balance (separate card) -->
+		{#if initialOvertimeMode !== 'Disabled'}
+			<section class="card">
+				<h2>Initial Overtime Balance</h2>
+				<p class="card-desc">
+					Set your starting overtime balance for <strong>{orgContext.selectedOrg?.name}</strong>.
+					{#if initialOvertimeMode === 'RequiresApproval'}
+						<em>This requires admin approval.</em>
+					{/if}
+				</p>
+
+				{#if overtimeError}
+					<div class="error-msg">{overtimeError}</div>
+				{/if}
+				{#if overtimeSuccess}
+					<div class="success-msg">{overtimeSuccess}</div>
+				{/if}
+
+				<div class="form-group">
+					<label for="initialOvertime">Overtime (hours)</label>
+					<input
+						id="initialOvertime"
+						type="number"
+						step="0.5"
+						bind:value={initialOvertimeHours}
+						placeholder="e.g. 2.5 or -1"
+						class="input input-sm"
+						disabled={initialOvertimeMode === 'RequiresApproval'}
+					/>
+					<span class="form-hint">
+						{#if initialOvertimeHours > 0}
+							+{initialOvertimeHours.toFixed(1)}h carried over
+						{:else if initialOvertimeHours < 0}
+							{initialOvertimeHours.toFixed(1)}h deficit
+						{:else}
+							Starting from zero
+						{/if}
+					</span>
+				</div>
+
+				{#if initialOvertimeMode === 'Allowed'}
+					<button class="btn-primary" onclick={saveInitialOvertime} disabled={overtimeSaving}>
+						{overtimeSaving ? 'Saving...' : 'Save Overtime'}
+					</button>
+				{:else}
+					<p class="muted" style="font-size: 0.8125rem;">Submit a request through the Timer page to change this value.</p>
+				{/if}
+			</section>
+		{/if}
 	{/if}
 
 	<!-- Change password -->
@@ -379,8 +458,9 @@
 	.org-option-radio.checked::after {
 		content: '';
 		position: absolute;
-		top: 3px;
-		left: 3px;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
 		width: 8px;
 		height: 8px;
 		border-radius: 50%;
@@ -542,5 +622,12 @@
 		font-weight: 600;
 		color: #6b7280;
 		text-transform: uppercase;
+	}
+
+	.form-hint {
+		display: block;
+		font-size: 0.75rem;
+		color: #9ca3af;
+		margin-top: 0.25rem;
 	}
 </style>

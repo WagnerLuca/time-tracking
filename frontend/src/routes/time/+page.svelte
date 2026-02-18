@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { timeTrackingApi, organizationsApi } from '$lib/apiClient';
+	import { timeTrackingApi, organizationsApi, workScheduleApi, requestsApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/api';
+	import { RequestType } from '$lib/api';
 
 	let current = $state<TimeEntryResponse | null>(null);
 	let weekEntries = $state<TimeEntryResponse[]>([]);
@@ -11,8 +12,12 @@
 
 	// Work schedule (target hours)
 	let workSchedule = $state<WorkScheduleResponse | null>(null);
-	// Org detail (for settings like allowEditPause)
+	// Org detail (for settings like editPauseMode)
 	let orgDetail = $state<OrganizationDetailResponse | null>(null);
+
+	// Cumulative overtime
+	let cumulativeOvertime = $state(0);
+	let hasOvertimeData = $state(false);
 
 	// Timer display
 	let elapsed = $state('00:00:00');
@@ -43,7 +48,19 @@
 
 	onMount(async () => {
 		await Promise.all([loadCurrent(), loadWeek(), loadWorkSchedule()]);
+		await loadCumulativeOvertime();
 		loading = false;
+	});
+
+	// Reload data when organization context changes
+	let prevOrgId: number | null | undefined = undefined;
+	$effect(() => {
+		const currentOrgId = orgContext.selectedOrgId;
+		if (prevOrgId !== undefined && prevOrgId !== currentOrgId) {
+			loadWeek();
+			loadWorkSchedule().then(() => loadCumulativeOvertime());
+		}
+		prevOrgId = currentOrgId;
 	});
 
 	onDestroy(() => {
@@ -130,7 +147,8 @@
 		try {
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
-			const { data } = await timeTrackingApi.apiTimeTrackingGet(undefined, from, to, 200);
+			const orgId = orgContext.selectedOrgId ?? undefined;
+			const { data } = await timeTrackingApi.apiTimeTrackingGet(orgId, from, to, 200);
 			weekEntries = data;
 		} catch {
 			weekEntries = [];
@@ -144,7 +162,7 @@
 			return;
 		}
 		try {
-			const { data: ws } = await organizationsApi.apiOrganizationsSlugWorkScheduleGet(orgContext.selectedOrgSlug!);
+			const { data: ws } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgContext.selectedOrgSlug!);
 			workSchedule = ws;
 		} catch {
 			workSchedule = null;
@@ -154,6 +172,63 @@
 			orgDetail = od;
 		} catch {
 			orgDetail = null;
+		}
+	}
+
+	function getDayTarget(date: Date): number {
+		if (!workSchedule) return 0;
+		const dayOfWeek = date.getDay();
+		const targets: Record<number, number> = {
+			1: (workSchedule.targetMon ?? 0) * 60,
+			2: (workSchedule.targetTue ?? 0) * 60,
+			3: (workSchedule.targetWed ?? 0) * 60,
+			4: (workSchedule.targetThu ?? 0) * 60,
+			5: (workSchedule.targetFri ?? 0) * 60,
+		};
+		return targets[dayOfWeek] ?? 0;
+	}
+
+	async function loadCumulativeOvertime() {
+		if (!workSchedule) {
+			cumulativeOvertime = 0;
+			hasOvertimeData = false;
+			return;
+		}
+		try {
+			const orgId = orgContext.selectedOrgId ?? undefined;
+			const { data: allEntries } = await timeTrackingApi.apiTimeTrackingGet(orgId, undefined, undefined, 10000);
+			const sorted = [...allEntries]
+				.filter(e => !e.isRunning && e.endTime)
+				.sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime());
+
+			if (sorted.length > 0) {
+				const sumMinutes = (entries: TimeEntryResponse[]) =>
+					entries.reduce((s, e) => s + (e.netDurationMinutes ?? e.durationMinutes ?? 0), 0);
+
+				const firstDate = new Date(sorted[0].startTime!);
+				firstDate.setHours(0, 0, 0, 0);
+				const today = new Date();
+				today.setHours(23, 59, 59, 999);
+
+				const totalWorked = sumMinutes(sorted);
+				let totalTargetMins = 0;
+				const cursor = new Date(firstDate);
+				while (cursor <= today) {
+					totalTargetMins += getDayTarget(cursor);
+					cursor.setDate(cursor.getDate() + 1);
+				}
+
+				const initialOvertimeHours = (workSchedule?.initialOvertimeMode !== 'Disabled' && workSchedule?.initialOvertimeHours) ? workSchedule.initialOvertimeHours * 60 : 0;
+				const initialOvertime = initialOvertimeHours;
+				cumulativeOvertime = totalWorked - totalTargetMins + initialOvertime;
+				hasOvertimeData = true;
+			} else {
+				cumulativeOvertime = 0;
+				hasOvertimeData = false;
+			}
+		} catch {
+			cumulativeOvertime = 0;
+			hasOvertimeData = false;
 		}
 	}
 
@@ -185,6 +260,7 @@
 			current = null;
 			stopTimer();
 			note = '';
+			loadCumulativeOvertime();
 			await loadWeek();
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to stop timer.';
@@ -219,6 +295,12 @@
 	function formatHours(minutes: number): string {
 		if (minutes === 0) return '-';
 		return (minutes / 60).toFixed(1) + 'h';
+	}
+
+	function formatDelta(minutes: number): string {
+		if (minutes === 0) return '±0h';
+		const sign = minutes > 0 ? '+' : '';
+		return sign + (minutes / 60).toFixed(1) + 'h';
 	}
 
 	function formatTime(iso: string): string {
@@ -278,7 +360,7 @@
 			if (editStartTime) payload.startTime = new Date(editStartTime).toISOString();
 			if (editEndTime) payload.endTime = new Date(editEndTime).toISOString();
 			payload.description = editDescription.trim() || undefined;
-			if (orgDetail?.allowEditPause) {
+			if (orgDetail?.editPauseMode === 'Allowed') {
 				payload.pauseDurationMinutes = Math.max(0, Number(editPause) || 0);
 			}
 			await timeTrackingApi.apiTimeTrackingIdPut(entryId, payload);
@@ -288,6 +370,72 @@
 			editError = err.response?.data?.message || err.response?.data || 'Failed to update entry.';
 		} finally {
 			editSaving = false;
+		}
+	}
+
+	// Request functionality for RequiresApproval modes
+	let requestingEntryId = $state<number | null>(null);
+	let requestType = $state<'edit' | 'pause' | null>(null);
+	let requestMessage = $state('');
+	let requestSending = $state(false);
+	let requestSuccess = $state('');
+	// Values for the request
+	let requestNewStart = $state('');
+	let requestNewEnd = $state('');
+	let requestNewPause = $state(0);
+
+	function startRequest(entryId: number, type: 'edit' | 'pause') {
+		requestingEntryId = entryId;
+		requestType = type;
+		requestMessage = '';
+		requestSuccess = '';
+		// Pre-fill with current values
+		const entry = weekEntries.find((e: TimeEntryResponse) => e.id === entryId);
+		if (entry) {
+			if (type === 'edit') {
+				requestNewStart = entry.startTime ? toLocalDateTimeInput(entry.startTime) : '';
+				requestNewEnd = entry.endTime ? toLocalDateTimeInput(entry.endTime) : '';
+			} else {
+				requestNewPause = entry.pauseDurationMinutes ?? 0;
+			}
+		}
+	}
+
+	function cancelRequest() {
+		requestingEntryId = null;
+		requestType = null;
+		requestMessage = '';
+	}
+
+	async function submitRequest() {
+		if (!requestingEntryId || !requestType || !orgContext.selectedOrgSlug) return;
+		requestSending = true;
+		try {
+			const rType = requestType === 'edit' ? 1 as RequestType : 2 as RequestType;
+			let requestData: string | undefined;
+			if (requestType === 'edit') {
+				const data: Record<string, string> = {};
+				if (requestNewStart) data.startTime = new Date(requestNewStart).toISOString();
+				if (requestNewEnd) data.endTime = new Date(requestNewEnd).toISOString();
+				requestData = JSON.stringify(data);
+			} else {
+				requestData = String(Math.max(0, requestNewPause));
+			}
+			await requestsApi.apiOrganizationsSlugRequestsPost(orgContext.selectedOrgSlug, {
+				type: rType,
+				relatedEntityId: requestingEntryId,
+				requestData,
+				message: requestMessage || undefined
+			});
+			requestSuccess = 'Request submitted! An admin will review it.';
+			requestingEntryId = null;
+			requestType = null;
+			requestMessage = '';
+			setTimeout(() => (requestSuccess = ''), 4000);
+		} catch (err: any) {
+			actionError = err.response?.data?.message || 'Failed to submit request.';
+		} finally {
+			requestSending = false;
 		}
 	}
 </script>
@@ -405,6 +553,15 @@
 			</div>
 		</section>
 
+		<!-- Cumulative overtime -->
+		{#if hasOvertimeData && workSchedule}
+			<div class="overtime-card" class:positive={cumulativeOvertime > 0} class:negative={cumulativeOvertime < 0}>
+				<span class="overtime-label">Cumulative Balance</span>
+				<span class="overtime-value">{formatDelta(cumulativeOvertime)}</span>
+				<span class="overtime-hint">Since first tracked entry</span>
+			</div>
+		{/if}
+
 		<!-- Day entries detail -->
 		<section class="entries-section">
 			<h2>Entries this week</h2>
@@ -436,7 +593,7 @@
 										<label>Note</label>
 										<input type="text" bind:value={editDescription} placeholder="Optional note" disabled={editSaving} />
 									</div>
-									{#if orgDetail?.allowEditPause}
+									{#if orgDetail?.editPauseMode === 'Allowed'}
 										<div class="edit-field edit-field-pause">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label>Pause (min)</label>
@@ -470,11 +627,17 @@
 										<span class="running-badge">Running</span>
 									{/if}
 									{#if (entry.pauseDurationMinutes ?? 0) > 0}
-										{#if orgDetail?.allowEditPause && !entry.isRunning}
-											<button class="pause-badge pause-badge-edit" title="Click to edit pause" onclick={() => startEditEntry(entry)}>-{entry.pauseDurationMinutes}m pause &#9998;</button>
+										{#if orgDetail?.editPauseMode === 'Allowed' && !entry.isRunning}
+											<button class="pause-badge pause-badge-edit" title="Click to edit pause" onclick={() => startEditEntry(entry)}>&#8722;{entry.pauseDurationMinutes}m pause &#9998;</button>
+										{:else if orgDetail?.editPauseMode === 'RequiresApproval' && !entry.isRunning}
+											<button class="pause-badge pause-badge-request" title="Request pause edit" onclick={() => startRequest(entry.id!, 'pause')}>&#8722;{entry.pauseDurationMinutes}m pause &#128233;</button>
 										{:else}
-											<span class="pause-badge">-{entry.pauseDurationMinutes}m pause</span>
+											<span class="pause-badge">&#8722;{entry.pauseDurationMinutes}m pause</span>
 										{/if}
+									{:else if orgDetail?.editPauseMode === 'Allowed' && !entry.isRunning}
+										<button class="pause-badge pause-badge-edit pause-badge-add" title="Click to add pause" onclick={() => startEditEntry(entry)}>+pause &#9998;</button>
+									{:else if orgDetail?.editPauseMode === 'RequiresApproval' && !entry.isRunning}
+										<button class="pause-badge pause-badge-request pause-badge-add" title="Request to add pause" onclick={() => startRequest(entry.id!, 'pause')}>+pause &#128233;</button>
 									{/if}
 								</div>
 								<div class="entry-dur">
@@ -489,7 +652,11 @@
 								</div>
 								<div class="entry-actions">
 									{#if !entry.isRunning}
-										<button class="btn-icon-edit" title="Edit" onclick={() => startEditEntry(entry)}>&#9998;</button>
+										{#if orgDetail?.editPastEntriesMode === 'Allowed'}
+											<button class="btn-icon-edit" title="Edit" onclick={() => startEditEntry(entry)}>&#9998;</button>
+										{:else if orgDetail?.editPastEntriesMode === 'RequiresApproval'}
+											<button class="btn-icon-request" title="Request edit" onclick={() => startRequest(entry.id!, 'edit')}>&#128233;</button>
+										{/if}
 										<button class="btn-icon-danger" title="Delete" onclick={() => deleteEntry(entry.id!)}>
 											&times;
 										</button>
@@ -501,6 +668,56 @@
 				</div>
 			{/if}
 		</section>
+	{/if}
+
+	{#if requestSuccess}
+		<div class="success-banner">{requestSuccess}</div>
+	{/if}
+
+	{#if requestingEntryId}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<div class="request-backdrop" onclick={cancelRequest}></div>
+		<div class="request-modal">
+			<h3>{requestType === 'edit' ? 'Request Entry Edit' : 'Request Pause Edit'}</h3>
+			<p class="request-hint">Specify the new values. An admin will review and apply them.</p>
+
+			{#if requestType === 'edit'}
+				<div class="request-fields">
+					<div class="request-field">
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+						<label>New Start Time</label>
+						<input type="datetime-local" bind:value={requestNewStart} disabled={requestSending} />
+					</div>
+					<div class="request-field">
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+						<label>New End Time</label>
+						<input type="datetime-local" bind:value={requestNewEnd} disabled={requestSending} />
+					</div>
+				</div>
+			{:else}
+				<div class="request-fields">
+					<div class="request-field">
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+						<label>New Pause Duration (minutes)</label>
+						<input type="number" min="0" bind:value={requestNewPause} disabled={requestSending} />
+					</div>
+				</div>
+			{/if}
+
+			<textarea
+				bind:value={requestMessage}
+				placeholder="Optional message for the admin..."
+				rows="2"
+				disabled={requestSending}
+			></textarea>
+			<div class="request-modal-actions">
+				<button class="btn-primary" onclick={submitRequest} disabled={requestSending}>
+					{requestSending ? 'Sending...' : 'Submit Request'}
+				</button>
+				<button class="btn-cancel-sm" onclick={cancelRequest}>Cancel</button>
+			</div>
+		</div>
 	{/if}
 </div>
 
@@ -793,6 +1010,7 @@
 		color: #374151;
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
+		min-width: 110px;
 	}
 
 	.day-target-label {
@@ -822,7 +1040,52 @@
 
 	/* Week progress */
 	.week-progress-track {
-		height: 4px;
+		
+
+	/* Cumulative overtime card */
+	.overtime-card {
+		background: white;
+		border: 2px solid #e5e7eb;
+		border-radius: 12px;
+		padding: 1rem 1.5rem;
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		margin-bottom: 2rem;
+	}
+
+	.overtime-card.positive {
+		border-color: #86efac;
+		background: #f0fdf4;
+	}
+
+	.overtime-card.negative {
+		border-color: #fca5a5;
+		background: #fef2f2;
+	}
+
+	.overtime-label {
+		font-size: 0.75rem;
+		color: #9ca3af;
+		text-transform: uppercase;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+	}
+
+	.overtime-value {
+		font-size: 1.25rem;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.overtime-card.positive .overtime-value { color: #16a34a; }
+	.overtime-card.negative .overtime-value { color: #dc2626; }
+
+	.overtime-hint {
+		font-size: 0.6875rem;
+		color: #9ca3af;
+		margin-left: auto;
+	}height: 4px;
 		background: #e5e7eb;
 		border-radius: 2px;
 		overflow: hidden;
@@ -951,6 +1214,7 @@
 		padding: 1rem;
 		background: #f9fafb;
 		border-bottom: 1px solid #e5e7eb;
+		overflow: hidden;
 	}
 
 	.edit-error {
@@ -968,6 +1232,8 @@
 		gap: 0.75rem;
 		flex-wrap: wrap;
 		margin-bottom: 0.75rem;
+		max-width: 100%;
+		overflow: hidden;
 	}
 
 	.edit-field {
@@ -990,6 +1256,8 @@
 		border-radius: 6px;
 		font-size: 0.8125rem;
 		font-family: inherit;
+		box-sizing: border-box;
+		max-width: 100%;
 	}
 
 	.edit-field input:focus {
@@ -1062,6 +1330,19 @@
 		border-color: #fb923c;
 	}
 
+	.pause-badge-add {
+		background: #f9fafb;
+		color: #9ca3af;
+		border-color: #e5e7eb;
+		font-size: 0.625rem;
+	}
+
+	.pause-badge-add:hover {
+		background: #fff7ed;
+		color: #c2410c;
+		border-color: #fed7aa;
+	}
+
 	.edit-field-pause input {
 		width: 5rem;
 	}
@@ -1094,5 +1375,132 @@
 	.btn-icon-edit:hover {
 		opacity: 1;
 		background: #eff6ff;
+	}
+
+	/* Request icon */
+	.btn-icon-request {
+		background: none;
+		border: none;
+		color: #f59e0b;
+		font-size: 0.9375rem;
+		cursor: pointer;
+		padding: 0.125rem 0.375rem;
+		border-radius: 4px;
+		line-height: 1;
+		opacity: 0.5;
+		transition: opacity 0.15s;
+	}
+
+	.btn-icon-request:hover {
+		opacity: 1;
+		background: #fffbeb;
+	}
+
+	.pause-badge-request {
+		cursor: pointer;
+		border: 1px dashed #f59e0b;
+		background: #fffbeb;
+		color: #b45309;
+	}
+
+	.pause-badge-request:hover {
+		background: #fef3c7;
+	}
+
+	/* Success banner */
+	.success-banner {
+		background: #f0fdf4;
+		color: #16a34a;
+		padding: 0.75rem 1rem;
+		border-radius: 8px;
+		margin-top: 1rem;
+		font-size: 0.875rem;
+		border-left: 3px solid #16a34a;
+	}
+
+	/* Request modal */
+	.request-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.3);
+		z-index: 100;
+	}
+
+	.request-modal {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		background: #fff;
+		border-radius: 12px;
+		padding: 1.5rem;
+		width: 90%;
+		max-width: 420px;
+		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+		z-index: 101;
+	}
+
+	.request-modal h3 {
+		margin: 0 0 0.25rem;
+		font-size: 1.125rem;
+	}
+
+	.request-hint {
+		margin: 0 0 1rem;
+		font-size: 0.8125rem;
+		color: #6b7280;
+	}
+
+	.request-modal textarea {
+		width: 100%;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		padding: 0.5rem 0.75rem;
+		font-size: 0.875rem;
+		resize: vertical;
+		margin-bottom: 1rem;
+		font-family: inherit;
+		box-sizing: border-box;
+	}
+
+	.request-modal textarea:focus {
+		outline: none;
+		border-color: #3b82f6;
+		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+	}
+
+	.request-modal-actions {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.request-fields {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.request-field label {
+		display: block;
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #374151;
+		margin-bottom: 0.25rem;
+	}
+
+	.request-field input {
+		width: 100%;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		padding: 0.5rem 0.75rem;
+		font-size: 0.875rem;
+		box-sizing: border-box;
+	}
+
+	.request-field input:focus {
+		outline: none;
+		border-color: #3b82f6;
+		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 	}
 </style>
