@@ -23,6 +23,13 @@
 	let timerInterval: ReturnType<typeof setInterval> | null = null;
 	let prevOrgId: number | null | undefined = undefined;
 
+	// Weekly breakdown data
+	let weekDays = $state<Array<{label: string, date: Date, worked: number, target: number}>>([]);
+	// Monthly week breakdown
+	let monthWeeks = $state<Array<{label: string, worked: number, target: number}>>([]);
+	// First entry date
+	let firstEntryDate = $state<Date | null>(null);
+
 	onMount(async () => {
 		if (!auth.user) return;
 		try {
@@ -89,35 +96,37 @@
 
 	function getWeekTargetMinutes(): number {
 		if (!workSchedule) return 0;
-		// Only count target minutes for days up to and including today
 		const now = new Date();
 		const dayOfWeek = now.getDay() || 7;
 		const weekStart = new Date(now);
 		weekStart.setDate(now.getDate() - dayOfWeek + 1);
 		weekStart.setHours(0, 0, 0, 0);
-
-		let total = 0;
-		const cursor = new Date(weekStart);
 		const todayEnd = new Date(now);
 		todayEnd.setHours(23, 59, 59, 999);
-		while (cursor <= todayEnd) {
-			total += getDayTarget(cursor);
-			cursor.setDate(cursor.getDate() + 1);
-		}
-		return total;
+		return getTargetSinceFirstEntry(weekStart, todayEnd);
 	}
 
 	function getMonthTargetMinutes(year: number, month: number): number {
 		if (!workSchedule) return 0;
-		// Only count target minutes for days up to and including today
+		const monthStart = new Date(year, month, 1);
 		const now = new Date();
-		let total = 0;
-		const daysInMonth = new Date(year, month + 1, 0).getDate();
-		const todayDate = now.getDate();
 		const isCurrentMonth = now.getFullYear() === year && now.getMonth() === month;
-		const maxDay = isCurrentMonth ? todayDate : daysInMonth;
-		for (let d = 1; d <= maxDay; d++) {
-			total += getDayTarget(new Date(year, month, d));
+		const monthEnd = isCurrentMonth ? new Date(now) : new Date(year, month + 1, 0);
+		monthEnd.setHours(23, 59, 59, 999);
+		return getTargetSinceFirstEntry(monthStart, monthEnd);
+	}
+
+	function getTargetSinceFirstEntry(rangeStart: Date, rangeEnd: Date): number {
+		if (!workSchedule) return 0;
+		const effectiveStart = firstEntryDate && firstEntryDate > rangeStart ? firstEntryDate : rangeStart;
+		if (effectiveStart > rangeEnd) return 0;
+
+		let total = 0;
+		const cursor = new Date(effectiveStart);
+		cursor.setHours(0, 0, 0, 0);
+		while (cursor <= rangeEnd) {
+			total += getDayTarget(cursor);
+			cursor.setDate(cursor.getDate() + 1);
 		}
 		return total;
 	}
@@ -145,7 +154,6 @@
 			const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 			const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-			// Fetch all time entries for cumulative overtime
 			const orgId = orgContext.selectedOrgId ?? undefined;
 			const [todayRes, weekRes, monthRes, allRes] = await Promise.all([
 				timeTrackingApi.apiTimeTrackingGet(orgId, todayStart.toISOString(), todayEnd.toISOString(), 200),
@@ -162,39 +170,88 @@
 				entries.filter(e => !e.isRunning && (e.netDurationMinutes ?? e.durationMinutes))
 					.reduce((s, e) => s + (e.netDurationMinutes ?? e.durationMinutes ?? 0), 0);
 
+			// Find first entry date (for target calculations)
+			const sorted = [...allEntries].filter(e => !e.isRunning && e.endTime)
+				.sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime());
+			if (sorted.length > 0) {
+				firstEntryDate = new Date(sorted[0].startTime!);
+				firstEntryDate.setHours(0, 0, 0, 0);
+			} else {
+				firstEntryDate = null;
+			}
+
 			todayMinutes = sumMinutes(todayEntries);
 			weekMinutes = sumMinutes(weekEntries);
 			monthMinutes = sumMinutes(monthEntries);
 
-			// Compute targets
+			// Compute targets — only since first tracked entry
 			todayTarget = getDayTarget(now);
 			weekTarget = getWeekTargetMinutes();
 			monthTarget = getMonthTargetMinutes(now.getFullYear(), now.getMonth());
 
-			// Compute cumulative overtime since first entry
-			if (workSchedule && allEntries.length > 0) {
-				const sorted = [...allEntries].filter(e => !e.isRunning && e.endTime).sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime());
-				if (sorted.length > 0) {
-					const firstDate = new Date(sorted[0].startTime!);
-					firstDate.setHours(0, 0, 0, 0);
-					const today = new Date(now);
-					today.setHours(23, 59, 59, 999);
+			// Build weekly breakdown (Mon-Sun)
+			const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+			const tempWeekDays: typeof weekDays = [];
+			for (let i = 0; i < 7; i++) {
+				const d = new Date(weekStart);
+				d.setDate(weekStart.getDate() + i);
+				const dStart = new Date(d); dStart.setHours(0, 0, 0, 0);
+				const dEnd = new Date(d); dEnd.setHours(23, 59, 59, 999);
+				const dayEntries = weekEntries.filter(e => {
+					const t = new Date(e.startTime!);
+					return t >= dStart && t <= dEnd;
+				});
+				tempWeekDays.push({ label: dayNames[i], date: d, worked: sumMinutes(dayEntries), target: getDayTarget(d) });
+			}
+			weekDays = tempWeekDays;
 
-					// Sum actual worked minutes
-					const totalWorked = sumMinutes(sorted);
-
-					// Sum target minutes for each day from first entry through today
-					let totalTargetMins = 0;
-					const cursor = new Date(firstDate);
-					while (cursor <= today) {
-						totalTargetMins += getDayTarget(cursor);
-						cursor.setDate(cursor.getDate() + 1);
-					}
-
-					const initialOvertimeHours = (workSchedule?.initialOvertimeMode !== 'Disabled' && workSchedule?.initialOvertimeHours) ? workSchedule.initialOvertimeHours * 60 : 0;
-					const initialOvertime = initialOvertimeHours;
-					cumulativeOvertime = totalWorked - totalTargetMins + initialOvertime;
+			// Build monthly week breakdown
+			const tempMonthWeeks: typeof monthWeeks = [];
+			let wkStart = new Date(monthStart);
+			while (wkStart <= monthEnd) {
+				let wkEnd = new Date(wkStart);
+				const daysUntilSunday = (7 - wkStart.getDay()) % 7;
+				wkEnd.setDate(wkStart.getDate() + (daysUntilSunday || 7) - (wkStart.getDay() === 0 ? 7 : 0));
+				if (wkStart.getDay() === 1) {
+					wkEnd.setDate(wkStart.getDate() + 6);
+				} else if (wkStart.getDay() === 0) {
+					wkEnd = new Date(wkStart);
+				} else {
+					wkEnd.setDate(wkStart.getDate() + (7 - wkStart.getDay()));
 				}
+				wkEnd.setHours(23, 59, 59, 999);
+				if (wkEnd > monthEnd) wkEnd = new Date(monthEnd);
+				const wkS = new Date(wkStart); wkS.setHours(0, 0, 0, 0);
+				const wkEntries = monthEntries.filter(e => {
+					const t = new Date(e.startTime!);
+					return t >= wkS && t <= wkEnd;
+				});
+				tempMonthWeeks.push({
+					label: `${wkStart.getDate()}–${wkEnd.getDate()}`,
+					worked: sumMinutes(wkEntries),
+					target: getTargetSinceFirstEntry(wkS, wkEnd)
+				});
+				wkStart = new Date(wkEnd);
+				wkStart.setDate(wkStart.getDate() + 1);
+				wkStart.setHours(0, 0, 0, 0);
+			}
+			monthWeeks = tempMonthWeeks;
+
+			// Compute cumulative overtime since first entry
+			if (workSchedule && sorted.length > 0) {
+				const fDate = new Date(sorted[0].startTime!);
+				fDate.setHours(0, 0, 0, 0);
+				const today2 = new Date(now);
+				today2.setHours(23, 59, 59, 999);
+				const totalWorked = sumMinutes(sorted);
+				let totalTargetMins = 0;
+				const cursor = new Date(fDate);
+				while (cursor <= today2) {
+					totalTargetMins += getDayTarget(cursor);
+					cursor.setDate(cursor.getDate() + 1);
+				}
+				const initialOvertimeMins = (workSchedule?.initialOvertimeMode !== 'Disabled' && workSchedule?.initialOvertimeHours) ? workSchedule.initialOvertimeHours * 60 : 0;
+				cumulativeOvertime = totalWorked - totalTargetMins + initialOvertimeMins;
 			} else {
 				cumulativeOvertime = 0;
 			}
@@ -267,6 +324,24 @@
 	function getMonthName(): string {
 		return new Date().toLocaleDateString([], { month: 'long' });
 	}
+
+	function isToday(date: Date): boolean {
+		const now = new Date();
+		return date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+	}
+
+	function isFuture(date: Date): boolean {
+		const now = new Date();
+		now.setHours(0, 0, 0, 0);
+		const d = new Date(date);
+		d.setHours(0, 0, 0, 0);
+		return d > now;
+	}
+
+	function barWidth(worked: number, target: number): number {
+		if (target <= 0) return worked > 0 ? 100 : 0;
+		return Math.min(100, (worked / target) * 100);
+	}
 </script>
 
 <svelte:head>
@@ -274,7 +349,22 @@
 </svelte:head>
 
 <div class="dashboard">
-	<h1>Welcome, {auth.user?.firstName}!</h1>
+	<!-- Header with org context -->
+	<div class="dash-header">
+		<div>
+			<h1>Welcome, {auth.user?.firstName}!</h1>
+			{#if orgContext.selectedOrg}
+				<p class="org-context">{orgContext.selectedOrg.name}</p>
+			{:else}
+				<p class="org-context personal">Personal</p>
+			{/if}
+		</div>
+		{#if orgContext.selectedOrg}
+			<a href="/organizations/{orgContext.selectedOrgSlug}" class="org-link" title="View organization">
+				<span class="org-link-icon">&#9881;</span> Manage
+			</a>
+		{/if}
+	</div>
 
 	{#if actionError}
 		<div class="error-banner">{actionError}
@@ -341,7 +431,65 @@
 		<div class="overtime-card" class:positive={cumulativeOvertime + runningMinutes > 0} class:negative={cumulativeOvertime + runningMinutes < 0}>
 			<span class="overtime-label">Cumulative Balance</span>
 			<span class="overtime-value">{formatDelta(cumulativeOvertime + runningMinutes)}</span>
-			<span class="overtime-hint">Since first tracked entry</span>
+			<span class="overtime-hint">Since first tracked entry{firstEntryDate ? ` (${firstEntryDate.toLocaleDateString()})` : ''}</span>
+		</div>
+	{/if}
+
+	<!-- Weekly Breakdown -->
+	{#if weekDays.length > 0}
+		<div class="breakdown-card">
+			<h2 class="breakdown-title">This Week</h2>
+			<div class="breakdown-rows">
+				{#each weekDays as day}
+					<div class="breakdown-row" class:today={isToday(day.date)} class:future={isFuture(day.date)}>
+						<span class="breakdown-day">{day.label}</span>
+						<div class="breakdown-bar-track">
+							<div class="breakdown-bar-fill" class:over={day.worked > day.target && day.target > 0} style="width: {barWidth(isToday(day.date) ? day.worked + runningMinutes : day.worked, day.target)}%"></div>
+						</div>
+						<span class="breakdown-hours">{formatHours(isToday(day.date) ? day.worked + runningMinutes : day.worked)}</span>
+						{#if day.target > 0}
+							<span class="breakdown-target">/ {formatHours(day.target)}</span>
+						{/if}
+					</div>
+				{/each}
+			</div>
+			<div class="breakdown-footer">
+				<span>Total: {formatHours(weekMinutes + runningMinutes)}</span>
+				{#if weekTarget > 0}
+					<span class="breakdown-footer-delta" class:positive={weekMinutes + runningMinutes - weekTarget > 0} class:negative={weekMinutes + runningMinutes - weekTarget < 0}>
+						{formatDelta(weekMinutes + runningMinutes - weekTarget)}
+					</span>
+				{/if}
+			</div>
+		</div>
+	{/if}
+
+	<!-- Monthly Overview -->
+	{#if monthWeeks.length > 0}
+		<div class="breakdown-card">
+			<h2 class="breakdown-title">{getMonthName()} Overview</h2>
+			<div class="breakdown-rows">
+				{#each monthWeeks as wk}
+					<div class="breakdown-row">
+						<span class="breakdown-day month-range">{wk.label}</span>
+						<div class="breakdown-bar-track">
+							<div class="breakdown-bar-fill month-bar" class:over={wk.worked > wk.target && wk.target > 0} style="width: {barWidth(wk.worked, wk.target)}%"></div>
+						</div>
+						<span class="breakdown-hours">{formatHours(wk.worked)}</span>
+						{#if wk.target > 0}
+							<span class="breakdown-target">/ {formatHours(wk.target)}</span>
+						{/if}
+					</div>
+				{/each}
+			</div>
+			<div class="breakdown-footer">
+				<span>Total: {formatHours(monthMinutes + runningMinutes)}</span>
+				{#if monthTarget > 0}
+					<span class="breakdown-footer-delta" class:positive={monthMinutes + runningMinutes - monthTarget > 0} class:negative={monthMinutes + runningMinutes - monthTarget < 0}>
+						{formatDelta(monthMinutes + runningMinutes - monthTarget)}
+					</span>
+				{/if}
+			</div>
 		</div>
 	{/if}
 
@@ -351,10 +499,12 @@
 			<span class="ql-icon">&#9201;</span>
 			<span>Weekly View</span>
 		</a>
-		<a href="/organizations" class="quick-link">
-			<span class="ql-icon">&#128101;</span>
-			<span>Organizations</span>
-		</a>
+		{#if orgContext.selectedOrg}
+			<a href="/organizations/{orgContext.selectedOrgSlug}" class="quick-link">
+				<span class="ql-icon">&#128101;</span>
+				<span>Organization</span>
+			</a>
+		{/if}
 		<a href="/settings" class="quick-link">
 			<span class="ql-icon">&#9881;</span>
 			<span>Settings</span>
@@ -364,9 +514,51 @@
 
 <style>
 	.dashboard h1 {
-		margin: 0 0 1.5rem;
+		margin: 0;
 		font-size: 1.75rem;
 		color: #1a1a2e;
+	}
+
+	.dash-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		margin-bottom: 1.5rem;
+	}
+
+	.org-context {
+		margin: 0.25rem 0 0;
+		font-size: 0.9375rem;
+		color: #3b82f6;
+		font-weight: 500;
+	}
+
+	.org-context.personal {
+		color: #9ca3af;
+	}
+
+	.org-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		background: #eff6ff;
+		color: #2563eb;
+		border: 1px solid #bfdbfe;
+		border-radius: 8px;
+		padding: 0.5rem 1rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		text-decoration: none;
+		transition: all 0.15s;
+	}
+
+	.org-link:hover {
+		background: #dbeafe;
+		border-color: #93c5fd;
+	}
+
+	.org-link-icon {
+		font-size: 0.875rem;
 	}
 
 	.error-banner {
@@ -618,4 +810,113 @@
 	.ql-icon {
 		font-size: 1.125rem;
 	}
+
+	/* Breakdown cards */
+	.breakdown-card {
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 12px;
+		padding: 1.25rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.breakdown-title {
+		margin: 0 0 1rem;
+		font-size: 1rem;
+		font-weight: 600;
+		color: #1a1a2e;
+	}
+
+	.breakdown-rows {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.breakdown-row {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+	}
+
+	.breakdown-row.today {
+		font-weight: 600;
+	}
+
+	.breakdown-row.future {
+		opacity: 0.4;
+	}
+
+	.breakdown-day {
+		width: 32px;
+		font-size: 0.8125rem;
+		color: #6b7280;
+		flex-shrink: 0;
+	}
+
+	.breakdown-day.month-range {
+		width: 50px;
+	}
+
+	.breakdown-bar-track {
+		flex: 1;
+		height: 8px;
+		background: #f3f4f6;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.breakdown-bar-fill {
+		height: 100%;
+		background: #3b82f6;
+		border-radius: 4px;
+		transition: width 0.3s ease;
+	}
+
+	.breakdown-bar-fill.over {
+		background: #16a34a;
+	}
+
+	.breakdown-bar-fill.month-bar {
+		background: #8b5cf6;
+	}
+
+	.breakdown-bar-fill.month-bar.over {
+		background: #16a34a;
+	}
+
+	.breakdown-hours {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: #1a1a2e;
+		width: 40px;
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.breakdown-target {
+		font-size: 0.75rem;
+		color: #9ca3af;
+		width: 40px;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.breakdown-footer {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-top: 0.75rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid #f3f4f6;
+		font-size: 0.875rem;
+		color: #374151;
+		font-weight: 600;
+	}
+
+	.breakdown-footer-delta {
+		font-weight: 600;
+	}
+
+	.breakdown-footer-delta.positive { color: #16a34a; }
+	.breakdown-footer-delta.negative { color: #dc2626; }
 </style>

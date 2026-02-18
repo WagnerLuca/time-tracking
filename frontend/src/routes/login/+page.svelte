@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth.svelte';
+	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { goto } from '$app/navigation';
 
 	let email = $state('');
@@ -13,7 +14,17 @@
 		submitting = true;
 		try {
 			await auth.login({ email, password });
-			goto('/');
+			// Load orgs and auto-select if just one
+			if (auth.user?.id) {
+				await orgContext.loadOrganizations(auth.user.id);
+			}
+			if (orgContext.selectedOrgId) {
+				goto('/');
+			} else if (orgContext.organizations.length > 0) {
+				goto('/select-org');
+			} else {
+				goto('/');
+			}
 		} catch (err: any) {
 			error = err.response?.data?.message || 'Login failed. Please check your credentials.';
 		} finally {

@@ -107,6 +107,44 @@
 		}
 	}
 
+	// Notification detail popup
+	let detailReq = $state<OrgRequestResponse | null>(null);
+
+	function openNotifDetail(req: OrgRequestResponse) {
+		detailReq = req;
+	}
+
+	function closeNotifDetail() {
+		detailReq = null;
+	}
+
+	function parseRequestData(type: string | null | undefined, data: string | null | undefined): string[] {
+		if (!data) return [];
+		try {
+			if (type === 'EditPastEntry') {
+				const obj = JSON.parse(data);
+				const parts: string[] = [];
+				if (obj.startTime) parts.push(`New Start: ${new Date(obj.startTime).toLocaleString()}`);
+				if (obj.endTime) parts.push(`New End: ${new Date(obj.endTime).toLocaleString()}`);
+				if (obj.description !== undefined) parts.push(`Note: ${obj.description}`);
+				return parts;
+			} else if (type === 'EditPause') {
+				return [`New Pause: ${data} minutes`];
+			} else if (type === 'SetInitialOvertime') {
+				return [`Overtime: ${data}h`];
+			}
+		} catch { /* fallback */ }
+		return data ? [data] : [];
+	}
+
+	function formatRequestTypeFull(type: string | null | undefined): string {
+		if (type === 'JoinOrganization') return 'Join Organization';
+		if (type === 'EditPastEntry') return 'Edit Past Time Entry';
+		if (type === 'EditPause') return 'Edit Pause Duration';
+		if (type === 'SetInitialOvertime') return 'Set Initial Overtime';
+		return type ?? 'Unknown';
+	}
+
 	function formatRequestType(type: string | null | undefined): string {
 		if (type === 'JoinOrganization') return 'Join';
 		if (type === 'EditPastEntry') return 'Edit Entry';
@@ -131,11 +169,6 @@
 		await auth.logout();
 		goto('/login');
 	}
-
-	function handleOrgChange(e: Event) {
-		const value = (e.target as HTMLSelectElement).value;
-		orgContext.select(value ? parseInt(value) : null);
-	}
 </script>
 
 <svelte:head>
@@ -150,19 +183,15 @@
 	<nav class="top-nav">
 		<div class="nav-left">
 			<a href="/" class="nav-brand">Time Tracking</a>
+			{#if orgContext.selectedOrg}
+				<span class="nav-org-name">{orgContext.selectedOrg.name}</span>
+			{/if}
 			<a href="/time" class="nav-link">Timer</a>
-			<a href="/organizations" class="nav-link">Organizations</a>
+			{#if orgContext.selectedOrg}
+				<a href="/organizations/{orgContext.selectedOrgSlug}" class="nav-link">Organization</a>
+			{/if}
 		</div>
 		<div class="nav-right">
-			{#if orgContext.organizations.length > 0}
-				<select class="org-switcher" value={orgContext.selectedOrgId ?? ''} onchange={handleOrgChange}>
-					<option value="">Personal</option>
-					{#each orgContext.organizations as org}
-						<option value={org.organizationId}>{org.name}</option>
-					{/each}
-				</select>
-			{/if}
-
 			<!-- Notification bell -->
 			<div class="notif-wrapper">
 				<button class="notif-bell" onclick={toggleNotifPanel} title="Notifications">
@@ -193,7 +222,7 @@
 								</div>
 								<div class="notif-list">
 									{#each userNotifRequests as req}
-										<div class="notif-item user-notif-item" class:notif-accepted={req.status === 'Accepted'} class:notif-declined={req.status === 'Declined'}>
+										<button class="notif-item-btn user-notif-item" class:notif-accepted={req.status === 'Accepted'} class:notif-declined={req.status === 'Declined'} onclick={() => openNotifDetail(req)}>
 											<div class="notif-item-info">
 												<span class="notif-item-status-badge" class:accepted={req.status === 'Accepted'} class:declined={req.status === 'Declined'}>
 													{req.status === 'Accepted' ? '✓ Accepted' : '✗ Declined'}
@@ -205,10 +234,8 @@
 												{/if}
 												<span class="notif-item-time">{formatTimeAgo(req.respondedAt)}</span>
 											</div>
-											<div class="notif-item-actions">
-												<button class="notif-dismiss" onclick={() => dismissUserNotif(req.id!)} title="Dismiss">&times;</button>
-											</div>
-										</div>
+											<span class="notif-item-expand">›</span>
+										</button>
 									{/each}
 								</div>
 							</div>
@@ -222,7 +249,7 @@
 								</div>
 								<div class="notif-list">
 									{#each pendingRequests as req}
-										<div class="notif-item">
+										<button class="notif-item-btn" onclick={() => openNotifDetail(req)}>
 											<div class="notif-item-info">
 												<span class="notif-item-type">{formatRequestType(req.type)}</span>
 												<span class="notif-item-user">{req.userFirstName} {req.userLastName}</span>
@@ -232,11 +259,8 @@
 												{/if}
 												<span class="notif-item-time">{formatTimeAgo(req.createdAt)}</span>
 											</div>
-											<div class="notif-item-actions">
-												<button class="notif-accept" onclick={() => respondToRequest(req, true)} title="Accept">&#10003;</button>
-												<button class="notif-decline" onclick={() => respondToRequest(req, false)} title="Decline">&#10007;</button>
-											</div>
-										</div>
+											<span class="notif-item-expand">›</span>
+										</button>
 									{/each}
 								</div>
 							</div>
@@ -253,6 +277,97 @@
 			<button class="btn-logout" onclick={handleLogout}>Sign Out</button>
 		</div>
 	</nav>
+
+	<!-- Notification detail popup -->
+	{#if detailReq}
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="detail-backdrop" onclick={closeNotifDetail}></div>
+		<div class="detail-popup">
+			<div class="detail-popup-header">
+				<h3 class="detail-popup-title">{formatRequestTypeFull(detailReq.type)}</h3>
+				<button class="notif-close" onclick={closeNotifDetail}>&times;</button>
+			</div>
+			<div class="detail-popup-body">
+				{#if detailReq.status}
+					<div class="detail-row">
+						<span class="detail-label">Status</span>
+						<span class="detail-value">
+							<span class="notif-item-status-badge" class:accepted={detailReq.status === 'Accepted'} class:declined={detailReq.status === 'Declined'} class:pending={detailReq.status === 'Pending'}>
+								{detailReq.status === 'Accepted' ? '✓ Accepted' : detailReq.status === 'Declined' ? '✗ Declined' : '⏳ Pending'}
+							</span>
+						</span>
+					</div>
+				{/if}
+
+				{#if detailReq.userFirstName || detailReq.userLastName}
+					<div class="detail-row">
+						<span class="detail-label">User</span>
+						<span class="detail-value">{detailReq.userFirstName} {detailReq.userLastName}</span>
+					</div>
+				{/if}
+
+				{#if detailReq.organizationName}
+					<div class="detail-row">
+						<span class="detail-label">Organization</span>
+						<span class="detail-value">{detailReq.organizationName}</span>
+					</div>
+				{/if}
+
+				{#if detailReq.createdAt}
+					<div class="detail-row">
+						<span class="detail-label">Created</span>
+						<span class="detail-value">{new Date(detailReq.createdAt).toLocaleString()}</span>
+					</div>
+				{/if}
+
+				{#if detailReq.respondedAt}
+					<div class="detail-row">
+						<span class="detail-label">Responded</span>
+						<span class="detail-value">{new Date(detailReq.respondedAt).toLocaleString()}</span>
+					</div>
+				{/if}
+
+				{#if detailReq.respondedByName}
+					<div class="detail-row">
+						<span class="detail-label">Responded by</span>
+						<span class="detail-value">{detailReq.respondedByName}</span>
+					</div>
+				{/if}
+
+				{#if detailReq.message}
+					<div class="detail-row">
+						<span class="detail-label">Message</span>
+						<span class="detail-value detail-value-msg">"{detailReq.message}"</span>
+					</div>
+				{/if}
+
+				{#if parseRequestData(detailReq.type, detailReq.requestData).length > 0}
+					<div class="detail-section">
+						<span class="detail-section-title">Request Details</span>
+						{#each parseRequestData(detailReq.type, detailReq.requestData) as line}
+							<div class="detail-data-row">{line}</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<!-- Action buttons for pending admin requests -->
+			{#if detailReq.status === 'Pending' && pendingRequests.some(r => r.id === detailReq?.id)}
+				<div class="detail-popup-actions">
+					<button class="detail-accept" onclick={() => { respondToRequest(detailReq!, true); closeNotifDetail(); }}>Accept</button>
+					<button class="detail-decline" onclick={() => { respondToRequest(detailReq!, false); closeNotifDetail(); }}>Decline</button>
+				</div>
+			{/if}
+
+			<!-- Dismiss button for user notifications -->
+			{#if detailReq.status !== 'Pending' && userNotifRequests.some(r => r.id === detailReq?.id)}
+				<div class="detail-popup-actions">
+					<button class="detail-dismiss-btn" onclick={() => { dismissUserNotif(detailReq!.id!); closeNotifDetail(); }}>Dismiss Notification</button>
+				</div>
+			{/if}
+		</div>
+	{/if}
+
 	<main class="app-main">
 		{@render children?.()}
 	</main>
@@ -303,6 +418,19 @@
 		text-decoration: none;
 	}
 
+	.nav-org-name {
+		color: #6b7280;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		padding: 0.25rem 0.625rem;
+		background: #f3f4f6;
+		border-radius: 6px;
+		white-space: nowrap;
+		max-width: 160px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
 	.nav-link {
 		color: #4b5563;
 		text-decoration: none;
@@ -339,22 +467,7 @@
 		color: #1a1a2e;
 	}
 
-	.org-switcher {
-		padding: 0.375rem 0.625rem;
-		border: 1px solid #d1d5db;
-		border-radius: 8px;
-		font-size: 0.8125rem;
-		background: white;
-		color: #374151;
-		max-width: 200px;
-		cursor: pointer;
-	}
 
-	.org-switcher:focus {
-		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
-	}
 
 	.btn-logout {
 		background: none;
@@ -479,17 +592,6 @@
 		max-height: 360px;
 	}
 
-	.notif-item {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.65rem 1rem;
-		border-bottom: 1px solid #f3f4f6;
-		gap: 0.5rem;
-	}
-
-	.notif-item:last-child { border-bottom: none; }
-
 	.notif-item-info {
 		display: flex;
 		flex-direction: column;
@@ -528,39 +630,6 @@
 		font-size: 0.7rem;
 		color: #9ca3af;
 	}
-
-	.notif-item-actions {
-		display: flex;
-		gap: 0.35rem;
-		flex-shrink: 0;
-	}
-
-	.notif-accept, .notif-decline {
-		width: 28px;
-		height: 28px;
-		border: none;
-		border-radius: 6px;
-		font-size: 0.9rem;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: background 0.15s;
-	}
-
-	.notif-accept {
-		background: #dcfce7;
-		color: #16a34a;
-	}
-
-	.notif-accept:hover { background: #bbf7d0; }
-
-	.notif-decline {
-		background: #fef2f2;
-		color: #dc2626;
-	}
-
-	.notif-decline:hover { background: #fecaca; }
 
 	/* User notification styles */
 	.notif-section {
@@ -639,5 +708,201 @@
 		color: #6b7280;
 		background: #f3f4f6;
 	}
+
+	/* Clickable notification items */
+	.notif-item-btn {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.65rem 1rem;
+		border-bottom: 1px solid #f3f4f6;
+		gap: 0.5rem;
+		width: 100%;
+		background: none;
+		border-left: 3px solid transparent;
+		border-top: none;
+		border-right: none;
+		cursor: pointer;
+		text-align: left;
+		font-family: inherit;
+		transition: background 0.15s;
+	}
+
+	.notif-item-btn:hover {
+		background: #f8fafc;
+	}
+
+	.notif-item-btn:last-child {
+		border-bottom: none;
+	}
+
+	.notif-item-expand {
+		color: #9ca3af;
+		font-size: 1.1rem;
+		flex-shrink: 0;
+		transition: color 0.15s;
+	}
+
+	.notif-item-btn:hover .notif-item-expand {
+		color: #3b82f6;
+	}
+
+	.notif-item-status-badge.pending {
+		background: #fef3c7;
+		color: #92400e;
+	}
+
+	/* Detail popup */
+	.detail-backdrop {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.35);
+		z-index: 299;
+	}
+
+	.detail-popup {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		width: 400px;
+		max-width: 92vw;
+		max-height: 80vh;
+		background: white;
+		border-radius: 14px;
+		box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+		z-index: 300;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.detail-popup-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 1rem 1.25rem;
+		border-bottom: 1px solid #f3f4f6;
+	}
+
+	.detail-popup-title {
+		margin: 0;
+		font-size: 1rem;
+		font-weight: 700;
+		color: #1a1a2e;
+	}
+
+	.detail-popup-body {
+		padding: 1rem 1.25rem;
+		overflow-y: auto;
+		flex: 1;
+	}
+
+	.detail-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		padding: 0.4rem 0;
+		border-bottom: 1px solid #f9fafb;
+	}
+
+	.detail-row:last-child {
+		border-bottom: none;
+	}
+
+	.detail-label {
+		font-size: 0.8rem;
+		color: #6b7280;
+		font-weight: 500;
+		flex-shrink: 0;
+		margin-right: 0.75rem;
+	}
+
+	.detail-value {
+		font-size: 0.85rem;
+		color: #1a1a2e;
+		font-weight: 500;
+		text-align: right;
+	}
+
+	.detail-value-msg {
+		font-style: italic;
+		color: #6b7280;
+	}
+
+	.detail-section {
+		margin-top: 0.75rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid #e5e7eb;
+	}
+
+	.detail-section-title {
+		display: block;
+		font-size: 0.6875rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: #9ca3af;
+		margin-bottom: 0.5rem;
+	}
+
+	.detail-data-row {
+		font-size: 0.85rem;
+		color: #1a1a2e;
+		padding: 0.3rem 0;
+		font-weight: 500;
+	}
+
+	.detail-popup-actions {
+		display: flex;
+		gap: 0.5rem;
+		padding: 0.75rem 1.25rem;
+		border-top: 1px solid #f3f4f6;
+	}
+
+	.detail-accept {
+		flex: 1;
+		padding: 0.5rem;
+		border: none;
+		border-radius: 8px;
+		background: #10b981;
+		color: white;
+		font-weight: 600;
+		font-size: 0.85rem;
+		cursor: pointer;
+		transition: background 0.15s;
+	}
+
+	.detail-accept:hover { background: #059669; }
+
+	.detail-decline {
+		flex: 1;
+		padding: 0.5rem;
+		border: none;
+		border-radius: 8px;
+		background: #ef4444;
+		color: white;
+		font-weight: 600;
+		font-size: 0.85rem;
+		cursor: pointer;
+		transition: background 0.15s;
+	}
+
+	.detail-decline:hover { background: #dc2626; }
+
+	.detail-dismiss-btn {
+		flex: 1;
+		padding: 0.5rem;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		background: white;
+		color: #4b5563;
+		font-weight: 500;
+		font-size: 0.85rem;
+		cursor: pointer;
+		transition: background 0.15s;
+	}
+
+	.detail-dismiss-btn:hover { background: #f3f4f6; }
 </style>
 

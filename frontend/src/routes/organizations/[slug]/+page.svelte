@@ -69,6 +69,24 @@
 	let memberTargetFri = $state(0);
 	let memberOvertimeHours = $state(0);
 
+	// Self schedule editing (inline on org page)
+	let editingMySchedule = $state(false);
+	let myWeeklyHours = $state<number | null>(null);
+	let myDistributeEvenly = $state(true);
+	let myTargetMon = $state(0);
+	let myTargetTue = $state(0);
+	let myTargetWed = $state(0);
+	let myTargetThu = $state(0);
+	let myTargetFri = $state(0);
+	let myScheduleSaving = $state(false);
+	let myScheduleError = $state('');
+
+	// Initial overtime editing (inline)
+	let editingMyOvertime = $state(false);
+	let myOvertimeHours = $state(0);
+	let myOvertimeSaving = $state(false);
+	let myOvertimeError = $state('');
+
 	// Request history (admin)
 	let requestHistory = $state<OrgRequestResponse[]>([]);
 	let requestHistoryLoading = $state(false);
@@ -99,6 +117,22 @@
 			error = err.response?.status === 404 ? 'Organization not found.' : 'Failed to load organization.';
 		} finally {
 			loading = false;
+		}
+	}
+
+	/** Reload org data without toggling loading state (avoids scroll-to-top) */
+	async function reloadOrg() {
+		try {
+			const { data } = await organizationsApi.apiOrganizationsSlugGet(orgSlug);
+			org = data;
+			try {
+				const { data: ws } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgSlug);
+				workSchedule = ws;
+			} catch {
+				workSchedule = null;
+			}
+		} catch (err: any) {
+			actionError = err.response?.data?.message || 'Failed to reload organization.';
 		}
 	}
 
@@ -231,6 +265,65 @@
 		}
 	}
 
+	function startEditMySchedule() {
+		if (!workSchedule) return;
+		myWeeklyHours = workSchedule.weeklyWorkHours ?? null;
+		myTargetMon = workSchedule.targetMon ?? 0;
+		myTargetTue = workSchedule.targetTue ?? 0;
+		myTargetWed = workSchedule.targetWed ?? 0;
+		myTargetThu = workSchedule.targetThu ?? 0;
+		myTargetFri = workSchedule.targetFri ?? 0;
+		myDistributeEvenly = myTargetMon === myTargetTue && myTargetTue === myTargetWed && myTargetWed === myTargetThu && myTargetThu === myTargetFri;
+		myScheduleError = '';
+		editingMySchedule = true;
+	}
+
+	async function saveMySchedule() {
+		myScheduleSaving = true;
+		myScheduleError = '';
+		try {
+			const payload = {
+				weeklyWorkHours: myWeeklyHours ?? undefined,
+				distributeEvenly: myDistributeEvenly,
+				targetMon: myDistributeEvenly ? undefined : myTargetMon,
+				targetTue: myDistributeEvenly ? undefined : myTargetTue,
+				targetWed: myDistributeEvenly ? undefined : myTargetWed,
+				targetThu: myDistributeEvenly ? undefined : myTargetThu,
+				targetFri: myDistributeEvenly ? undefined : myTargetFri,
+			};
+			const { data } = await workScheduleApi.apiOrganizationsSlugWorkSchedulePut(orgSlug, payload);
+			workSchedule = data;
+			editingMySchedule = false;
+		} catch (err: any) {
+			myScheduleError = err.response?.data?.message || 'Failed to save schedule.';
+		} finally {
+			myScheduleSaving = false;
+		}
+	}
+
+	function startEditMyOvertime() {
+		if (!workSchedule) return;
+		myOvertimeHours = workSchedule.initialOvertimeHours ?? 0;
+		myOvertimeError = '';
+		editingMyOvertime = true;
+	}
+
+	async function saveMyOvertime() {
+		myOvertimeSaving = true;
+		myOvertimeError = '';
+		try {
+			await workScheduleApi.apiOrganizationsSlugInitialOvertimePut(orgSlug, { initialOvertimeHours: myOvertimeHours });
+			// Reload work schedule
+			const { data: ws } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgSlug);
+			workSchedule = ws;
+			editingMyOvertime = false;
+		} catch (err: any) {
+			myOvertimeError = err.response?.data?.message || 'Failed to save overtime.';
+		} finally {
+			myOvertimeSaving = false;
+		}
+	}
+
 	async function loadUsersForDropdown() {
 		if (usersLoaded) return;
 		try {
@@ -278,7 +371,7 @@
 				website: editWebsite.trim() || undefined
 			};
 			await organizationsApi.apiOrganizationsSlugPut(orgSlug, payload);
-			await loadOrg();
+			await reloadOrg();
 			editing = false;
 		} catch (err: any) {
 			editError = err.response?.data?.message || 'Failed to update organization.';
@@ -314,7 +407,7 @@
 				role: newMemberRole as any
 			};
 			await organizationsApi.apiOrganizationsSlugMembersPost(orgSlug, payload);
-			await loadOrg();
+			await reloadOrg();
 			showAddMember = false;
 			selectedUserId = null;
 			newMemberRole = 0;
@@ -329,7 +422,7 @@
 		actionError = '';
 		try {
 			await organizationsApi.apiOrganizationsSlugMembersUserIdPut(orgSlug, userId, { role: newRole as any });
-			await loadOrg();
+			await reloadOrg();
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to update member role.';
 		}
@@ -340,7 +433,7 @@
 		actionError = '';
 		try {
 			await organizationsApi.apiOrganizationsSlugMembersUserIdDelete(orgSlug, userId);
-			await loadOrg();
+			await reloadOrg();
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to remove member.';
 		}
@@ -368,7 +461,7 @@
 				autoPauseEnabled: !org.autoPauseEnabled
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
-			await loadOrg();
+			await reloadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to update setting.';
 		} finally {
@@ -388,7 +481,7 @@
 				editPastEntriesMode: next
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
-			await loadOrg();
+			await reloadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to update setting.';
 		} finally {
@@ -408,7 +501,7 @@
 				editPauseMode: next
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
-			await loadOrg();
+			await reloadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to update setting.';
 		} finally {
@@ -428,7 +521,7 @@
 				initialOvertimeMode: next
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
-			await loadOrg();
+			await reloadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to update setting.';
 		} finally {
@@ -448,7 +541,7 @@
 				joinPolicy: next
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
-			await loadOrg();
+			await reloadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to update setting.';
 		} finally {
@@ -514,7 +607,7 @@
 				pauseMinutes: newRulePauseMinutes
 			};
 			await pauseRulesApi.apiOrganizationsSlugPauseRulesPost(orgSlug, payload);
-			await loadOrg();
+			await reloadOrg();
 			showAddRule = false;
 			newRuleMinHours = 6;
 			newRulePauseMinutes = 30;
@@ -544,7 +637,7 @@
 				minHours: editRuleMinHours,
 				pauseMinutes: editRulePauseMinutes
 			});
-			await loadOrg();
+			await reloadOrg();
 			editingRuleId = null;
 		} catch (err: any) {
 			editRuleError = err.response?.data?.message || err.response?.data || 'Failed to update rule.';
@@ -557,7 +650,7 @@
 		if (!confirm('Delete this pause rule?')) return;
 		try {
 			await pauseRulesApi.apiOrganizationsSlugPauseRulesRuleIdDelete(orgSlug, ruleId);
-			await loadOrg();
+			await reloadOrg();
 		} catch (err: any) {
 			settingsError = err.response?.data?.message || 'Failed to delete rule.';
 		}
@@ -582,7 +675,7 @@
 				orgSlug, userId, { initialOvertimeHours: editOvertimeMinutes }
 			);
 			editingOvertimeMemberId = null;
-			await loadOrg();
+			await reloadOrg();
 		} catch (err: any) {
 			editOvertimeError = err.response?.data?.message || 'Failed to update overtime.';
 		} finally {
@@ -822,53 +915,113 @@
 			<!-- My Work Schedule (visible to all members) -->
 			{#if myRole && workSchedule}
 				<section class="schedule-overview-section">
-					<h2>My Work Schedule</h2>
-					<div class="schedule-overview-grid">
-						<div class="schedule-stat">
-							<span class="schedule-stat-label">Weekly Hours</span>
-							<span class="schedule-stat-value">{workSchedule.weeklyWorkHours ?? '—'}h</span>
-						</div>
-						<div class="schedule-stat">
-							<span class="schedule-stat-label">Mon</span>
-							<span class="schedule-stat-value">{workSchedule.targetMon ?? 0}h</span>
-						</div>
-						<div class="schedule-stat">
-							<span class="schedule-stat-label">Tue</span>
-							<span class="schedule-stat-value">{workSchedule.targetTue ?? 0}h</span>
-						</div>
-						<div class="schedule-stat">
-							<span class="schedule-stat-label">Wed</span>
-							<span class="schedule-stat-value">{workSchedule.targetWed ?? 0}h</span>
-						</div>
-						<div class="schedule-stat">
-							<span class="schedule-stat-label">Thu</span>
-							<span class="schedule-stat-value">{workSchedule.targetThu ?? 0}h</span>
-						</div>
-						<div class="schedule-stat">
-							<span class="schedule-stat-label">Fri</span>
-							<span class="schedule-stat-value">{workSchedule.targetFri ?? 0}h</span>
-						</div>
+					<div class="section-header-row">
+						<h2>My Work Schedule</h2>
+						{#if !editingMySchedule}
+							<button class="btn-schedule-sm" onclick={startEditMySchedule}>Edit</button>
+						{/if}
 					</div>
-					<p class="schedule-hint">Configure your schedule in <a href="/settings">Settings</a></p>
+
+					{#if editingMySchedule}
+						<div class="my-schedule-form">
+							{#if myScheduleError}
+								<div class="inline-error">{myScheduleError}</div>
+							{/if}
+							<div class="schedule-form-row">
+								<label>Weekly Hours</label>
+								<input type="number" class="input-xs" bind:value={myWeeklyHours} min="0" max="168" step="0.5" />
+							</div>
+							<div class="schedule-form-row">
+								<label class="checkbox-label-sm">
+									<input type="checkbox" bind:checked={myDistributeEvenly} />
+									Distribute evenly (Mon–Fri)
+								</label>
+							</div>
+							{#if !myDistributeEvenly}
+								<div class="schedule-day-targets">
+									<div class="day-target-sm"><span>Mon</span><input type="number" bind:value={myTargetMon} min="0" max="24" step="0.5" /></div>
+									<div class="day-target-sm"><span>Tue</span><input type="number" bind:value={myTargetTue} min="0" max="24" step="0.5" /></div>
+									<div class="day-target-sm"><span>Wed</span><input type="number" bind:value={myTargetWed} min="0" max="24" step="0.5" /></div>
+									<div class="day-target-sm"><span>Thu</span><input type="number" bind:value={myTargetThu} min="0" max="24" step="0.5" /></div>
+									<div class="day-target-sm"><span>Fri</span><input type="number" bind:value={myTargetFri} min="0" max="24" step="0.5" /></div>
+								</div>
+							{/if}
+							<div class="schedule-form-actions">
+								<button class="btn-primary-sm" onclick={saveMySchedule} disabled={myScheduleSaving}>
+									{myScheduleSaving ? 'Saving...' : 'Save'}
+								</button>
+								<button class="btn-secondary-sm" onclick={() => (editingMySchedule = false)}>Cancel</button>
+							</div>
+						</div>
+					{:else}
+						<div class="schedule-overview-grid">
+							<div class="schedule-stat">
+								<span class="schedule-stat-label">Weekly Hours</span>
+								<span class="schedule-stat-value">{workSchedule.weeklyWorkHours ?? '—'}h</span>
+							</div>
+							<div class="schedule-stat">
+								<span class="schedule-stat-label">Mon</span>
+								<span class="schedule-stat-value">{workSchedule.targetMon ?? 0}h</span>
+							</div>
+							<div class="schedule-stat">
+								<span class="schedule-stat-label">Tue</span>
+								<span class="schedule-stat-value">{workSchedule.targetTue ?? 0}h</span>
+							</div>
+							<div class="schedule-stat">
+								<span class="schedule-stat-label">Wed</span>
+								<span class="schedule-stat-value">{workSchedule.targetWed ?? 0}h</span>
+							</div>
+							<div class="schedule-stat">
+								<span class="schedule-stat-label">Thu</span>
+								<span class="schedule-stat-value">{workSchedule.targetThu ?? 0}h</span>
+							</div>
+							<div class="schedule-stat">
+								<span class="schedule-stat-label">Fri</span>
+								<span class="schedule-stat-value">{workSchedule.targetFri ?? 0}h</span>
+							</div>
+						</div>
+					{/if}
 				</section>
 
 				{#if workSchedule.initialOvertimeMode !== 'Disabled'}
 					<section class="schedule-overview-section overtime-section">
-						<h2>Initial Overtime Balance</h2>
-						<div class="schedule-overview-grid">
-							<div class="schedule-stat overtime-stat">
-								<span class="schedule-stat-label">Hours</span>
-								<span class="schedule-stat-value">{workSchedule.initialOvertimeHours ?? 0}h</span>
-							</div>
-							<div class="schedule-stat">
-								<span class="schedule-stat-label">Mode</span>
-								<span class="schedule-stat-value">{workSchedule.initialOvertimeMode}</span>
-							</div>
+						<div class="section-header-row">
+							<h2>Initial Overtime Balance</h2>
+							{#if !editingMyOvertime && workSchedule.initialOvertimeMode === 'Allowed'}
+								<button class="btn-schedule-sm" onclick={startEditMyOvertime}>Edit</button>
+							{/if}
 						</div>
-						{#if workSchedule.initialOvertimeMode === 'Allowed'}
-							<p class="schedule-hint">Set your overtime balance in <a href="/settings">Settings</a></p>
+
+						{#if editingMyOvertime}
+							<div class="my-schedule-form">
+								{#if myOvertimeError}
+									<div class="inline-error">{myOvertimeError}</div>
+								{/if}
+								<div class="schedule-form-row">
+									<label>Hours</label>
+									<input type="number" class="input-xs" bind:value={myOvertimeHours} step="0.5" />
+								</div>
+								<div class="schedule-form-actions">
+									<button class="btn-primary-sm" onclick={saveMyOvertime} disabled={myOvertimeSaving}>
+										{myOvertimeSaving ? 'Saving...' : 'Save'}
+									</button>
+									<button class="btn-secondary-sm" onclick={() => (editingMyOvertime = false)}>Cancel</button>
+								</div>
+							</div>
 						{:else}
-							<p class="schedule-hint">Requires admin approval to change</p>
+							<div class="schedule-overview-grid">
+								<div class="schedule-stat overtime-stat">
+									<span class="schedule-stat-label">Hours</span>
+									<span class="schedule-stat-value">{workSchedule.initialOvertimeHours ?? 0}h</span>
+								</div>
+								<div class="schedule-stat">
+									<span class="schedule-stat-label">Mode</span>
+									<span class="schedule-stat-value schedule-stat-value-sm">{ruleModeLabel(workSchedule.initialOvertimeMode)}</span>
+								</div>
+							</div>
+							{#if workSchedule.initialOvertimeMode === 'RequiresApproval'}
+								<p class="schedule-hint">Requires admin approval to change</p>
+							{/if}
 						{/if}
 					</section>
 				{/if}
@@ -1241,6 +1394,11 @@
 		font-size: 1.1rem;
 		font-weight: 700;
 		color: #1a1a2e;
+	}
+
+	.schedule-stat-value-sm {
+		font-size: 0.85rem;
+		word-break: break-word;
 	}
 
 	.overtime-stat .schedule-stat-value {
@@ -2121,5 +2279,21 @@
 	.overtime-stat .schedule-stat-value {
 		color: #2563eb;
 		font-weight: 700;
+	}
+
+	.my-schedule-form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 0.5rem 0;
+	}
+
+	.inline-error {
+		background: #fef2f2;
+		color: #dc2626;
+		font-size: 0.8125rem;
+		padding: 0.375rem 0.625rem;
+		border-radius: 6px;
+		border-left: 3px solid #dc2626;
 	}
 </style>

@@ -208,6 +208,11 @@
 				<p class="muted">No organizations yet. <a href="/organizations/new">Create one</a>.</p>
 			{/if}
 		</div>
+
+		<div class="org-manage-links">
+			<a href="/organizations" class="org-manage-link">Browse Organizations</a>
+			<a href="/organizations/new" class="org-manage-link">+ Create New</a>
+		</div>
 	</section>
 
 	<!-- Work Schedule (when org is selected) -->
@@ -629,5 +634,24 @@
 		font-size: 0.75rem;
 		color: #9ca3af;
 		margin-top: 0.25rem;
+	}
+
+	.org-manage-links {
+		display: flex;
+		gap: 1rem;
+		margin-top: 1rem;
+		padding-top: 1rem;
+		border-top: 1px solid #f3f4f6;
+	}
+
+	.org-manage-link {
+		font-size: 0.8125rem;
+		color: #3b82f6;
+		text-decoration: none;
+		font-weight: 500;
+	}
+
+	.org-manage-link:hover {
+		text-decoration: underline;
 	}
 </style>
