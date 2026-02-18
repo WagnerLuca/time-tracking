@@ -48,6 +48,7 @@ docs/UpdateUserRequest.md
 docs/UpdateWorkScheduleRequest.md
 docs/User.md
 docs/UserInfo.md
+docs/UserNotificationResponse.md
 docs/UserOrganizationResponse.md
 docs/UserResponse.md
 docs/UsersApi.md

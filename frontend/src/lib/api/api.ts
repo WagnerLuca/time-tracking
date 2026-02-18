@@ -115,6 +115,7 @@ export interface OrganizationDetailResponse {
     'editPastEntriesMode': string | null;
     'editPauseMode': string | null;
     'initialOvertimeMode': string | null;
+    'joinPolicy': string | null;
     'createdAt'?: string;
     'members': Array<OrganizationMemberResponse> | null;
     'pauseRules'?: Array<PauseRuleResponse> | null;
@@ -138,6 +139,7 @@ export interface OrganizationResponse {
     'logoUrl'?: string | null;
     'createdAt'?: string;
     'memberCount'?: number;
+    'joinPolicy': string | null;
 }
 
 export const OrganizationRole = {
@@ -254,6 +256,7 @@ export interface UpdateOrganizationSettingsRequest {
     'editPastEntriesMode'?: RuleMode;
     'editPauseMode'?: RuleMode;
     'initialOvertimeMode'?: RuleMode;
+    'joinPolicy'?: RuleMode;
 }
 
 
@@ -305,6 +308,10 @@ export interface UserInfo {
     'lastName': string | null;
     'profileImageUrl'?: string | null;
     'emailConfirmed'?: boolean;
+}
+export interface UserNotificationResponse {
+    'count'?: number;
+    'requests': Array<OrgRequestResponse> | null;
 }
 export interface UserOrganizationResponse {
     'organizationId'?: number;
@@ -2298,6 +2305,74 @@ export const RequestsApiAxiosParamCreator = function (configuration?: Configurat
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsUserNotificationsGet: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/organizations/user-notifications`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {Array<number>} [requestBody] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsUserNotificationsMarkSeenPost: async (requestBody?: Array<number>, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/organizations/user-notifications/mark-seen`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(requestBody, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -2371,6 +2446,29 @@ export const RequestsApiFp = function(configuration?: Configuration) {
             const localVarOperationServerBasePath = operationServerMap['RequestsApi.apiOrganizationsSlugRequestsPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsUserNotificationsGet(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UserNotificationResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsUserNotificationsGet(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['RequestsApi.apiOrganizationsUserNotificationsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {Array<number>} [requestBody] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsUserNotificationsMarkSeenPost(requestBody?: Array<number>, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsUserNotificationsMarkSeenPost(requestBody, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['RequestsApi.apiOrganizationsUserNotificationsMarkSeenPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -2428,6 +2526,23 @@ export const RequestsApiFactory = function (configuration?: Configuration, baseP
          */
         apiOrganizationsSlugRequestsPost(slug: string, createOrgRequestRequest?: CreateOrgRequestRequest, options?: RawAxiosRequestConfig): AxiosPromise<OrgRequestResponse> {
             return localVarFp.apiOrganizationsSlugRequestsPost(slug, createOrgRequestRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsUserNotificationsGet(options?: RawAxiosRequestConfig): AxiosPromise<UserNotificationResponse> {
+            return localVarFp.apiOrganizationsUserNotificationsGet(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {Array<number>} [requestBody] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsUserNotificationsMarkSeenPost(requestBody?: Array<number>, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiOrganizationsUserNotificationsMarkSeenPost(requestBody, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -2488,6 +2603,25 @@ export class RequestsApi extends BaseAPI {
      */
     public apiOrganizationsSlugRequestsPost(slug: string, createOrgRequestRequest?: CreateOrgRequestRequest, options?: RawAxiosRequestConfig) {
         return RequestsApiFp(this.configuration).apiOrganizationsSlugRequestsPost(slug, createOrgRequestRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsUserNotificationsGet(options?: RawAxiosRequestConfig) {
+        return RequestsApiFp(this.configuration).apiOrganizationsUserNotificationsGet(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {Array<number>} [requestBody] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsUserNotificationsMarkSeenPost(requestBody?: Array<number>, options?: RawAxiosRequestConfig) {
+        return RequestsApiFp(this.configuration).apiOrganizationsUserNotificationsMarkSeenPost(requestBody, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

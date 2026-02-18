@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Configuration, AuthApi, OrganizationsApi, TimeTrackingApi, UsersApi } from '$lib/api';
+import { Configuration, AuthApi, OrganizationsApi, PauseRulesApi, RequestsApi, TimeTrackingApi, UsersApi, WorkScheduleApi } from '$lib/api';
 
 // Detect base URL: browser uses current hostname, SSR uses Docker service name
 const getApiBaseUrl = (): string => {
@@ -54,5 +54,8 @@ const config = new Configuration({
 // Export typed API instances
 export const authApi = new AuthApi(config, undefined, axiosInstance);
 export const organizationsApi = new OrganizationsApi(config, undefined, axiosInstance);
+export const pauseRulesApi = new PauseRulesApi(config, undefined, axiosInstance);
+export const requestsApi = new RequestsApi(config, undefined, axiosInstance);
 export const timeTrackingApi = new TimeTrackingApi(config, undefined, axiosInstance);
 export const usersApi = new UsersApi(config, undefined, axiosInstance);
+export const workScheduleApi = new WorkScheduleApi(config, undefined, axiosInstance);

@@ -1439,6 +1439,78 @@
         }
       }
     },
+    "/api/organizations/user-notifications": {
+      "get": {
+        "tags": [
+          "Requests"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserNotificationResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserNotificationResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserNotificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/organizations/user-notifications/mark-seen": {
+      "post": {
+        "tags": [
+          "Requests"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/TimeTracking/start": {
       "post": {
         "tags": [
@@ -2458,6 +2530,7 @@
           "editPastEntriesMode",
           "editPauseMode",
           "initialOvertimeMode",
+          "joinPolicy",
           "members",
           "name",
           "slug"
@@ -2500,6 +2573,10 @@
             "nullable": true
           },
           "initialOvertimeMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "joinPolicy": {
             "type": "string",
             "nullable": true
           },
@@ -2570,6 +2647,7 @@
       },
       "OrganizationResponse": {
         "required": [
+          "joinPolicy",
           "name",
           "slug"
         ],
@@ -2606,6 +2684,10 @@
           "memberCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "joinPolicy": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -2915,6 +2997,9 @@
           },
           "initialOvertimeMode": {
             "$ref": "#/components/schemas/RuleMode"
+          },
+          "joinPolicy": {
+            "$ref": "#/components/schemas/RuleMode"
           }
         },
         "additionalProperties": false
@@ -3122,6 +3207,26 @@
           },
           "emailConfirmed": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserNotificationResponse": {
+        "required": [
+          "requests"
+        ],
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrgRequestResponse"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
