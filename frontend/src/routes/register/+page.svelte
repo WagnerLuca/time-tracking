@@ -26,7 +26,7 @@
 		submitting = true;
 		try {
 			await auth.register({ email, password, firstName, lastName });
-			goto('/');
+			goto('/organizations');
 		} catch (err: any) {
 			error = err.response?.data?.message || 'Registration failed. Please try again.';
 		} finally {

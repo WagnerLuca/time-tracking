@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte';
+	import { orgContext } from '$lib/stores/orgContext.svelte';
+	import { goto } from '$app/navigation';
 	import { organizationsApi, requestsApi } from '$lib/apiClient';
 	import type { OrganizationResponse } from '$lib/api';
 	import { RequestType } from '$lib/api';
@@ -54,6 +56,12 @@
 			if (status === 'Accepted') {
 				joinMessages = { ...joinMessages, [org.slug]: { type: 'success', text: 'Joined!' } };
 				myOrgIds = new Set([...myOrgIds, org.id!]);
+				// Auto-select the joined org and redirect to dashboard
+				if (auth.user?.id) {
+					await orgContext.loadOrganizations(auth.user.id);
+				}
+				orgContext.select(org.id!);
+				goto('/');
 			} else {
 				joinMessages = { ...joinMessages, [org.slug]: { type: 'success', text: 'Request sent! Waiting for admin approval.' } };
 				pendingJoinSlugs = new Set([...pendingJoinSlugs, org.slug]);

@@ -23,7 +23,7 @@
 			} else if (orgContext.organizations.length > 0) {
 				goto('/select-org');
 			} else {
-				goto('/');
+				goto('/organizations');
 			}
 		} catch (err: any) {
 			error = err.response?.data?.message || 'Login failed. Please check your credentials.';
