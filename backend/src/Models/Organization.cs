@@ -63,6 +63,14 @@ public class Organization
     /// </summary>
     public RuleMode InitialOvertimeMode { get; set; } = RuleMode.Allowed;
     
+    /// <summary>
+    /// Controls how users can join this organization.
+    /// Allowed = anyone can join freely.
+    /// RequiresApproval = user submits a join request that admin must approve.
+    /// Disabled = only admins can manually add members.
+    /// </summary>
+    public RuleMode JoinPolicy { get; set; } = RuleMode.RequiresApproval;
+    
     // Navigation properties
     [JsonIgnore]
     public ICollection<UserOrganization> UserOrganizations { get; set; } = new List<UserOrganization>();

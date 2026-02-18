@@ -64,6 +64,37 @@ public class RequestsController : OrganizationBaseController
                 .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId.Value && uo.IsActive);
             if (isMember)
                 return BadRequest(new { message = "You are already a member of this organization." });
+
+            // Check JoinPolicy
+            if (org.JoinPolicy == RuleMode.Disabled)
+                return BadRequest(new { message = "This organization does not accept join requests. Ask an admin to add you." });
+
+            if (org.JoinPolicy == RuleMode.Allowed)
+            {
+                // Auto-join: create accepted request and add member immediately
+                var autoRequest = new OrgRequest
+                {
+                    UserId = userId.Value,
+                    OrganizationId = org.Id,
+                    Type = RequestType.JoinOrganization,
+                    Message = request.Message,
+                    Status = RequestStatus.Accepted,
+                    RespondedAt = DateTime.UtcNow
+                };
+                _context.OrgRequests.Add(autoRequest);
+                _context.UserOrganizations.Add(new UserOrganization
+                {
+                    UserId = userId.Value,
+                    OrganizationId = org.Id,
+                    Role = OrganizationRole.Member,
+                    IsActive = true,
+                    JoinedAt = DateTime.UtcNow
+                });
+                await _context.SaveChangesAsync();
+                autoRequest.User = user;
+                return CreatedAtAction(nameof(GetRequests), new { slug }, MapToResponse(autoRequest, org.Name, org.Slug));
+            }
+            // RequiresApproval: fall through to create pending request
         }
         else
         {

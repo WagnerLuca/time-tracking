@@ -33,7 +33,8 @@ public class OrganizationsController : OrganizationBaseController
                 Website = o.Website,
                 LogoUrl = o.LogoUrl,
                 CreatedAt = o.CreatedAt,
-                MemberCount = o.UserOrganizations.Count(uo => uo.IsActive)
+                MemberCount = o.UserOrganizations.Count(uo => uo.IsActive),
+                JoinPolicy = o.JoinPolicy.ToString()
             })
             .ToListAsync();
 
@@ -63,6 +64,7 @@ public class OrganizationsController : OrganizationBaseController
                 EditPastEntriesMode = o.EditPastEntriesMode.ToString(),
                 EditPauseMode = o.EditPauseMode.ToString(),
                 InitialOvertimeMode = o.InitialOvertimeMode.ToString(),
+                JoinPolicy = o.JoinPolicy.ToString(),
                 CreatedAt = o.CreatedAt,
                 Members = o.UserOrganizations
                     .Where(uo => uo.IsActive)
@@ -183,7 +185,8 @@ public class OrganizationsController : OrganizationBaseController
             Website = organization.Website,
             LogoUrl = organization.LogoUrl,
             CreatedAt = organization.CreatedAt,
-            MemberCount = 1
+            MemberCount = 1,
+            JoinPolicy = organization.JoinPolicy.ToString()
         };
 
         return CreatedAtAction(nameof(GetOrganization), new { slug = organization.Slug }, response);
@@ -239,7 +242,8 @@ public class OrganizationsController : OrganizationBaseController
             Website = organization.Website,
             LogoUrl = organization.LogoUrl,
             CreatedAt = organization.CreatedAt,
-            MemberCount = organization.UserOrganizations.Count(uo => uo.IsActive)
+            MemberCount = organization.UserOrganizations.Count(uo => uo.IsActive),
+            JoinPolicy = organization.JoinPolicy.ToString()
         });
     }
 
@@ -487,6 +491,8 @@ public class OrganizationsController : OrganizationBaseController
             org.EditPauseMode = request.EditPauseMode.Value;
         if (request.InitialOvertimeMode.HasValue)
             org.InitialOvertimeMode = request.InitialOvertimeMode.Value;
+        if (request.JoinPolicy.HasValue)
+            org.JoinPolicy = request.JoinPolicy.Value;
 
         org.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
@@ -495,7 +501,8 @@ public class OrganizationsController : OrganizationBaseController
             org.AutoPauseEnabled,
             EditPastEntriesMode = org.EditPastEntriesMode.ToString(),
             EditPauseMode = org.EditPauseMode.ToString(),
-            InitialOvertimeMode = org.InitialOvertimeMode.ToString()
+            InitialOvertimeMode = org.InitialOvertimeMode.ToString(),
+            JoinPolicy = org.JoinPolicy.ToString()
         });
     }
 

@@ -11,6 +11,7 @@ public record OrganizationResponse
     public string? LogoUrl { get; init; }
     public DateTime CreatedAt { get; init; }
     public int MemberCount { get; init; }
+    public required string JoinPolicy { get; init; }
 }
 
 public record OrganizationDetailResponse
@@ -25,6 +26,7 @@ public record OrganizationDetailResponse
     public required string EditPastEntriesMode { get; init; }
     public required string EditPauseMode { get; init; }
     public required string InitialOvertimeMode { get; init; }
+    public required string JoinPolicy { get; init; }
     public DateTime CreatedAt { get; init; }
     public required List<OrganizationMemberResponse> Members { get; init; }
     public List<PauseRuleResponse>? PauseRules { get; init; }
@@ -88,6 +90,7 @@ public record UpdateOrganizationSettingsRequest
     public RuleMode? EditPastEntriesMode { get; init; }
     public RuleMode? EditPauseMode { get; init; }
     public RuleMode? InitialOvertimeMode { get; init; }
+    public RuleMode? JoinPolicy { get; init; }
 }
 
 public record PauseRuleResponse
