@@ -46,3 +46,22 @@ public record AdminNotificationResponse
     public int PendingRequests { get; init; }
     public required List<OrgRequestResponse> Requests { get; init; }
 }
+
+/// <summary>
+/// User notification: requests that have been responded to
+/// </summary>
+public record UserNotificationResponse
+{
+    public int Count { get; init; }
+    public required List<OrgRequestResponse> Requests { get; init; }
+}
+
+/// <summary>
+/// JSON payload for EditPastEntry request data
+/// </summary>
+public record EditEntryRequestData
+{
+    public DateTime? StartTime { get; init; }
+    public DateTime? EndTime { get; init; }
+    public string? Description { get; init; }
+}

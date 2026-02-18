@@ -43,6 +43,11 @@ public class OrgRequest
     public DateTime? RespondedAt { get; set; }
     public int? RespondedByUserId { get; set; }
     
+    /// <summary>
+    /// Tracks when the user was notified of the response. Null = not yet seen.
+    /// </summary>
+    public DateTime? UserNotifiedAt { get; set; }
+    
     // Navigation properties
     [JsonIgnore]
     public User User { get; set; } = null!;

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using TimeTracking.Api.Data;
 using TimeTracking.Api.Models;
 using TimeTracking.Api.Models.Dtos;
@@ -246,9 +247,47 @@ public class RequestsController : OrganizationBaseController
                     }
                     break;
 
-                // EditPastEntry and EditPause side effects would be handled
-                // by the frontend/specific edit endpoints when the request is approved.
-                // The approval simply grants permission.
+                case RequestType.EditPastEntry:
+                    if (orgRequest.RelatedEntityId.HasValue && orgRequest.RequestData != null)
+                    {
+                        var entry = await _context.TimeEntries
+                            .FirstOrDefaultAsync(e => e.Id == orgRequest.RelatedEntityId.Value
+                                                   && e.OrganizationId == org.Id);
+                        if (entry != null)
+                        {
+                            try
+                            {
+                                var data = JsonSerializer.Deserialize<EditEntryRequestData>(orgRequest.RequestData,
+                                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                                if (data != null)
+                                {
+                                    if (data.StartTime.HasValue) entry.StartTime = data.StartTime.Value;
+                                    if (data.EndTime.HasValue) entry.EndTime = data.EndTime.Value;
+                                    if (data.Description != null) entry.Description = data.Description;
+                                    entry.UpdatedAt = DateTime.UtcNow;
+                                }
+                            }
+                            catch { /* invalid JSON, skip auto-apply */ }
+                        }
+                    }
+                    break;
+
+                case RequestType.EditPause:
+                    if (orgRequest.RelatedEntityId.HasValue && orgRequest.RequestData != null)
+                    {
+                        var pauseEntry = await _context.TimeEntries
+                            .FirstOrDefaultAsync(e => e.Id == orgRequest.RelatedEntityId.Value
+                                                   && e.OrganizationId == org.Id);
+                        if (pauseEntry != null)
+                        {
+                            if (int.TryParse(orgRequest.RequestData, out var pauseMinutes))
+                            {
+                                pauseEntry.PauseDurationMinutes = Math.Max(0, pauseMinutes);
+                                pauseEntry.UpdatedAt = DateTime.UtcNow;
+                            }
+                        }
+                    }
+                    break;
             }
         }
 
@@ -325,5 +364,61 @@ public class RequestsController : OrganizationBaseController
             Requests = pendingRequests.Select(r =>
                 MapToResponse(r, r.Organization.Name, r.Organization.Slug)).ToList()
         });
+    }
+
+    // ────────────────────────────────────────────────────
+    //  GET  /api/organizations/user-notifications
+    //  Get request responses the user hasn't seen yet
+    // ────────────────────────────────────────────────────
+    [HttpGet("user-notifications")]
+    [Authorize]
+    public async Task<ActionResult<UserNotificationResponse>> GetUserNotifications()
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var unseenResponses = await _context.OrgRequests
+            .Include(r => r.User)
+            .Include(r => r.Organization)
+            .Include(r => r.RespondedByUser)
+            .Where(r => r.UserId == userId.Value
+                     && r.Status != RequestStatus.Pending
+                     && r.UserNotifiedAt == null)
+            .OrderByDescending(r => r.RespondedAt)
+            .ToListAsync();
+
+        return Ok(new UserNotificationResponse
+        {
+            Count = unseenResponses.Count,
+            Requests = unseenResponses.Select(r =>
+                MapToResponse(r, r.Organization.Name, r.Organization.Slug)).ToList()
+        });
+    }
+
+    // ────────────────────────────────────────────────────
+    //  POST  /api/organizations/user-notifications/mark-seen
+    //  Mark user notifications as seen
+    // ────────────────────────────────────────────────────
+    [HttpPost("user-notifications/mark-seen")]
+    [Authorize]
+    public async Task<ActionResult> MarkNotificationsSeen([FromBody] List<int>? requestIds = null)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var query = _context.OrgRequests
+            .Where(r => r.UserId == userId.Value
+                     && r.Status != RequestStatus.Pending
+                     && r.UserNotifiedAt == null);
+
+        if (requestIds != null && requestIds.Count > 0)
+            query = query.Where(r => requestIds.Contains(r.Id));
+
+        var requests = await query.ToListAsync();
+        foreach (var req in requests)
+            req.UserNotifiedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return Ok(new { marked = requests.Count });
     }
 }
