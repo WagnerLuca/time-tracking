@@ -16,6 +16,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<TimeEntry> TimeEntries { get; set; }
     public DbSet<PauseRule> PauseRules { get; set; }
+    public DbSet<OrgRequest> OrgRequests { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -155,6 +156,39 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany(o => o.PauseRules)
                 .HasForeignKey(e => e.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure OrgRequest entity
+        modelBuilder.Entity<OrgRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Message).HasMaxLength(500);
+            entity.Property(e => e.Status).IsRequired();
+            entity.Property(e => e.Type).IsRequired();
+            entity.Property(e => e.RequestData).HasMaxLength(2000);
+
+            if (isInMemory)
+                entity.Property(e => e.CreatedAt).IsRequired();
+            else
+                entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // Index: user+org+type+status for fast lookups
+            entity.HasIndex(e => new { e.UserId, e.OrganizationId, e.Type, e.Status });
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.RespondedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.RespondedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

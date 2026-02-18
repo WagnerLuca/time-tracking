@@ -230,7 +230,7 @@ public class TimeTrackingController : ControllerBase
         var entries = await query
             .OrderByDescending(e => e.StartTime)
             .Skip(offset)
-            .Take(Math.Min(limit, 200))
+            .Take(Math.Min(limit, 10000))
             .ToListAsync();
 
         return Ok(entries.Select(ToResponse));
@@ -238,7 +238,7 @@ public class TimeTrackingController : ControllerBase
 
     // ── PUT /api/timetracking/{id} ──
     /// <summary>
-    /// Edit a past time entry. Requires AllowEditPastEntries if in an organization.
+    /// Edit a past time entry. Respects EditPastEntriesMode if in an organization.
     /// </summary>
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(TimeEntryResponse), StatusCodes.Status200OK)]
@@ -264,8 +264,10 @@ public class TimeTrackingController : ControllerBase
         {
             var org = await _context.Organizations
                 .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId && o.IsActive);
-            if (org != null && !org.AllowEditPastEntries)
-                return StatusCode(403, new { message = "Editing past entries is not allowed in this organization." });
+            if (org != null && org.EditPastEntriesMode == RuleMode.Disabled)
+                return StatusCode(403, new { message = "Editing past entries is disabled in this organization." });
+            if (org != null && org.EditPastEntriesMode == RuleMode.RequiresApproval)
+                return StatusCode(403, new { message = "Editing past entries requires admin approval in this organization. Please submit a request." });
         }
 
         if (request.StartTime.HasValue)
@@ -291,8 +293,10 @@ public class TimeTrackingController : ControllerBase
             {
                 var pauseOrg = await _context.Organizations
                     .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId && o.IsActive);
-                if (pauseOrg != null && !pauseOrg.AllowEditPause)
-                    return StatusCode(403, new { message = "Editing pause duration is not allowed in this organization." });
+                if (pauseOrg != null && pauseOrg.EditPauseMode == RuleMode.Disabled)
+                    return StatusCode(403, new { message = "Editing pause duration is disabled in this organization." });
+                if (pauseOrg != null && pauseOrg.EditPauseMode == RuleMode.RequiresApproval)
+                    return StatusCode(403, new { message = "Editing pause duration requires admin approval in this organization. Please submit a request." });
             }
             entry.PauseDurationMinutes = Math.Max(0, request.PauseDurationMinutes.Value);
         }

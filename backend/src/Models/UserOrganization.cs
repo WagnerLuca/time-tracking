@@ -28,6 +28,9 @@ public class UserOrganization
     public double TargetWed { get; set; }
     public double TargetThu { get; set; }
     public double TargetFri { get; set; }
+
+    // Initial overtime balance in hours (set by user, applied before first tracked entry)
+    public double InitialOvertimeHours { get; set; }
     
     // Navigation properties
     [JsonIgnore]

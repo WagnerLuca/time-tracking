@@ -2,6 +2,19 @@ using System.Text.Json.Serialization;
 
 namespace TimeTracking.Api.Models;
 
+/// <summary>
+/// Tri-state rule mode for organization settings.
+/// Disabled = feature off entirely.
+/// RequiresApproval = user must request, admin approves.
+/// Allowed = user can do it themselves.
+/// </summary>
+public enum RuleMode
+{
+    Disabled = 0,
+    RequiresApproval = 1,
+    Allowed = 2
+}
+
 public class Organization
 {
     public int Id { get; set; }
@@ -24,17 +37,31 @@ public class Organization
     /// <summary>
     /// When true, automatic pause deductions are applied based on PauseRules
     /// </summary>
-    public bool AutoPauseEnabled { get; set; } = false;
+    public bool AutoPauseEnabled { get; set; } = true;
     
     /// <summary>
-    /// When true, members can edit their past time entries
+    /// Controls whether members can edit their past time entries.
+    /// Allowed = user can edit freely.
+    /// RequiresApproval = user must request and admin approves.
+    /// Disabled = editing past entries is not available.
     /// </summary>
-    public bool AllowEditPastEntries { get; set; } = false;
+    public RuleMode EditPastEntriesMode { get; set; } = RuleMode.Allowed;
     
     /// <summary>
-    /// When true, members can override the auto-deducted pause duration on their entries
+    /// Controls whether members can override the auto-deducted pause duration.
+    /// Allowed = user can edit freely.
+    /// RequiresApproval = user must request and admin approves.
+    /// Disabled = pause editing is not available.
     /// </summary>
-    public bool AllowEditPause { get; set; } = false;
+    public RuleMode EditPauseMode { get; set; } = RuleMode.Allowed;
+    
+    /// <summary>
+    /// Controls whether members can set their own initial overtime balance.
+    /// Allowed = user can set freely.
+    /// RequiresApproval = user must request and admin approves.
+    /// Disabled = initial overtime is not available.
+    /// </summary>
+    public RuleMode InitialOvertimeMode { get; set; } = RuleMode.Allowed;
     
     // Navigation properties
     [JsonIgnore]

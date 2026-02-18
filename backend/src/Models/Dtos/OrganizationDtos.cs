@@ -22,8 +22,9 @@ public record OrganizationDetailResponse
     public string? Website { get; init; }
     public string? LogoUrl { get; init; }
     public bool AutoPauseEnabled { get; init; }
-    public bool AllowEditPastEntries { get; init; }
-    public bool AllowEditPause { get; init; }
+    public required string EditPastEntriesMode { get; init; }
+    public required string EditPauseMode { get; init; }
+    public required string InitialOvertimeMode { get; init; }
     public DateTime CreatedAt { get; init; }
     public required List<OrganizationMemberResponse> Members { get; init; }
     public List<PauseRuleResponse>? PauseRules { get; init; }
@@ -38,6 +39,7 @@ public record OrganizationMemberResponse
     public string? ProfileImageUrl { get; init; }
     public required string Role { get; init; }
     public DateTime JoinedAt { get; init; }
+    public double InitialOvertimeHours { get; init; }
 }
 
 public record UserOrganizationResponse
@@ -83,8 +85,9 @@ public record UpdateMemberRoleRequest
 public record UpdateOrganizationSettingsRequest
 {
     public bool? AutoPauseEnabled { get; init; }
-    public bool? AllowEditPastEntries { get; init; }
-    public bool? AllowEditPause { get; init; }
+    public RuleMode? EditPastEntriesMode { get; init; }
+    public RuleMode? EditPauseMode { get; init; }
+    public RuleMode? InitialOvertimeMode { get; init; }
 }
 
 public record PauseRuleResponse
@@ -118,6 +121,8 @@ public record WorkScheduleResponse
     public double TargetWed { get; init; }
     public double TargetThu { get; init; }
     public double TargetFri { get; init; }
+    public double InitialOvertimeHours { get; init; }
+    public required string InitialOvertimeMode { get; init; }
 }
 
 public record UpdateWorkScheduleRequest
@@ -133,6 +138,7 @@ public record UpdateWorkScheduleRequest
     public double? TargetWed { get; init; }
     public double? TargetThu { get; init; }
     public double? TargetFri { get; init; }
+    public double? InitialOvertimeHours { get; init; }
 }
 
 // Admin time overview
@@ -147,4 +153,9 @@ public record MemberTimeOverviewResponse
     public double TotalTrackedMinutes { get; init; }
     public double NetTrackedMinutes { get; init; }
     public int EntryCount { get; init; }
+}
+
+public record SetInitialOvertimeRequest
+{
+    public double InitialOvertimeHours { get; init; }
 }
