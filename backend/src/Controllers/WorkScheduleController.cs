@@ -121,4 +121,141 @@ public class WorkScheduleController : OrganizationBaseController
             InitialOvertimeMode = org.InitialOvertimeMode.ToString()
         });
     }
+
+    // ────────────────────────────────────────────────────
+    //  PUT  /api/organizations/{slug}/initial-overtime
+    //  Update the current user's initial overtime balance (separate from work schedule)
+    // ────────────────────────────────────────────────────
+    [HttpPut("{slug}/initial-overtime")]
+    [Authorize]
+    public async Task<ActionResult> UpdateMyInitialOvertime(string slug, [FromBody] SetInitialOvertimeRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+
+        var org = await GetOrgBySlug(slug);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
+        var membership = await _context.UserOrganizations
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId.Value && uo.IsActive);
+        if (membership == null)
+            return NotFound(new { message = "You are not a member of this organization." });
+
+        if (org.InitialOvertimeMode == RuleMode.Disabled)
+            return BadRequest(new { message = "Initial overtime is disabled for this organization." });
+        if (org.InitialOvertimeMode == RuleMode.RequiresApproval)
+            return BadRequest(new { message = "Initial overtime requires admin approval. Please submit a request." });
+
+        membership.InitialOvertimeHours = request.InitialOvertimeHours;
+        await _context.SaveChangesAsync();
+
+        return Ok(new { initialOvertimeHours = membership.InitialOvertimeHours });
+    }
+
+    // ────────────────────────────────────────────────────
+    //  GET  /api/organizations/{slug}/members/{userId}/work-schedule
+    //  Admin+: get a member's work schedule
+    // ────────────────────────────────────────────────────
+    [HttpGet("{slug}/members/{memberId}/work-schedule")]
+    [Authorize]
+    public async Task<ActionResult<WorkScheduleResponse>> GetMemberWorkSchedule(string slug, int memberId)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+
+        var org = await GetOrgBySlug(slug);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(org.Id);
+        if (callerRole == null || callerRole < OrganizationRole.Admin)
+            return Forbid();
+
+        var membership = await _context.UserOrganizations
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == memberId && uo.IsActive);
+        if (membership == null)
+            return NotFound(new { message = "Member not found in this organization." });
+
+        return Ok(new WorkScheduleResponse
+        {
+            UserId = memberId,
+            OrganizationId = org.Id,
+            WeeklyWorkHours = membership.WeeklyWorkHours,
+            TargetMon = membership.TargetMon,
+            TargetTue = membership.TargetTue,
+            TargetWed = membership.TargetWed,
+            TargetThu = membership.TargetThu,
+            TargetFri = membership.TargetFri,
+            InitialOvertimeHours = membership.InitialOvertimeHours,
+            InitialOvertimeMode = org.InitialOvertimeMode.ToString()
+        });
+    }
+
+    // ────────────────────────────────────────────────────
+    //  PUT  /api/organizations/{slug}/members/{userId}/work-schedule
+    //  Admin+: set a member's work schedule
+    // ────────────────────────────────────────────────────
+    [HttpPut("{slug}/members/{memberId}/work-schedule")]
+    [Authorize]
+    public async Task<ActionResult<WorkScheduleResponse>> UpdateMemberWorkSchedule(
+        string slug, int memberId, [FromBody] UpdateWorkScheduleRequest request)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+
+        var org = await GetOrgBySlug(slug);
+        if (org == null) return NotFound(new { message = "Organization not found" });
+
+        var callerRole = await GetCallerRole(org.Id);
+        if (callerRole == null || callerRole < OrganizationRole.Admin)
+            return Forbid();
+
+        var membership = await _context.UserOrganizations
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == memberId && uo.IsActive);
+        if (membership == null)
+            return NotFound(new { message = "Member not found in this organization." });
+
+        if (request.WeeklyWorkHours.HasValue)
+        {
+            membership.WeeklyWorkHours = request.WeeklyWorkHours.Value;
+
+            if (request.DistributeEvenly)
+            {
+                var daily = Math.Round(request.WeeklyWorkHours.Value / 5.0, 2);
+                membership.TargetMon = daily;
+                membership.TargetTue = daily;
+                membership.TargetWed = daily;
+                membership.TargetThu = daily;
+                membership.TargetFri = daily;
+            }
+            else
+            {
+                membership.TargetMon = request.TargetMon ?? membership.TargetMon;
+                membership.TargetTue = request.TargetTue ?? membership.TargetTue;
+                membership.TargetWed = request.TargetWed ?? membership.TargetWed;
+                membership.TargetThu = request.TargetThu ?? membership.TargetThu;
+                membership.TargetFri = request.TargetFri ?? membership.TargetFri;
+            }
+        }
+
+        if (request.InitialOvertimeHours.HasValue)
+        {
+            membership.InitialOvertimeHours = request.InitialOvertimeHours.Value;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new WorkScheduleResponse
+        {
+            UserId = memberId,
+            OrganizationId = org.Id,
+            WeeklyWorkHours = membership.WeeklyWorkHours,
+            TargetMon = membership.TargetMon,
+            TargetTue = membership.TargetTue,
+            TargetWed = membership.TargetWed,
+            TargetThu = membership.TargetThu,
+            TargetFri = membership.TargetFri,
+            InitialOvertimeHours = membership.InitialOvertimeHours,
+            InitialOvertimeMode = org.InitialOvertimeMode.ToString()
+        });
+    }
 }
