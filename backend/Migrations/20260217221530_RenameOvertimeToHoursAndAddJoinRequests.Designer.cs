@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TimeTracking.Api.Data;
@@ -11,9 +12,11 @@ using TimeTracking.Api.Data;
 namespace TimeTracking.Api.Migrations
 {
     [DbContext(typeof(TimeTrackingDbContext))]
-    partial class TimeTrackingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260217221530_RenameOvertimeToHoursAndAddJoinRequests")]
+    partial class RenameOvertimeToHoursAndAddJoinRequests
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -22,7 +25,7 @@ namespace TimeTracking.Api.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("TimeTracking.Api.Models.OrgRequest", b =>
+            modelBuilder.Entity("TimeTracking.Api.Models.JoinRequest", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -42,13 +45,6 @@ namespace TimeTracking.Api.Migrations
                     b.Property<int>("OrganizationId")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("RelatedEntityId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("RequestData")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
                     b.Property<DateTime?>("RespondedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -56,9 +52,6 @@ namespace TimeTracking.Api.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Type")
                         .HasColumnType("integer");
 
                     b.Property<int>("UserId")
@@ -70,9 +63,9 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasIndex("RespondedByUserId");
 
-                    b.HasIndex("UserId", "OrganizationId", "Type", "Status");
+                    b.HasIndex("UserId", "OrganizationId", "Status");
 
-                    b.ToTable("OrgRequests");
+                    b.ToTable("JoinRequests");
                 });
 
             modelBuilder.Entity("TimeTracking.Api.Models.Organization", b =>
@@ -82,6 +75,15 @@ namespace TimeTracking.Api.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("AllowEditPastEntries")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("AllowEditPause")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("AllowInitialOvertime")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("AutoPauseEnabled")
                         .HasColumnType("boolean");
@@ -93,15 +95,6 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
-
-                    b.Property<int>("EditPastEntriesMode")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("EditPauseMode")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("InitialOvertimeMode")
-                        .HasColumnType("integer");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -387,7 +380,7 @@ namespace TimeTracking.Api.Migrations
                     b.ToTable("UserOrganizations");
                 });
 
-            modelBuilder.Entity("TimeTracking.Api.Models.OrgRequest", b =>
+            modelBuilder.Entity("TimeTracking.Api.Models.JoinRequest", b =>
                 {
                     b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
                         .WithMany()
