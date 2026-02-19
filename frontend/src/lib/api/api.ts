@@ -23,9 +23,37 @@ import type { RequestArgs } from './base';
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError, operationServerMap } from './base';
 
+export interface AbsenceDayResponse {
+    'id'?: number;
+    'userId'?: number;
+    'organizationId'?: number;
+    'date'?: string;
+    'type': string | null;
+    'note'?: string | null;
+    'userFirstName'?: string | null;
+    'userLastName'?: string | null;
+}
+
+export const AbsenceType = {
+    NUMBER_0: 0,
+    NUMBER_1: 1,
+    NUMBER_2: 2
+} as const;
+
+export type AbsenceType = typeof AbsenceType[keyof typeof AbsenceType];
+
+
 export interface AddMemberRequest {
     'userId'?: number;
     'role'?: OrganizationRole;
+}
+
+
+export interface AdminCreateAbsenceDayRequest {
+    'userId'?: number;
+    'date'?: string;
+    'type'?: AbsenceType;
+    'note'?: string | null;
 }
 
 
@@ -40,6 +68,18 @@ export interface AuthResponse {
 export interface ChangePasswordRequest {
     'currentPassword': string | null;
     'newPassword': string | null;
+}
+export interface CreateAbsenceDayRequest {
+    'date'?: string;
+    'type'?: AbsenceType;
+    'note'?: string | null;
+}
+
+
+export interface CreateHolidayRequest {
+    'date'?: string;
+    'name': string | null;
+    'isRecurring'?: boolean;
 }
 export interface CreateOrgRequestRequest {
     'message'?: string | null;
@@ -64,6 +104,24 @@ export interface CreateUserRequest {
     'email': string | null;
     'firstName': string | null;
     'lastName': string | null;
+}
+export interface CreateWorkSchedulePeriodRequest {
+    'validFrom'?: string;
+    'validTo'?: string | null;
+    'weeklyWorkHours'?: number | null;
+    'distributeEvenly'?: boolean;
+    'targetMon'?: number | null;
+    'targetTue'?: number | null;
+    'targetWed'?: number | null;
+    'targetThu'?: number | null;
+    'targetFri'?: number | null;
+}
+export interface HolidayResponse {
+    'id'?: number;
+    'organizationId'?: number;
+    'date'?: string;
+    'name': string | null;
+    'isRecurring'?: boolean;
 }
 export interface LoginRequest {
     'email': string | null;
@@ -116,6 +174,7 @@ export interface OrganizationDetailResponse {
     'editPauseMode': string | null;
     'initialOvertimeMode': string | null;
     'joinPolicy': string | null;
+    'workScheduleChangeMode': string | null;
     'createdAt'?: string;
     'members': Array<OrganizationMemberResponse> | null;
     'pauseRules'?: Array<PauseRuleResponse> | null;
@@ -239,6 +298,11 @@ export interface TimeEntryResponse {
     'netDurationMinutes'?: number | null;
     'createdAt'?: string;
 }
+export interface UpdateHolidayRequest {
+    'date'?: string | null;
+    'name'?: string | null;
+    'isRecurring'?: boolean | null;
+}
 export interface UpdateMemberRoleRequest {
     'role'?: OrganizationRole;
 }
@@ -257,6 +321,7 @@ export interface UpdateOrganizationSettingsRequest {
     'editPauseMode'?: RuleMode;
     'initialOvertimeMode'?: RuleMode;
     'joinPolicy'?: RuleMode;
+    'workScheduleChangeMode'?: RuleMode;
 }
 
 
@@ -276,6 +341,17 @@ export interface UpdateUserRequest {
     'firstName': string | null;
     'lastName': string | null;
     'isActive'?: boolean;
+}
+export interface UpdateWorkSchedulePeriodRequest {
+    'validFrom'?: string | null;
+    'validTo'?: string | null;
+    'weeklyWorkHours'?: number | null;
+    'distributeEvenly'?: boolean;
+    'targetMon'?: number | null;
+    'targetTue'?: number | null;
+    'targetWed'?: number | null;
+    'targetThu'?: number | null;
+    'targetFri'?: number | null;
 }
 export interface UpdateWorkScheduleRequest {
     'weeklyWorkHours'?: number | null;
@@ -331,6 +407,19 @@ export interface UserResponse {
     'updatedAt'?: string | null;
     'isActive'?: boolean;
 }
+export interface WorkSchedulePeriodResponse {
+    'id'?: number;
+    'userId'?: number;
+    'organizationId'?: number;
+    'validFrom'?: string;
+    'validTo'?: string | null;
+    'weeklyWorkHours'?: number | null;
+    'targetMon'?: number;
+    'targetTue'?: number;
+    'targetWed'?: number;
+    'targetThu'?: number;
+    'targetFri'?: number;
+}
 export interface WorkScheduleResponse {
     'userId'?: number;
     'organizationId'?: number;
@@ -342,7 +431,358 @@ export interface WorkScheduleResponse {
     'targetFri'?: number;
     'initialOvertimeHours'?: number;
     'initialOvertimeMode': string | null;
+    'workScheduleChangeMode': string | null;
 }
+
+/**
+ * AbsenceDayApi - axios parameter creator
+ */
+export const AbsenceDayApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @param {string} slug 
+         * @param {AdminCreateAbsenceDayRequest} [adminCreateAbsenceDayRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugAbsencesAdminPost: async (slug: string, adminCreateAbsenceDayRequest?: AdminCreateAbsenceDayRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugAbsencesAdminPost', 'slug', slug)
+            const localVarPath = `/api/organizations/{slug}/absences/admin`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(adminCreateAbsenceDayRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} [userId] 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugAbsencesGet: async (slug: string, userId?: number, from?: string, to?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugAbsencesGet', 'slug', slug)
+            const localVarPath = `/api/organizations/{slug}/absences`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+            if (userId !== undefined) {
+                localVarQueryParameter['userId'] = userId;
+            }
+
+            if (from !== undefined) {
+                localVarQueryParameter['from'] = (from as any instanceof Date) ?
+                    (from as any).toISOString().substring(0,10) :
+                    from;
+            }
+
+            if (to !== undefined) {
+                localVarQueryParameter['to'] = (to as any instanceof Date) ?
+                    (to as any).toISOString().substring(0,10) :
+                    to;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugAbsencesIdDelete: async (slug: string, id: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugAbsencesIdDelete', 'slug', slug)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiOrganizationsSlugAbsencesIdDelete', 'id', id)
+            const localVarPath = `/api/organizations/{slug}/absences/{id}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {CreateAbsenceDayRequest} [createAbsenceDayRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugAbsencesPost: async (slug: string, createAbsenceDayRequest?: CreateAbsenceDayRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugAbsencesPost', 'slug', slug)
+            const localVarPath = `/api/organizations/{slug}/absences`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createAbsenceDayRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * AbsenceDayApi - functional programming interface
+ */
+export const AbsenceDayApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = AbsenceDayApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @param {string} slug 
+         * @param {AdminCreateAbsenceDayRequest} [adminCreateAbsenceDayRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugAbsencesAdminPost(slug: string, adminCreateAbsenceDayRequest?: AdminCreateAbsenceDayRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AbsenceDayResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugAbsencesAdminPost(slug, adminCreateAbsenceDayRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiOrganizationsSlugAbsencesAdminPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} [userId] 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugAbsencesGet(slug: string, userId?: number, from?: string, to?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<AbsenceDayResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugAbsencesGet(slug, userId, from, to, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiOrganizationsSlugAbsencesGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugAbsencesIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugAbsencesIdDelete(slug, id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiOrganizationsSlugAbsencesIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {CreateAbsenceDayRequest} [createAbsenceDayRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugAbsencesPost(slug: string, createAbsenceDayRequest?: CreateAbsenceDayRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AbsenceDayResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugAbsencesPost(slug, createAbsenceDayRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiOrganizationsSlugAbsencesPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * AbsenceDayApi - factory interface
+ */
+export const AbsenceDayApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = AbsenceDayApiFp(configuration)
+    return {
+        /**
+         * 
+         * @param {string} slug 
+         * @param {AdminCreateAbsenceDayRequest} [adminCreateAbsenceDayRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugAbsencesAdminPost(slug: string, adminCreateAbsenceDayRequest?: AdminCreateAbsenceDayRequest, options?: RawAxiosRequestConfig): AxiosPromise<AbsenceDayResponse> {
+            return localVarFp.apiOrganizationsSlugAbsencesAdminPost(slug, adminCreateAbsenceDayRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} [userId] 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugAbsencesGet(slug: string, userId?: number, from?: string, to?: string, options?: RawAxiosRequestConfig): AxiosPromise<Array<AbsenceDayResponse>> {
+            return localVarFp.apiOrganizationsSlugAbsencesGet(slug, userId, from, to, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugAbsencesIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiOrganizationsSlugAbsencesIdDelete(slug, id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {CreateAbsenceDayRequest} [createAbsenceDayRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugAbsencesPost(slug: string, createAbsenceDayRequest?: CreateAbsenceDayRequest, options?: RawAxiosRequestConfig): AxiosPromise<AbsenceDayResponse> {
+            return localVarFp.apiOrganizationsSlugAbsencesPost(slug, createAbsenceDayRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * AbsenceDayApi - object-oriented interface
+ */
+export class AbsenceDayApi extends BaseAPI {
+    /**
+     * 
+     * @param {string} slug 
+     * @param {AdminCreateAbsenceDayRequest} [adminCreateAbsenceDayRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugAbsencesAdminPost(slug: string, adminCreateAbsenceDayRequest?: AdminCreateAbsenceDayRequest, options?: RawAxiosRequestConfig) {
+        return AbsenceDayApiFp(this.configuration).apiOrganizationsSlugAbsencesAdminPost(slug, adminCreateAbsenceDayRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {number} [userId] 
+     * @param {string} [from] 
+     * @param {string} [to] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugAbsencesGet(slug: string, userId?: number, from?: string, to?: string, options?: RawAxiosRequestConfig) {
+        return AbsenceDayApiFp(this.configuration).apiOrganizationsSlugAbsencesGet(slug, userId, from, to, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {number} id 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugAbsencesIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig) {
+        return AbsenceDayApiFp(this.configuration).apiOrganizationsSlugAbsencesIdDelete(slug, id, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {CreateAbsenceDayRequest} [createAbsenceDayRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugAbsencesPost(slug: string, createAbsenceDayRequest?: CreateAbsenceDayRequest, options?: RawAxiosRequestConfig) {
+        return AbsenceDayApiFp(this.configuration).apiOrganizationsSlugAbsencesPost(slug, createAbsenceDayRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
 
 /**
  * AuthApi - axios parameter creator
@@ -767,6 +1207,478 @@ export class AuthApi extends BaseAPI {
      */
     public apiAuthRegisterPost(registerRequest?: RegisterRequest, options?: RawAxiosRequestConfig) {
         return AuthApiFp(this.configuration).apiAuthRegisterPost(registerRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * HolidayApi - axios parameter creator
+ */
+export const HolidayApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsHolidayPresetsGet: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/organizations/holiday-presets`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugHolidaysGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugHolidaysGet', 'slug', slug)
+            const localVarPath = `/api/organizations/{slug}/holidays`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugHolidaysIdDelete: async (slug: string, id: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugHolidaysIdDelete', 'slug', slug)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiOrganizationsSlugHolidaysIdDelete', 'id', id)
+            const localVarPath = `/api/organizations/{slug}/holidays/{id}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {UpdateHolidayRequest} [updateHolidayRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugHolidaysIdPut: async (slug: string, id: number, updateHolidayRequest?: UpdateHolidayRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugHolidaysIdPut', 'slug', slug)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiOrganizationsSlugHolidaysIdPut', 'id', id)
+            const localVarPath = `/api/organizations/{slug}/holidays/{id}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updateHolidayRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {string} [preset] 
+         * @param {number} [year] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugHolidaysImportPresetPost: async (slug: string, preset?: string, year?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugHolidaysImportPresetPost', 'slug', slug)
+            const localVarPath = `/api/organizations/{slug}/holidays/import-preset`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+            if (preset !== undefined) {
+                localVarQueryParameter['preset'] = preset;
+            }
+
+            if (year !== undefined) {
+                localVarQueryParameter['year'] = year;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {CreateHolidayRequest} [createHolidayRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugHolidaysPost: async (slug: string, createHolidayRequest?: CreateHolidayRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugHolidaysPost', 'slug', slug)
+            const localVarPath = `/api/organizations/{slug}/holidays`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createHolidayRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * HolidayApi - functional programming interface
+ */
+export const HolidayApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = HolidayApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsHolidayPresetsGet(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsHolidayPresetsGet(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiOrganizationsHolidayPresetsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugHolidaysGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<HolidayResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugHolidaysGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiOrganizationsSlugHolidaysGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugHolidaysIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugHolidaysIdDelete(slug, id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiOrganizationsSlugHolidaysIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {UpdateHolidayRequest} [updateHolidayRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugHolidaysIdPut(slug: string, id: number, updateHolidayRequest?: UpdateHolidayRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<HolidayResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugHolidaysIdPut(slug, id, updateHolidayRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiOrganizationsSlugHolidaysIdPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {string} [preset] 
+         * @param {number} [year] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugHolidaysImportPresetPost(slug: string, preset?: string, year?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<HolidayResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugHolidaysImportPresetPost(slug, preset, year, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiOrganizationsSlugHolidaysImportPresetPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {CreateHolidayRequest} [createHolidayRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugHolidaysPost(slug: string, createHolidayRequest?: CreateHolidayRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<HolidayResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugHolidaysPost(slug, createHolidayRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiOrganizationsSlugHolidaysPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * HolidayApi - factory interface
+ */
+export const HolidayApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = HolidayApiFp(configuration)
+    return {
+        /**
+         * 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsHolidayPresetsGet(options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiOrganizationsHolidayPresetsGet(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugHolidaysGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<Array<HolidayResponse>> {
+            return localVarFp.apiOrganizationsSlugHolidaysGet(slug, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugHolidaysIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiOrganizationsSlugHolidaysIdDelete(slug, id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {UpdateHolidayRequest} [updateHolidayRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugHolidaysIdPut(slug: string, id: number, updateHolidayRequest?: UpdateHolidayRequest, options?: RawAxiosRequestConfig): AxiosPromise<HolidayResponse> {
+            return localVarFp.apiOrganizationsSlugHolidaysIdPut(slug, id, updateHolidayRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {string} [preset] 
+         * @param {number} [year] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugHolidaysImportPresetPost(slug: string, preset?: string, year?: number, options?: RawAxiosRequestConfig): AxiosPromise<Array<HolidayResponse>> {
+            return localVarFp.apiOrganizationsSlugHolidaysImportPresetPost(slug, preset, year, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {CreateHolidayRequest} [createHolidayRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugHolidaysPost(slug: string, createHolidayRequest?: CreateHolidayRequest, options?: RawAxiosRequestConfig): AxiosPromise<HolidayResponse> {
+            return localVarFp.apiOrganizationsSlugHolidaysPost(slug, createHolidayRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * HolidayApi - object-oriented interface
+ */
+export class HolidayApi extends BaseAPI {
+    /**
+     * 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsHolidayPresetsGet(options?: RawAxiosRequestConfig) {
+        return HolidayApiFp(this.configuration).apiOrganizationsHolidayPresetsGet(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugHolidaysGet(slug: string, options?: RawAxiosRequestConfig) {
+        return HolidayApiFp(this.configuration).apiOrganizationsSlugHolidaysGet(slug, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {number} id 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugHolidaysIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig) {
+        return HolidayApiFp(this.configuration).apiOrganizationsSlugHolidaysIdDelete(slug, id, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {number} id 
+     * @param {UpdateHolidayRequest} [updateHolidayRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugHolidaysIdPut(slug: string, id: number, updateHolidayRequest?: UpdateHolidayRequest, options?: RawAxiosRequestConfig) {
+        return HolidayApiFp(this.configuration).apiOrganizationsSlugHolidaysIdPut(slug, id, updateHolidayRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {string} [preset] 
+     * @param {number} [year] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugHolidaysImportPresetPost(slug: string, preset?: string, year?: number, options?: RawAxiosRequestConfig) {
+        return HolidayApiFp(this.configuration).apiOrganizationsSlugHolidaysImportPresetPost(slug, preset, year, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {CreateHolidayRequest} [createHolidayRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugHolidaysPost(slug: string, createHolidayRequest?: CreateHolidayRequest, options?: RawAxiosRequestConfig) {
+        return HolidayApiFp(this.configuration).apiOrganizationsSlugHolidaysPost(slug, createHolidayRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -3958,6 +4870,659 @@ export class WorkScheduleApi extends BaseAPI {
      */
     public apiOrganizationsSlugWorkSchedulePut(slug: string, updateWorkScheduleRequest?: UpdateWorkScheduleRequest, options?: RawAxiosRequestConfig) {
         return WorkScheduleApiFp(this.configuration).apiOrganizationsSlugWorkSchedulePut(slug, updateWorkScheduleRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * WorkSchedulePeriodApi - axios parameter creator
+ */
+export const WorkSchedulePeriodApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet: async (slug: string, memberId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet', 'memberId', memberId)
+            const localVarPath = `/api/organizations/{slug}/members/{memberId}/schedule-periods`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete: async (slug: string, memberId: number, id: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete', 'memberId', memberId)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete', 'id', id)
+            const localVarPath = `/api/organizations/{slug}/members/{memberId}/schedule-periods/{id}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} id 
+         * @param {UpdateWorkSchedulePeriodRequest} [updateWorkSchedulePeriodRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdPut: async (slug: string, memberId: number, id: number, updateWorkSchedulePeriodRequest?: UpdateWorkSchedulePeriodRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdPut', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdPut', 'memberId', memberId)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdPut', 'id', id)
+            const localVarPath = `/api/organizations/{slug}/members/{memberId}/schedule-periods/{id}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updateWorkSchedulePeriodRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {CreateWorkSchedulePeriodRequest} [createWorkSchedulePeriodRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost: async (slug: string, memberId: number, createWorkSchedulePeriodRequest?: CreateWorkSchedulePeriodRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost', 'memberId', memberId)
+            const localVarPath = `/api/organizations/{slug}/members/{memberId}/schedule-periods`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createWorkSchedulePeriodRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugSchedulePeriodsGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugSchedulePeriodsGet', 'slug', slug)
+            const localVarPath = `/api/organizations/{slug}/schedule-periods`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugSchedulePeriodsIdDelete: async (slug: string, id: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugSchedulePeriodsIdDelete', 'slug', slug)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiOrganizationsSlugSchedulePeriodsIdDelete', 'id', id)
+            const localVarPath = `/api/organizations/{slug}/schedule-periods/{id}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {UpdateWorkSchedulePeriodRequest} [updateWorkSchedulePeriodRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugSchedulePeriodsIdPut: async (slug: string, id: number, updateWorkSchedulePeriodRequest?: UpdateWorkSchedulePeriodRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugSchedulePeriodsIdPut', 'slug', slug)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiOrganizationsSlugSchedulePeriodsIdPut', 'id', id)
+            const localVarPath = `/api/organizations/{slug}/schedule-periods/{id}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updateWorkSchedulePeriodRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {CreateWorkSchedulePeriodRequest} [createWorkSchedulePeriodRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugSchedulePeriodsPost: async (slug: string, createWorkSchedulePeriodRequest?: CreateWorkSchedulePeriodRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiOrganizationsSlugSchedulePeriodsPost', 'slug', slug)
+            const localVarPath = `/api/organizations/{slug}/schedule-periods`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            await setApiKeyToObject(localVarHeaderParameter, "Authorization", configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createWorkSchedulePeriodRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * WorkSchedulePeriodApi - functional programming interface
+ */
+export const WorkSchedulePeriodApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = WorkSchedulePeriodApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(slug: string, memberId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<WorkSchedulePeriodResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(slug, memberId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['WorkSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete(slug: string, memberId: number, id: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete(slug, memberId, id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['WorkSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} id 
+         * @param {UpdateWorkSchedulePeriodRequest} [updateWorkSchedulePeriodRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdPut(slug: string, memberId: number, id: number, updateWorkSchedulePeriodRequest?: UpdateWorkSchedulePeriodRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<WorkSchedulePeriodResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdPut(slug, memberId, id, updateWorkSchedulePeriodRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['WorkSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {CreateWorkSchedulePeriodRequest} [createWorkSchedulePeriodRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost(slug: string, memberId: number, createWorkSchedulePeriodRequest?: CreateWorkSchedulePeriodRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<WorkSchedulePeriodResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost(slug, memberId, createWorkSchedulePeriodRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['WorkSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugSchedulePeriodsGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<WorkSchedulePeriodResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugSchedulePeriodsGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['WorkSchedulePeriodApi.apiOrganizationsSlugSchedulePeriodsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugSchedulePeriodsIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugSchedulePeriodsIdDelete(slug, id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['WorkSchedulePeriodApi.apiOrganizationsSlugSchedulePeriodsIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {UpdateWorkSchedulePeriodRequest} [updateWorkSchedulePeriodRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugSchedulePeriodsIdPut(slug: string, id: number, updateWorkSchedulePeriodRequest?: UpdateWorkSchedulePeriodRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<WorkSchedulePeriodResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugSchedulePeriodsIdPut(slug, id, updateWorkSchedulePeriodRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['WorkSchedulePeriodApi.apiOrganizationsSlugSchedulePeriodsIdPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {CreateWorkSchedulePeriodRequest} [createWorkSchedulePeriodRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiOrganizationsSlugSchedulePeriodsPost(slug: string, createWorkSchedulePeriodRequest?: CreateWorkSchedulePeriodRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<WorkSchedulePeriodResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiOrganizationsSlugSchedulePeriodsPost(slug, createWorkSchedulePeriodRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['WorkSchedulePeriodApi.apiOrganizationsSlugSchedulePeriodsPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * WorkSchedulePeriodApi - factory interface
+ */
+export const WorkSchedulePeriodApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = WorkSchedulePeriodApiFp(configuration)
+    return {
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(slug: string, memberId: number, options?: RawAxiosRequestConfig): AxiosPromise<Array<WorkSchedulePeriodResponse>> {
+            return localVarFp.apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(slug, memberId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete(slug: string, memberId: number, id: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete(slug, memberId, id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} id 
+         * @param {UpdateWorkSchedulePeriodRequest} [updateWorkSchedulePeriodRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdPut(slug: string, memberId: number, id: number, updateWorkSchedulePeriodRequest?: UpdateWorkSchedulePeriodRequest, options?: RawAxiosRequestConfig): AxiosPromise<WorkSchedulePeriodResponse> {
+            return localVarFp.apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdPut(slug, memberId, id, updateWorkSchedulePeriodRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {CreateWorkSchedulePeriodRequest} [createWorkSchedulePeriodRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost(slug: string, memberId: number, createWorkSchedulePeriodRequest?: CreateWorkSchedulePeriodRequest, options?: RawAxiosRequestConfig): AxiosPromise<WorkSchedulePeriodResponse> {
+            return localVarFp.apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost(slug, memberId, createWorkSchedulePeriodRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugSchedulePeriodsGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<Array<WorkSchedulePeriodResponse>> {
+            return localVarFp.apiOrganizationsSlugSchedulePeriodsGet(slug, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugSchedulePeriodsIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiOrganizationsSlugSchedulePeriodsIdDelete(slug, id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {UpdateWorkSchedulePeriodRequest} [updateWorkSchedulePeriodRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugSchedulePeriodsIdPut(slug: string, id: number, updateWorkSchedulePeriodRequest?: UpdateWorkSchedulePeriodRequest, options?: RawAxiosRequestConfig): AxiosPromise<WorkSchedulePeriodResponse> {
+            return localVarFp.apiOrganizationsSlugSchedulePeriodsIdPut(slug, id, updateWorkSchedulePeriodRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {string} slug 
+         * @param {CreateWorkSchedulePeriodRequest} [createWorkSchedulePeriodRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiOrganizationsSlugSchedulePeriodsPost(slug: string, createWorkSchedulePeriodRequest?: CreateWorkSchedulePeriodRequest, options?: RawAxiosRequestConfig): AxiosPromise<WorkSchedulePeriodResponse> {
+            return localVarFp.apiOrganizationsSlugSchedulePeriodsPost(slug, createWorkSchedulePeriodRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * WorkSchedulePeriodApi - object-oriented interface
+ */
+export class WorkSchedulePeriodApi extends BaseAPI {
+    /**
+     * 
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(slug: string, memberId: number, options?: RawAxiosRequestConfig) {
+        return WorkSchedulePeriodApiFp(this.configuration).apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(slug, memberId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {number} id 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete(slug: string, memberId: number, id: number, options?: RawAxiosRequestConfig) {
+        return WorkSchedulePeriodApiFp(this.configuration).apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete(slug, memberId, id, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {number} id 
+     * @param {UpdateWorkSchedulePeriodRequest} [updateWorkSchedulePeriodRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdPut(slug: string, memberId: number, id: number, updateWorkSchedulePeriodRequest?: UpdateWorkSchedulePeriodRequest, options?: RawAxiosRequestConfig) {
+        return WorkSchedulePeriodApiFp(this.configuration).apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdPut(slug, memberId, id, updateWorkSchedulePeriodRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {CreateWorkSchedulePeriodRequest} [createWorkSchedulePeriodRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost(slug: string, memberId: number, createWorkSchedulePeriodRequest?: CreateWorkSchedulePeriodRequest, options?: RawAxiosRequestConfig) {
+        return WorkSchedulePeriodApiFp(this.configuration).apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost(slug, memberId, createWorkSchedulePeriodRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugSchedulePeriodsGet(slug: string, options?: RawAxiosRequestConfig) {
+        return WorkSchedulePeriodApiFp(this.configuration).apiOrganizationsSlugSchedulePeriodsGet(slug, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {number} id 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugSchedulePeriodsIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig) {
+        return WorkSchedulePeriodApiFp(this.configuration).apiOrganizationsSlugSchedulePeriodsIdDelete(slug, id, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {number} id 
+     * @param {UpdateWorkSchedulePeriodRequest} [updateWorkSchedulePeriodRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugSchedulePeriodsIdPut(slug: string, id: number, updateWorkSchedulePeriodRequest?: UpdateWorkSchedulePeriodRequest, options?: RawAxiosRequestConfig) {
+        return WorkSchedulePeriodApiFp(this.configuration).apiOrganizationsSlugSchedulePeriodsIdPut(slug, id, updateWorkSchedulePeriodRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} slug 
+     * @param {CreateWorkSchedulePeriodRequest} [createWorkSchedulePeriodRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiOrganizationsSlugSchedulePeriodsPost(slug: string, createWorkSchedulePeriodRequest?: CreateWorkSchedulePeriodRequest, options?: RawAxiosRequestConfig) {
+        return WorkSchedulePeriodApiFp(this.configuration).apiOrganizationsSlugSchedulePeriodsPost(slug, createWorkSchedulePeriodRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
