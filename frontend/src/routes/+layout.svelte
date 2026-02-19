@@ -187,6 +187,7 @@
 				<span class="nav-org-name">{orgContext.selectedOrg.name}</span>
 			{/if}
 			<a href="/time" class="nav-link">Timer</a>
+			<a href="/history" class="nav-link">History</a>
 			{#if orgContext.selectedOrg}
 				<a href="/organizations/{orgContext.selectedOrgSlug}" class="nav-link">Organization</a>
 			{/if}
