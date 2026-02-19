@@ -11,16 +11,16 @@ services:
       - "5432:5432"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-timetrack_user}"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user}"]
+      interval: 5s
+      timeout: 5s
       retries: 5
 
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/wagnerluca/time-tracking-backend:latest}
     environment:
-      UseInMemoryDatabase: ${USE_INMEMORY_DB:-false}
-      DATABASE_URL: postgres://${POSTGRES_USER:-timetrack}:${POSTGRES_PASSWORD:-timetrack}@db:5432/${POSTGRES_DB:-timetracking}
+      UseInMemoryDatabase: ${USE_INMEMORY_DB:-true}
+      DATABASE_URL: postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-pass}@db:5432/${POSTGRES_DB:-mydb}
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_URLS: http://+:7000
       JwtSettings__Secret: ${JWT_SECRET:-CHANGE_THIS_TO_A_SECURE_SECRET_KEY_AT_LEAST_32_CHARACTERS_LONG_FOR_PRODUCTION}
@@ -32,8 +32,8 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7000/health"]
-      interval: 30s
-      timeout: 10s
+      interval: 5s
+      timeout: 5s
       retries: 5
 
   frontend:
@@ -51,8 +51,8 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1))"]
-      interval: 30s
-      timeout: 10s
+      interval: 5s
+      timeout: 5s
       retries: 5
 
 volumes:
