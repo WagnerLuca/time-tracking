@@ -71,10 +71,21 @@ public class Organization
     /// </summary>
     public RuleMode JoinPolicy { get; set; } = RuleMode.RequiresApproval;
     
+    /// <summary>
+    /// Controls whether members can change their own work schedule periods.
+    /// Allowed = user can add/edit schedule periods freely.
+    /// RequiresApproval = user must request and admin approves.
+    /// Disabled = only admins can manage schedule periods.
+    /// </summary>
+    public RuleMode WorkScheduleChangeMode { get; set; } = RuleMode.Allowed;
+    
     // Navigation properties
     [JsonIgnore]
     public ICollection<UserOrganization> UserOrganizations { get; set; } = new List<UserOrganization>();
     
     [JsonIgnore]
     public ICollection<PauseRule> PauseRules { get; set; } = new List<PauseRule>();
+    
+    [JsonIgnore]
+    public ICollection<Holiday> Holidays { get; set; } = new List<Holiday>();
 }

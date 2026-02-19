@@ -27,6 +27,7 @@ public record OrganizationDetailResponse
     public required string EditPauseMode { get; init; }
     public required string InitialOvertimeMode { get; init; }
     public required string JoinPolicy { get; init; }
+    public required string WorkScheduleChangeMode { get; init; }
     public DateTime CreatedAt { get; init; }
     public required List<OrganizationMemberResponse> Members { get; init; }
     public List<PauseRuleResponse>? PauseRules { get; init; }
@@ -91,6 +92,7 @@ public record UpdateOrganizationSettingsRequest
     public RuleMode? EditPauseMode { get; init; }
     public RuleMode? InitialOvertimeMode { get; init; }
     public RuleMode? JoinPolicy { get; init; }
+    public RuleMode? WorkScheduleChangeMode { get; init; }
 }
 
 public record PauseRuleResponse
@@ -126,6 +128,7 @@ public record WorkScheduleResponse
     public double TargetFri { get; init; }
     public double InitialOvertimeHours { get; init; }
     public required string InitialOvertimeMode { get; init; }
+    public required string WorkScheduleChangeMode { get; init; }
 }
 
 public record UpdateWorkScheduleRequest
@@ -161,4 +164,98 @@ public record MemberTimeOverviewResponse
 public record SetInitialOvertimeRequest
 {
     public double InitialOvertimeHours { get; init; }
+}
+
+// Holiday DTOs
+public record HolidayResponse
+{
+    public int Id { get; init; }
+    public int OrganizationId { get; init; }
+    public DateOnly Date { get; init; }
+    public required string Name { get; init; }
+    public bool IsRecurring { get; init; }
+}
+
+public record CreateHolidayRequest
+{
+    public DateOnly Date { get; init; }
+    public required string Name { get; init; }
+    public bool IsRecurring { get; init; }
+}
+
+public record UpdateHolidayRequest
+{
+    public DateOnly? Date { get; init; }
+    public string? Name { get; init; }
+    public bool? IsRecurring { get; init; }
+}
+
+// Absence Day DTOs
+public record AbsenceDayResponse
+{
+    public int Id { get; init; }
+    public int UserId { get; init; }
+    public int OrganizationId { get; init; }
+    public DateOnly Date { get; init; }
+    public required string Type { get; init; }
+    public string? Note { get; init; }
+    public string? UserFirstName { get; init; }
+    public string? UserLastName { get; init; }
+}
+
+public record CreateAbsenceDayRequest
+{
+    public DateOnly Date { get; init; }
+    public AbsenceType Type { get; init; } = AbsenceType.SickDay;
+    public string? Note { get; init; }
+}
+
+public record AdminCreateAbsenceDayRequest
+{
+    public int UserId { get; init; }
+    public DateOnly Date { get; init; }
+    public AbsenceType Type { get; init; } = AbsenceType.SickDay;
+    public string? Note { get; init; }
+}
+
+// Work Schedule Period DTOs
+public record WorkSchedulePeriodResponse
+{
+    public int Id { get; init; }
+    public int UserId { get; init; }
+    public int OrganizationId { get; init; }
+    public DateOnly ValidFrom { get; init; }
+    public DateOnly? ValidTo { get; init; }
+    public double? WeeklyWorkHours { get; init; }
+    public double TargetMon { get; init; }
+    public double TargetTue { get; init; }
+    public double TargetWed { get; init; }
+    public double TargetThu { get; init; }
+    public double TargetFri { get; init; }
+}
+
+public record CreateWorkSchedulePeriodRequest
+{
+    public DateOnly ValidFrom { get; init; }
+    public DateOnly? ValidTo { get; init; }
+    public double? WeeklyWorkHours { get; init; }
+    public bool DistributeEvenly { get; init; } = true;
+    public double? TargetMon { get; init; }
+    public double? TargetTue { get; init; }
+    public double? TargetWed { get; init; }
+    public double? TargetThu { get; init; }
+    public double? TargetFri { get; init; }
+}
+
+public record UpdateWorkSchedulePeriodRequest
+{
+    public DateOnly? ValidFrom { get; init; }
+    public DateOnly? ValidTo { get; init; }
+    public double? WeeklyWorkHours { get; init; }
+    public bool DistributeEvenly { get; init; } = true;
+    public double? TargetMon { get; init; }
+    public double? TargetTue { get; init; }
+    public double? TargetWed { get; init; }
+    public double? TargetThu { get; init; }
+    public double? TargetFri { get; init; }
 }

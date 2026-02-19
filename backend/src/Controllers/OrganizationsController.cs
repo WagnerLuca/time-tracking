@@ -65,6 +65,7 @@ public class OrganizationsController : OrganizationBaseController
                 EditPauseMode = o.EditPauseMode.ToString(),
                 InitialOvertimeMode = o.InitialOvertimeMode.ToString(),
                 JoinPolicy = o.JoinPolicy.ToString(),
+                WorkScheduleChangeMode = o.WorkScheduleChangeMode.ToString(),
                 CreatedAt = o.CreatedAt,
                 Members = o.UserOrganizations
                     .Where(uo => uo.IsActive)
@@ -493,6 +494,8 @@ public class OrganizationsController : OrganizationBaseController
             org.InitialOvertimeMode = request.InitialOvertimeMode.Value;
         if (request.JoinPolicy.HasValue)
             org.JoinPolicy = request.JoinPolicy.Value;
+        if (request.WorkScheduleChangeMode.HasValue)
+            org.WorkScheduleChangeMode = request.WorkScheduleChangeMode.Value;
 
         org.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
@@ -502,7 +505,8 @@ public class OrganizationsController : OrganizationBaseController
             EditPastEntriesMode = org.EditPastEntriesMode.ToString(),
             EditPauseMode = org.EditPauseMode.ToString(),
             InitialOvertimeMode = org.InitialOvertimeMode.ToString(),
-            JoinPolicy = org.JoinPolicy.ToString()
+            JoinPolicy = org.JoinPolicy.ToString(),
+            WorkScheduleChangeMode = org.WorkScheduleChangeMode.ToString()
         });
     }
 

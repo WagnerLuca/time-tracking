@@ -17,6 +17,9 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<TimeEntry> TimeEntries { get; set; }
     public DbSet<PauseRule> PauseRules { get; set; }
     public DbSet<OrgRequest> OrgRequests { get; set; }
+    public DbSet<Holiday> Holidays { get; set; }
+    public DbSet<AbsenceDay> AbsenceDays { get; set; }
+    public DbSet<WorkSchedulePeriod> WorkSchedulePeriods { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -189,6 +192,76 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.RespondedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Configure Holiday entity
+        modelBuilder.Entity<Holiday>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Date).IsRequired();
+
+            if (isInMemory)
+                entity.Property(e => e.CreatedAt).IsRequired();
+            else
+                entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasIndex(e => new { e.OrganizationId, e.Date }).IsUnique();
+
+            entity.HasOne(e => e.Organization)
+                .WithMany(o => o.Holidays)
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure AbsenceDay entity
+        modelBuilder.Entity<AbsenceDay>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Note).HasMaxLength(500);
+            entity.Property(e => e.Date).IsRequired();
+            entity.Property(e => e.Type).IsRequired();
+
+            if (isInMemory)
+                entity.Property(e => e.CreatedAt).IsRequired();
+            else
+                entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasIndex(e => new { e.UserId, e.OrganizationId, e.Date }).IsUnique();
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure WorkSchedulePeriod entity
+        modelBuilder.Entity<WorkSchedulePeriod>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ValidFrom).IsRequired();
+
+            if (isInMemory)
+                entity.Property(e => e.CreatedAt).IsRequired();
+            else
+                entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasIndex(e => new { e.UserId, e.OrganizationId, e.ValidFrom });
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

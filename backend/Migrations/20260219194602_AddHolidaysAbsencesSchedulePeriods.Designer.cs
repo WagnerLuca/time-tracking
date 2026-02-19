@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TimeTracking.Api.Data;
@@ -11,9 +12,11 @@ using TimeTracking.Api.Data;
 namespace TimeTracking.Api.Migrations
 {
     [DbContext(typeof(TimeTrackingDbContext))]
-    partial class TimeTrackingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260219194602_AddHolidaysAbsencesSchedulePeriods")]
+    partial class AddHolidaysAbsencesSchedulePeriods
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -76,9 +79,6 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
-
-                    b.Property<bool>("IsRecurring")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
