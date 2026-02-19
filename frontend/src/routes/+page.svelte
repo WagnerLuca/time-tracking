@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { timeTrackingApi, organizationsApi, workScheduleApi } from '$lib/apiClient';
+	import { timeTrackingApi, organizationsApi, workScheduleApi, holidayApi, absenceDayApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, StartTimeEntryRequest, WorkScheduleResponse } from '$lib/api';
 
 	let currentEntry = $state<TimeEntryResponse | null>(null);
@@ -29,6 +29,13 @@
 	let monthWeeks = $state<Array<{label: string, worked: number, target: number}>>([]);
 	// First entry date
 	let firstEntryDate = $state<Date | null>(null);
+	// Days off (holidays + absences) — date strings like "2025-01-01"
+	let daysOffSet = $state<Set<string>>(new Set());
+	// Separate day-type maps for color coding
+	let holidayDates = $state<Map<string, string>>(new Map()); // date -> name
+	let sickDayDates = $state<Set<string>>(new Set());
+	let vacationDates = $state<Set<string>>(new Set());
+	let otherAbsenceDates = $state<Set<string>>(new Set());
 
 	onMount(async () => {
 		if (!auth.user) return;
@@ -84,6 +91,9 @@
 	function getDayTarget(date: Date): number {
 		if (!workSchedule) return 0;
 		const dayOfWeek = date.getDay();
+		// Check if this date is a holiday or absence day
+		const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+		if (daysOffSet.has(dateStr)) return 0;
 		const targets: Record<number, number> = {
 			1: workSchedule.targetMon ?? 0,
 			2: workSchedule.targetTue ?? 0,
@@ -133,6 +143,52 @@
 
 	async function loadStats() {
 		try {
+			// Load holidays + absences for days-off calculation and color coding
+			if (orgContext.selectedOrgSlug) {
+				try {
+					const [holRes, absRes] = await Promise.all([
+						holidayApi.apiOrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
+						absenceDayApi.apiOrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug)
+					]);
+					const offDates = new Set<string>();
+					const holidays = new Map<string, string>();
+					const sick = new Set<string>();
+					const vacation = new Set<string>();
+					const otherAbs = new Set<string>();
+					for (const h of holRes.data) {
+						if (h.date) {
+							offDates.add(h.date);
+							holidays.set(h.date, h.name ?? 'Holiday');
+						}
+					}
+					for (const a of absRes.data) {
+						if (a.date) {
+							offDates.add(a.date);
+							if (a.type === 'SickDay') sick.add(a.date);
+							else if (a.type === 'Vacation') vacation.add(a.date);
+							else otherAbs.add(a.date);
+						}
+					}
+					daysOffSet = offDates;
+					holidayDates = holidays;
+					sickDayDates = sick;
+					vacationDates = vacation;
+					otherAbsenceDates = otherAbs;
+				} catch {
+					daysOffSet = new Set();
+					holidayDates = new Map();
+					sickDayDates = new Set();
+					vacationDates = new Set();
+					otherAbsenceDates = new Set();
+				}
+			} else {
+				daysOffSet = new Set();
+				holidayDates = new Map();
+				sickDayDates = new Set();
+				vacationDates = new Set();
+				otherAbsenceDates = new Set();
+			}
+
 			const now = new Date();
 
 			// Today
@@ -342,6 +398,28 @@
 		if (target <= 0) return worked > 0 ? 100 : 0;
 		return Math.min(100, (worked / target) * 100);
 	}
+
+	function dateKey(d: Date): string {
+		return d.toISOString().slice(0, 10);
+	}
+
+	function getDayType(d: Date): 'holiday' | 'sick' | 'vacation' | 'other-absence' | null {
+		const key = dateKey(d);
+		if (holidayDates.has(key)) return 'holiday';
+		if (sickDayDates.has(key)) return 'sick';
+		if (vacationDates.has(key)) return 'vacation';
+		if (otherAbsenceDates.has(key)) return 'other-absence';
+		return null;
+	}
+
+	function getDayTypeLabel(d: Date): string {
+		const key = dateKey(d);
+		if (holidayDates.has(key)) return holidayDates.get(key)!;
+		if (sickDayDates.has(key)) return 'Sick Day';
+		if (vacationDates.has(key)) return 'Vacation';
+		if (otherAbsenceDates.has(key)) return 'Absence';
+		return '';
+	}
 </script>
 
 <svelte:head>
@@ -349,6 +427,12 @@
 </svelte:head>
 
 <div class="dashboard">
+	{#if loading}
+		<div class="loading-state">
+			<div class="spinner"></div>
+			<p>Loading dashboard...</p>
+		</div>
+	{:else}
 	<!-- Header with org context -->
 	<div class="dash-header">
 		<div>
@@ -441,8 +525,12 @@
 			<h2 class="breakdown-title">This Week</h2>
 			<div class="breakdown-rows">
 				{#each weekDays as day}
-					<div class="breakdown-row" class:today={isToday(day.date)} class:future={isFuture(day.date)}>
+					{@const dayType = getDayType(day.date)}
+					<div class="breakdown-row" class:today={isToday(day.date)} class:future={isFuture(day.date)} class:day-holiday={dayType === 'holiday'} class:day-sick={dayType === 'sick'} class:day-vacation={dayType === 'vacation'} class:day-other={dayType === 'other-absence'}>
 						<span class="breakdown-day">{day.label}</span>
+						{#if dayType}
+							<span class="day-type-dot day-type-{dayType}" title={getDayTypeLabel(day.date)}></span>
+						{/if}
 						<div class="breakdown-bar-track">
 							<div class="breakdown-bar-fill" class:over={day.worked > day.target && day.target > 0} style="width: {barWidth(isToday(day.date) ? day.worked + runningMinutes : day.worked, day.target)}%"></div>
 						</div>
@@ -461,6 +549,16 @@
 					</span>
 				{/if}
 			</div>
+		</div>
+	{/if}
+
+	<!-- Day Type Legend -->
+	{#if holidayDates.size > 0 || sickDayDates.size > 0 || vacationDates.size > 0 || otherAbsenceDates.size > 0}
+		<div class="day-type-legend">
+			{#if holidayDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-holiday"></span> Holiday</span>{/if}
+			{#if sickDayDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-sick"></span> Sick Day</span>{/if}
+			{#if vacationDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-vacation"></span> Vacation</span>{/if}
+			{#if otherAbsenceDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-other"></span> Other Absence</span>{/if}
 		</div>
 	{/if}
 
@@ -494,10 +592,15 @@
 	{/if}
 
 	<!-- Quick links -->
+	<h2 class="section-title">Quick Links</h2>
 	<div class="quick-links">
 		<a href="/time" class="quick-link">
 			<span class="ql-icon">&#9201;</span>
 			<span>Weekly View</span>
+		</a>
+		<a href="/history" class="quick-link">
+			<span class="ql-icon">&#128197;</span>
+			<span>History</span>
 		</a>
 		{#if orgContext.selectedOrg}
 			<a href="/organizations/{orgContext.selectedOrgSlug}" class="quick-link">
@@ -510,12 +613,20 @@
 			<span>Settings</span>
 		</a>
 	</div>
+	{/if}
 </div>
 
 <style>
 	.dashboard h1 {
 		margin: 0;
-		font-size: 1.75rem;
+		
+
+	.section-title {
+		font-size: 1rem;
+		color: #374151;
+		margin: 1.5rem 0 0.75rem;
+		font-weight: 600;
+	}font-size: 1.75rem;
 		color: #1a1a2e;
 	}
 
@@ -847,6 +958,36 @@
 		opacity: 0.4;
 	}
 
+	.breakdown-row.day-holiday { background: rgba(139, 92, 246, 0.08); border-radius: 4px; padding: 2px 4px; margin: -2px -4px; }
+	.breakdown-row.day-sick { background: rgba(239, 68, 68, 0.08); border-radius: 4px; padding: 2px 4px; margin: -2px -4px; }
+	.breakdown-row.day-vacation { background: rgba(16, 185, 129, 0.08); border-radius: 4px; padding: 2px 4px; margin: -2px -4px; }
+	.breakdown-row.day-other { background: rgba(156, 163, 175, 0.12); border-radius: 4px; padding: 2px 4px; margin: -2px -4px; }
+
+	.day-type-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+	.day-type-dot.day-type-holiday { background: #8b5cf6; }
+	.day-type-dot.day-type-sick { background: #ef4444; }
+	.day-type-dot.day-type-vacation { background: #10b981; }
+	.day-type-dot.day-type-other { background: #9ca3af; }
+
+	.day-type-legend {
+		display: flex;
+		gap: 1rem;
+		flex-wrap: wrap;
+		font-size: 0.75rem;
+		color: #6b7280;
+		margin-bottom: 1rem;
+	}
+	.legend-item {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+	}
+
 	.breakdown-day {
 		width: 32px;
 		font-size: 0.8125rem;
@@ -918,5 +1059,62 @@
 	}
 
 	.breakdown-footer-delta.positive { color: #16a34a; }
+
+	/* Loading state */
+	.loading-state {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 4rem 2rem;
+		gap: 1rem;
+		color: #6b7280;
+	}
+
+	.spinner {
+		width: 2rem;
+		height: 2rem;
+		border: 3px solid #e5e7eb;
+		border-top-color: #3b82f6;
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
+	}
+
+	/* Responsive */
+	@media (max-width: 640px) {
+		.dashboard {
+			padding: 1rem;
+		}
+
+		.dashboard h1 {
+			font-size: 1.35rem;
+		}
+
+		.stats-row {
+			grid-template-columns: 1fr !important;
+			gap: 0.75rem;
+		}
+
+		.timer-row {
+			flex-wrap: wrap;
+			gap: 0.5rem;
+		}
+
+		.timer-clock {
+			font-size: 1.5rem;
+		}
+
+		.quick-links {
+			grid-template-columns: 1fr !important;
+		}
+
+		.breakdown-row {
+			font-size: 0.8rem;
+		}
+	}
 	.breakdown-footer-delta.negative { color: #dc2626; }
 </style>

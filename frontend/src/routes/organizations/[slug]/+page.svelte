@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { organizationsApi, pauseRulesApi, usersApi, workScheduleApi, requestsApi } from '$lib/apiClient';
+	import { organizationsApi, pauseRulesApi, usersApi, workScheduleApi, requestsApi, holidayApi, absenceDayApi, workSchedulePeriodApi } from '$lib/apiClient';
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationRequest,
@@ -13,7 +13,11 @@
 		CreatePauseRuleRequest,
 		RuleMode,
 		WorkScheduleResponse,
-		OrgRequestResponse
+		OrgRequestResponse,
+		HolidayResponse,
+		AbsenceDayResponse,
+		WorkSchedulePeriodResponse,
+		AbsenceType
 	} from '$lib/api';
 
 	let org = $state<OrganizationDetailResponse | null>(null);
@@ -93,6 +97,78 @@
 	let requestHistoryLoaded = $state(false);
 	let requestHistoryFilter = $state<string>('all'); // 'all', 'Pending', 'Accepted', 'Declined'
 
+	// Holidays
+	let holidays = $state<HolidayResponse[]>([]);
+	let holidaysLoading = $state(false);
+	let holidaysLoaded = $state(false);
+	let showAddHoliday = $state(false);
+	let newHolidayName = $state('');
+	let newHolidayDate = $state('');
+	let addingHoliday = $state(false);
+	let holidayError = $state('');
+	let editingHolidayId = $state<number | null>(null);
+	let editHolidayName = $state('');
+	let editHolidayDate = $state('');
+	let editHolidaySaving = $state(false);
+	let newHolidayRecurring = $state(false);
+	let editHolidayRecurring = $state(false);
+	let importingHolidays = $state(false);
+	let importPreset = $state('de');
+	let importYear = $state(new Date().getFullYear());
+
+	// Absences / sick days
+	let absences = $state<AbsenceDayResponse[]>([]);
+	let absencesLoading = $state(false);
+	let absencesLoaded = $state(false);
+	let showAddAbsence = $state(false);
+	let newAbsenceDate = $state('');
+	let newAbsenceType = $state(0); // SickDay
+	let newAbsenceNote = $state('');
+	let addingAbsence = $state(false);
+	let absenceError = $state('');
+	// Admin absence
+	let showAdminAddAbsence = $state(false);
+	let adminAbsenceUserId = $state<number | null>(null);
+	let adminAbsenceDate = $state('');
+	let adminAbsenceType = $state(0);
+	let adminAbsenceNote = $state('');
+	let addingAdminAbsence = $state(false);
+	let adminAbsenceError = $state('');
+	let adminAbsenceFilter = $state<number | null>(null); // userId filter
+
+	// Schedule periods
+	let schedulePeriods = $state<WorkSchedulePeriodResponse[]>([]);
+	let schedulePeriodsLoading = $state(false);
+	let schedulePeriodsLoaded = $state(false);
+	let showAddPeriod = $state(false);
+	let newPeriodFrom = $state('');
+	let newPeriodTo = $state('');
+	let newPeriodWeeklyHours = $state<number | null>(null);
+	let newPeriodDistributeEvenly = $state(true);
+	let newPeriodMon = $state(0);
+	let newPeriodTue = $state(0);
+	let newPeriodWed = $state(0);
+	let newPeriodThu = $state(0);
+	let newPeriodFri = $state(0);
+	let addingPeriod = $state(false);
+	let periodError = $state('');
+	// Admin schedule periods for member
+	let adminPeriodsForMember = $state<number | null>(null);
+	let adminPeriods = $state<WorkSchedulePeriodResponse[]>([]);
+	let adminPeriodsLoading = $state(false);
+	let showAdminAddPeriod = $state(false);
+	let adminNewPeriodFrom = $state('');
+	let adminNewPeriodTo = $state('');
+	let adminNewPeriodWeeklyHours = $state<number | null>(null);
+	let adminNewPeriodDistributeEvenly = $state(true);
+	let adminNewPeriodMon = $state(0);
+	let adminNewPeriodTue = $state(0);
+	let adminNewPeriodWed = $state(0);
+	let adminNewPeriodThu = $state(0);
+	let adminNewPeriodFri = $state(0);
+	let addingAdminPeriod = $state(false);
+	let adminPeriodError = $state('');
+
 	let orgSlug: string;
 
 	onMount(() => {
@@ -113,11 +189,21 @@
 			} catch {
 				workSchedule = null;
 			}
+			// Auto-load all lazy sections in parallel
+			loadAllSections();
 		} catch (err: any) {
 			error = err.response?.status === 404 ? 'Organization not found.' : 'Failed to load organization.';
 		} finally {
 			loading = false;
 		}
+	}
+
+	function loadAllSections() {
+		loadHolidays();
+		loadAbsences();
+		loadSchedulePeriods();
+		loadUsersForDropdown();
+		loadRequestHistory();
 	}
 
 	/** Reload org data without toggling loading state (avoids scroll-to-top) */
@@ -688,6 +774,341 @@
 		const sign = minutes > 0 ? '+' : '';
 		return sign + (minutes / 60).toFixed(1) + 'h';
 	}
+
+	// ── Holidays ──
+	async function loadHolidays() {
+		if (holidaysLoaded) return;
+		holidaysLoading = true;
+		holidayError = '';
+		try {
+			const { data } = await holidayApi.apiOrganizationsSlugHolidaysGet(orgSlug);
+			holidays = (data as HolidayResponse[]).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
+			holidaysLoaded = true;
+		} catch {
+			holidays = [];
+		} finally {
+			holidaysLoading = false;
+		}
+	}
+
+	async function addHoliday(e: Event) {
+		e.preventDefault();
+		addingHoliday = true;
+		holidayError = '';
+		try {
+			await holidayApi.apiOrganizationsSlugHolidaysPost(orgSlug, {
+				date: newHolidayDate,
+				name: newHolidayName,
+				isRecurring: newHolidayRecurring
+			});
+			holidaysLoaded = false;
+			await loadHolidays();
+			showAddHoliday = false;
+			newHolidayName = '';
+			newHolidayDate = '';
+			newHolidayRecurring = false;
+		} catch (err: any) {
+			holidayError = err.response?.data?.message || 'Failed to add holiday.';
+		} finally {
+			addingHoliday = false;
+		}
+	}
+
+	function startEditHoliday(h: HolidayResponse) {
+		editingHolidayId = h.id ?? null;
+		editHolidayName = h.name ?? '';
+		editHolidayDate = h.date ?? '';
+		editHolidayRecurring = h.isRecurring ?? false;
+	}
+
+	async function saveEditHoliday(id: number) {
+		editHolidaySaving = true;
+		holidayError = '';
+		try {
+			await holidayApi.apiOrganizationsSlugHolidaysIdPut(orgSlug, id, {
+				date: editHolidayDate,
+				name: editHolidayName,
+				isRecurring: editHolidayRecurring
+			});
+			editingHolidayId = null;
+			holidaysLoaded = false;
+			await loadHolidays();
+		} catch (err: any) {
+			holidayError = err.response?.data?.message || 'Failed to update holiday.';
+		} finally {
+			editHolidaySaving = false;
+		}
+	}
+
+	async function deleteHoliday(id: number) {
+		if (!confirm('Delete this holiday?')) return;
+		try {
+			await holidayApi.apiOrganizationsSlugHolidaysIdDelete(orgSlug, id);
+			holidaysLoaded = false;
+			await loadHolidays();
+		} catch (err: any) {
+			holidayError = err.response?.data?.message || 'Failed to delete holiday.';
+		}
+	}
+
+	function formatDateDisplay(dateStr?: string): string {
+		if (!dateStr) return '';
+		try {
+			const d = new Date(dateStr + 'T00:00:00');
+			return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+		} catch { return dateStr; }
+	}
+
+	// ── Absences ──
+	async function loadAbsences() {
+		if (absencesLoaded) return;
+		absencesLoading = true;
+		absenceError = '';
+		try {
+			const { data } = await absenceDayApi.apiOrganizationsSlugAbsencesGet(orgSlug);
+			absences = (data as AbsenceDayResponse[]).sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+			absencesLoaded = true;
+		} catch {
+			absences = [];
+		} finally {
+			absencesLoading = false;
+		}
+	}
+
+	function absenceTypeLabel(type?: string | null): string {
+		switch (type) {
+			case 'SickDay': return 'Sick Day';
+			case 'Vacation': return 'Vacation';
+			case 'Other': return 'Other';
+			default: return type ?? 'Unknown';
+		}
+	}
+
+	function absenceTypeBadge(type?: string | null): string {
+		switch (type) {
+			case 'SickDay': return 'absence-sick';
+			case 'Vacation': return 'absence-vacation';
+			default: return 'absence-other';
+		}
+	}
+
+	async function addAbsence(e: Event) {
+		e.preventDefault();
+		addingAbsence = true;
+		absenceError = '';
+		try {
+			await absenceDayApi.apiOrganizationsSlugAbsencesPost(orgSlug, {
+				date: newAbsenceDate,
+				type: newAbsenceType as AbsenceType,
+				note: newAbsenceNote || undefined
+			});
+			absencesLoaded = false;
+			await loadAbsences();
+			showAddAbsence = false;
+			newAbsenceDate = '';
+			newAbsenceType = 0;
+			newAbsenceNote = '';
+		} catch (err: any) {
+			absenceError = err.response?.data?.message || 'Failed to add absence.';
+		} finally {
+			addingAbsence = false;
+		}
+	}
+
+	async function deleteAbsence(id: number) {
+		if (!confirm('Delete this absence?')) return;
+		try {
+			await absenceDayApi.apiOrganizationsSlugAbsencesIdDelete(orgSlug, id);
+			absencesLoaded = false;
+			await loadAbsences();
+		} catch (err: any) {
+			absenceError = err.response?.data?.message || 'Failed to delete absence.';
+		}
+	}
+
+	// Admin absence
+	async function addAdminAbsence(e: Event) {
+		e.preventDefault();
+		if (!adminAbsenceUserId) return;
+		addingAdminAbsence = true;
+		adminAbsenceError = '';
+		try {
+			await absenceDayApi.apiOrganizationsSlugAbsencesAdminPost(orgSlug, {
+				userId: adminAbsenceUserId,
+				date: adminAbsenceDate,
+				type: adminAbsenceType as AbsenceType,
+				note: adminAbsenceNote || undefined
+			});
+			absencesLoaded = false;
+			await loadAbsences();
+			showAdminAddAbsence = false;
+			adminAbsenceDate = '';
+			adminAbsenceType = 0;
+			adminAbsenceNote = '';
+			adminAbsenceUserId = null;
+		} catch (err: any) {
+			adminAbsenceError = err.response?.data?.message || 'Failed to add absence.';
+		} finally {
+			addingAdminAbsence = false;
+		}
+	}
+
+	function filteredAbsences(): AbsenceDayResponse[] {
+		if (!adminAbsenceFilter) return absences;
+		return absences.filter(a => a.userId === adminAbsenceFilter);
+	}
+
+	// ── Schedule Periods ──
+	async function loadSchedulePeriods() {
+		if (schedulePeriodsLoaded) return;
+		schedulePeriodsLoading = true;
+		periodError = '';
+		try {
+			const { data } = await workSchedulePeriodApi.apiOrganizationsSlugSchedulePeriodsGet(orgSlug);
+			schedulePeriods = (data as WorkSchedulePeriodResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
+			schedulePeriodsLoaded = true;
+		} catch {
+			schedulePeriods = [];
+		} finally {
+			schedulePeriodsLoading = false;
+		}
+	}
+
+	async function addSchedulePeriod(e: Event) {
+		e.preventDefault();
+		addingPeriod = true;
+		periodError = '';
+		try {
+			await workSchedulePeriodApi.apiOrganizationsSlugSchedulePeriodsPost(orgSlug, {
+				validFrom: newPeriodFrom,
+				validTo: newPeriodTo || undefined,
+				weeklyWorkHours: newPeriodWeeklyHours,
+				distributeEvenly: newPeriodDistributeEvenly,
+				targetMon: newPeriodDistributeEvenly ? undefined : newPeriodMon,
+				targetTue: newPeriodDistributeEvenly ? undefined : newPeriodTue,
+				targetWed: newPeriodDistributeEvenly ? undefined : newPeriodWed,
+				targetThu: newPeriodDistributeEvenly ? undefined : newPeriodThu,
+				targetFri: newPeriodDistributeEvenly ? undefined : newPeriodFri
+			});
+			schedulePeriodsLoaded = false;
+			await loadSchedulePeriods();
+			showAddPeriod = false;
+			newPeriodFrom = '';
+			newPeriodTo = '';
+			newPeriodWeeklyHours = null;
+		} catch (err: any) {
+			periodError = err.response?.data?.message || 'Failed to add schedule period.';
+		} finally {
+			addingPeriod = false;
+		}
+	}
+
+	async function deleteSchedulePeriod(id: number) {
+		if (!confirm('Delete this schedule period?')) return;
+		try {
+			await workSchedulePeriodApi.apiOrganizationsSlugSchedulePeriodsIdDelete(orgSlug, id);
+			schedulePeriodsLoaded = false;
+			await loadSchedulePeriods();
+		} catch (err: any) {
+			periodError = err.response?.data?.message || 'Failed to delete period.';
+		}
+	}
+
+	// Admin: member schedule periods
+	async function openMemberPeriods(memberId: number) {
+		if (adminPeriodsForMember === memberId) {
+			adminPeriodsForMember = null;
+			return;
+		}
+		adminPeriodsForMember = memberId;
+		adminPeriodsLoading = true;
+		adminPeriodError = '';
+		try {
+			const { data } = await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(orgSlug, memberId);
+			adminPeriods = (data as WorkSchedulePeriodResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
+		} catch {
+			adminPeriods = [];
+		} finally {
+			adminPeriodsLoading = false;
+		}
+	}
+
+	async function addAdminSchedulePeriod(e: Event) {
+		e.preventDefault();
+		if (!adminPeriodsForMember) return;
+		addingAdminPeriod = true;
+		adminPeriodError = '';
+		try {
+			await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost(orgSlug, adminPeriodsForMember, {
+				validFrom: adminNewPeriodFrom,
+				validTo: adminNewPeriodTo || undefined,
+				weeklyWorkHours: adminNewPeriodWeeklyHours,
+				distributeEvenly: adminNewPeriodDistributeEvenly,
+				targetMon: adminNewPeriodDistributeEvenly ? undefined : adminNewPeriodMon,
+				targetTue: adminNewPeriodDistributeEvenly ? undefined : adminNewPeriodTue,
+				targetWed: adminNewPeriodDistributeEvenly ? undefined : adminNewPeriodWed,
+				targetThu: adminNewPeriodDistributeEvenly ? undefined : adminNewPeriodThu,
+				targetFri: adminNewPeriodDistributeEvenly ? undefined : adminNewPeriodFri
+			});
+			// reload
+			const { data } = await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(orgSlug, adminPeriodsForMember);
+			adminPeriods = (data as WorkSchedulePeriodResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
+			showAdminAddPeriod = false;
+			adminNewPeriodFrom = '';
+			adminNewPeriodTo = '';
+			adminNewPeriodWeeklyHours = null;
+		} catch (err: any) {
+			adminPeriodError = err.response?.data?.message || 'Failed to add schedule period.';
+		} finally {
+			addingAdminPeriod = false;
+		}
+	}
+
+	async function deleteAdminSchedulePeriod(memberId: number, periodId: number) {
+		if (!confirm('Delete this schedule period?')) return;
+		try {
+			await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete(orgSlug, memberId, periodId);
+			const { data } = await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(orgSlug, memberId);
+			adminPeriods = (data as WorkSchedulePeriodResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
+		} catch (err: any) {
+			adminPeriodError = err.response?.data?.message || 'Failed to delete period.';
+		}
+	}
+
+	// Settings: cycle work schedule change mode
+	async function cycleWorkScheduleChangeMode() {
+		if (!org) return;
+		settingsSaving = true;
+		settingsError = '';
+		try {
+			const modes: RuleMode[] = [0, 1, 2];
+			const current = parseRuleMode(org.workScheduleChangeMode);
+			const next = modes[(current + 1) % 3] as RuleMode;
+			const payload: UpdateOrganizationSettingsRequest = {
+				workScheduleChangeMode: next
+			};
+			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
+			await reloadOrg();
+		} catch (err: any) {
+			settingsError = err.response?.data?.message || 'Failed to update setting.';
+		} finally {
+			settingsSaving = false;
+		}
+	}
+
+	async function importHolidays() {
+		importingHolidays = true;
+		holidayError = '';
+		try {
+			await holidayApi.apiOrganizationsSlugHolidaysImportPresetPost(orgSlug, importPreset, importYear);
+			holidaysLoaded = false;
+			await loadHolidays();
+		} catch (err: any) {
+			holidayError = err.response?.data?.message || 'Failed to import holidays.';
+		} finally {
+			importingHolidays = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -903,6 +1324,88 @@
 												</button>
 												<button class="btn-secondary-sm" onclick={() => (editingMemberSchedule = null)}>Close</button>
 											</div>
+
+											<!-- Member Schedule Periods -->
+											<div class="member-periods-section">
+												<div class="section-header-row">
+													<h4>Schedule Periods</h4>
+													{#if adminPeriodsForMember !== member.id}
+														<button class="btn-schedule-sm" onclick={() => openMemberPeriods(member.id!)}>Load</button>
+													{:else}
+														<button class="btn-primary-sm" onclick={() => (showAdminAddPeriod = !showAdminAddPeriod)}>
+															{showAdminAddPeriod ? 'Cancel' : '+ Add'}
+														</button>
+													{/if}
+												</div>
+
+												{#if adminPeriodsForMember === member.id}
+													{#if adminPeriodsLoading}
+														<p class="muted">Loading periods...</p>
+													{:else}
+														{#if adminPeriodError}
+															<div class="inline-error">{adminPeriodError}</div>
+														{/if}
+
+														{#if showAdminAddPeriod}
+															<form onsubmit={addAdminSchedulePeriod} class="period-form compact">
+																<div class="period-form-row">
+																	<!-- svelte-ignore a11y_label_has_associated_control -->
+																	<label>From</label>
+																	<input type="date" bind:value={adminNewPeriodFrom} required disabled={addingAdminPeriod} />
+																</div>
+																<div class="period-form-row">
+																	<!-- svelte-ignore a11y_label_has_associated_control -->
+																	<label>To</label>
+																	<input type="date" bind:value={adminNewPeriodTo} disabled={addingAdminPeriod} />
+																</div>
+																<div class="period-form-row">
+																	<!-- svelte-ignore a11y_label_has_associated_control -->
+																	<label>Weekly h</label>
+																	<input type="number" bind:value={adminNewPeriodWeeklyHours} step="0.5" min="0" max="168" disabled={addingAdminPeriod} />
+																</div>
+																<div class="schedule-form-row">
+																	<label class="checkbox-label-sm">
+																		<input type="checkbox" bind:checked={adminNewPeriodDistributeEvenly} disabled={addingAdminPeriod} />
+																		Distribute evenly
+																	</label>
+																</div>
+																{#if !adminNewPeriodDistributeEvenly}
+																	<div class="schedule-day-targets">
+																		<div class="day-target-sm"><span>Mon</span><input type="number" bind:value={adminNewPeriodMon} step="0.5" min="0" max="24" disabled={addingAdminPeriod} /></div>
+																		<div class="day-target-sm"><span>Tue</span><input type="number" bind:value={adminNewPeriodTue} step="0.5" min="0" max="24" disabled={addingAdminPeriod} /></div>
+																		<div class="day-target-sm"><span>Wed</span><input type="number" bind:value={adminNewPeriodWed} step="0.5" min="0" max="24" disabled={addingAdminPeriod} /></div>
+																		<div class="day-target-sm"><span>Thu</span><input type="number" bind:value={adminNewPeriodThu} step="0.5" min="0" max="24" disabled={addingAdminPeriod} /></div>
+																		<div class="day-target-sm"><span>Fri</span><input type="number" bind:value={adminNewPeriodFri} step="0.5" min="0" max="24" disabled={addingAdminPeriod} /></div>
+																	</div>
+																{/if}
+																<div class="schedule-form-actions">
+																	<button type="submit" class="btn-primary-sm" disabled={addingAdminPeriod}>
+																		{addingAdminPeriod ? 'Adding...' : 'Add'}
+																	</button>
+																</div>
+															</form>
+														{/if}
+
+														{#if adminPeriods.length === 0}
+															<p class="muted">No schedule periods.</p>
+														{:else}
+															<div class="periods-list">
+																{#each adminPeriods as p}
+																	<div class="period-row">
+																		<div class="period-dates">
+																			<span>{formatDateDisplay(p.validFrom)}</span>
+																			<span class="period-arrow">&rarr;</span>
+																			<span>{p.validTo ? formatDateDisplay(p.validTo) : 'ongoing'}</span>
+																		</div>
+																		<span class="period-hours">{p.weeklyWorkHours ?? '—'}h/w</span>
+																		<button class="btn-icon-danger" title="Delete" onclick={() => deleteAdminSchedulePeriod(member.id!, p.id!)}>&times;</button>
+																	</div>
+																{/each}
+															</div>
+														{/if}
+													{/if}
+												{/if}
+											</div>
 										</div>
 									{/if}
 								</div>
@@ -917,7 +1420,7 @@
 				<section class="schedule-overview-section">
 					<div class="section-header-row">
 						<h2>My Work Schedule</h2>
-						{#if !editingMySchedule}
+						{#if !editingMySchedule && workSchedule.workScheduleChangeMode !== 'Disabled'}
 							<button class="btn-schedule-sm" onclick={startEditMySchedule}>Edit</button>
 						{/if}
 					</div>
@@ -1027,6 +1530,325 @@
 				{/if}
 			{/if}
 
+			<!-- Holidays -->
+			{#if myRole}
+				<section class="schedule-overview-section">
+					<div class="section-header-row">
+						<h2>Holidays</h2>
+						{#if holidaysLoaded && canEdit}
+							<button class="btn-primary-sm" onclick={() => (showAddHoliday = !showAddHoliday)}>
+								{showAddHoliday ? 'Cancel' : '+ Add Holiday'}
+							</button>
+						{/if}
+					</div>
+
+					{#if holidaysLoading}
+						<p class="muted">Loading holidays...</p>
+					{:else if holidaysLoaded}
+						{#if holidayError}
+							<div class="inline-error">{holidayError}</div>
+						{/if}
+
+						{#if canEdit}
+							<div class="import-holidays-row">
+								<select bind:value={importPreset} class="input-xs" disabled={importingHolidays}>
+									<option value="de">Germany</option>
+									<option value="at">Austria</option>
+									<option value="ch">Switzerland</option>
+								</select>
+								<input type="number" bind:value={importYear} class="input-xs" min="2020" max="2099" style="width:80px" disabled={importingHolidays} />
+								<button class="btn-secondary-sm" onclick={importHolidays} disabled={importingHolidays}>
+									{importingHolidays ? 'Importing...' : 'Import Holidays'}
+								</button>
+							</div>
+						{/if}
+
+						{#if showAddHoliday && canEdit}
+							<form onsubmit={addHoliday} class="period-form">
+								<div class="period-form-row">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
+									<label>Date</label>
+									<input type="date" bind:value={newHolidayDate} required disabled={addingHoliday} />
+								</div>
+								<div class="period-form-row">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
+									<label>Name</label>
+									<input type="text" bind:value={newHolidayName} placeholder="e.g. Christmas" required disabled={addingHoliday} />
+								</div>
+								<div class="period-form-row">
+									<label class="checkbox-label">
+										<input type="checkbox" bind:checked={newHolidayRecurring} disabled={addingHoliday} />
+										Yearly recurring
+									</label>
+								</div>
+								<div class="schedule-form-actions">
+									<button type="submit" class="btn-primary-sm" disabled={addingHoliday}>
+										{addingHoliday ? 'Adding...' : 'Add'}
+									</button>
+								</div>
+							</form>
+						{/if}
+
+						{#if holidays.length === 0}
+							<p class="muted">No holidays configured.</p>
+						{:else}
+							<div class="holidays-list">
+								{#each holidays as h}
+									<div class="holiday-row">
+										{#if editingHolidayId === h.id && canEdit}
+											<input type="date" bind:value={editHolidayDate} class="input-xs" disabled={editHolidaySaving} />
+											<input type="text" bind:value={editHolidayName} class="input-xs" disabled={editHolidaySaving} />
+											<label class="checkbox-label compact">
+												<input type="checkbox" bind:checked={editHolidayRecurring} disabled={editHolidaySaving} />
+												Yearly
+											</label>
+											<div class="rule-actions">
+												<button class="btn-primary-sm" onclick={() => saveEditHoliday(h.id!)} disabled={editHolidaySaving}>Save</button>
+												<button class="btn-secondary-sm" onclick={() => (editingHolidayId = null)}>Cancel</button>
+											</div>
+										{:else}
+											<span class="holiday-date">{formatDateDisplay(h.date)}</span>
+											<span class="holiday-name">{h.name}</span>
+											{#if h.isRecurring}
+												<span class="recurring-badge" title="Repeats every year">&#x1f501; Yearly</span>
+											{/if}
+											{#if canEdit}
+												<div class="rule-actions">
+													<button class="btn-secondary-sm" onclick={() => startEditHoliday(h)}>Edit</button>
+													<button class="btn-icon-danger" title="Delete" onclick={() => deleteHoliday(h.id!)}>&times;</button>
+												</div>
+											{/if}
+										{/if}
+									</div>
+								{/each}
+							</div>
+						{/if}
+					{/if}
+				</section>
+			{/if}
+
+			<!-- My Absences -->
+			{#if myRole}
+				<section class="schedule-overview-section">
+					<div class="section-header-row">
+						<h2>{canEdit ? 'Absences' : 'My Absences'}</h2>
+						{#if absencesLoaded}
+							<button class="btn-primary-sm" onclick={() => (showAddAbsence = !showAddAbsence)}>
+								{showAddAbsence ? 'Cancel' : '+ Add Absence'}
+							</button>
+						{/if}
+					</div>
+
+					{#if absencesLoading}
+						<p class="muted">Loading absences...</p>
+					{:else if absencesLoaded}
+						{#if absenceError}
+							<div class="inline-error">{absenceError}</div>
+						{/if}
+
+						{#if showAddAbsence}
+							<form onsubmit={addAbsence} class="period-form">
+								<div class="period-form-row">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
+									<label>Date</label>
+									<input type="date" bind:value={newAbsenceDate} required disabled={addingAbsence} />
+								</div>
+								<div class="period-form-row">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
+									<label>Type</label>
+									<select bind:value={newAbsenceType} disabled={addingAbsence}>
+										<option value={0}>Sick Day</option>
+										<option value={1}>Vacation</option>
+										<option value={2}>Other</option>
+									</select>
+								</div>
+								<div class="period-form-row">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
+									<label>Note</label>
+									<input type="text" bind:value={newAbsenceNote} placeholder="Optional note" disabled={addingAbsence} />
+								</div>
+								<div class="schedule-form-actions">
+									<button type="submit" class="btn-primary-sm" disabled={addingAbsence}>
+										{addingAbsence ? 'Adding...' : 'Add'}
+									</button>
+								</div>
+							</form>
+						{/if}
+
+						{#if canEdit}
+							<div class="absence-toolbar">
+								<div class="absence-admin-row">
+									<button class="btn-secondary-sm" onclick={() => (showAdminAddAbsence = !showAdminAddAbsence)}>
+										{showAdminAddAbsence ? 'Cancel' : '+ Admin Add'}
+									</button>
+									<select bind:value={adminAbsenceFilter} class="filter-select">
+										<option value={null}>All members</option>
+										{#each (org?.members ?? []) as m}
+											<option value={m.id}>{m.firstName} {m.lastName}</option>
+										{/each}
+									</select>
+								</div>
+
+								{#if showAdminAddAbsence}
+									{#if adminAbsenceError}
+										<div class="inline-error">{adminAbsenceError}</div>
+									{/if}
+									<form onsubmit={addAdminAbsence} class="period-form">
+										<div class="period-form-row">
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label>Member</label>
+											<select bind:value={adminAbsenceUserId} required disabled={addingAdminAbsence}>
+												<option value={null}>Select member...</option>
+												{#each (org?.members ?? []) as m}
+													<option value={m.id}>{m.firstName} {m.lastName}</option>
+												{/each}
+											</select>
+										</div>
+										<div class="period-form-row">
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label>Date</label>
+											<input type="date" bind:value={adminAbsenceDate} required disabled={addingAdminAbsence} />
+										</div>
+										<div class="period-form-row">
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label>Type</label>
+											<select bind:value={adminAbsenceType} disabled={addingAdminAbsence}>
+												<option value={0}>Sick Day</option>
+												<option value={1}>Vacation</option>
+												<option value={2}>Other</option>
+											</select>
+										</div>
+										<div class="period-form-row">
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label>Note</label>
+											<input type="text" bind:value={adminAbsenceNote} placeholder="Optional" disabled={addingAdminAbsence} />
+										</div>
+										<div class="schedule-form-actions">
+											<button type="submit" class="btn-primary-sm" disabled={addingAdminAbsence}>
+												{addingAdminAbsence ? 'Adding...' : 'Add'}
+											</button>
+										</div>
+									</form>
+								{/if}
+							</div>
+						{/if}
+
+						{#if filteredAbsences().length === 0}
+							<p class="muted">No absences recorded.</p>
+						{:else}
+							<div class="absences-list">
+								{#each filteredAbsences() as a}
+									<div class="absence-row">
+										<span class="absence-date">{formatDateDisplay(a.date)}</span>
+										<span class="absence-badge {absenceTypeBadge(a.type)}">{absenceTypeLabel(a.type)}</span>
+										{#if canEdit && a.userId !== auth.user?.id}
+											<span class="absence-user">{a.userFirstName} {a.userLastName}</span>
+										{/if}
+										{#if a.note}
+											<span class="absence-note">{a.note}</span>
+										{/if}
+										{#if a.userId === auth.user?.id || canEdit}
+											<button class="btn-icon-danger" title="Delete" onclick={() => deleteAbsence(a.id!)}>&times;</button>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						{/if}
+					{/if}
+				</section>
+			{/if}
+
+			<!-- Schedule Periods (combined with Work Schedule) -->
+			{#if myRole && workSchedule && workSchedule.workScheduleChangeMode !== 'Disabled'}
+				<section class="schedule-overview-section">
+					<div class="section-header-row">
+						<h2>Schedule Periods</h2>
+						{#if schedulePeriodsLoaded && workSchedule.workScheduleChangeMode === 'Allowed'}
+							<button class="btn-primary-sm" onclick={() => (showAddPeriod = !showAddPeriod)}>
+								{showAddPeriod ? 'Cancel' : '+ Add Period'}
+							</button>
+						{/if}
+					</div>
+
+					{#if workSchedule.workScheduleChangeMode === 'RequiresApproval'}
+						<p class="schedule-hint">Schedule period changes require admin approval</p>
+					{/if}
+
+					{#if schedulePeriodsLoading}
+						<p class="muted">Loading schedule periods...</p>
+					{:else if schedulePeriodsLoaded}
+						{#if periodError}
+							<div class="inline-error">{periodError}</div>
+						{/if}
+
+						{#if showAddPeriod && workSchedule.workScheduleChangeMode === 'Allowed'}
+							<form onsubmit={addSchedulePeriod} class="period-form">
+								<div class="period-form-row">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
+									<label>From</label>
+									<input type="date" bind:value={newPeriodFrom} required disabled={addingPeriod} />
+								</div>
+								<div class="period-form-row">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
+									<label>To (optional)</label>
+									<input type="date" bind:value={newPeriodTo} disabled={addingPeriod} />
+								</div>
+								<div class="period-form-row">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
+									<label>Weekly Hours</label>
+									<input type="number" bind:value={newPeriodWeeklyHours} step="0.5" min="0" max="168" disabled={addingPeriod} />
+								</div>
+								<div class="schedule-form-row">
+									<label class="checkbox-label-sm">
+										<input type="checkbox" bind:checked={newPeriodDistributeEvenly} disabled={addingPeriod} />
+										Distribute evenly (Mon–Fri)
+									</label>
+								</div>
+								{#if !newPeriodDistributeEvenly}
+									<div class="schedule-day-targets">
+										<div class="day-target-sm"><span>Mon</span><input type="number" bind:value={newPeriodMon} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+										<div class="day-target-sm"><span>Tue</span><input type="number" bind:value={newPeriodTue} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+										<div class="day-target-sm"><span>Wed</span><input type="number" bind:value={newPeriodWed} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+										<div class="day-target-sm"><span>Thu</span><input type="number" bind:value={newPeriodThu} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+										<div class="day-target-sm"><span>Fri</span><input type="number" bind:value={newPeriodFri} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+									</div>
+								{/if}
+								<div class="schedule-form-actions">
+									<button type="submit" class="btn-primary-sm" disabled={addingPeriod}>
+										{addingPeriod ? 'Adding...' : 'Add'}
+									</button>
+								</div>
+							</form>
+						{/if}
+
+						{#if schedulePeriods.length === 0}
+							<p class="muted">No schedule periods configured. The base work schedule is used.</p>
+						{:else}
+							<div class="periods-list">
+								{#each schedulePeriods as p}
+									{@const today = new Date().toISOString().slice(0, 10)}
+									{@const isActive = p.validFrom && p.validFrom <= today && (!p.validTo || p.validTo >= today)}
+									<div class="period-row" class:period-active={isActive}>
+										<div class="period-dates">
+											<span>{formatDateDisplay(p.validFrom)}</span>
+											<span class="period-arrow">&rarr;</span>
+											<span>{p.validTo ? formatDateDisplay(p.validTo) : 'ongoing'}</span>
+										</div>
+										{#if isActive}
+											<span class="active-badge">Active</span>
+										{/if}
+										<span class="period-hours">{p.weeklyWorkHours ?? '—'}h/week</span>
+										{#if workSchedule.workScheduleChangeMode === 'Allowed'}
+											<button class="btn-icon-danger" title="Delete" onclick={() => deleteSchedulePeriod(p.id!)}>&times;</button>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						{/if}
+					{/if}
+				</section>
+			{/if}
+
 			<!-- Settings section (Admin+) -->
 			{#if canEdit}
 				<section class="settings-section">
@@ -1109,6 +1931,21 @@
 								aria-label="Cycle join policy"
 							>
 								{joinPolicyLabel(org.joinPolicy)}
+							</button>
+						</div>
+
+						<div class="setting-row">
+							<div class="setting-info">
+								<div class="setting-label">Schedule Periods</div>
+								<div class="setting-desc">Control whether members can create/modify their own schedule periods (time-ranged work schedules).</div>
+							</div>
+							<button
+								class="rule-mode-btn {ruleModeColor(org.workScheduleChangeMode)}"
+								onclick={cycleWorkScheduleChangeMode}
+								disabled={settingsSaving}
+								aria-label="Cycle schedule change mode"
+							>
+								{ruleModeLabel(org.workScheduleChangeMode)}
 							</button>
 						</div>
 					</div>
@@ -1199,14 +2036,11 @@
 				<section class="request-history-section">
 					<div class="section-header-row">
 						<h2>Request History</h2>
-						{#if !requestHistoryLoaded}
-							<button class="btn-secondary" onclick={loadRequestHistory} disabled={requestHistoryLoading}>
-								{requestHistoryLoading ? 'Loading...' : 'Load Requests'}
-							</button>
-						{/if}
 					</div>
 
-					{#if requestHistoryLoaded}
+					{#if requestHistoryLoading}
+						<p class="muted">Loading requests...</p>
+					{:else if requestHistoryLoaded}
 						<div class="request-filters">
 							<button class="filter-btn" class:active={requestHistoryFilter === 'all'} onclick={() => (requestHistoryFilter = 'all')}>All ({requestHistory.length})</button>
 							<button class="filter-btn" class:active={requestHistoryFilter === 'Pending'} onclick={() => (requestHistoryFilter = 'Pending')}>Pending ({requestHistory.filter(r => r.status === 'Pending').length})</button>
@@ -2295,5 +3129,297 @@
 		padding: 0.375rem 0.625rem;
 		border-radius: 6px;
 		border-left: 3px solid #dc2626;
+	}
+
+	/* Holidays */
+	.holidays-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+	}
+
+	.holiday-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem 0.75rem;
+		background: #f8fafc;
+		border-radius: 6px;
+		font-size: 0.875rem;
+	}
+
+	.holiday-date {
+		font-weight: 500;
+		color: #374151;
+		min-width: 90px;
+	}
+
+	.holiday-name {
+		flex: 1;
+		color: #6b7280;
+	}
+
+	.recurring-badge {
+		font-size: 0.7rem;
+		background: #dbeafe;
+		color: #1d4ed8;
+		padding: 0.125rem 0.5rem;
+		border-radius: 999px;
+		white-space: nowrap;
+	}
+
+	.import-holidays-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 0.75rem;
+		flex-wrap: wrap;
+	}
+
+	.checkbox-label {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		font-size: 0.85rem;
+		color: #374151;
+		cursor: pointer;
+	}
+
+	.checkbox-label.compact {
+		font-size: 0.8rem;
+		white-space: nowrap;
+	}
+
+	.checkbox-label input[type="checkbox"] {
+		margin: 0;
+	}
+
+	/* Absences */
+	.absences-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+	}
+
+	.absence-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem 0.75rem;
+		background: #f8fafc;
+		border-radius: 6px;
+		font-size: 0.875rem;
+	}
+
+	.absence-date {
+		font-weight: 500;
+		color: #374151;
+		min-width: 90px;
+	}
+
+	.absence-badge {
+		padding: 0.125rem 0.5rem;
+		border-radius: 9999px;
+		font-size: 0.75rem;
+		font-weight: 500;
+	}
+
+	.absence-sick {
+		background: #fef2f2;
+		color: #dc2626;
+	}
+
+	.absence-vacation {
+		background: #eff6ff;
+		color: #2563eb;
+	}
+
+	.absence-other {
+		background: #f3f4f6;
+		color: #6b7280;
+	}
+
+	.absence-user {
+		color: #6b7280;
+		font-size: 0.8125rem;
+	}
+
+	.absence-note {
+		color: #9ca3af;
+		font-size: 0.8125rem;
+		font-style: italic;
+		flex: 1;
+	}
+
+	.absence-toolbar {
+		margin-bottom: 0.75rem;
+	}
+
+	.absence-admin-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.filter-select {
+		padding: 0.25rem 0.5rem;
+		border: 1px solid #d1d5db;
+		border-radius: 6px;
+		font-size: 0.8125rem;
+		background: white;
+	}
+
+	/* Schedule Periods */
+	.periods-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+	}
+
+	.period-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem 0.75rem;
+		background: #f8fafc;
+		border-radius: 6px;
+		font-size: 0.875rem;
+	}
+
+	.period-row.period-active {
+		background: #ecfdf5;
+		border: 1px solid #10b981;
+	}
+
+	.active-badge {
+		font-size: 0.7rem;
+		background: #10b981;
+		color: #fff;
+		padding: 0.125rem 0.5rem;
+		border-radius: 999px;
+		font-weight: 600;
+		white-space: nowrap;
+	}
+
+	.period-dates {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		font-weight: 500;
+		color: #374151;
+	}
+
+	.period-arrow {
+		color: #9ca3af;
+	}
+
+	.period-hours {
+		color: #3b82f6;
+		font-weight: 600;
+		margin-left: auto;
+	}
+
+	.period-form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.625rem;
+		padding: 0.75rem;
+		background: #f9fafb;
+		border-radius: 8px;
+		margin-bottom: 0.75rem;
+		border: 1px solid #e5e7eb;
+	}
+
+	.period-form.compact {
+		padding: 0.5rem;
+		gap: 0.5rem;
+	}
+
+	.period-form-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.period-form-row label {
+		min-width: 80px;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: #374151;
+	}
+
+	.period-form-row input,
+	.period-form-row select {
+		flex: 1;
+		padding: 0.375rem 0.5rem;
+		border: 1px solid #d1d5db;
+		border-radius: 6px;
+		font-size: 0.8125rem;
+	}
+
+	.member-periods-section {
+		margin-top: 0.75rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid #e5e7eb;
+	}
+
+	.member-periods-section h4 {
+		margin: 0;
+		font-size: 0.875rem;
+		color: #374151;
+	}
+
+	/* Responsive */
+	@media (max-width: 640px) {
+		.page {
+			padding: 1rem;
+		}
+
+		.org-header {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 0.75rem;
+		}
+
+		.org-header .org-actions {
+			width: 100%;
+			flex-wrap: wrap;
+		}
+
+		.holiday-row,
+		.absence-row,
+		.period-row {
+			flex-wrap: wrap;
+		}
+
+		.import-holidays-row {
+			flex-direction: column;
+			align-items: stretch;
+		}
+
+		.settings-grid {
+			grid-template-columns: 1fr !important;
+		}
+
+		.schedule-overview-grid {
+			grid-template-columns: repeat(3, 1fr) !important;
+		}
+
+		.schedule-day-targets {
+			flex-wrap: wrap;
+		}
+
+		.member-row {
+			flex-wrap: wrap;
+		}
+
+		.request-item {
+			flex-direction: column;
+		}
+
+		.request-filters {
+			flex-wrap: wrap;
+		}
 	}
 </style>

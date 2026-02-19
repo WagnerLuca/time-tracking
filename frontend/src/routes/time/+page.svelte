@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { timeTrackingApi, organizationsApi, workScheduleApi, requestsApi } from '$lib/apiClient';
+	import { timeTrackingApi, organizationsApi, workScheduleApi, requestsApi, holidayApi, absenceDayApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/api';
 	import { RequestType } from '$lib/api';
 
@@ -18,6 +18,13 @@
 	// Cumulative overtime
 	let cumulativeOvertime = $state(0);
 	let hasOvertimeData = $state(false);
+	// Days off (holidays + absences)
+	let daysOffSet = $state<Set<string>>(new Set());
+	// Day-type tracking for color-coded display
+	let holidayDates = $state<Map<string, string>>(new Map()); // date -> name
+	let sickDayDates = $state<Set<string>>(new Set());
+	let vacationDates = $state<Set<string>>(new Set());
+	let otherAbsenceDates = $state<Set<string>>(new Set());
 
 	// Timer display
 	let elapsed = $state('00:00:00');
@@ -90,7 +97,10 @@
 			const date = new Date(range.start);
 			date.setDate(range.start.getDate() + i);
 			const isPastOrToday = date <= now;
-			return { name, date: new Date(date), minutes: 0, targetMinutes: (targets[i] ?? 0) * 60, entryCount: 0, isPastOrToday };
+			// Check if day off
+			const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+			const off = daysOffSet.has(dateStr);
+			return { name, date: new Date(date), minutes: 0, targetMinutes: off ? 0 : (targets[i] ?? 0) * 60, entryCount: 0, isPastOrToday };
 		});
 
 		for (const entry of entries) {
@@ -177,6 +187,9 @@
 
 	function getDayTarget(date: Date): number {
 		if (!workSchedule) return 0;
+		// Skip holidays and absences
+		const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+		if (daysOffSet.has(dateStr)) return 0;
 		const dayOfWeek = date.getDay();
 		const targets: Record<number, number> = {
 			1: (workSchedule.targetMon ?? 0) * 60,
@@ -188,7 +201,75 @@
 		return targets[dayOfWeek] ?? 0;
 	}
 
+	function dateKey(d: Date): string {
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	}
+
+	function getDayType(d: Date): string | null {
+		const k = dateKey(d);
+		if (holidayDates.has(k)) return 'holiday';
+		if (sickDayDates.has(k)) return 'sick';
+		if (vacationDates.has(k)) return 'vacation';
+		if (otherAbsenceDates.has(k)) return 'other-absence';
+		return null;
+	}
+
+	function getDayTypeLabel(d: Date): string {
+		const k = dateKey(d);
+		if (holidayDates.has(k)) return holidayDates.get(k) ?? 'Holiday';
+		if (sickDayDates.has(k)) return 'Sick Day';
+		if (vacationDates.has(k)) return 'Vacation';
+		if (otherAbsenceDates.has(k)) return 'Other Absence';
+		return '';
+	}
+
 	async function loadCumulativeOvertime() {
+		// Load holidays + absences for days-off calculation
+		if (orgContext.selectedOrgSlug) {
+			try {
+				const [holRes, absRes] = await Promise.all([
+					holidayApi.apiOrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
+					absenceDayApi.apiOrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug)
+				]);
+				const offDates = new Set<string>();
+				const hDates = new Map<string, string>();
+				const sDates = new Set<string>();
+				const vDates = new Set<string>();
+				const oDates = new Set<string>();
+				for (const h of holRes.data) {
+					if (h.date) {
+						offDates.add(h.date);
+						hDates.set(h.date, h.name ?? 'Holiday');
+					}
+				}
+				for (const a of absRes.data) {
+					if (a.date) {
+						offDates.add(a.date);
+						if (a.type === 'SickDay') sDates.add(a.date);
+						else if (a.type === 'Vacation') vDates.add(a.date);
+						else oDates.add(a.date);
+					}
+				}
+				daysOffSet = offDates;
+				holidayDates = hDates;
+				sickDayDates = sDates;
+				vacationDates = vDates;
+				otherAbsenceDates = oDates;
+			} catch {
+				daysOffSet = new Set();
+				holidayDates = new Map();
+				sickDayDates = new Set();
+				vacationDates = new Set();
+				otherAbsenceDates = new Set();
+			}
+		} else {
+			daysOffSet = new Set();
+			holidayDates = new Map();
+			sickDayDates = new Set();
+			vacationDates = new Set();
+			otherAbsenceDates = new Set();
+		}
+
 		if (!workSchedule) {
 			cumulativeOvertime = 0;
 			hasOvertimeData = false;
@@ -531,9 +612,10 @@
 					{@const pct = maxMins > 0 ? Math.min((day.minutes / maxMins) * 100, 100) : 0}
 					{@const targetPct = maxMins > 0 && day.targetMinutes > 0 ? Math.min((day.targetMinutes / maxMins) * 100, 100) : 0}
 					{@const delta = day.isPastOrToday && day.targetMinutes > 0 ? day.minutes - day.targetMinutes : 0}
-					<div class="day-row" class:today={isToday(day.date)} class:future={!day.isPastOrToday}>
+					{@const dayType = getDayType(day.date)}
+					<div class="day-row" class:today={isToday(day.date)} class:future={!day.isPastOrToday} class:day-holiday={dayType === 'holiday'} class:day-sick={dayType === 'sick'} class:day-vacation={dayType === 'vacation'} class:day-other={dayType === 'other-absence'}>
 						<span class="day-name">{day.name}</span>
-						<span class="day-date">{formatDateShort(day.date)}</span>
+						<span class="day-date">{formatDateShort(day.date)}{#if dayType} <span class="day-type-dot day-type-{dayType}" title={getDayTypeLabel(day.date)}></span>{/if}</span>
 						<div class="day-bar-track">
 							{#if targetPct > 0}
 								<div class="day-bar-target" style="left: {targetPct}%"></div>
@@ -551,6 +633,16 @@
 					</div>
 				{/each}
 			</div>
+
+			<!-- Day Type Legend -->
+			{#if holidayDates.size > 0 || sickDayDates.size > 0 || vacationDates.size > 0 || otherAbsenceDates.size > 0}
+				<div class="day-type-legend">
+					{#if holidayDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-holiday"></span> Holiday</span>{/if}
+					{#if sickDayDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-sick"></span> Sick Day</span>{/if}
+					{#if vacationDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-vacation"></span> Vacation</span>{/if}
+					{#if otherAbsenceDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-other"></span> Other Absence</span>{/if}
+				</div>
+			{/if}
 		</section>
 
 		<!-- Cumulative overtime -->
@@ -950,10 +1042,10 @@
 
 	.day-row {
 		display: grid;
-		grid-template-columns: 36px 52px 1fr auto;
+		grid-template-columns: 36px 70px 1fr auto;
 		align-items: center;
 		gap: 0.5rem;
-		padding: 0.25rem 0;
+		padding: 0.375rem 0.5rem;
 	}
 
 	.day-row.today {
@@ -962,6 +1054,39 @@
 
 	.day-row.future {
 		opacity: 0.5;
+	}
+
+	.day-row.day-holiday { background: rgba(139, 92, 246, 0.08); border-radius: 6px; }
+	.day-row.day-sick { background: rgba(239, 68, 68, 0.08); border-radius: 6px; }
+	.day-row.day-vacation { background: rgba(16, 185, 129, 0.08); border-radius: 6px; }
+	.day-row.day-other { background: rgba(156, 163, 175, 0.12); border-radius: 6px; }
+
+	.day-type-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		flex-shrink: 0;
+		display: inline-block;
+		vertical-align: middle;
+		margin-left: 4px;
+	}
+	.day-type-dot.day-type-holiday { background: #8b5cf6; }
+	.day-type-dot.day-type-sick { background: #ef4444; }
+	.day-type-dot.day-type-vacation { background: #10b981; }
+	.day-type-dot.day-type-other { background: #9ca3af; }
+
+	.day-type-legend {
+		display: flex;
+		gap: 1rem;
+		flex-wrap: wrap;
+		font-size: 0.75rem;
+		color: #6b7280;
+		margin-top: 0.75rem;
+	}
+	.legend-item {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
 	}
 
 	.day-name {
