@@ -60,14 +60,14 @@
 	});
 
 	// Reload data when organization context changes
-	let prevOrgId: number | null | undefined = undefined;
+	let prevOrgSlug: string | null | undefined = undefined;
 	$effect(() => {
-		const currentOrgId = orgContext.selectedOrgId;
-		if (prevOrgId !== undefined && prevOrgId !== currentOrgId) {
+		const currentSlug = orgContext.selectedOrgSlug;
+		if (currentSlug && currentSlug !== prevOrgSlug) {
 			loadWeek();
 			loadWorkSchedule().then(() => loadCumulativeOvertime());
 		}
-		prevOrgId = currentOrgId;
+		prevOrgSlug = currentSlug;
 	});
 
 	onDestroy(() => {
