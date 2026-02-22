@@ -28,6 +28,11 @@
 	let yearEntries = $state<TimeEntryResponse[]>([]);
 	let yearLoading = $state(false);
 
+	// Cumulative balance
+	let allTimeEntries = $state<TimeEntryResponse[]>([]);
+	let cumulativeBalance = $state(0); // overall cumulative balance in minutes
+	let monthlyCumulativeBalances = $state<Map<string, number>>(new Map()); // "YYYY-MM" -> cumulative balance
+
 	// Computed
 	const monthName = $derived(new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long' }));
 
@@ -38,19 +43,27 @@
 	// Year overview
 	const yearMonths = $derived(viewMode === 'year' ? buildYearMonths(currentYear, yearEntries) : []);
 
-	let prevOrgId: number | null | undefined = undefined;
+	// Current month's cumulative balance
+	const currentMonthCumulative = $derived(() => {
+		const key = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+		return monthlyCumulativeBalances.get(key) ?? 0;
+	});
+
+	let prevOrgSlug: string | null | undefined = undefined;
 
 	onMount(async () => {
-		await loadAll();
+		if (orgContext.selectedOrgSlug) {
+			await loadAll();
+		}
 		loading = false;
 	});
 
 	$effect(() => {
-		const currentOrgId = orgContext.selectedOrgId;
-		if (prevOrgId !== undefined && prevOrgId !== currentOrgId) {
+		const currentSlug = orgContext.selectedOrgSlug;
+		if (currentSlug && currentSlug !== prevOrgSlug) {
 			loadAll();
 		}
-		prevOrgId = currentOrgId;
+		prevOrgSlug = currentSlug;
 	});
 
 	async function loadAll() {
@@ -61,6 +74,7 @@
 			loadDaysOff(),
 			loadSchedulePeriods()
 		]);
+		await loadCumulativeBalance();
 		if (viewMode === 'year') await loadYearEntries();
 		loading = false;
 	}
@@ -136,6 +150,86 @@
 			otherAbsenceDates = oDates;
 		} catch {
 			holidayDates = new Map(); sickDayDates = new Set(); vacationDates = new Set(); otherAbsenceDates = new Set(); daysOffSet = new Set();
+		}
+	}
+
+	async function loadCumulativeBalance() {
+		if (!orgContext.selectedOrgId || !workSchedule) {
+			cumulativeBalance = 0;
+			monthlyCumulativeBalances = new Map();
+			return;
+		}
+		try {
+			const orgId = orgContext.selectedOrgId;
+			const { data: allEntries } = await timeTrackingApi.apiTimeTrackingGet(orgId, undefined, undefined, 50000);
+			allTimeEntries = allEntries.filter(e => !e.isRunning && e.endTime);
+
+			if (allTimeEntries.length === 0) {
+				cumulativeBalance = 0;
+				monthlyCumulativeBalances = new Map();
+				return;
+			}
+
+			// Sort by date
+			const sorted = [...allTimeEntries].sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime());
+			const firstDate = new Date(sorted[0].startTime!);
+			firstDate.setHours(0, 0, 0, 0);
+
+			// Group entries by month
+			const monthlyWorked = new Map<string, number>();
+			for (const e of sorted) {
+				const d = new Date(e.startTime!);
+				const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+				monthlyWorked.set(mk, (monthlyWorked.get(mk) ?? 0) + (e.netDurationMinutes ?? e.durationMinutes ?? 0));
+			}
+
+			// Compute targets per month from first entry month to now
+			const now = new Date();
+			const monthlyTargets = new Map<string, number>();
+			const cursor = new Date(firstDate.getFullYear(), firstDate.getMonth(), 1);
+			while (cursor <= now) {
+				const mk = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
+				const lastDayOfMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+				let target = 0;
+				const dayCursor = new Date(cursor);
+				// Start from actual first entry date in the first month
+				if (cursor.getFullYear() === firstDate.getFullYear() && cursor.getMonth() === firstDate.getMonth()) {
+					dayCursor.setDate(firstDate.getDate());
+				}
+				const endDate = now < lastDayOfMonth ? now : lastDayOfMonth;
+				while (dayCursor <= endDate) {
+					target += getDayTarget(new Date(dayCursor));
+					dayCursor.setDate(dayCursor.getDate() + 1);
+				}
+				monthlyTargets.set(mk, target);
+				cursor.setMonth(cursor.getMonth() + 1);
+			}
+
+			// Build cumulative balances
+			const initialOvertime = (workSchedule?.initialOvertimeMode !== 'Disabled' && workSchedule?.initialOvertimeHours) ? workSchedule.initialOvertimeHours * 60 : 0;
+			let cumulative = initialOvertime;
+			const balances = new Map<string, number>();
+
+			// Get all months from first entry to now
+			const monthKeys: string[] = [];
+			const mk1 = new Date(firstDate.getFullYear(), firstDate.getMonth(), 1);
+			while (mk1 <= now) {
+				monthKeys.push(`${mk1.getFullYear()}-${String(mk1.getMonth() + 1).padStart(2, '0')}`);
+				mk1.setMonth(mk1.getMonth() + 1);
+			}
+
+			for (const mk of monthKeys) {
+				const worked = monthlyWorked.get(mk) ?? 0;
+				const target = monthlyTargets.get(mk) ?? 0;
+				cumulative += worked - target;
+				balances.set(mk, cumulative);
+			}
+
+			cumulativeBalance = cumulative;
+			monthlyCumulativeBalances = balances;
+		} catch {
+			cumulativeBalance = 0;
+			monthlyCumulativeBalances = new Map();
 		}
 	}
 
@@ -216,6 +310,16 @@
 	function formatDelta(minutes: number): string {
 		const sign = minutes >= 0 ? '+' : '';
 		return sign + formatHours(minutes);
+	}
+
+	function getYearCumulative(year: number): number {
+		// Find the latest month in this year that has cumulative data
+		for (let m = 12; m >= 1; m--) {
+			const key = `${year}-${String(m).padStart(2, '0')}`;
+			const val = monthlyCumulativeBalances.get(key);
+			if (val !== undefined) return val;
+		}
+		return cumulativeBalance;
 	}
 
 	interface CalendarDay {
@@ -420,7 +524,11 @@
 				</div>
 				<div class="stat-card">
 					<span class="stat-value" class:positive={monthStats.totalDelta > 0} class:negative={monthStats.totalDelta < 0}>{formatDelta(monthStats.totalDelta)}</span>
-					<span class="stat-label">Balance</span>
+					<span class="stat-label">Month Balance</span>
+				</div>
+				<div class="stat-card cumulative-card">
+					<span class="stat-value" class:positive={currentMonthCumulative() > 0} class:negative={currentMonthCumulative() < 0}>{formatDelta(currentMonthCumulative())}</span>
+					<span class="stat-label">Cumulative</span>
 				</div>
 				<div class="stat-card">
 					<span class="stat-value">{formatHours(monthStats.avgPerDay)}</span>
@@ -549,6 +657,10 @@
 						<span class="stat-value" class:positive={yearDelta > 0} class:negative={yearDelta < 0}>{formatDelta(yearDelta)}</span>
 						<span class="stat-label">Year Balance</span>
 					</div>
+					<div class="stat-card cumulative-card">
+						<span class="stat-value" class:positive={getYearCumulative(currentYear) > 0} class:negative={getYearCumulative(currentYear) < 0}>{formatDelta(getYearCumulative(currentYear))}</span>
+						<span class="stat-label">Cumulative</span>
+					</div>
 				</div>
 
 				<div class="summary-badges">
@@ -561,6 +673,8 @@
 				<div class="year-grid">
 					{#each yearMonths as mo}
 						{@const isCurrent = mo.month === new Date().getMonth() && currentYear === new Date().getFullYear()}
+						{@const moKey = `${currentYear}-${String(mo.month + 1).padStart(2, '0')}`}
+						{@const moCumulative = monthlyCumulativeBalances.get(moKey)}
 						<button class="month-card" class:current={isCurrent} class:has-data={mo.workedMinutes > 0} onclick={() => { currentMonth = mo.month; viewMode = 'month'; loadEntries(); }}>
 							<div class="mc-header">
 								<span class="mc-name">{mo.name}</span>
@@ -577,6 +691,11 @@
 									<span class="mc-target">/ {formatHours(mo.targetMinutes)}</span>
 								{/if}
 							</div>
+							{#if moCumulative !== undefined}
+								<div class="mc-cumulative" class:positive={moCumulative > 0} class:negative={moCumulative < 0}>
+									Σ {formatDelta(moCumulative)}
+								</div>
+							{/if}
 							<div class="mc-badges">
 								{#if mo.holidays > 0}<span class="mc-badge mc-badge-holiday">{mo.holidays}🏖️</span>{/if}
 								{#if mo.sickDays > 0}<span class="mc-badge mc-badge-sick">{mo.sickDays}🤒</span>{/if}
@@ -881,6 +1000,12 @@
 
 	.mc-badges { display: flex; gap: 0.375rem; flex-wrap: wrap; }
 	.mc-badge { font-size: 0.6875rem; }
+
+	.mc-cumulative { font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; color: #6b7280; }
+	.mc-cumulative.positive { color: #16a34a; }
+	.mc-cumulative.negative { color: #dc2626; }
+
+	.cumulative-card { border-left: 3px solid #6366f1; }
 
 	/* Responsive */
 	@media (max-width: 640px) {
