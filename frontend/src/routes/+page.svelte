@@ -21,7 +21,6 @@
 	let stopping = $state(false);
 	let actionError = $state('');
 	let timerInterval: ReturnType<typeof setInterval> | null = null;
-	let prevOrgId: number | null | undefined = undefined;
 
 	// Weekly breakdown data
 	let weekDays = $state<Array<{label: string, date: Date, worked: number, target: number}>>([]);
@@ -49,13 +48,14 @@
 		}
 	});
 
-	// Reload when org changes
+	// Reload when org changes (track slug since it resolves after organizations load)
+	let prevOrgSlug: string | null | undefined = undefined;
 	$effect(() => {
-		const currentOrgId = orgContext.selectedOrgId;
-		if (prevOrgId !== undefined && prevOrgId !== currentOrgId) {
+		const currentSlug = orgContext.selectedOrgSlug;
+		if (currentSlug && currentSlug !== prevOrgSlug) {
 			loadWorkSchedule().then(() => loadStats());
 		}
-		prevOrgId = currentOrgId;
+		prevOrgSlug = currentSlug;
 	});
 
 	onDestroy(() => {
@@ -400,7 +400,7 @@
 	}
 
 	function dateKey(d: Date): string {
-		return d.toISOString().slice(0, 10);
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 	}
 
 	function getDayType(d: Date): 'holiday' | 'sick' | 'vacation' | 'other-absence' | null {
