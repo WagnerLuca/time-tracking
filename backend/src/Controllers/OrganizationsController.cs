@@ -66,6 +66,8 @@ public class OrganizationsController : OrganizationBaseController
                 InitialOvertimeMode = o.InitialOvertimeMode.ToString(),
                 JoinPolicy = o.JoinPolicy.ToString(),
                 WorkScheduleChangeMode = o.WorkScheduleChangeMode.ToString(),
+                MemberTimeEntryVisibility = o.MemberTimeEntryVisibility,
+                SettingsUpdatedAt = o.SettingsUpdatedAt,
                 CreatedAt = o.CreatedAt,
                 Members = o.UserOrganizations
                     .Where(uo => uo.IsActive)
@@ -496,9 +498,33 @@ public class OrganizationsController : OrganizationBaseController
             org.JoinPolicy = request.JoinPolicy.Value;
         if (request.WorkScheduleChangeMode.HasValue)
             org.WorkScheduleChangeMode = request.WorkScheduleChangeMode.Value;
+        if (request.MemberTimeEntryVisibility.HasValue)
+            org.MemberTimeEntryVisibility = request.MemberTimeEntryVisibility.Value;
 
         org.UpdatedAt = DateTime.UtcNow;
+        org.SettingsUpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+
+        // ── Create notifications for all org members except the caller ──
+        var memberUserIds = await _context.UserOrganizations
+            .Where(uo => uo.OrganizationId == org.Id && uo.IsActive && uo.UserId != callerId.Value)
+            .Select(uo => uo.UserId)
+            .ToListAsync();
+
+        if (memberUserIds.Count > 0)
+        {
+            var notifications = memberUserIds.Select(uid => new Notification
+            {
+                UserId = uid,
+                OrganizationId = org.Id,
+                Title = "Organization rules updated",
+                Message = $"The rules for \"{org.Name}\" have been updated by an administrator.",
+                Type = "SettingsChanged"
+            }).ToList();
+
+            _context.Notifications.AddRange(notifications);
+            await _context.SaveChangesAsync();
+        }
 
         return Ok(new {
             org.AutoPauseEnabled,
@@ -506,13 +532,14 @@ public class OrganizationsController : OrganizationBaseController
             EditPauseMode = org.EditPauseMode.ToString(),
             InitialOvertimeMode = org.InitialOvertimeMode.ToString(),
             JoinPolicy = org.JoinPolicy.ToString(),
-            WorkScheduleChangeMode = org.WorkScheduleChangeMode.ToString()
+            WorkScheduleChangeMode = org.WorkScheduleChangeMode.ToString(),
+            org.MemberTimeEntryVisibility
         });
     }
 
     // ────────────────────────────────────────────────────
     //  GET  /api/organizations/{slug}/time-overview
-    //  Admin+: Get time tracked by all members in a date range
+    //  Admin+ only when MemberTimeEntryVisibility is ON
     // ────────────────────────────────────────────────────
     [HttpGet("{slug}/time-overview")]
     [Authorize]
@@ -526,7 +553,8 @@ public class OrganizationsController : OrganizationBaseController
         if (org == null) return NotFound(new { message = "Organization not found" });
 
         var callerRole = await GetCallerRole(org.Id);
-        if (callerRole == null || callerRole < OrganizationRole.Admin)
+        // Must be admin+ AND the org setting must be enabled
+        if (callerRole == null || callerRole < OrganizationRole.Admin || !org.MemberTimeEntryVisibility)
             return Forbid();
 
         // Default to current week (Mon-Sun)
@@ -577,7 +605,7 @@ public class OrganizationsController : OrganizationBaseController
 
     // ────────────────────────────────────────────────────
     //  GET  /api/organizations/{slug}/member-entries/{userId}
-    //  Admin+: Get detailed time entries for a specific member
+    //  Admin+ only when MemberTimeEntryVisibility is ON
     // ────────────────────────────────────────────────────
     [HttpGet("{slug}/member-entries/{userId}")]
     [Authorize]
@@ -591,7 +619,8 @@ public class OrganizationsController : OrganizationBaseController
         if (org == null) return NotFound(new { message = "Organization not found" });
 
         var callerRole = await GetCallerRole(org.Id);
-        if (callerRole == null || callerRole < OrganizationRole.Admin)
+        // Must be admin+ AND the org setting must be enabled
+        if (callerRole == null || callerRole < OrganizationRole.Admin || !org.MemberTimeEntryVisibility)
             return Forbid();
 
         var now = DateTime.UtcNow;

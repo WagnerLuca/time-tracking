@@ -28,6 +28,8 @@ public record OrganizationDetailResponse
     public required string InitialOvertimeMode { get; init; }
     public required string JoinPolicy { get; init; }
     public required string WorkScheduleChangeMode { get; init; }
+    public bool MemberTimeEntryVisibility { get; init; }
+    public DateTime? SettingsUpdatedAt { get; init; }
     public DateTime CreatedAt { get; init; }
     public required List<OrganizationMemberResponse> Members { get; init; }
     public List<PauseRuleResponse>? PauseRules { get; init; }
@@ -93,6 +95,7 @@ public record UpdateOrganizationSettingsRequest
     public RuleMode? InitialOvertimeMode { get; init; }
     public RuleMode? JoinPolicy { get; init; }
     public RuleMode? WorkScheduleChangeMode { get; init; }
+    public bool? MemberTimeEntryVisibility { get; init; }
 }
 
 public record PauseRuleResponse

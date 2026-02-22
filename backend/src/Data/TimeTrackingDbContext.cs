@@ -20,6 +20,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<Holiday> Holidays { get; set; }
     public DbSet<AbsenceDay> AbsenceDays { get; set; }
     public DbSet<WorkSchedulePeriod> WorkSchedulePeriods { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

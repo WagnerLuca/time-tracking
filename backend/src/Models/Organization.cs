@@ -79,6 +79,17 @@ public class Organization
     /// </summary>
     public RuleMode WorkScheduleChangeMode { get; set; } = RuleMode.Allowed;
     
+    /// <summary>
+    /// When true, admins and owners can view members' time entries and time overview.
+    /// When false, nobody can see other members' tracked working hours.
+    /// </summary>
+    public bool MemberTimeEntryVisibility { get; set; } = false;
+    
+    /// <summary>
+    /// Timestamp of the last settings update. Used to notify members of rule changes.
+    /// </summary>
+    public DateTime? SettingsUpdatedAt { get; set; }
+    
     // Navigation properties
     [JsonIgnore]
     public ICollection<UserOrganization> UserOrganizations { get; set; } = new List<UserOrganization>();
