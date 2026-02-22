@@ -17,7 +17,8 @@
 		HolidayResponse,
 		AbsenceDayResponse,
 		WorkSchedulePeriodResponse,
-		AbsenceType
+		AbsenceType,
+		MemberTimeOverviewResponse
 	} from '$lib/api';
 
 	let org = $state<OrganizationDetailResponse | null>(null);
@@ -54,6 +55,14 @@
 
 	// Action feedback
 	let actionError = $state('');
+
+	// Tab navigation
+	let activeTab = $state<'my-schedule' | 'team' | 'settings'>('my-schedule');
+
+	// Team overview data (admin)
+	let teamOverview = $state<MemberTimeOverviewResponse[]>([]);
+	let teamOverviewLoading = $state(false);
+	let teamOverviewLoaded = $state(false);
 
 	// Work schedule (for member view)
 	let workSchedule = $state<WorkScheduleResponse | null>(null);
@@ -122,6 +131,7 @@
 	let absencesLoaded = $state(false);
 	let showAddAbsence = $state(false);
 	let newAbsenceDate = $state('');
+	let newAbsenceToDate = $state('');
 	let newAbsenceType = $state(0); // SickDay
 	let newAbsenceNote = $state('');
 	let addingAbsence = $state(false);
@@ -204,6 +214,42 @@
 		loadSchedulePeriods();
 		loadUsersForDropdown();
 		loadRequestHistory();
+		loadTeamOverview();
+	}
+
+	/** Load admin time overview for current week */
+	async function loadTeamOverview() {
+		if (teamOverviewLoaded || !canEdit) return;
+		teamOverviewLoading = true;
+		try {
+			const now = new Date();
+			const dayOfWeek = now.getDay() || 7;
+			const weekStart = new Date(now);
+			weekStart.setDate(now.getDate() - dayOfWeek + 1);
+			weekStart.setHours(0, 0, 0, 0);
+			const weekEnd = new Date(weekStart);
+			weekEnd.setDate(weekStart.getDate() + 6);
+			weekEnd.setHours(23, 59, 59, 999);
+			const { data } = await organizationsApi.apiOrganizationsSlugTimeOverviewGet(orgSlug, weekStart.toISOString(), weekEnd.toISOString());
+			teamOverview = data;
+			teamOverviewLoaded = true;
+		} catch {
+			teamOverview = [];
+		} finally {
+			teamOverviewLoading = false;
+		}
+	}
+
+	function getMemberOverview(memberId: number): MemberTimeOverviewResponse | null {
+		return teamOverview.find(m => m.userId === memberId) ?? null;
+	}
+
+	function formatMinutesToHours(minutes?: number | null): string {
+		if (!minutes) return '0h';
+		const h = Math.floor(Math.abs(minutes) / 60);
+		const m = Math.abs(minutes) % 60;
+		const sign = minutes < 0 ? '-' : '';
+		return m > 0 ? `${sign}${h}h ${m}m` : `${sign}${h}h`;
 	}
 
 	/** Reload org data without toggling loading state (avoids scroll-to-top) */
@@ -894,18 +940,38 @@
 
 	async function addAbsence(e: Event) {
 		e.preventDefault();
+		if (!newAbsenceDate) return;
 		addingAbsence = true;
 		absenceError = '';
 		try {
-			await absenceDayApi.apiOrganizationsSlugAbsencesPost(orgSlug, {
-				date: newAbsenceDate,
-				type: newAbsenceType as AbsenceType,
-				note: newAbsenceNote || undefined
-			});
+			const from = new Date(newAbsenceDate);
+			const to = newAbsenceToDate ? new Date(newAbsenceToDate) : from;
+			const workdays: string[] = [];
+			const cursor = new Date(from);
+			while (cursor <= to) {
+				const dow = cursor.getDay();
+				if (dow >= 1 && dow <= 5) {
+					workdays.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`);
+				}
+				cursor.setDate(cursor.getDate() + 1);
+			}
+			if (workdays.length === 0) {
+				absenceError = 'No workdays in selected range.';
+				addingAbsence = false;
+				return;
+			}
+			for (const dateStr of workdays) {
+				await absenceDayApi.apiOrganizationsSlugAbsencesPost(orgSlug, {
+					date: dateStr,
+					type: newAbsenceType as AbsenceType,
+					note: newAbsenceNote || undefined
+				});
+			}
 			absencesLoaded = false;
 			await loadAbsences();
 			showAddAbsence = false;
 			newAbsenceDate = '';
+			newAbsenceToDate = '';
 			newAbsenceType = 0;
 			newAbsenceNote = '';
 		} catch (err: any) {
@@ -1119,7 +1185,7 @@
 	<a href="/organizations" class="back-link">&larr; Back to Organizations</a>
 
 	{#if loading}
-		<p class="muted">Loading...</p>
+		<div class="loading-state"><div class="spinner"></div><span>Loading...</span></div>
 	{:else if error}
 		<div class="error-msg">{error}</div>
 	{:else if org}
@@ -1160,7 +1226,7 @@
 				</form>
 			</div>
 		{:else}
-			<!-- Organization details -->
+			<!-- Organization header -->
 			<div class="org-header">
 				<div>
 					<h1>{org.name}</h1>
@@ -1185,534 +1251,182 @@
 				<a href={org.website} target="_blank" class="website-link">{org.website}</a>
 			{/if}
 
-			<!-- Members section -->
-			<section class="members-section">
-				<div class="section-header">
-					<h2>Members ({(org.members ?? []).length})</h2>
-					{#if canEdit}
-						<button class="btn-primary-sm" onclick={() => { showAddMember = !showAddMember; if (showAddMember) loadUsersForDropdown(); }}>
-							{showAddMember ? 'Cancel' : '+ Add Member'}
-						</button>
-					{/if}
-				</div>
-
-				{#if showAddMember}
-					<div class="add-member-form">
-						{#if addMemberError}
-							<div class="error-banner">{addMemberError}</div>
-						{/if}
-						<form onsubmit={addMember} class="inline-form">
-							<select
-								bind:value={selectedUserId}
-								disabled={addingMember}
-								class="user-select"
-							>
-								<option value={null}>Select a user...</option>
-								{#each getAvailableUsers() as user}
-									<option value={user.id}>{user.firstName} {user.lastName} ({user.email})</option>
-								{/each}
-							</select>
-							<select bind:value={newMemberRole} disabled={addingMember}>
-								<option value={0}>Member</option>
-								<option value={1}>Admin</option>
-								{#if isOwner}
-									<option value={2}>Owner</option>
-								{/if}
-							</select>
-							<button type="submit" class="btn-primary-sm" disabled={addingMember}>
-								{addingMember ? 'Adding...' : 'Add'}
-							</button>
-						</form>
-					</div>
+			<!-- Tab navigation -->
+			<div class="tab-bar">
+				<button class="tab-btn" class:active={activeTab === 'my-schedule'} onclick={() => (activeTab = 'my-schedule')}>
+					<svg class="tab-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
+					My Schedule
+				</button>
+				<button class="tab-btn" class:active={activeTab === 'team'} onclick={() => (activeTab = 'team')}>
+					<svg class="tab-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
+					Team
+				</button>
+				{#if canEdit}
+					<button class="tab-btn" class:active={activeTab === 'settings'} onclick={() => (activeTab = 'settings')}>
+						<svg class="tab-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+						Settings
+					</button>
 				{/if}
+			</div>
 
-				<div class="members-list">
-					{#each (org.members ?? []) as member}
-						<div class="member-wrapper">
-							<div class="member-row">
-								<div class="member-info">
-									<div class="member-name">
-										{member.firstName} {member.lastName}
-										{#if member.id === auth.user?.id}
-											<span class="you-badge">You</span>
-										{/if}
-									</div>
-									<div class="member-email">{member.email}</div>
-								</div>
-								<div class="member-actions">
-									{#if canEdit}
-										<button class="btn-schedule-sm" title="View/Edit Schedule" onclick={() => openMemberSchedule(member.id!)}>
-											{editingMemberSchedule === member.id ? '▾' : '▸'} Schedule
-										</button>
-									{/if}
-									{#if canEdit && member.role !== 'Owner' && member.id !== auth.user?.id}
-										<select
-											value={member.role === 'Admin' ? 1 : 0}
-											onchange={(e) => updateMemberRole(member.id!, parseInt(e.currentTarget.value))}
-										>
-											<option value={0}>Member</option>
-											<option value={1}>Admin</option>
-											{#if isOwner}
-												<option value={2}>Owner</option>
-											{/if}
-										</select>
-										<button
-											class="btn-icon-danger"
-											title="Remove member"
-											onclick={() => removeMember(member.id!, `${member.firstName} ${member.lastName}`)}
-										>
-											&times;
-										</button>
-									{:else}
-										<span class="role-badge role-{(member.role?.toLowerCase() ?? 'member')}">{member.role}</span>
-									{/if}
-								</div>
+			<!-- ==================== MY SCHEDULE TAB ==================== -->
+			{#if activeTab === 'my-schedule'}
+				<div class="tab-content">
+					<p class="tab-description">Your personal work schedule, overtime balance, absences and time period configurations.</p>
+					<!-- My Work Schedule -->
+					{#if myRole && workSchedule}
+						<section class="schedule-overview-section">
+							<div class="section-header-row">
+								<h2>My Work Schedule</h2>
+								{#if !editingMySchedule && workSchedule.workScheduleChangeMode !== 'Disabled'}
+									<button class="btn-schedule-sm" onclick={startEditMySchedule}>Edit</button>
+								{/if}
 							</div>
 
-							{#if canEdit && editingMemberSchedule === member.id}
-								<div class="member-schedule-panel">
-									{#if memberScheduleLoading}
-										<p class="muted">Loading schedule...</p>
-									{:else}
-										{#if memberScheduleError}
-											<div class="error-banner">{memberScheduleError}</div>
-										{/if}
-										<div class="member-schedule-form">
-											<div class="schedule-form-row">
-												<!-- svelte-ignore a11y_label_has_associated_control -->
-												<label>Weekly Hours</label>
-												<input type="number" step="0.5" min="0" max="80" bind:value={memberWeeklyHours} class="input input-xs" disabled={memberScheduleSaving} />
-											</div>
-											<div class="schedule-form-row">
-												<label class="checkbox-label-sm">
-													<input type="checkbox" bind:checked={memberDistributeEvenly} disabled={memberScheduleSaving} />
-													Distribute evenly
-												</label>
-											</div>
-											{#if !memberDistributeEvenly}
-												<div class="schedule-day-targets">
-													<div class="day-target-sm">
-														<span>Mon</span>
-														<input type="number" step="0.5" min="0" max="24" bind:value={memberTargetMon} disabled={memberScheduleSaving} />
-													</div>
-													<div class="day-target-sm">
-														<span>Tue</span>
-														<input type="number" step="0.5" min="0" max="24" bind:value={memberTargetTue} disabled={memberScheduleSaving} />
-													</div>
-													<div class="day-target-sm">
-														<span>Wed</span>
-														<input type="number" step="0.5" min="0" max="24" bind:value={memberTargetWed} disabled={memberScheduleSaving} />
-													</div>
-													<div class="day-target-sm">
-														<span>Thu</span>
-														<input type="number" step="0.5" min="0" max="24" bind:value={memberTargetThu} disabled={memberScheduleSaving} />
-													</div>
-													<div class="day-target-sm">
-														<span>Fri</span>
-														<input type="number" step="0.5" min="0" max="24" bind:value={memberTargetFri} disabled={memberScheduleSaving} />
-													</div>
-												</div>
-											{/if}
-											<div class="schedule-form-row">
-												<!-- svelte-ignore a11y_label_has_associated_control -->
-												<label>Initial Overtime (h)</label>
-												<input type="number" step="0.5" bind:value={memberOvertimeHours} class="input input-xs" disabled={memberScheduleSaving} />
-											</div>
-											<div class="schedule-form-actions">
-												<button class="btn-primary-sm" onclick={saveMemberSchedule} disabled={memberScheduleSaving}>
-													{memberScheduleSaving ? 'Saving...' : 'Save'}
-												</button>
-												<button class="btn-secondary-sm" onclick={() => (editingMemberSchedule = null)}>Close</button>
-											</div>
-
-											<!-- Member Schedule Periods -->
-											<div class="member-periods-section">
-												<div class="section-header-row">
-													<h4>Schedule Periods</h4>
-													{#if adminPeriodsForMember !== member.id}
-														<button class="btn-schedule-sm" onclick={() => openMemberPeriods(member.id!)}>Load</button>
-													{:else}
-														<button class="btn-primary-sm" onclick={() => (showAdminAddPeriod = !showAdminAddPeriod)}>
-															{showAdminAddPeriod ? 'Cancel' : '+ Add'}
-														</button>
-													{/if}
-												</div>
-
-												{#if adminPeriodsForMember === member.id}
-													{#if adminPeriodsLoading}
-														<p class="muted">Loading periods...</p>
-													{:else}
-														{#if adminPeriodError}
-															<div class="inline-error">{adminPeriodError}</div>
-														{/if}
-
-														{#if showAdminAddPeriod}
-															<form onsubmit={addAdminSchedulePeriod} class="period-form compact">
-																<div class="period-form-row">
-																	<!-- svelte-ignore a11y_label_has_associated_control -->
-																	<label>From</label>
-																	<input type="date" bind:value={adminNewPeriodFrom} required disabled={addingAdminPeriod} />
-																</div>
-																<div class="period-form-row">
-																	<!-- svelte-ignore a11y_label_has_associated_control -->
-																	<label>To</label>
-																	<input type="date" bind:value={adminNewPeriodTo} disabled={addingAdminPeriod} />
-																</div>
-																<div class="period-form-row">
-																	<!-- svelte-ignore a11y_label_has_associated_control -->
-																	<label>Weekly h</label>
-																	<input type="number" bind:value={adminNewPeriodWeeklyHours} step="0.5" min="0" max="168" disabled={addingAdminPeriod} />
-																</div>
-																<div class="schedule-form-row">
-																	<label class="checkbox-label-sm">
-																		<input type="checkbox" bind:checked={adminNewPeriodDistributeEvenly} disabled={addingAdminPeriod} />
-																		Distribute evenly
-																	</label>
-																</div>
-																{#if !adminNewPeriodDistributeEvenly}
-																	<div class="schedule-day-targets">
-																		<div class="day-target-sm"><span>Mon</span><input type="number" bind:value={adminNewPeriodMon} step="0.5" min="0" max="24" disabled={addingAdminPeriod} /></div>
-																		<div class="day-target-sm"><span>Tue</span><input type="number" bind:value={adminNewPeriodTue} step="0.5" min="0" max="24" disabled={addingAdminPeriod} /></div>
-																		<div class="day-target-sm"><span>Wed</span><input type="number" bind:value={adminNewPeriodWed} step="0.5" min="0" max="24" disabled={addingAdminPeriod} /></div>
-																		<div class="day-target-sm"><span>Thu</span><input type="number" bind:value={adminNewPeriodThu} step="0.5" min="0" max="24" disabled={addingAdminPeriod} /></div>
-																		<div class="day-target-sm"><span>Fri</span><input type="number" bind:value={adminNewPeriodFri} step="0.5" min="0" max="24" disabled={addingAdminPeriod} /></div>
-																	</div>
-																{/if}
-																<div class="schedule-form-actions">
-																	<button type="submit" class="btn-primary-sm" disabled={addingAdminPeriod}>
-																		{addingAdminPeriod ? 'Adding...' : 'Add'}
-																	</button>
-																</div>
-															</form>
-														{/if}
-
-														{#if adminPeriods.length === 0}
-															<p class="muted">No schedule periods.</p>
-														{:else}
-															<div class="periods-list">
-																{#each adminPeriods as p}
-																	<div class="period-row">
-																		<div class="period-dates">
-																			<span>{formatDateDisplay(p.validFrom)}</span>
-																			<span class="period-arrow">&rarr;</span>
-																			<span>{p.validTo ? formatDateDisplay(p.validTo) : 'ongoing'}</span>
-																		</div>
-																		<span class="period-hours">{p.weeklyWorkHours ?? '—'}h/w</span>
-																		<button class="btn-icon-danger" title="Delete" onclick={() => deleteAdminSchedulePeriod(member.id!, p.id!)}>&times;</button>
-																	</div>
-																{/each}
-															</div>
-														{/if}
-													{/if}
-												{/if}
-											</div>
+							{#if editingMySchedule}
+								<div class="my-schedule-form">
+									{#if myScheduleError}
+										<div class="inline-error">{myScheduleError}</div>
+									{/if}
+									<div class="schedule-form-row">
+										<label>Weekly Hours</label>
+										<input type="number" class="input-xs" bind:value={myWeeklyHours} min="0" max="168" step="0.5" />
+									</div>
+									<div class="schedule-form-row">
+										<label class="checkbox-label-sm">
+											<input type="checkbox" bind:checked={myDistributeEvenly} />
+											Distribute evenly (Mon–Fri)
+										</label>
+									</div>
+									{#if !myDistributeEvenly}
+										<div class="schedule-day-targets">
+											<div class="day-target-sm"><span>Mon</span><input type="number" bind:value={myTargetMon} min="0" max="24" step="0.5" /></div>
+											<div class="day-target-sm"><span>Tue</span><input type="number" bind:value={myTargetTue} min="0" max="24" step="0.5" /></div>
+											<div class="day-target-sm"><span>Wed</span><input type="number" bind:value={myTargetWed} min="0" max="24" step="0.5" /></div>
+											<div class="day-target-sm"><span>Thu</span><input type="number" bind:value={myTargetThu} min="0" max="24" step="0.5" /></div>
+											<div class="day-target-sm"><span>Fri</span><input type="number" bind:value={myTargetFri} min="0" max="24" step="0.5" /></div>
 										</div>
 									{/if}
-								</div>
-							{/if}
-						</div>
-					{/each}
-				</div>
-			</section>
-
-			<!-- My Work Schedule (visible to all members) -->
-			{#if myRole && workSchedule}
-				<section class="schedule-overview-section">
-					<div class="section-header-row">
-						<h2>My Work Schedule</h2>
-						{#if !editingMySchedule && workSchedule.workScheduleChangeMode !== 'Disabled'}
-							<button class="btn-schedule-sm" onclick={startEditMySchedule}>Edit</button>
-						{/if}
-					</div>
-
-					{#if editingMySchedule}
-						<div class="my-schedule-form">
-							{#if myScheduleError}
-								<div class="inline-error">{myScheduleError}</div>
-							{/if}
-							<div class="schedule-form-row">
-								<label>Weekly Hours</label>
-								<input type="number" class="input-xs" bind:value={myWeeklyHours} min="0" max="168" step="0.5" />
-							</div>
-							<div class="schedule-form-row">
-								<label class="checkbox-label-sm">
-									<input type="checkbox" bind:checked={myDistributeEvenly} />
-									Distribute evenly (Mon–Fri)
-								</label>
-							</div>
-							{#if !myDistributeEvenly}
-								<div class="schedule-day-targets">
-									<div class="day-target-sm"><span>Mon</span><input type="number" bind:value={myTargetMon} min="0" max="24" step="0.5" /></div>
-									<div class="day-target-sm"><span>Tue</span><input type="number" bind:value={myTargetTue} min="0" max="24" step="0.5" /></div>
-									<div class="day-target-sm"><span>Wed</span><input type="number" bind:value={myTargetWed} min="0" max="24" step="0.5" /></div>
-									<div class="day-target-sm"><span>Thu</span><input type="number" bind:value={myTargetThu} min="0" max="24" step="0.5" /></div>
-									<div class="day-target-sm"><span>Fri</span><input type="number" bind:value={myTargetFri} min="0" max="24" step="0.5" /></div>
-								</div>
-							{/if}
-							<div class="schedule-form-actions">
-								<button class="btn-primary-sm" onclick={saveMySchedule} disabled={myScheduleSaving}>
-									{myScheduleSaving ? 'Saving...' : 'Save'}
-								</button>
-								<button class="btn-secondary-sm" onclick={() => (editingMySchedule = false)}>Cancel</button>
-							</div>
-						</div>
-					{:else}
-						<div class="schedule-overview-grid">
-							<div class="schedule-stat">
-								<span class="schedule-stat-label">Weekly Hours</span>
-								<span class="schedule-stat-value">{workSchedule.weeklyWorkHours ?? '—'}h</span>
-							</div>
-							<div class="schedule-stat">
-								<span class="schedule-stat-label">Mon</span>
-								<span class="schedule-stat-value">{workSchedule.targetMon ?? 0}h</span>
-							</div>
-							<div class="schedule-stat">
-								<span class="schedule-stat-label">Tue</span>
-								<span class="schedule-stat-value">{workSchedule.targetTue ?? 0}h</span>
-							</div>
-							<div class="schedule-stat">
-								<span class="schedule-stat-label">Wed</span>
-								<span class="schedule-stat-value">{workSchedule.targetWed ?? 0}h</span>
-							</div>
-							<div class="schedule-stat">
-								<span class="schedule-stat-label">Thu</span>
-								<span class="schedule-stat-value">{workSchedule.targetThu ?? 0}h</span>
-							</div>
-							<div class="schedule-stat">
-								<span class="schedule-stat-label">Fri</span>
-								<span class="schedule-stat-value">{workSchedule.targetFri ?? 0}h</span>
-							</div>
-						</div>
-					{/if}
-				</section>
-
-				{#if workSchedule.initialOvertimeMode !== 'Disabled'}
-					<section class="schedule-overview-section overtime-section">
-						<div class="section-header-row">
-							<h2>Initial Overtime Balance</h2>
-							{#if !editingMyOvertime && workSchedule.initialOvertimeMode === 'Allowed'}
-								<button class="btn-schedule-sm" onclick={startEditMyOvertime}>Edit</button>
-							{/if}
-						</div>
-
-						{#if editingMyOvertime}
-							<div class="my-schedule-form">
-								{#if myOvertimeError}
-									<div class="inline-error">{myOvertimeError}</div>
-								{/if}
-								<div class="schedule-form-row">
-									<label>Hours</label>
-									<input type="number" class="input-xs" bind:value={myOvertimeHours} step="0.5" />
-								</div>
-								<div class="schedule-form-actions">
-									<button class="btn-primary-sm" onclick={saveMyOvertime} disabled={myOvertimeSaving}>
-										{myOvertimeSaving ? 'Saving...' : 'Save'}
-									</button>
-									<button class="btn-secondary-sm" onclick={() => (editingMyOvertime = false)}>Cancel</button>
-								</div>
-							</div>
-						{:else}
-							<div class="schedule-overview-grid">
-								<div class="schedule-stat overtime-stat">
-									<span class="schedule-stat-label">Hours</span>
-									<span class="schedule-stat-value">{workSchedule.initialOvertimeHours ?? 0}h</span>
-								</div>
-								<div class="schedule-stat">
-									<span class="schedule-stat-label">Mode</span>
-									<span class="schedule-stat-value schedule-stat-value-sm">{ruleModeLabel(workSchedule.initialOvertimeMode)}</span>
-								</div>
-							</div>
-							{#if workSchedule.initialOvertimeMode === 'RequiresApproval'}
-								<p class="schedule-hint">Requires admin approval to change</p>
-							{/if}
-						{/if}
-					</section>
-				{/if}
-			{/if}
-
-			<!-- Holidays -->
-			{#if myRole}
-				<section class="schedule-overview-section">
-					<div class="section-header-row">
-						<h2>Holidays</h2>
-						{#if holidaysLoaded && canEdit}
-							<button class="btn-primary-sm" onclick={() => (showAddHoliday = !showAddHoliday)}>
-								{showAddHoliday ? 'Cancel' : '+ Add Holiday'}
-							</button>
-						{/if}
-					</div>
-
-					{#if holidaysLoading}
-						<p class="muted">Loading holidays...</p>
-					{:else if holidaysLoaded}
-						{#if holidayError}
-							<div class="inline-error">{holidayError}</div>
-						{/if}
-
-						{#if canEdit}
-							<div class="import-holidays-row">
-								<select bind:value={importPreset} class="input-xs" disabled={importingHolidays}>
-									<option value="de">Germany</option>
-									<option value="at">Austria</option>
-									<option value="ch">Switzerland</option>
-								</select>
-								<input type="number" bind:value={importYear} class="input-xs" min="2020" max="2099" style="width:80px" disabled={importingHolidays} />
-								<button class="btn-secondary-sm" onclick={importHolidays} disabled={importingHolidays}>
-									{importingHolidays ? 'Importing...' : 'Import Holidays'}
-								</button>
-							</div>
-						{/if}
-
-						{#if showAddHoliday && canEdit}
-							<form onsubmit={addHoliday} class="period-form">
-								<div class="period-form-row">
-									<!-- svelte-ignore a11y_label_has_associated_control -->
-									<label>Date</label>
-									<input type="date" bind:value={newHolidayDate} required disabled={addingHoliday} />
-								</div>
-								<div class="period-form-row">
-									<!-- svelte-ignore a11y_label_has_associated_control -->
-									<label>Name</label>
-									<input type="text" bind:value={newHolidayName} placeholder="e.g. Christmas" required disabled={addingHoliday} />
-								</div>
-								<div class="period-form-row">
-									<label class="checkbox-label">
-										<input type="checkbox" bind:checked={newHolidayRecurring} disabled={addingHoliday} />
-										Yearly recurring
-									</label>
-								</div>
-								<div class="schedule-form-actions">
-									<button type="submit" class="btn-primary-sm" disabled={addingHoliday}>
-										{addingHoliday ? 'Adding...' : 'Add'}
-									</button>
-								</div>
-							</form>
-						{/if}
-
-						{#if holidays.length === 0}
-							<p class="muted">No holidays configured.</p>
-						{:else}
-							<div class="holidays-list">
-								{#each holidays as h}
-									<div class="holiday-row">
-										{#if editingHolidayId === h.id && canEdit}
-											<input type="date" bind:value={editHolidayDate} class="input-xs" disabled={editHolidaySaving} />
-											<input type="text" bind:value={editHolidayName} class="input-xs" disabled={editHolidaySaving} />
-											<label class="checkbox-label compact">
-												<input type="checkbox" bind:checked={editHolidayRecurring} disabled={editHolidaySaving} />
-												Yearly
-											</label>
-											<div class="rule-actions">
-												<button class="btn-primary-sm" onclick={() => saveEditHoliday(h.id!)} disabled={editHolidaySaving}>Save</button>
-												<button class="btn-secondary-sm" onclick={() => (editingHolidayId = null)}>Cancel</button>
-											</div>
-										{:else}
-											<span class="holiday-date">{formatDateDisplay(h.date)}</span>
-											<span class="holiday-name">{h.name}</span>
-											{#if h.isRecurring}
-												<span class="recurring-badge" title="Repeats every year">&#x1f501; Yearly</span>
-											{/if}
-											{#if canEdit}
-												<div class="rule-actions">
-													<button class="btn-secondary-sm" onclick={() => startEditHoliday(h)}>Edit</button>
-													<button class="btn-icon-danger" title="Delete" onclick={() => deleteHoliday(h.id!)}>&times;</button>
-												</div>
-											{/if}
-										{/if}
+									<div class="schedule-form-actions">
+										<button class="btn-primary-sm" onclick={saveMySchedule} disabled={myScheduleSaving}>
+											{myScheduleSaving ? 'Saving...' : 'Save'}
+										</button>
+										<button class="btn-secondary-sm" onclick={() => (editingMySchedule = false)}>Cancel</button>
 									</div>
-								{/each}
-							</div>
+								</div>
+							{:else}
+								<div class="schedule-overview-grid">
+									<div class="schedule-stat">
+										<span class="schedule-stat-label">Weekly Hours</span>
+										<span class="schedule-stat-value">{workSchedule.weeklyWorkHours ?? '—'}h</span>
+									</div>
+									<div class="schedule-stat">
+										<span class="schedule-stat-label">Mon</span>
+										<span class="schedule-stat-value">{workSchedule.targetMon ?? 0}h</span>
+									</div>
+									<div class="schedule-stat">
+										<span class="schedule-stat-label">Tue</span>
+										<span class="schedule-stat-value">{workSchedule.targetTue ?? 0}h</span>
+									</div>
+									<div class="schedule-stat">
+										<span class="schedule-stat-label">Wed</span>
+										<span class="schedule-stat-value">{workSchedule.targetWed ?? 0}h</span>
+									</div>
+									<div class="schedule-stat">
+										<span class="schedule-stat-label">Thu</span>
+										<span class="schedule-stat-value">{workSchedule.targetThu ?? 0}h</span>
+									</div>
+									<div class="schedule-stat">
+										<span class="schedule-stat-label">Fri</span>
+										<span class="schedule-stat-value">{workSchedule.targetFri ?? 0}h</span>
+									</div>
+								</div>
+							{/if}
+						</section>
+
+						<!-- Initial Overtime Balance -->
+						{#if workSchedule.initialOvertimeMode !== 'Disabled'}
+							<section class="schedule-overview-section overtime-section">
+								<div class="section-header-row">
+									<h2>Initial Overtime Balance</h2>
+									{#if !editingMyOvertime && workSchedule.initialOvertimeMode === 'Allowed'}
+										<button class="btn-schedule-sm" onclick={startEditMyOvertime}>Edit</button>
+									{/if}
+								</div>
+
+								{#if editingMyOvertime}
+									<div class="my-schedule-form">
+										{#if myOvertimeError}
+											<div class="inline-error">{myOvertimeError}</div>
+										{/if}
+										<div class="schedule-form-row">
+											<label>Hours</label>
+											<input type="number" class="input-xs" bind:value={myOvertimeHours} step="0.5" />
+										</div>
+										<div class="schedule-form-actions">
+											<button class="btn-primary-sm" onclick={saveMyOvertime} disabled={myOvertimeSaving}>
+												{myOvertimeSaving ? 'Saving...' : 'Save'}
+											</button>
+											<button class="btn-secondary-sm" onclick={() => (editingMyOvertime = false)}>Cancel</button>
+										</div>
+									</div>
+								{:else}
+									<div class="schedule-overview-grid">
+										<div class="schedule-stat overtime-stat">
+											<span class="schedule-stat-label">Hours</span>
+											<span class="schedule-stat-value">{workSchedule.initialOvertimeHours ?? 0}h</span>
+										</div>
+										<div class="schedule-stat">
+											<span class="schedule-stat-label">Mode</span>
+											<span class="schedule-stat-value schedule-stat-value-sm">{ruleModeLabel(workSchedule.initialOvertimeMode)}</span>
+										</div>
+									</div>
+									{#if workSchedule.initialOvertimeMode === 'RequiresApproval'}
+										<p class="schedule-hint">Requires admin approval to change</p>
+									{/if}
+								{/if}
+							</section>
 						{/if}
 					{/if}
-				</section>
-			{/if}
 
-			<!-- My Absences -->
-			{#if myRole}
-				<section class="schedule-overview-section">
-					<div class="section-header-row">
-						<h2>{canEdit ? 'Absences' : 'My Absences'}</h2>
-						{#if absencesLoaded}
-							<button class="btn-primary-sm" onclick={() => (showAddAbsence = !showAddAbsence)}>
-								{showAddAbsence ? 'Cancel' : '+ Add Absence'}
-							</button>
-						{/if}
-					</div>
-
-					{#if absencesLoading}
-						<p class="muted">Loading absences...</p>
-					{:else if absencesLoaded}
-						{#if absenceError}
-							<div class="inline-error">{absenceError}</div>
-						{/if}
-
-						{#if showAddAbsence}
-							<form onsubmit={addAbsence} class="period-form">
-								<div class="period-form-row">
-									<!-- svelte-ignore a11y_label_has_associated_control -->
-									<label>Date</label>
-									<input type="date" bind:value={newAbsenceDate} required disabled={addingAbsence} />
-								</div>
-								<div class="period-form-row">
-									<!-- svelte-ignore a11y_label_has_associated_control -->
-									<label>Type</label>
-									<select bind:value={newAbsenceType} disabled={addingAbsence}>
-										<option value={0}>Sick Day</option>
-										<option value={1}>Vacation</option>
-										<option value={2}>Other</option>
-									</select>
-								</div>
-								<div class="period-form-row">
-									<!-- svelte-ignore a11y_label_has_associated_control -->
-									<label>Note</label>
-									<input type="text" bind:value={newAbsenceNote} placeholder="Optional note" disabled={addingAbsence} />
-								</div>
-								<div class="schedule-form-actions">
-									<button type="submit" class="btn-primary-sm" disabled={addingAbsence}>
-										{addingAbsence ? 'Adding...' : 'Add'}
+					<!-- My Absences -->
+					{#if myRole}
+						<section class="schedule-overview-section">
+							<div class="section-header-row">
+								<h2>My Absences</h2>
+								{#if absencesLoaded}
+									<button class="btn-primary-sm" onclick={() => (showAddAbsence = !showAddAbsence)}>
+										{showAddAbsence ? 'Cancel' : '+ Add Absence'}
 									</button>
-								</div>
-							</form>
-						{/if}
+								{/if}
+							</div>
 
-						{#if canEdit}
-							<div class="absence-toolbar">
-								<div class="absence-admin-row">
-									<button class="btn-secondary-sm" onclick={() => (showAdminAddAbsence = !showAdminAddAbsence)}>
-										{showAdminAddAbsence ? 'Cancel' : '+ Admin Add'}
-									</button>
-									<select bind:value={adminAbsenceFilter} class="filter-select">
-										<option value={null}>All members</option>
-										{#each (org?.members ?? []) as m}
-											<option value={m.id}>{m.firstName} {m.lastName}</option>
-										{/each}
-									</select>
-								</div>
+							{#if absencesLoading}
+								<p class="muted">Loading absences...</p>
+							{:else if absencesLoaded}
+								{#if absenceError}
+									<div class="inline-error">{absenceError}</div>
+								{/if}
 
-								{#if showAdminAddAbsence}
-									{#if adminAbsenceError}
-										<div class="inline-error">{adminAbsenceError}</div>
-									{/if}
-									<form onsubmit={addAdminAbsence} class="period-form">
+								{#if showAddAbsence}
+									<form onsubmit={addAbsence} class="period-form">
 										<div class="period-form-row">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>Member</label>
-											<select bind:value={adminAbsenceUserId} required disabled={addingAdminAbsence}>
-												<option value={null}>Select member...</option>
-												{#each (org?.members ?? []) as m}
-													<option value={m.id}>{m.firstName} {m.lastName}</option>
-												{/each}
-											</select>
+											<label>From</label>
+											<input type="date" bind:value={newAbsenceDate} required disabled={addingAbsence} />
 										</div>
 										<div class="period-form-row">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>Date</label>
-											<input type="date" bind:value={adminAbsenceDate} required disabled={addingAdminAbsence} />
+											<label>To (optional)</label>
+											<input type="date" bind:value={newAbsenceToDate} min={newAbsenceDate} disabled={addingAbsence} />
 										</div>
+										{#if newAbsenceDate && newAbsenceToDate && newAbsenceDate !== newAbsenceToDate}
+											<p class="range-hint">Absences will be created for workdays (Mon–Fri) only.</p>
+										{/if}
 										<div class="period-form-row">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label>Type</label>
-											<select bind:value={adminAbsenceType} disabled={addingAdminAbsence}>
+											<select bind:value={newAbsenceType} disabled={addingAbsence}>
 												<option value={0}>Sick Day</option>
 												<option value={1}>Vacation</option>
 												<option value={2}>Other</option>
@@ -1721,392 +1435,570 @@
 										<div class="period-form-row">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label>Note</label>
-											<input type="text" bind:value={adminAbsenceNote} placeholder="Optional" disabled={addingAdminAbsence} />
+											<input type="text" bind:value={newAbsenceNote} placeholder="Optional note" disabled={addingAbsence} />
 										</div>
 										<div class="schedule-form-actions">
-											<button type="submit" class="btn-primary-sm" disabled={addingAdminAbsence}>
-												{addingAdminAbsence ? 'Adding...' : 'Add'}
+											<button type="submit" class="btn-primary-sm" disabled={addingAbsence}>
+												{addingAbsence ? 'Adding...' : 'Add'}
 											</button>
 										</div>
 									</form>
 								{/if}
-							</div>
-						{/if}
 
-						{#if filteredAbsences().length === 0}
-							<p class="muted">No absences recorded.</p>
-						{:else}
-							<div class="absences-list">
-								{#each filteredAbsences() as a}
-									<div class="absence-row">
-										<span class="absence-date">{formatDateDisplay(a.date)}</span>
-										<span class="absence-badge {absenceTypeBadge(a.type)}">{absenceTypeLabel(a.type)}</span>
-										{#if canEdit && a.userId !== auth.user?.id}
-											<span class="absence-user">{a.userFirstName} {a.userLastName}</span>
-										{/if}
-										{#if a.note}
-											<span class="absence-note">{a.note}</span>
-										{/if}
-										{#if a.userId === auth.user?.id || canEdit}
-											<button class="btn-icon-danger" title="Delete" onclick={() => deleteAbsence(a.id!)}>&times;</button>
-										{/if}
-									</div>
-								{/each}
-							</div>
-						{/if}
-					{/if}
-				</section>
-			{/if}
-
-			<!-- Schedule Periods (combined with Work Schedule) -->
-			{#if myRole && workSchedule && workSchedule.workScheduleChangeMode !== 'Disabled'}
-				<section class="schedule-overview-section">
-					<div class="section-header-row">
-						<h2>Schedule Periods</h2>
-						{#if schedulePeriodsLoaded && workSchedule.workScheduleChangeMode === 'Allowed'}
-							<button class="btn-primary-sm" onclick={() => (showAddPeriod = !showAddPeriod)}>
-								{showAddPeriod ? 'Cancel' : '+ Add Period'}
-							</button>
-						{/if}
-					</div>
-
-					{#if workSchedule.workScheduleChangeMode === 'RequiresApproval'}
-						<p class="schedule-hint">Schedule period changes require admin approval</p>
-					{/if}
-
-					{#if schedulePeriodsLoading}
-						<p class="muted">Loading schedule periods...</p>
-					{:else if schedulePeriodsLoaded}
-						{#if periodError}
-							<div class="inline-error">{periodError}</div>
-						{/if}
-
-						{#if showAddPeriod && workSchedule.workScheduleChangeMode === 'Allowed'}
-							<form onsubmit={addSchedulePeriod} class="period-form">
-								<div class="period-form-row">
-									<!-- svelte-ignore a11y_label_has_associated_control -->
-									<label>From</label>
-									<input type="date" bind:value={newPeriodFrom} required disabled={addingPeriod} />
-								</div>
-								<div class="period-form-row">
-									<!-- svelte-ignore a11y_label_has_associated_control -->
-									<label>To (optional)</label>
-									<input type="date" bind:value={newPeriodTo} disabled={addingPeriod} />
-								</div>
-								<div class="period-form-row">
-									<!-- svelte-ignore a11y_label_has_associated_control -->
-									<label>Weekly Hours</label>
-									<input type="number" bind:value={newPeriodWeeklyHours} step="0.5" min="0" max="168" disabled={addingPeriod} />
-								</div>
-								<div class="schedule-form-row">
-									<label class="checkbox-label-sm">
-										<input type="checkbox" bind:checked={newPeriodDistributeEvenly} disabled={addingPeriod} />
-										Distribute evenly (Mon–Fri)
-									</label>
-								</div>
-								{#if !newPeriodDistributeEvenly}
-									<div class="schedule-day-targets">
-										<div class="day-target-sm"><span>Mon</span><input type="number" bind:value={newPeriodMon} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
-										<div class="day-target-sm"><span>Tue</span><input type="number" bind:value={newPeriodTue} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
-										<div class="day-target-sm"><span>Wed</span><input type="number" bind:value={newPeriodWed} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
-										<div class="day-target-sm"><span>Thu</span><input type="number" bind:value={newPeriodThu} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
-										<div class="day-target-sm"><span>Fri</span><input type="number" bind:value={newPeriodFri} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+								{@const myAbsences = (absences ?? []).filter(a => a.userId === auth.user?.id)}
+								{#if myAbsences.length === 0}
+									<p class="muted">No absences recorded.</p>
+								{:else}
+									<div class="absences-list">
+										{#each myAbsences as a}
+											<div class="absence-row">
+												<span class="absence-date">{formatDateDisplay(a.date)}</span>
+												<span class="absence-badge {absenceTypeBadge(a.type)}">{absenceTypeLabel(a.type)}</span>
+												{#if a.note}
+													<span class="absence-note">{a.note}</span>
+												{/if}
+												<button class="btn-icon-danger" title="Delete" onclick={() => deleteAbsence(a.id!)}>&times;</button>
+											</div>
+										{/each}
 									</div>
 								{/if}
-								<div class="schedule-form-actions">
-									<button type="submit" class="btn-primary-sm" disabled={addingPeriod}>
-										{addingPeriod ? 'Adding...' : 'Add'}
+							{/if}
+						</section>
+					{/if}
+
+					<!-- My Schedule Periods -->
+					{#if myRole && workSchedule && workSchedule.workScheduleChangeMode !== 'Disabled'}
+						<section class="schedule-overview-section">
+							<div class="section-header-row">
+								<h2>Schedule Periods</h2>
+								{#if schedulePeriodsLoaded && workSchedule.workScheduleChangeMode === 'Allowed'}
+									<button class="btn-primary-sm" onclick={() => (showAddPeriod = !showAddPeriod)}>
+										{showAddPeriod ? 'Cancel' : '+ Add Period'}
 									</button>
-								</div>
-							</form>
+								{/if}
+							</div>
+
+							{#if workSchedule.workScheduleChangeMode === 'RequiresApproval'}
+								<p class="schedule-hint">Schedule period changes require admin approval</p>
+							{/if}
+
+							{#if schedulePeriodsLoading}
+								<p class="muted">Loading schedule periods...</p>
+							{:else if schedulePeriodsLoaded}
+								{#if periodError}
+									<div class="inline-error">{periodError}</div>
+								{/if}
+
+								{#if showAddPeriod && workSchedule.workScheduleChangeMode === 'Allowed'}
+									<form onsubmit={addSchedulePeriod} class="period-form">
+										<div class="period-form-row">
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label>From</label>
+											<input type="date" bind:value={newPeriodFrom} required disabled={addingPeriod} />
+										</div>
+										<div class="period-form-row">
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label>To (optional)</label>
+											<input type="date" bind:value={newPeriodTo} disabled={addingPeriod} />
+										</div>
+										<div class="period-form-row">
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label>Weekly Hours</label>
+											<input type="number" bind:value={newPeriodWeeklyHours} step="0.5" min="0" max="168" disabled={addingPeriod} />
+										</div>
+										<div class="schedule-form-row">
+											<label class="checkbox-label-sm">
+												<input type="checkbox" bind:checked={newPeriodDistributeEvenly} disabled={addingPeriod} />
+												Distribute evenly (Mon–Fri)
+											</label>
+										</div>
+										{#if !newPeriodDistributeEvenly}
+											<div class="schedule-day-targets">
+												<div class="day-target-sm"><span>Mon</span><input type="number" bind:value={newPeriodMon} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+												<div class="day-target-sm"><span>Tue</span><input type="number" bind:value={newPeriodTue} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+												<div class="day-target-sm"><span>Wed</span><input type="number" bind:value={newPeriodWed} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+												<div class="day-target-sm"><span>Thu</span><input type="number" bind:value={newPeriodThu} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+												<div class="day-target-sm"><span>Fri</span><input type="number" bind:value={newPeriodFri} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+											</div>
+										{/if}
+										<div class="schedule-form-actions">
+											<button type="submit" class="btn-primary-sm" disabled={addingPeriod}>
+												{addingPeriod ? 'Adding...' : 'Add'}
+											</button>
+										</div>
+									</form>
+								{/if}
+
+								{#if schedulePeriods.length === 0}
+									<p class="muted">No schedule periods configured. The base work schedule is used.</p>
+								{:else}
+									<div class="periods-list">
+										{#each schedulePeriods as p}
+											{@const today = new Date().toISOString().slice(0, 10)}
+											{@const isActive = p.validFrom && p.validFrom <= today && (!p.validTo || p.validTo >= today)}
+											<div class="period-row" class:period-active={isActive}>
+												<div class="period-dates">
+													<span>{formatDateDisplay(p.validFrom)}</span>
+													<span class="period-arrow">&rarr;</span>
+													<span>{p.validTo ? formatDateDisplay(p.validTo) : 'ongoing'}</span>
+												</div>
+												{#if isActive}
+													<span class="active-badge">Active</span>
+												{/if}
+												<span class="period-hours">{p.weeklyWorkHours ?? '—'}h/week</span>
+												{#if workSchedule.workScheduleChangeMode === 'Allowed'}
+													<button class="btn-icon-danger" title="Delete" onclick={() => deleteSchedulePeriod(p.id!)}>&times;</button>
+												{/if}
+											</div>
+										{/each}
+									</div>
+								{/if}
+							{/if}
+						</section>
+					{/if}
+				</div>
+
+			<!-- ==================== TEAM TAB ==================== -->
+			{:else if activeTab === 'team'}
+				<div class="tab-content">
+					<p class="tab-description">Your team at a glance. {#if canEdit}Click a member for details, schedule editing, and absence history.{:else}Click a member to see their profile.{/if}</p>
+
+					<!-- Members -->
+					<section class="members-section">
+						<div class="section-header">
+							<h2>Members ({(org.members ?? []).length})</h2>
+							{#if canEdit}
+								<button class="btn-primary-sm" onclick={() => { showAddMember = !showAddMember; if (showAddMember) loadUsersForDropdown(); }}>
+									{showAddMember ? 'Cancel' : '+ Add Member'}
+								</button>
+							{/if}
+						</div>
+
+						{#if showAddMember && canEdit}
+							<div class="add-member-form">
+								{#if addMemberError}
+									<div class="error-banner">{addMemberError}</div>
+								{/if}
+								<form onsubmit={addMember} class="inline-form">
+									<select bind:value={selectedUserId} disabled={addingMember} class="user-select">
+										<option value={null}>Select a user...</option>
+										{#each getAvailableUsers() as user}
+											<option value={user.id}>{user.firstName} {user.lastName} ({user.email})</option>
+										{/each}
+									</select>
+									<select bind:value={newMemberRole} disabled={addingMember}>
+										<option value={0}>Member</option>
+										<option value={1}>Admin</option>
+										{#if isOwner}<option value={2}>Owner</option>{/if}
+									</select>
+									<button type="submit" class="btn-primary-sm" disabled={addingMember}>
+										{addingMember ? 'Adding...' : 'Add'}
+									</button>
+								</form>
+							</div>
 						{/if}
 
-						{#if schedulePeriods.length === 0}
-							<p class="muted">No schedule periods configured. The base work schedule is used.</p>
-						{:else}
-							<div class="periods-list">
-								{#each schedulePeriods as p}
-									{@const today = new Date().toISOString().slice(0, 10)}
-									{@const isActive = p.validFrom && p.validFrom <= today && (!p.validTo || p.validTo >= today)}
-									<div class="period-row" class:period-active={isActive}>
-										<div class="period-dates">
-											<span>{formatDateDisplay(p.validFrom)}</span>
-											<span class="period-arrow">&rarr;</span>
-											<span>{p.validTo ? formatDateDisplay(p.validTo) : 'ongoing'}</span>
+						<div class="team-cards">
+							{#each (org.members ?? []) as member}
+								{@const overview = getMemberOverview(member.id!)}
+								<a
+									class="team-card"
+									href="/organizations/{orgSlug}/members/{member.id}"
+									title="View {member.firstName}'s details"
+								>
+									<div class="team-card-avatar">
+										{(member.firstName?.[0] ?? '').toUpperCase()}{(member.lastName?.[0] ?? '').toUpperCase()}
+									</div>
+									<div class="team-card-body">
+										<div class="team-card-name">
+											{member.firstName} {member.lastName}
+											{#if member.id === auth.user?.id}
+												<span class="you-badge">You</span>
+											{/if}
 										</div>
-										{#if isActive}
-											<span class="active-badge">Active</span>
-										{/if}
-										<span class="period-hours">{p.weeklyWorkHours ?? '—'}h/week</span>
-										{#if workSchedule.workScheduleChangeMode === 'Allowed'}
-											<button class="btn-icon-danger" title="Delete" onclick={() => deleteSchedulePeriod(p.id!)}>&times;</button>
+										<div class="team-card-email">{member.email}</div>
+										{#if canEdit && overview}
+											<div class="team-card-stats">
+												<span class="stat" title="Tracked this week">
+													<svg viewBox="0 0 16 16" fill="currentColor" class="stat-icon"><path d="M8 3.5a.5.5 0 00-1 0V8a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 7.71V3.5z"/><path d="M8 16A8 8 0 108 0a8 8 0 000 16zm7-8A7 7 0 111 8a7 7 0 0114 0z"/></svg>
+													{formatMinutesToHours(overview.netTrackedMinutes)}
+												</span>
+												<span class="stat" title="Entries this week">
+													<svg viewBox="0 0 16 16" fill="currentColor" class="stat-icon"><path d="M5 3.5h6A1.5 1.5 0 0112.5 5v6a1.5 1.5 0 01-1.5 1.5H5A1.5 1.5 0 013.5 11V5A1.5 1.5 0 015 3.5z"/></svg>
+													{overview.entryCount ?? 0} entries
+												</span>
+												{#if overview.weeklyWorkHours}
+													<span class="stat" title="Weekly target">
+														<svg viewBox="0 0 16 16" fill="currentColor" class="stat-icon"><path d="M8 15A7 7 0 118 1a7 7 0 010 14zm0 1A8 8 0 108 0a8 8 0 000 16z"/><path d="M10.97 4.97a.235.235 0 00-.02.022L7.477 9.417 5.384 7.323a.75.75 0 00-1.06 1.06L6.97 11.03a.75.75 0 001.079-.02l3.992-4.99a.75.75 0 00-1.071-1.05z"/></svg>
+														{overview.weeklyWorkHours}h/w
+													</span>
+												{/if}
+											</div>
 										{/if}
 									</div>
-								{/each}
+									<div class="team-card-right">
+										<span class="role-badge role-{(member.role?.toLowerCase() ?? 'member')}">{member.role}</span>
+										<svg class="team-card-arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
+									</div>
+								</a>
+							{/each}
+						</div>
+					</section>
+
+					<!-- Holidays -->
+					{#if myRole}
+						<section class="schedule-overview-section">
+							<div class="section-header-row">
+								<h2>Holidays</h2>
+								{#if holidaysLoaded && canEdit}
+									<button class="btn-primary-sm" onclick={() => (showAddHoliday = !showAddHoliday)}>
+										{showAddHoliday ? 'Cancel' : '+ Add Holiday'}
+									</button>
+								{/if}
 							</div>
+
+							{#if holidaysLoading}
+								<p class="muted">Loading holidays...</p>
+							{:else if holidaysLoaded}
+								{#if holidayError}
+									<div class="inline-error">{holidayError}</div>
+								{/if}
+
+								{#if canEdit}
+									<div class="import-holidays-row">
+										<select bind:value={importPreset} class="input-xs" disabled={importingHolidays}>
+											<option value="de">Germany</option>
+											<option value="at">Austria</option>
+											<option value="ch">Switzerland</option>
+										</select>
+										<input type="number" bind:value={importYear} class="input-xs" min="2020" max="2099" style="width:80px" disabled={importingHolidays} />
+										<button class="btn-secondary-sm" onclick={importHolidays} disabled={importingHolidays}>
+											{importingHolidays ? 'Importing...' : 'Import Holidays'}
+										</button>
+									</div>
+								{/if}
+
+								{#if showAddHoliday && canEdit}
+									<form onsubmit={addHoliday} class="period-form">
+										<div class="period-form-row">
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label>Date</label>
+											<input type="date" bind:value={newHolidayDate} required disabled={addingHoliday} />
+										</div>
+										<div class="period-form-row">
+											<!-- svelte-ignore a11y_label_has_associated_control -->
+											<label>Name</label>
+											<input type="text" bind:value={newHolidayName} placeholder="e.g. Christmas" required disabled={addingHoliday} />
+										</div>
+										<div class="period-form-row">
+											<label class="checkbox-label">
+												<input type="checkbox" bind:checked={newHolidayRecurring} disabled={addingHoliday} />
+												Yearly recurring
+											</label>
+										</div>
+										<div class="schedule-form-actions">
+											<button type="submit" class="btn-primary-sm" disabled={addingHoliday}>
+												{addingHoliday ? 'Adding...' : 'Add'}
+											</button>
+										</div>
+									</form>
+								{/if}
+
+								{#if holidays.length === 0}
+									<p class="muted">No holidays configured.</p>
+								{:else}
+									<div class="holidays-list">
+										{#each holidays as h}
+											<div class="holiday-row">
+												{#if editingHolidayId === h.id && canEdit}
+													<input type="date" bind:value={editHolidayDate} class="input-xs" disabled={editHolidaySaving} />
+													<input type="text" bind:value={editHolidayName} class="input-xs" disabled={editHolidaySaving} />
+													<label class="checkbox-label compact">
+														<input type="checkbox" bind:checked={editHolidayRecurring} disabled={editHolidaySaving} />
+														Yearly
+													</label>
+													<div class="rule-actions">
+														<button class="btn-primary-sm" onclick={() => saveEditHoliday(h.id!)} disabled={editHolidaySaving}>Save</button>
+														<button class="btn-secondary-sm" onclick={() => (editingHolidayId = null)}>Cancel</button>
+													</div>
+												{:else}
+													<span class="holiday-date">{formatDateDisplay(h.date)}</span>
+													<span class="holiday-name">{h.name}</span>
+													{#if h.isRecurring}
+														<span class="recurring-badge" title="Repeats every year">&#x1f501; Yearly</span>
+													{/if}
+													{#if canEdit}
+														<div class="rule-actions">
+															<button class="btn-secondary-sm" onclick={() => startEditHoliday(h)}>Edit</button>
+															<button class="btn-icon-danger" title="Delete" onclick={() => deleteHoliday(h.id!)}>&times;</button>
+														</div>
+													{/if}
+												{/if}
+											</div>
+										{/each}
+									</div>
+								{/if}
+							{/if}
+						</section>
+					{/if}
+				</div>
+
+			<!-- ==================== SETTINGS TAB (Admin) ==================== -->
+			{:else if activeTab === 'settings' && canEdit}
+				<div class="tab-content">
+					<p class="tab-description">Organization-wide rules, permissions, and approval workflows.</p>
+
+					<!-- Organization Settings -->
+					<section class="settings-section">
+						<h2>Organization Settings</h2>
+						{#if settingsError}
+							<div class="error-banner">{settingsError}</div>
 						{/if}
-					{/if}
-				</section>
-			{/if}
 
-			<!-- Settings section (Admin+) -->
-			{#if canEdit}
-				<section class="settings-section">
-					<h2>Organization Settings</h2>
-					{#if settingsError}
-						<div class="error-banner">{settingsError}</div>
-					{/if}
-
-					<div class="settings-grid">
-						<div class="setting-row">
-							<div class="setting-info">
-								<div class="setting-label">Auto-Pause Tracking</div>
-								<div class="setting-desc">Automatically deduct break time from tracked hours based on configurable rules.</div>
-							</div>
-							<button
-								class="toggle-switch"
-								class:active={org.autoPauseEnabled}
-								onclick={toggleAutoPause}
-								disabled={settingsSaving}
-								aria-label="Toggle auto-pause"
-							>
-								<span class="toggle-knob"></span>
-							</button>
-						</div>
-
-						<div class="setting-row">
-							<div class="setting-info">
-								<div class="setting-label">Edit Past Entries</div>
-								<div class="setting-desc">Control whether members can edit start/end times of completed time entries (e.g. if they forgot to track).</div>
-							</div>
-							<button
-								class="rule-mode-btn {ruleModeColor(org.editPastEntriesMode)}"
-								onclick={cycleEditPastEntriesMode}
-								disabled={settingsSaving}
-								aria-label="Cycle edit past entries mode"
-							>
-								{ruleModeLabel(org.editPastEntriesMode)}
-							</button>
-						</div>
-
-						<div class="setting-row">
-							<div class="setting-info">
-								<div class="setting-label">Edit Pause Duration</div>
-								<div class="setting-desc">Control whether members can override the auto-deducted break time on their entries (e.g. if they took a shorter or longer break).</div>
-							</div>
-							<button
-								class="rule-mode-btn {ruleModeColor(org.editPauseMode)}"
-								onclick={cycleEditPauseMode}
-								disabled={settingsSaving}
-								aria-label="Cycle edit pause duration mode"
-							>
-								{ruleModeLabel(org.editPauseMode)}
-							</button>
-						</div>
-
-						<div class="setting-row">
-							<div class="setting-info">
-								<div class="setting-label">Initial Overtime</div>
-								<div class="setting-desc">Control whether members can set their own initial overtime balance (e.g. hours carried over from a previous system).</div>
-							</div>
-							<button
-								class="rule-mode-btn {ruleModeColor(org.initialOvertimeMode)}"
-								onclick={cycleInitialOvertimeMode}
-								disabled={settingsSaving}
-								aria-label="Cycle initial overtime mode"
-							>
-								{ruleModeLabel(org.initialOvertimeMode)}
-							</button>
-						</div>
-
-						<div class="setting-row">
-							<div class="setting-info">
-								<div class="setting-label">Join Policy</div>
-								<div class="setting-desc">Control how new members can join. Open: anyone can join. Requires Approval: users submit a request. Admin Only: only admins can add members.</div>
-							</div>
-							<button
-								class="rule-mode-btn {ruleModeColor(org.joinPolicy)}"
-								onclick={cycleJoinPolicy}
-								disabled={settingsSaving}
-								aria-label="Cycle join policy"
-							>
-								{joinPolicyLabel(org.joinPolicy)}
-							</button>
-						</div>
-
-						<div class="setting-row">
-							<div class="setting-info">
-								<div class="setting-label">Schedule Periods</div>
-								<div class="setting-desc">Control whether members can create/modify their own schedule periods (time-ranged work schedules).</div>
-							</div>
-							<button
-								class="rule-mode-btn {ruleModeColor(org.workScheduleChangeMode)}"
-								onclick={cycleWorkScheduleChangeMode}
-								disabled={settingsSaving}
-								aria-label="Cycle schedule change mode"
-							>
-								{ruleModeLabel(org.workScheduleChangeMode)}
-							</button>
-						</div>
-					</div>
-
-					<!-- Pause Rules (only when auto-pause is enabled) -->
-					{#if org.autoPauseEnabled}
-						<div class="pause-rules-section">
-							<div class="section-header">
-								<h3>Pause Rules</h3>
-								<button class="btn-primary-sm" onclick={() => (showAddRule = !showAddRule)}>
-									{showAddRule ? 'Cancel' : '+ Add Rule'}
+						<div class="settings-grid">
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Auto-Pause Tracking</div>
+									<div class="setting-desc">Automatically deduct break time from tracked hours based on configurable rules.</div>
+								</div>
+								<button
+									class="toggle-switch"
+									class:active={org.autoPauseEnabled}
+									onclick={toggleAutoPause}
+									disabled={settingsSaving}
+									aria-label="Toggle auto-pause"
+								>
+									<span class="toggle-knob"></span>
 								</button>
 							</div>
 
-							{#if showAddRule}
-								<div class="add-rule-form">
-									{#if addRuleError}
-										<div class="error-banner">{addRuleError}</div>
-									{/if}
-									<form onsubmit={addPauseRule} class="inline-form">
-										<div class="rule-field">
-											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>When tracked &ge;</label>
-											<input type="number" step="0.5" min="0.5" bind:value={newRuleMinHours} required disabled={addingRule} />
-											<span>hours</span>
-										</div>
-										<div class="rule-field">
-											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>deduct</label>
-											<input type="number" min="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
-											<span>min pause</span>
-										</div>
-										<button type="submit" class="btn-primary-sm" disabled={addingRule}>
-											{addingRule ? 'Adding...' : 'Add Rule'}
-										</button>
-									</form>
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Edit Past Entries</div>
+									<div class="setting-desc">Control whether members can edit start/end times of completed time entries.</div>
 								</div>
-							{/if}
+								<button
+									class="rule-mode-btn {ruleModeColor(org.editPastEntriesMode)}"
+									onclick={cycleEditPastEntriesMode}
+									disabled={settingsSaving}
+								>
+									{ruleModeLabel(org.editPastEntriesMode)}
+								</button>
+							</div>
 
-							{#if getPauseRules().length === 0}
-								<p class="muted">No pause rules configured. Add rules to automatically deduct break time.</p>
-							{:else}
-								<div class="rules-list">
-									{#each getPauseRules() as rule}
-										<div class="rule-row">
-											{#if editingRuleId === rule.id}
-												{#if editRuleError}
-													<div class="error-banner" style="width:100%">{editRuleError}</div>
-												{/if}
-												<div class="rule-edit-form">
-													<div class="rule-field">
-														<!-- svelte-ignore a11y_label_has_associated_control -->
-														<label>&ge;</label>
-														<input type="number" step="0.5" min="0.5" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
-														<span>h</span>
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Edit Pause Duration</div>
+									<div class="setting-desc">Control whether members can override auto-deducted break time.</div>
+								</div>
+								<button
+									class="rule-mode-btn {ruleModeColor(org.editPauseMode)}"
+									onclick={cycleEditPauseMode}
+									disabled={settingsSaving}
+								>
+									{ruleModeLabel(org.editPauseMode)}
+								</button>
+							</div>
+
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Initial Overtime</div>
+									<div class="setting-desc">Control whether members can set their own initial overtime balance.</div>
+								</div>
+								<button
+									class="rule-mode-btn {ruleModeColor(org.initialOvertimeMode)}"
+									onclick={cycleInitialOvertimeMode}
+									disabled={settingsSaving}
+								>
+									{ruleModeLabel(org.initialOvertimeMode)}
+								</button>
+							</div>
+
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Join Policy</div>
+									<div class="setting-desc">Control how new members can join the organization.</div>
+								</div>
+								<button
+									class="rule-mode-btn {ruleModeColor(org.joinPolicy)}"
+									onclick={cycleJoinPolicy}
+									disabled={settingsSaving}
+								>
+									{joinPolicyLabel(org.joinPolicy)}
+								</button>
+							</div>
+
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Schedule Periods</div>
+									<div class="setting-desc">Control whether members can create/modify their own schedule periods.</div>
+								</div>
+								<button
+									class="rule-mode-btn {ruleModeColor(org.workScheduleChangeMode)}"
+									onclick={cycleWorkScheduleChangeMode}
+									disabled={settingsSaving}
+								>
+									{ruleModeLabel(org.workScheduleChangeMode)}
+								</button>
+							</div>
+						</div>
+
+						<!-- Pause Rules -->
+						{#if org.autoPauseEnabled}
+							<div class="pause-rules-section">
+								<div class="section-header">
+									<h3>Pause Rules</h3>
+									<button class="btn-primary-sm" onclick={() => (showAddRule = !showAddRule)}>
+										{showAddRule ? 'Cancel' : '+ Add Rule'}
+									</button>
+								</div>
+
+								{#if showAddRule}
+									<div class="add-rule-form">
+										{#if addRuleError}
+											<div class="error-banner">{addRuleError}</div>
+										{/if}
+										<form onsubmit={addPauseRule} class="inline-form">
+											<div class="rule-field">
+												<!-- svelte-ignore a11y_label_has_associated_control -->
+												<label>When tracked &ge;</label>
+												<input type="number" step="0.5" min="0.5" bind:value={newRuleMinHours} required disabled={addingRule} />
+												<span>hours</span>
+											</div>
+											<div class="rule-field">
+												<!-- svelte-ignore a11y_label_has_associated_control -->
+												<label>deduct</label>
+												<input type="number" min="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
+												<span>min pause</span>
+											</div>
+											<button type="submit" class="btn-primary-sm" disabled={addingRule}>
+												{addingRule ? 'Adding...' : 'Add Rule'}
+											</button>
+										</form>
+									</div>
+								{/if}
+
+								{#if getPauseRules().length === 0}
+									<p class="muted">No pause rules configured. Add rules to automatically deduct break time.</p>
+								{:else}
+									<div class="rules-list">
+										{#each getPauseRules() as rule}
+											<div class="rule-row">
+												{#if editingRuleId === rule.id}
+													{#if editRuleError}
+														<div class="error-banner" style="width:100%">{editRuleError}</div>
+													{/if}
+													<div class="rule-edit-form">
+														<div class="rule-field">
+															<!-- svelte-ignore a11y_label_has_associated_control -->
+															<label>&ge;</label>
+															<input type="number" step="0.5" min="0.5" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
+															<span>h</span>
+														</div>
+														<div class="rule-field">
+															<!-- svelte-ignore a11y_label_has_associated_control -->
+															<label>&rarr;</label>
+															<input type="number" min="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
+															<span>min</span>
+														</div>
+														<div class="rule-actions">
+															<button class="btn-primary-sm" onclick={() => saveEditRule(rule.id!)} disabled={editingRuleSaving}>Save</button>
+															<button class="btn-secondary-sm" onclick={cancelEditRule}>Cancel</button>
+														</div>
 													</div>
-													<div class="rule-field">
-														<!-- svelte-ignore a11y_label_has_associated_control -->
-														<label>&rarr;</label>
-														<input type="number" min="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
-														<span>min</span>
+												{:else}
+													<div class="rule-text">
+														<strong>&ge; {rule.minHours}h</strong> tracked &rarr; <strong>{rule.pauseMinutes} min</strong> pause deducted
 													</div>
 													<div class="rule-actions">
-														<button class="btn-primary-sm" onclick={() => saveEditRule(rule.id!)} disabled={editingRuleSaving}>Save</button>
-														<button class="btn-secondary-sm" onclick={cancelEditRule}>Cancel</button>
+														<button class="btn-secondary-sm" onclick={() => startEditRule(rule)}>Edit</button>
+														<button class="btn-icon-danger" title="Delete rule" onclick={() => deleteRule(rule.id!)}>&times;</button>
 													</div>
+												{/if}
+											</div>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</section>
+
+					<!-- Request History -->
+					<section class="request-history-section">
+						<div class="section-header-row">
+							<h2>Request History</h2>
+						</div>
+
+						{#if requestHistoryLoading}
+							<p class="muted">Loading requests...</p>
+						{:else if requestHistoryLoaded}
+							<div class="request-filters">
+								<button class="filter-btn" class:active={requestHistoryFilter === 'all'} onclick={() => (requestHistoryFilter = 'all')}>All ({requestHistory.length})</button>
+								<button class="filter-btn" class:active={requestHistoryFilter === 'Pending'} onclick={() => (requestHistoryFilter = 'Pending')}>Pending ({requestHistory.filter(r => r.status === 'Pending').length})</button>
+								<button class="filter-btn" class:active={requestHistoryFilter === 'Accepted'} onclick={() => (requestHistoryFilter = 'Accepted')}>Accepted ({requestHistory.filter(r => r.status === 'Accepted').length})</button>
+								<button class="filter-btn" class:active={requestHistoryFilter === 'Declined'} onclick={() => (requestHistoryFilter = 'Declined')}>Declined ({requestHistory.filter(r => r.status === 'Declined').length})</button>
+							</div>
+
+							{#if filteredRequests().length === 0}
+								<p class="muted">No requests found.</p>
+							{:else}
+								<div class="request-list">
+									{#each filteredRequests() as req}
+										<div class="request-item">
+											<div class="request-item-header">
+												<span class="request-type-tag">{formatRequestType(req.type)}</span>
+												<span class="request-status {statusBadgeClass(req.status)}">{req.status}</span>
+											</div>
+											<div class="request-item-body">
+												<div class="request-user">
+													<strong>{req.userFirstName} {req.userLastName}</strong>
+													<span class="request-email">{req.userEmail}</span>
 												</div>
-											{:else}
-												<div class="rule-text">
-													<strong>&ge; {rule.minHours}h</strong> tracked &rarr; <strong>{rule.pauseMinutes} min</strong> pause deducted
+												{#if req.requestData}
+													<div class="request-data">{parseRequestData(req.type, req.requestData)}</div>
+												{/if}
+												{#if req.message}
+													<div class="request-message">"{req.message}"</div>
+												{/if}
+												<div class="request-meta">
+													<span>Created {formatTimeAgo(req.createdAt)}</span>
+													{#if req.respondedAt}
+														<span>&middot; {req.status === 'Accepted' ? 'Accepted' : 'Declined'} by {req.respondedByName ?? 'Unknown'} {formatTimeAgo(req.respondedAt)}</span>
+													{/if}
+													{#if req.relatedEntityId}
+														<span>&middot; Entry #{req.relatedEntityId}</span>
+													{/if}
 												</div>
-												<div class="rule-actions">
-													<button class="btn-secondary-sm" onclick={() => startEditRule(rule)}>Edit</button>
-													<button class="btn-icon-danger" title="Delete rule" onclick={() => deleteRule(rule.id!)}>&times;</button>
+											</div>
+											{#if req.status === 'Pending'}
+												<div class="request-item-actions">
+													<button class="btn-accept-sm" onclick={async () => {
+														try {
+															await requestsApi.apiOrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: true });
+															requestHistoryLoaded = false;
+															await loadRequestHistory();
+														} catch (e: any) {
+															actionError = e.response?.data?.message || 'Failed to accept';
+														}
+													}}>Accept</button>
+													<button class="btn-decline-sm" onclick={async () => {
+														try {
+															await requestsApi.apiOrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: false });
+															requestHistoryLoaded = false;
+															await loadRequestHistory();
+														} catch (e: any) {
+															actionError = e.response?.data?.message || 'Failed to decline';
+														}
+													}}>Decline</button>
 												</div>
 											{/if}
 										</div>
 									{/each}
 								</div>
 							{/if}
-						</div>
-					{/if}
-				</section>
-			{/if}
-
-			<!-- Request History (Admin+) -->
-			{#if canEdit}
-				<section class="request-history-section">
-					<div class="section-header-row">
-						<h2>Request History</h2>
-					</div>
-
-					{#if requestHistoryLoading}
-						<p class="muted">Loading requests...</p>
-					{:else if requestHistoryLoaded}
-						<div class="request-filters">
-							<button class="filter-btn" class:active={requestHistoryFilter === 'all'} onclick={() => (requestHistoryFilter = 'all')}>All ({requestHistory.length})</button>
-							<button class="filter-btn" class:active={requestHistoryFilter === 'Pending'} onclick={() => (requestHistoryFilter = 'Pending')}>Pending ({requestHistory.filter(r => r.status === 'Pending').length})</button>
-							<button class="filter-btn" class:active={requestHistoryFilter === 'Accepted'} onclick={() => (requestHistoryFilter = 'Accepted')}>Accepted ({requestHistory.filter(r => r.status === 'Accepted').length})</button>
-							<button class="filter-btn" class:active={requestHistoryFilter === 'Declined'} onclick={() => (requestHistoryFilter = 'Declined')}>Declined ({requestHistory.filter(r => r.status === 'Declined').length})</button>
-						</div>
-
-						{#if filteredRequests().length === 0}
-							<p class="muted">No requests found.</p>
-						{:else}
-							<div class="request-list">
-								{#each filteredRequests() as req}
-									<div class="request-item">
-										<div class="request-item-header">
-											<span class="request-type-tag">{formatRequestType(req.type)}</span>
-											<span class="request-status {statusBadgeClass(req.status)}">{req.status}</span>
-										</div>
-										<div class="request-item-body">
-											<div class="request-user">
-												<strong>{req.userFirstName} {req.userLastName}</strong>
-												<span class="request-email">{req.userEmail}</span>
-											</div>
-											{#if req.requestData}
-												<div class="request-data">{parseRequestData(req.type, req.requestData)}</div>
-											{/if}
-											{#if req.message}
-												<div class="request-message">"{req.message}"</div>
-											{/if}
-											<div class="request-meta">
-												<span>Created {formatTimeAgo(req.createdAt)}</span>
-												{#if req.respondedAt}
-													<span>&middot; {req.status === 'Accepted' ? 'Accepted' : 'Declined'} by {req.respondedByName ?? 'Unknown'} {formatTimeAgo(req.respondedAt)}</span>
-												{/if}
-												{#if req.relatedEntityId}
-													<span>&middot; Entry #{req.relatedEntityId}</span>
-												{/if}
-											</div>
-										</div>
-										{#if req.status === 'Pending'}
-											<div class="request-item-actions">
-												<button class="btn-accept-sm" onclick={async () => {
-													try {
-														await requestsApi.apiOrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: true });
-														requestHistoryLoaded = false;
-														await loadRequestHistory();
-													} catch (e: any) {
-														actionError = e.response?.data?.message || 'Failed to accept';
-													}
-												}}>Accept</button>
-												<button class="btn-decline-sm" onclick={async () => {
-													try {
-														await requestsApi.apiOrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: false });
-														requestHistoryLoaded = false;
-														await loadRequestHistory();
-													} catch (e: any) {
-														actionError = e.response?.data?.message || 'Failed to decline';
-													}
-												}}>Decline</button>
-											</div>
-										{/if}
-									</div>
-								{/each}
-							</div>
 						{/if}
-					{/if}
-				</section>
+					</section>
+				</div>
 			{/if}
 		{/if}
 	{/if}
@@ -2145,6 +2037,107 @@
 		margin-bottom: 1rem;
 		font-size: 0.875rem;
 		border-left: 3px solid #dc2626;
+	}
+
+	/* ====== Tab Navigation ====== */
+	.tab-bar {
+		display: flex;
+		gap: 0;
+		background: transparent;
+		border-bottom: 2px solid #e2e8f0;
+		margin: 1.25rem 0 0;
+		padding: 0;
+	}
+
+	.tab-btn {
+		position: relative;
+		flex: 1;
+		padding: 0.875rem 1.25rem;
+		border: none;
+		border-radius: 0;
+		background: transparent;
+		color: #64748b;
+		font-size: 0.9rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: color 0.2s ease, background 0.15s ease;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		white-space: nowrap;
+		letter-spacing: 0.01em;
+	}
+
+	.tab-btn::after {
+		content: '';
+		position: absolute;
+		bottom: -2px;
+		left: 0;
+		right: 0;
+		height: 3px;
+		background: transparent;
+		border-radius: 3px 3px 0 0;
+		transition: background 0.2s ease;
+	}
+
+	.tab-btn:hover {
+		color: #1e293b;
+		background: #f8fafc;
+	}
+
+	.tab-btn.active {
+		color: #2563eb;
+		font-weight: 600;
+	}
+
+	.tab-btn.active::after {
+		background: #2563eb;
+	}
+
+	.tab-icon {
+		width: 1.125rem;
+		height: 1.125rem;
+		flex-shrink: 0;
+	}
+
+	.tab-content {
+		animation: fadeTab 0.25s ease;
+		padding-top: 0.5rem;
+	}
+
+	.tab-description {
+		color: #64748b;
+		font-size: 0.875rem;
+		margin: 0.5rem 0 1.25rem;
+		line-height: 1.5;
+	}
+
+	@keyframes fadeTab {
+		from { opacity: 0; transform: translateY(6px); }
+		to   { opacity: 1; transform: translateY(0); }
+	}
+
+	.loading-state {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		justify-content: center;
+		padding: 3rem 0;
+		color: #94a3b8;
+	}
+
+	.spinner {
+		width: 1.25rem;
+		height: 1.25rem;
+		border: 2px solid #e2e8f0;
+		border-top-color: #2563eb;
+		border-radius: 50%;
+		animation: spin 0.6s linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
 	}
 
 	/* Organization header */
@@ -2308,6 +2301,107 @@
 		border: 1px solid #e5e7eb;
 		border-radius: 12px;
 		overflow: hidden;
+	}
+
+	/* Team card grid */
+	.team-cards {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.team-card {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		padding: 0.875rem 1rem;
+		background: white;
+		border: 1px solid #e5e7eb;
+		border-radius: 12px;
+		cursor: pointer;
+		transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+		text-decoration: none;
+		color: inherit;
+	}
+
+	.team-card:hover {
+		border-color: #93c5fd;
+		box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+		transform: translateY(-1px);
+	}
+
+	.team-card-avatar {
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: 50%;
+		background: linear-gradient(135deg, #3b82f6, #6366f1);
+		color: white;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		flex-shrink: 0;
+		letter-spacing: 0.03em;
+	}
+
+	.team-card-body {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.team-card-name {
+		font-weight: 600;
+		color: #1e293b;
+		font-size: 0.9375rem;
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+	}
+
+	.team-card-email {
+		font-size: 0.8125rem;
+		color: #94a3b8;
+		margin-top: 0.125rem;
+	}
+
+	.team-card-stats {
+		display: flex;
+		gap: 0.75rem;
+		margin-top: 0.375rem;
+		flex-wrap: wrap;
+	}
+
+	.team-card-stats .stat {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		font-size: 0.75rem;
+		color: #64748b;
+	}
+
+	.stat-icon {
+		width: 0.875rem;
+		height: 0.875rem;
+		opacity: 0.6;
+	}
+
+	.team-card-right {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-shrink: 0;
+	}
+
+	.team-card-arrow {
+		width: 1.25rem;
+		height: 1.25rem;
+		color: #cbd5e1;
+		transition: color 0.15s;
+	}
+
+	.team-card:hover .team-card-arrow {
+		color: #3b82f6;
 	}
 
 	.member-row {
@@ -3129,6 +3223,13 @@
 		padding: 0.375rem 0.625rem;
 		border-radius: 6px;
 		border-left: 3px solid #dc2626;
+	}
+
+	.range-hint {
+		font-size: 0.75rem;
+		color: #6b7280;
+		margin: 0.25rem 0;
+		font-style: italic;
 	}
 
 	/* Holidays */
