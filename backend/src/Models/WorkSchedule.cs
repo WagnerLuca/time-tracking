@@ -3,11 +3,12 @@ using System.Text.Json.Serialization;
 namespace TimeTracking.Api.Models;
 
 /// <summary>
-/// A time-ranged work schedule for a user within an organization.
+/// A work schedule for a user within an organization.
 /// ValidFrom is inclusive. ValidTo is inclusive (last day this schedule applies).
 /// If ValidTo is null, the schedule is open-ended (applies from ValidFrom onwards).
+/// Only one schedule can be active at a time per user per organization.
 /// </summary>
-public class WorkSchedulePeriod
+public class WorkSchedule
 {
     public int Id { get; set; }
     public int UserId { get; set; }
