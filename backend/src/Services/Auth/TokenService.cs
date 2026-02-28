@@ -109,6 +109,7 @@ public class TokenService : ITokenService
     public async Task<RefreshToken?> ValidateRefreshTokenAsync(string token)
     {
         var refreshToken = await _context.RefreshTokens
+            .AsNoTracking()
             .Include(rt => rt.User)
             .FirstOrDefaultAsync(rt => rt.Token == token);
 

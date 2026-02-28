@@ -245,7 +245,7 @@ public class OrganizationService : IOrganizationService
         if (callerRole == OrganizationRole.Admin && request.Role == OrganizationRole.Owner)
             return ServiceResult.Forbidden<OrganizationMemberResponse>();
 
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == request.UserId && u.IsActive);
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == request.UserId && u.IsActive);
         if (user == null)
             return ServiceResult.NotFound<OrganizationMemberResponse>("User not found");
 
@@ -451,6 +451,7 @@ public class OrganizationService : IOrganizationService
         var weekEnd = to ?? weekStart.AddDays(7);
 
         var members = await _context.UserOrganizations
+            .AsNoTracking()
             .Where(uo => uo.OrganizationId == org.Id && uo.IsActive)
             .Include(uo => uo.User)
             .ToListAsync();
@@ -458,6 +459,7 @@ public class OrganizationService : IOrganizationService
         var memberIds = members.Select(m => m.UserId).ToList();
 
         var timeEntries = await _context.TimeEntries
+            .AsNoTracking()
             .Where(te => memberIds.Contains(te.UserId)
                       && te.OrganizationId == org.Id
                       && !te.IsRunning
@@ -467,6 +469,7 @@ public class OrganizationService : IOrganizationService
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var schedules = await _context.WorkSchedules
+            .AsNoTracking()
             .Where(s => memberIds.Contains(s.UserId)
                      && s.OrganizationId == org.Id
                      && s.ValidFrom <= today

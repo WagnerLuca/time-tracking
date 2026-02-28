@@ -375,6 +375,7 @@ public class WorkScheduleService : IWorkScheduleService
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         return await _context.WorkSchedules
+            .AsNoTracking()
             .Where(s => s.UserId == userId && s.OrganizationId == orgId
                 && s.ValidFrom <= today
                 && (s.ValidTo == null || s.ValidTo >= today))
@@ -385,6 +386,7 @@ public class WorkScheduleService : IWorkScheduleService
     private async Task<List<WorkSchedule>> GetAllSchedulesAsync(int userId, int orgId)
     {
         return await _context.WorkSchedules
+            .AsNoTracking()
             .Where(s => s.UserId == userId && s.OrganizationId == orgId)
             .OrderBy(s => s.ValidFrom)
             .ToListAsync();
@@ -406,6 +408,7 @@ public class WorkScheduleService : IWorkScheduleService
         int userId, int orgId, DateOnly from, DateOnly? to, int? excludeId = null)
     {
         var existing = await _context.WorkSchedules
+            .AsNoTracking()
             .Where(s => s.UserId == userId && s.OrganizationId == orgId
                      && (excludeId == null || s.Id != excludeId))
             .ToListAsync();
@@ -433,7 +436,7 @@ public class WorkScheduleService : IWorkScheduleService
 
     private async Task<Organization?> GetOrgBySlugAsync(string slug)
     {
-        return await _context.Organizations.FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
     }
 
     private async Task<UserOrganization?> GetMembershipAsync(int userId, int orgId)

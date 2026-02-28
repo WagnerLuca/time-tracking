@@ -33,6 +33,7 @@ public class AuthService : IAuthService
         {
             // Check if user already exists
             var existingUser = await _context.Users
+                .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
 
             if (existingUser != null)

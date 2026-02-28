@@ -189,12 +189,13 @@ public class HolidayService : IHolidayService
 
     private async Task<Organization?> GetOrgBySlugAsync(string slug)
     {
-        return await _context.Organizations.FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
     }
 
     private async Task<OrganizationRole?> GetRoleAsync(int userId, int organizationId)
     {
         var membership = await _context.UserOrganizations
+            .AsNoTracking()
             .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
                                     && uo.UserId == userId
                                     && uo.IsActive);

@@ -125,6 +125,7 @@ public class RequestService : IRequestService
             return ServiceResult.Forbidden<List<OrgRequestResponse>>();
 
         var query = _context.OrgRequests
+            .AsNoTracking()
             .Include(r => r.User)
             .Include(r => r.RespondedByUser)
             .Where(r => r.OrganizationId == org.Id);
@@ -180,6 +181,7 @@ public class RequestService : IRequestService
     public async Task<ServiceResult<List<OrgRequestResponse>>> GetMyRequestsAsync(int userId, RequestType? type)
     {
         var query = _context.OrgRequests
+            .AsNoTracking()
             .Include(r => r.Organization)
             .Include(r => r.RespondedByUser)
             .Where(r => r.UserId == userId);
@@ -191,7 +193,7 @@ public class RequestService : IRequestService
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
 
-        var user = await _context.Users.FindAsync(userId);
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null)
             return ServiceResult.Fail<List<OrgRequestResponse>>(ServiceErrorType.Unauthorized, "Unauthorized");
 
@@ -219,6 +221,7 @@ public class RequestService : IRequestService
             });
 
         var pendingRequests = await _context.OrgRequests
+            .AsNoTracking()
             .Include(r => r.User)
             .Include(r => r.Organization)
             .Where(r => adminOrgIds.Contains(r.OrganizationId) && r.Status == RequestStatus.Pending)
@@ -236,6 +239,7 @@ public class RequestService : IRequestService
     public async Task<ServiceResult<UserNotificationResponse>> GetUserNotificationsAsync(int userId)
     {
         var unseenResponses = await _context.OrgRequests
+            .AsNoTracking()
             .Include(r => r.User)
             .Include(r => r.Organization)
             .Include(r => r.RespondedByUser)
@@ -375,12 +379,13 @@ public class RequestService : IRequestService
 
     private async Task<Organization?> GetOrgBySlugAsync(string slug)
     {
-        return await _context.Organizations.FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
     }
 
     private async Task<OrganizationRole?> GetRoleAsync(int userId, int organizationId)
     {
         var membership = await _context.UserOrganizations
+            .AsNoTracking()
             .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
                                     && uo.UserId == userId
                                     && uo.IsActive);

@@ -32,6 +32,7 @@ public class TimeTrackingService : ITimeTrackingService
         if (orgId == null && !string.IsNullOrWhiteSpace(request?.OrganizationSlug))
         {
             var orgBySlug = await _context.Organizations
+                .AsNoTracking()
                 .FirstOrDefaultAsync(o => o.Slug == request.OrganizationSlug && o.IsActive);
             if (orgBySlug == null)
                 return ServiceResult.BadRequest<TimeEntryResponse>("Organization not found.");
@@ -89,6 +90,7 @@ public class TimeTrackingService : ITimeTrackingService
     public async Task<ServiceResult<TimeEntryResponse>> GetCurrentAsync(int userId)
     {
         var running = await _context.TimeEntries
+            .AsNoTracking()
             .Include(e => e.Organization)
             .FirstOrDefaultAsync(e => e.UserId == userId && e.IsRunning);
 
@@ -102,6 +104,7 @@ public class TimeTrackingService : ITimeTrackingService
         int userId, int? organizationId, DateTime? from, DateTime? to, int limit, int offset)
     {
         var query = _context.TimeEntries
+            .AsNoTracking()
             .Include(e => e.Organization)
             .Where(e => e.UserId == userId)
             .AsQueryable();
@@ -139,6 +142,7 @@ public class TimeTrackingService : ITimeTrackingService
         if (entry.OrganizationId.HasValue)
         {
             var org = await _context.Organizations
+                .AsNoTracking()
                 .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId && o.IsActive);
 
             if (org != null && org.EditPastEntriesMode == RuleMode.Disabled)
@@ -164,6 +168,7 @@ public class TimeTrackingService : ITimeTrackingService
             if (entry.OrganizationId.HasValue)
             {
                 var pauseOrg = await _context.Organizations
+                    .AsNoTracking()
                     .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId && o.IsActive);
                 if (pauseOrg != null && pauseOrg.EditPauseMode == RuleMode.Disabled)
                     return ServiceResult.Forbidden<TimeEntryResponse>("Editing pause duration is disabled in this organization.");
@@ -205,12 +210,14 @@ public class TimeTrackingService : ITimeTrackingService
         if (entry.OrganizationId == null || !entry.EndTime.HasValue) return;
 
         var org = await _context.Organizations
+            .AsNoTracking()
             .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId && o.AutoPauseEnabled);
         if (org == null) return;
 
         var workHours = (entry.EndTime.Value - entry.StartTime).TotalHours;
 
         var rule = await _context.PauseRules
+            .AsNoTracking()
             .Where(pr => pr.OrganizationId == entry.OrganizationId && pr.MinHours <= workHours)
             .OrderByDescending(pr => pr.MinHours)
             .FirstOrDefaultAsync();
