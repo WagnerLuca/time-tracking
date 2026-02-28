@@ -6,7 +6,8 @@ namespace TimeTracking.Api.Controllers;
 
 /// <summary>
 /// Base controller with shared helpers for organization-scoped controllers.
-/// Provides user-id extraction and ServiceResult → HTTP response mapping.
+/// Provides user-id extraction and ServiceResult → HTTP response mapping
+/// using RFC 7807 Problem Details for error responses.
 /// </summary>
 public abstract class OrganizationBaseController : ControllerBase
 {
@@ -45,14 +46,22 @@ public abstract class OrganizationBaseController : ControllerBase
 
     private IActionResult MapError(ServiceResult result)
     {
-        return result.ErrorType switch
+        var statusCode = result.ErrorType switch
         {
-            ServiceErrorType.NotFound     => NotFound(new { message = result.ErrorMessage }),
-            ServiceErrorType.BadRequest   => BadRequest(new { message = result.ErrorMessage }),
-            ServiceErrorType.Forbidden    => Forbid(),
-            ServiceErrorType.Unauthorized => Unauthorized(new { message = result.ErrorMessage }),
-            ServiceErrorType.Conflict     => Conflict(new { message = result.ErrorMessage }),
-            _ => StatusCode(500)
+            ServiceErrorType.NotFound     => StatusCodes.Status404NotFound,
+            ServiceErrorType.BadRequest   => StatusCodes.Status400BadRequest,
+            ServiceErrorType.Forbidden    => StatusCodes.Status403Forbidden,
+            ServiceErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
+            ServiceErrorType.Conflict     => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status500InternalServerError
         };
+
+        return Problem(
+            type: $"https://httpstatuses.io/{statusCode}",
+            title: result.ErrorType.ToString(),
+            statusCode: statusCode,
+            detail: result.ErrorMessage,
+            instance: HttpContext.Request.Path
+        );
     }
 }

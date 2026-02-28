@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TimeTracking.Api.Data;
+using TimeTracking.Api.Middleware;
 using TimeTracking.Api.Models;
 using TimeTracking.Api.Services;
 
@@ -235,6 +236,8 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 app.UseSwagger();
 app.UseSwaggerUI();
 

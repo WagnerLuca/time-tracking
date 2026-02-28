@@ -30,14 +30,18 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
         var (success, message, response) = await _authService.RegisterAsync(request);
 
         if (!success)
         {
-            return BadRequest(new AuthResponse { Success = false, Message = message });
+            return Problem(
+                type: "https://httpstatuses.io/400",
+                title: "Registration Failed",
+                statusCode: StatusCodes.Status400BadRequest,
+                detail: message);
         }
 
         return Ok(response);
@@ -49,14 +53,18 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var (success, message, response) = await _authService.LoginAsync(request);
 
         if (!success)
         {
-            return Unauthorized(new AuthResponse { Success = false, Message = message });
+            return Problem(
+                type: "https://httpstatuses.io/401",
+                title: "Authentication Failed",
+                statusCode: StatusCodes.Status401Unauthorized,
+                detail: message);
         }
 
         return Ok(response);
@@ -68,14 +76,18 @@ public class AuthController : ControllerBase
     [HttpPost("refresh")]
     [EnableRateLimiting("AuthModerate")]
     [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
     {
         var (success, message, response) = await _authService.RefreshTokenAsync(request.RefreshToken);
 
         if (!success)
         {
-            return Unauthorized(new AuthResponse { Success = false, Message = message });
+            return Problem(
+                type: "https://httpstatuses.io/401",
+                title: "Token Refresh Failed",
+                statusCode: StatusCodes.Status401Unauthorized,
+                detail: message);
         }
 
         return Ok(response);
@@ -101,20 +113,28 @@ public class AuthController : ControllerBase
     [Authorize]
     [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
         if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
         {
-            return Unauthorized(new AuthResponse { Success = false, Message = "Invalid user" });
+            return Problem(
+                type: "https://httpstatuses.io/401",
+                title: "Unauthorized",
+                statusCode: StatusCodes.Status401Unauthorized,
+                detail: "Invalid user token.");
         }
 
         var (success, message) = await _authService.ChangePasswordAsync(userId, request);
 
         if (!success)
         {
-            return BadRequest(new AuthResponse { Success = false, Message = message });
+            return Problem(
+                type: "https://httpstatuses.io/400",
+                title: "Password Change Failed",
+                statusCode: StatusCodes.Status400BadRequest,
+                detail: message);
         }
 
         return Ok(new AuthResponse { Success = true, Message = message });
@@ -126,20 +146,28 @@ public class AuthController : ControllerBase
     [HttpDelete("account")]
     [Authorize]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> DeleteAccount()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
         if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
         {
-            return Unauthorized(new AuthResponse { Success = false, Message = "Invalid user" });
+            return Problem(
+                type: "https://httpstatuses.io/401",
+                title: "Unauthorized",
+                statusCode: StatusCodes.Status401Unauthorized,
+                detail: "Invalid user token.");
         }
 
         var (success, message) = await _authService.DeleteAccountAsync(userId);
 
         if (!success)
         {
-            return BadRequest(new AuthResponse { Success = false, Message = message });
+            return Problem(
+                type: "https://httpstatuses.io/400",
+                title: "Account Deletion Failed",
+                statusCode: StatusCodes.Status400BadRequest,
+                detail: message);
         }
 
         return Ok(new AuthResponse { Success = true, Message = message });
@@ -157,7 +185,11 @@ public class AuthController : ControllerBase
 
         if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
         {
-            return Unauthorized(new AuthResponse { Success = false, Message = "Invalid token" });
+            return Problem(
+                type: "https://httpstatuses.io/401",
+                title: "Unauthorized",
+                statusCode: StatusCodes.Status401Unauthorized,
+                detail: "Invalid token.");
         }
 
         var user = await _context.Users
@@ -166,7 +198,11 @@ public class AuthController : ControllerBase
 
         if (user == null)
         {
-            return Unauthorized(new AuthResponse { Success = false, Message = "User not found" });
+            return Problem(
+                type: "https://httpstatuses.io/401",
+                title: "Unauthorized",
+                statusCode: StatusCodes.Status401Unauthorized,
+                detail: "User not found.");
         }
 
         var userInfo = new UserInfo
