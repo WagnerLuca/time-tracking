@@ -14,7 +14,8 @@ public enum RequestType
     JoinOrganization = 0,
     EditPastEntry = 1,
     EditPause = 2,
-    SetInitialOvertime = 3
+    SetInitialOvertime = 3,
+    WorkScheduleChange = 4
 }
 
 public class OrgRequest

@@ -77,6 +77,7 @@ public class RequestService : IRequestService
                 RequestType.EditPastEntry => org.EditPastEntriesMode,
                 RequestType.EditPause => org.EditPauseMode,
                 RequestType.SetInitialOvertime => org.InitialOvertimeMode,
+                RequestType.WorkScheduleChange => org.WorkScheduleChangeMode,
                 _ => RuleMode.Allowed
             };
 
@@ -349,7 +350,67 @@ public class RequestService : IRequestService
                     }
                 }
                 break;
+
+            case RequestType.WorkScheduleChange:
+                if (orgRequest.RequestData != null)
+                {
+                    try
+                    {
+                        var scheduleData = JsonSerializer.Deserialize<WorkScheduleChangeRequestData>(
+                            orgRequest.RequestData,
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        if (scheduleData != null)
+                        {
+                            await ApplyWorkScheduleChangeAsync(orgRequest.UserId, org.Id, scheduleData);
+                        }
+                    }
+                    catch { /* invalid JSON — request is accepted but schedule unchanged */ }
+                }
+                break;
         }
+    }
+
+    private async Task ApplyWorkScheduleChangeAsync(
+        int userId, int orgId, WorkScheduleChangeRequestData data)
+    {
+        var schedule = new WorkSchedule
+        {
+            UserId = userId,
+            OrganizationId = orgId,
+            ValidFrom = data.ValidFrom,
+            ValidTo = data.ValidTo,
+            WeeklyWorkHours = data.WeeklyWorkHours
+        };
+
+        if (data.WeeklyWorkHours.HasValue && data.DistributeEvenly)
+        {
+            var daily = Math.Round(data.WeeklyWorkHours.Value / 5.0, 2);
+            schedule.TargetMon = daily;
+            schedule.TargetTue = daily;
+            schedule.TargetWed = daily;
+            schedule.TargetThu = daily;
+            schedule.TargetFri = daily;
+        }
+        else
+        {
+            schedule.TargetMon = data.TargetMon ?? 0;
+            schedule.TargetTue = data.TargetTue ?? 0;
+            schedule.TargetWed = data.TargetWed ?? 0;
+            schedule.TargetThu = data.TargetThu ?? 0;
+            schedule.TargetFri = data.TargetFri ?? 0;
+        }
+
+        // Close any open-ended predecessor schedule
+        var openSchedule = await _context.WorkSchedules
+            .Where(s => s.UserId == userId && s.OrganizationId == orgId
+                     && s.ValidTo == null && s.ValidFrom < data.ValidFrom)
+            .OrderByDescending(s => s.ValidFrom)
+            .FirstOrDefaultAsync();
+
+        if (openSchedule != null)
+            openSchedule.ValidTo = data.ValidFrom.AddDays(-1);
+
+        _context.WorkSchedules.Add(schedule);
     }
 
     private static OrgRequestResponse MapToResponse(

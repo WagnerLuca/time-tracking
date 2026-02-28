@@ -266,7 +266,7 @@ public class WorkScheduleService : IWorkScheduleService
         return mode switch
         {
             RuleMode.Disabled         => $"{featureName} are disabled for this organization.",
-            RuleMode.RequiresApproval => $"{featureName} require admin approval. Please submit a request.",
+            RuleMode.RequiresApproval => $"{featureName} require admin approval. Please submit a WorkScheduleChange request via the organization requests endpoint.",
             _                         => null
         };
     }

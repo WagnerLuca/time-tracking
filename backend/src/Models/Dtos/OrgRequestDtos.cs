@@ -71,3 +71,28 @@ public record EditEntryRequestData
     public DateTime? EndTime { get; init; }
     public string? Description { get; init; }
 }
+
+/// <summary>
+/// JSON payload for WorkScheduleChange request data.
+/// Mirrors CreateWorkScheduleRequest so the approved schedule can be created directly.
+/// </summary>
+public record WorkScheduleChangeRequestData
+{
+    /// <summary>First day the new schedule is effective.</summary>
+    public DateOnly ValidFrom { get; init; }
+
+    /// <summary>Last day the schedule is effective. Null = open-ended.</summary>
+    public DateOnly? ValidTo { get; init; }
+
+    /// <summary>Total weekly work hours.</summary>
+    public double? WeeklyWorkHours { get; init; }
+
+    /// <summary>If true, distribute WeeklyWorkHours evenly across Mon–Fri.</summary>
+    public bool DistributeEvenly { get; init; } = true;
+
+    public double? TargetMon { get; init; }
+    public double? TargetTue { get; init; }
+    public double? TargetWed { get; init; }
+    public double? TargetThu { get; init; }
+    public double? TargetFri { get; init; }
+}
