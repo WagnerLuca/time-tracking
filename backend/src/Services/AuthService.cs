@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using TimeTracking.Api.Data;
 using TimeTracking.Api.Models;
 using TimeTracking.Api.Models.Dtos;
+using Microsoft.Extensions.Options;
+using System.Text.RegularExpressions;
 using BCrypt.Net;
 
 namespace TimeTracking.Api.Services;
@@ -11,15 +13,18 @@ public class AuthService : IAuthService
     private readonly TimeTrackingDbContext _context;
     private readonly ITokenService _tokenService;
     private readonly ILogger<AuthService> _logger;
+    private readonly JwtSettings _jwtSettings;
 
     public AuthService(
         TimeTrackingDbContext context,
         ITokenService tokenService,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IOptions<JwtSettings> jwtSettings)
     {
         _context = context;
         _tokenService = tokenService;
         _logger = logger;
+        _jwtSettings = jwtSettings.Value;
     }
 
     public async Task<(bool Success, string Message, LoginResponse? Response)> RegisterAsync(RegisterRequest request)
@@ -35,10 +40,11 @@ public class AuthService : IAuthService
                 return (false, "A user with this email already exists", null);
             }
 
-            // Validate password strength (basic validation)
-            if (request.Password.Length < 8)
+            // Validate password strength
+            var passwordError = ValidatePasswordStrength(request.Password);
+            if (passwordError != null)
             {
-                return (false, "Password must be at least 8 characters long", null);
+                return (false, passwordError, null);
             }
 
             // Hash the password
@@ -73,7 +79,7 @@ public class AuthService : IAuthService
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken.Token,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(15), // Should match JWT settings
+                ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes),
                 User = new UserInfo
                 {
                     Id = user.Id,
@@ -135,7 +141,7 @@ public class AuthService : IAuthService
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken.Token,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(15), // Should match JWT settings
+                ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes),
                 User = new UserInfo
                 {
                     Id = user.Id,
@@ -185,7 +191,7 @@ public class AuthService : IAuthService
             {
                 AccessToken = newAccessToken,
                 RefreshToken = newRefreshToken.Token,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(15) // Should match JWT settings
+                ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes)
             };
 
             return (true, "Token refreshed successfully", response);
@@ -221,9 +227,10 @@ public class AuthService : IAuthService
             }
 
             // Validate new password
-            if (request.NewPassword.Length < 8)
+            var passwordError = ValidatePasswordStrength(request.NewPassword);
+            if (passwordError != null)
             {
-                return (false, "New password must be at least 8 characters long");
+                return (false, passwordError);
             }
 
             // Hash and update password
@@ -266,5 +273,41 @@ public class AuthService : IAuthService
             _logger.LogError(ex, "Error during token revocation");
             return (false, "An error occurred while revoking the token");
         }
+    }
+
+    public async Task<(bool Success, string Message)> DeleteAccountAsync(int userId)
+    {
+        try
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                return (false, "User not found");
+
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} deleted their account", userId);
+            return (true, "Account deleted successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting account for user {UserId}", userId);
+            return (false, "An error occurred while deleting the account");
+        }
+    }
+
+    private static string? ValidatePasswordStrength(string password)
+    {
+        if (password.Length < 8)
+            return "Password must be at least 8 characters long.";
+        if (!Regex.IsMatch(password, @"[A-Z]"))
+            return "Password must contain at least one uppercase letter.";
+        if (!Regex.IsMatch(password, @"[a-z]"))
+            return "Password must contain at least one lowercase letter.";
+        if (!Regex.IsMatch(password, @"\d"))
+            return "Password must contain at least one digit.";
+        if (!Regex.IsMatch(password, @"[^a-zA-Z0-9]"))
+            return "Password must contain at least one special character.";
+        return null;
     }
 }

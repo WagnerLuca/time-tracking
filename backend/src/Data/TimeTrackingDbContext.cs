@@ -19,7 +19,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<OrgRequest> OrgRequests { get; set; }
     public DbSet<Holiday> Holidays { get; set; }
     public DbSet<AbsenceDay> AbsenceDays { get; set; }
-    public DbSet<WorkSchedulePeriod> WorkSchedulePeriods { get; set; }
+    public DbSet<WorkSchedule> WorkSchedules { get; set; }
     public DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -241,8 +241,8 @@ public class TimeTrackingDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // Configure WorkSchedulePeriod entity
-        modelBuilder.Entity<WorkSchedulePeriod>(entity =>
+        // Configure WorkSchedule entity
+        modelBuilder.Entity<WorkSchedule>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.ValidFrom).IsRequired();
@@ -252,7 +252,7 @@ public class TimeTrackingDbContext : DbContext
             else
                 entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            entity.HasIndex(e => new { e.UserId, e.OrganizationId, e.ValidFrom });
+            entity.HasIndex(e => new { e.UserId, e.OrganizationId, e.ValidFrom }).IsUnique();
 
             entity.HasOne(e => e.User)
                 .WithMany()
@@ -263,6 +263,33 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure Notification entity
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Message).IsRequired().HasMaxLength(2000);
+            entity.Property(e => e.Type).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.IsRead).IsRequired().HasDefaultValue(false);
+
+            if (isInMemory)
+                entity.Property(e => e.CreatedAt).IsRequired();
+            else
+                entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasIndex(e => new { e.UserId, e.IsRead });
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

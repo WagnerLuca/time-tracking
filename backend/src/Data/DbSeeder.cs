@@ -84,8 +84,6 @@ public static class DbSeeder
             Role = OrganizationRole.Owner,
             JoinedAt = DateTime.UtcNow.AddMonths(-6),
             IsActive = true,
-            WeeklyWorkHours = 40,
-            TargetMon = 8, TargetTue = 8, TargetWed = 8, TargetThu = 8, TargetFri = 8,
             InitialOvertimeHours = 12.5 // carried over from previous employer
         };
 
@@ -96,8 +94,6 @@ public static class DbSeeder
             Role = OrganizationRole.Admin,
             JoinedAt = DateTime.UtcNow.AddMonths(-4),
             IsActive = true,
-            WeeklyWorkHours = 32,
-            TargetMon = 8, TargetTue = 8, TargetWed = 8, TargetThu = 8, TargetFri = 0,
             InitialOvertimeHours = 0
         };
 
@@ -108,8 +104,6 @@ public static class DbSeeder
             Role = OrganizationRole.Member,
             JoinedAt = DateTime.UtcNow.AddMonths(-3),
             IsActive = true,
-            WeeklyWorkHours = 40,
-            TargetMon = 8, TargetTue = 8, TargetWed = 8, TargetThu = 8, TargetFri = 8,
             InitialOvertimeHours = 0
         };
 
@@ -309,10 +303,10 @@ public static class DbSeeder
         context.TimeEntries.AddRange(tomEntries);
         await context.SaveChangesAsync();
 
-        // ── Work Schedule Periods ──────────────────────────────────────
-        // Max: consistent 40h, but had a part-time phase in month 2
-        context.WorkSchedulePeriods.AddRange(
-            new WorkSchedulePeriod
+        // ── Work Schedules ───────────────────────────────────────────
+        // Max: consistent 40h
+        context.WorkSchedules.AddRange(
+            new WorkSchedule
             {
                 UserId = max.Id, OrganizationId = org.Id,
                 ValidFrom = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-6)),
@@ -323,8 +317,8 @@ public static class DbSeeder
             }
         );
         // Anna: 32h/week (Mon-Thu)
-        context.WorkSchedulePeriods.Add(
-            new WorkSchedulePeriod
+        context.WorkSchedules.Add(
+            new WorkSchedule
             {
                 UserId = anna.Id, OrganizationId = org.Id,
                 ValidFrom = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-4)),
@@ -335,8 +329,8 @@ public static class DbSeeder
             }
         );
         // Tom: 40h/week
-        context.WorkSchedulePeriods.Add(
-            new WorkSchedulePeriod
+        context.WorkSchedules.Add(
+            new WorkSchedule
             {
                 UserId = tom.Id, OrganizationId = org.Id,
                 ValidFrom = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-3)),
@@ -356,7 +350,7 @@ public static class DbSeeder
         Console.WriteLine($"   - {context.AbsenceDays.Count()} absence days");
         Console.WriteLine($"   - {context.TimeEntries.Count()} time entries");
         Console.WriteLine($"   - {context.PauseRules.Count()} pause rules");
-        Console.WriteLine($"   - {context.WorkSchedulePeriods.Count()} schedule periods");
+        Console.WriteLine($"   - {context.WorkSchedules.Count()} work schedules");
         Console.WriteLine($"   Max Mueller: max.mueller@example.com / Password123 (Owner)");
         Console.WriteLine($"   Anna Schmidt: anna.schmidt@example.com / Password123 (Admin)");
         Console.WriteLine($"   Tom Weber: tom.weber@example.com / Password123 (Member)");

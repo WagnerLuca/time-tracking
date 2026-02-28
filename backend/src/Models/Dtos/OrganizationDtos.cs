@@ -121,8 +121,11 @@ public record UpdatePauseRuleRequest
 // Work schedule DTOs
 public record WorkScheduleResponse
 {
+    public int Id { get; init; }
     public int UserId { get; init; }
     public int OrganizationId { get; init; }
+    public DateOnly ValidFrom { get; init; }
+    public DateOnly? ValidTo { get; init; }
     public double? WeeklyWorkHours { get; init; }
     public double TargetMon { get; init; }
     public double TargetTue { get; init; }
@@ -134,20 +137,30 @@ public record WorkScheduleResponse
     public required string WorkScheduleChangeMode { get; init; }
 }
 
-public record UpdateWorkScheduleRequest
+public record CreateWorkScheduleRequest
 {
+    public DateOnly ValidFrom { get; init; }
+    public DateOnly? ValidTo { get; init; }
     public double? WeeklyWorkHours { get; init; }
-    /// <summary>
-    /// If true, distribute WeeklyWorkHours equally across Mon-Fri.
-    /// If false, use the individual TargetXxx fields.
-    /// </summary>
     public bool DistributeEvenly { get; init; } = true;
     public double? TargetMon { get; init; }
     public double? TargetTue { get; init; }
     public double? TargetWed { get; init; }
     public double? TargetThu { get; init; }
     public double? TargetFri { get; init; }
-    public double? InitialOvertimeHours { get; init; }
+}
+
+public record UpdateWorkScheduleRequest
+{
+    public DateOnly? ValidFrom { get; init; }
+    public DateOnly? ValidTo { get; init; }
+    public double? WeeklyWorkHours { get; init; }
+    public bool DistributeEvenly { get; init; } = true;
+    public double? TargetMon { get; init; }
+    public double? TargetTue { get; init; }
+    public double? TargetWed { get; init; }
+    public double? TargetThu { get; init; }
+    public double? TargetFri { get; init; }
 }
 
 // Admin time overview
@@ -221,44 +234,4 @@ public record AdminCreateAbsenceDayRequest
     public string? Note { get; init; }
 }
 
-// Work Schedule Period DTOs
-public record WorkSchedulePeriodResponse
-{
-    public int Id { get; init; }
-    public int UserId { get; init; }
-    public int OrganizationId { get; init; }
-    public DateOnly ValidFrom { get; init; }
-    public DateOnly? ValidTo { get; init; }
-    public double? WeeklyWorkHours { get; init; }
-    public double TargetMon { get; init; }
-    public double TargetTue { get; init; }
-    public double TargetWed { get; init; }
-    public double TargetThu { get; init; }
-    public double TargetFri { get; init; }
-}
 
-public record CreateWorkSchedulePeriodRequest
-{
-    public DateOnly ValidFrom { get; init; }
-    public DateOnly? ValidTo { get; init; }
-    public double? WeeklyWorkHours { get; init; }
-    public bool DistributeEvenly { get; init; } = true;
-    public double? TargetMon { get; init; }
-    public double? TargetTue { get; init; }
-    public double? TargetWed { get; init; }
-    public double? TargetThu { get; init; }
-    public double? TargetFri { get; init; }
-}
-
-public record UpdateWorkSchedulePeriodRequest
-{
-    public DateOnly? ValidFrom { get; init; }
-    public DateOnly? ValidTo { get; init; }
-    public double? WeeklyWorkHours { get; init; }
-    public bool DistributeEvenly { get; init; } = true;
-    public double? TargetMon { get; init; }
-    public double? TargetTue { get; init; }
-    public double? TargetWed { get; init; }
-    public double? TargetThu { get; init; }
-    public double? TargetFri { get; init; }
-}

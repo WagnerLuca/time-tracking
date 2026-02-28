@@ -106,6 +106,15 @@ builder.Services.AddAuthorization();
 // Register application services
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IOrganizationService, OrganizationService>();
+builder.Services.AddScoped<ITimeTrackingService, TimeTrackingService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IRequestService, RequestService>();
+builder.Services.AddScoped<IHolidayService, HolidayService>();
+builder.Services.AddScoped<IAbsenceDayService, AbsenceDayService>();
+builder.Services.AddScoped<IWorkScheduleService, WorkScheduleService>();
+builder.Services.AddScoped<IPauseRuleService, PauseRuleService>();
+builder.Services.AddHostedService<RefreshTokenCleanupService>();
 
 // Add Entity Framework - PostgreSQL or InMemory
 var useInMemory = builder.Configuration.GetValue<bool>("UseInMemoryDatabase");

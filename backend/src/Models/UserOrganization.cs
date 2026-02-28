@@ -21,14 +21,6 @@ public class UserOrganization
     
     public bool IsActive { get; set; } = true;
 
-    // Work schedule: weekly target hours and per-day distribution (Mon-Fri)
-    public double? WeeklyWorkHours { get; set; }
-    public double TargetMon { get; set; }
-    public double TargetTue { get; set; }
-    public double TargetWed { get; set; }
-    public double TargetThu { get; set; }
-    public double TargetFri { get; set; }
-
     // Initial overtime balance in hours (set by user, applied before first tracked entry)
     public double InitialOvertimeHours { get; set; }
     

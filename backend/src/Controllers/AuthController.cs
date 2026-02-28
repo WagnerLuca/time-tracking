@@ -2,6 +2,8 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
+using TimeTracking.Api.Data;
 using TimeTracking.Api.Models.Dtos;
 using TimeTracking.Api.Services;
 
@@ -13,11 +15,13 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly ILogger<AuthController> _logger;
+    private readonly TimeTrackingDbContext _context;
 
-    public AuthController(IAuthService authService, ILogger<AuthController> logger)
+    public AuthController(IAuthService authService, ILogger<AuthController> logger, TimeTrackingDbContext context)
     {
         _authService = authService;
         _logger = logger;
+        _context = context;
     }
 
     /// <summary>
@@ -117,30 +121,62 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Delete the authenticated user's account and all associated data
+    /// </summary>
+    [HttpDelete("account")]
+    [Authorize]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> DeleteAccount()
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(new AuthResponse { Success = false, Message = "Invalid user" });
+        }
+
+        var (success, message) = await _authService.DeleteAccountAsync(userId);
+
+        if (!success)
+        {
+            return BadRequest(new AuthResponse { Success = false, Message = message });
+        }
+
+        return Ok(new AuthResponse { Success = true, Message = message });
+    }
+
+    /// <summary>
     /// Get current authenticated user info
     /// </summary>
     [HttpGet("me")]
     [Authorize]
     [ProducesResponseType(typeof(UserInfo), StatusCodes.Status200OK)]
-    public IActionResult GetCurrentUser()
+    public async Task<IActionResult> GetCurrentUser()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
-        var emailClaim = User.FindFirst(ClaimTypes.Email);
-        var firstNameClaim = User.FindFirst("firstName");
-        var lastNameClaim = User.FindFirst("lastName");
 
-        if (userIdClaim == null || emailClaim == null)
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
         {
             return Unauthorized(new AuthResponse { Success = false, Message = "Invalid token" });
         }
 
+        var user = await _context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null)
+        {
+            return Unauthorized(new AuthResponse { Success = false, Message = "User not found" });
+        }
+
         var userInfo = new UserInfo
         {
-            Id = int.Parse(userIdClaim.Value),
-            Email = emailClaim.Value,
-            FirstName = firstNameClaim?.Value ?? "",
-            LastName = lastNameClaim?.Value ?? "",
-            EmailConfirmed = false // You could add this to claims if needed
+            Id = user.Id,
+            Email = user.Email,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            ProfileImageUrl = user.ProfileImageUrl,
+            EmailConfirmed = user.EmailConfirmed
         };
 
         return Ok(userInfo);
