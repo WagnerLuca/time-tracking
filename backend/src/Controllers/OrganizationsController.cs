@@ -5,6 +5,9 @@ using TimeTracking.Api.Services;
 
 namespace TimeTracking.Api.Controllers;
 
+/// <summary>
+/// Manages organizations, memberships, settings, and time overviews.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class OrganizationsController : OrganizationBaseController
@@ -16,21 +19,27 @@ public class OrganizationsController : OrganizationBaseController
         _service = service;
     }
 
+    /// <summary>List all organizations.</summary>
     [HttpGet]
     [ProducesResponseType(typeof(List<OrganizationResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOrganizations()
         => ToResponse(await _service.GetOrganizationsAsync());
 
+    /// <summary>Get organization details by slug.</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpGet("{slug}")]
     [ProducesResponseType(typeof(OrganizationDetailResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOrganization(string slug)
         => ToResponse(await _service.GetOrganizationAsync(slug));
 
+    /// <summary>List organizations a specific user belongs to.</summary>
+    /// <param name="userId">Target user ID.</param>
     [HttpGet("user/{userId}")]
     [ProducesResponseType(typeof(List<UserOrganizationResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserOrganizations(int userId)
         => ToResponse(await _service.GetUserOrganizationsAsync(userId));
 
+    /// <summary>Create a new organization.</summary>
     [HttpPost]
     [Authorize]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status201Created)]
@@ -41,6 +50,8 @@ public class OrganizationsController : OrganizationBaseController
         return ToCreatedResponse(await _service.CreateOrganizationAsync(userId.Value, request));
     }
 
+    /// <summary>Update an existing organization.</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpPut("{slug}")]
     [Authorize]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
@@ -51,6 +62,8 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.UpdateOrganizationAsync(slug, userId.Value, request));
     }
 
+    /// <summary>Delete an organization (owner only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpDelete("{slug}")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -61,6 +74,8 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.DeleteOrganizationAsync(slug, userId.Value));
     }
 
+    /// <summary>Add a member to the organization.</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/members")]
     [Authorize]
     [ProducesResponseType(typeof(OrganizationMemberResponse), StatusCodes.Status201Created)]
@@ -71,6 +86,9 @@ public class OrganizationsController : OrganizationBaseController
         return ToCreatedResponse(await _service.AddMemberAsync(slug, userId.Value, request));
     }
 
+    /// <summary>Update a member's role in the organization.</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID to update.</param>
     [HttpPut("{slug}/members/{memberId}")]
     [Authorize]
     [ProducesResponseType(typeof(OrganizationMemberResponse), StatusCodes.Status200OK)]
@@ -81,6 +99,9 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.UpdateMemberRoleAsync(slug, userId.Value, memberId, request));
     }
 
+    /// <summary>Remove a member from the organization.</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID to remove.</param>
     [HttpDelete("{slug}/members/{memberId}")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -91,6 +112,8 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.RemoveMemberAsync(slug, userId.Value, memberId));
     }
 
+    /// <summary>Update organization settings (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpPut("{slug}/settings")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -101,6 +124,10 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.UpdateSettingsAsync(slug, userId.Value, request));
     }
 
+    /// <summary>Get time tracking overview for all members (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="from">Start of date range filter.</param>
+    /// <param name="to">End of date range filter.</param>
     [HttpGet("{slug}/time-overview")]
     [Authorize]
     [ProducesResponseType(typeof(List<MemberTimeOverviewResponse>), StatusCodes.Status200OK)]
@@ -112,6 +139,11 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.GetTimeOverviewAsync(slug, userId.Value, from, to));
     }
 
+    /// <summary>Get time entries for a specific member (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID whose entries to retrieve.</param>
+    /// <param name="from">Start of date range filter.</param>
+    /// <param name="to">End of date range filter.</param>
     [HttpGet("{slug}/member-entries/{memberId}")]
     [Authorize]
     [ProducesResponseType(typeof(List<TimeEntryResponse>), StatusCodes.Status200OK)]
@@ -123,6 +155,9 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.GetMemberEntriesAsync(slug, userId.Value, memberId, from, to));
     }
 
+    /// <summary>Set a member's initial overtime hours (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID to update.</param>
     [HttpPut("{slug}/members/{memberId}/initial-overtime")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]

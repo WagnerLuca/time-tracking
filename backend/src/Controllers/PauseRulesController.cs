@@ -5,6 +5,9 @@ using TimeTracking.Api.Services;
 
 namespace TimeTracking.Api.Controllers;
 
+/// <summary>
+/// Manages automatic pause rules for an organization.
+/// </summary>
 [ApiController]
 [Route("api/organizations")]
 public class PauseRulesController : OrganizationBaseController
@@ -16,6 +19,8 @@ public class PauseRulesController : OrganizationBaseController
         _service = service;
     }
 
+    /// <summary>List all pause rules for an organization.</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpGet("{slug}/pause-rules")]
     [ProducesResponseType(typeof(List<PauseRuleResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPauseRules(string slug)
@@ -23,6 +28,8 @@ public class PauseRulesController : OrganizationBaseController
         return ToResponse(await _service.GetPauseRulesAsync(slug));
     }
 
+    /// <summary>Create a new pause rule (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/pause-rules")]
     [Authorize]
     [ProducesResponseType(typeof(PauseRuleResponse), StatusCodes.Status201Created)]
@@ -34,6 +41,9 @@ public class PauseRulesController : OrganizationBaseController
         return ToCreatedResponse(await _service.CreatePauseRuleAsync(slug, userId.Value, request));
     }
 
+    /// <summary>Update an existing pause rule (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="ruleId">Pause rule ID.</param>
     [HttpPut("{slug}/pause-rules/{ruleId}")]
     [Authorize]
     [ProducesResponseType(typeof(PauseRuleResponse), StatusCodes.Status200OK)]
@@ -45,6 +55,9 @@ public class PauseRulesController : OrganizationBaseController
         return ToResponse(await _service.UpdatePauseRuleAsync(slug, userId.Value, ruleId, request));
     }
 
+    /// <summary>Delete a pause rule (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="ruleId">Pause rule ID.</param>
     [HttpDelete("{slug}/pause-rules/{ruleId}")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

@@ -6,6 +6,9 @@ using TimeTracking.Api.Services;
 
 namespace TimeTracking.Api.Controllers;
 
+/// <summary>
+/// Manages organization requests (join, edit entries) and their notifications.
+/// </summary>
 [ApiController]
 [Route("api/organizations")]
 public class RequestsController : OrganizationBaseController
@@ -17,6 +20,8 @@ public class RequestsController : OrganizationBaseController
         _service = service;
     }
 
+    /// <summary>Create a new request for the organization (e.g. join, edit entry).</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/requests")]
     [Authorize]
     [ProducesResponseType(typeof(OrgRequestResponse), StatusCodes.Status201Created)]
@@ -27,6 +32,10 @@ public class RequestsController : OrganizationBaseController
         return ToCreatedResponse(await _service.CreateRequestAsync(slug, userId.Value, request));
     }
 
+    /// <summary>List requests for an organization with optional filters.</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="type">Filter by request type.</param>
+    /// <param name="status">Filter by request status.</param>
     [HttpGet("{slug}/requests")]
     [Authorize]
     [ProducesResponseType(typeof(List<OrgRequestResponse>), StatusCodes.Status200OK)]
@@ -38,6 +47,9 @@ public class RequestsController : OrganizationBaseController
         return ToResponse(await _service.GetRequestsAsync(slug, userId.Value, type, status));
     }
 
+    /// <summary>Accept or decline a pending request (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="id">Request ID.</param>
     [HttpPut("{slug}/requests/{id}")]
     [Authorize]
     [ProducesResponseType(typeof(OrgRequestResponse), StatusCodes.Status200OK)]
@@ -49,6 +61,8 @@ public class RequestsController : OrganizationBaseController
         return ToResponse(await _service.RespondToRequestAsync(slug, userId.Value, id, request));
     }
 
+    /// <summary>List the current user's requests across all organizations.</summary>
+    /// <param name="type">Filter by request type.</param>
     [HttpGet("my-requests")]
     [Authorize]
     [ProducesResponseType(typeof(List<OrgRequestResponse>), StatusCodes.Status200OK)]
@@ -59,6 +73,7 @@ public class RequestsController : OrganizationBaseController
         return ToResponse(await _service.GetMyRequestsAsync(userId.Value, type));
     }
 
+    /// <summary>Get pending request notifications for admins.</summary>
     [HttpGet("notifications")]
     [Authorize]
     [ProducesResponseType(typeof(AdminNotificationResponse), StatusCodes.Status200OK)]
@@ -69,6 +84,7 @@ public class RequestsController : OrganizationBaseController
         return ToResponse(await _service.GetAdminNotificationsAsync(userId.Value));
     }
 
+    /// <summary>Get responded request notifications for the current user.</summary>
     [HttpGet("user-notifications")]
     [Authorize]
     [ProducesResponseType(typeof(UserNotificationResponse), StatusCodes.Status200OK)]
@@ -79,6 +95,8 @@ public class RequestsController : OrganizationBaseController
         return ToResponse(await _service.GetUserNotificationsAsync(userId.Value));
     }
 
+    /// <summary>Mark request notifications as seen.</summary>
+    /// <param name="requestIds">Optional list of specific request IDs to mark. If null, marks all.</param>
     [HttpPost("user-notifications/mark-seen")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]

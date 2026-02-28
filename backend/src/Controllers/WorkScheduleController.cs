@@ -5,6 +5,10 @@ using TimeTracking.Api.Services;
 
 namespace TimeTracking.Api.Controllers;
 
+/// <summary>
+/// Manages work schedules and initial overtime for organization members.
+/// Includes self-service endpoints and admin endpoints for managing other members.
+/// </summary>
 [ApiController]
 [Route("api/organizations")]
 public class WorkScheduleController : OrganizationBaseController
@@ -18,6 +22,8 @@ public class WorkScheduleController : OrganizationBaseController
 
     // ── Self endpoints ──
 
+    /// <summary>Get the current user's active work schedule.</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpGet("{slug}/work-schedule")]
     [Authorize]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
@@ -28,6 +34,8 @@ public class WorkScheduleController : OrganizationBaseController
         return ToResponse(await _service.GetMyWorkScheduleAsync(slug, userId.Value));
     }
 
+    /// <summary>List all work schedules for the current user.</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpGet("{slug}/work-schedules")]
     [Authorize]
     [ProducesResponseType(typeof(List<WorkScheduleResponse>), StatusCodes.Status200OK)]
@@ -38,6 +46,8 @@ public class WorkScheduleController : OrganizationBaseController
         return ToResponse(await _service.GetMyWorkSchedulesAsync(slug, userId.Value));
     }
 
+    /// <summary>Create a new work schedule for the current user.</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/work-schedules")]
     [Authorize]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status201Created)]
@@ -49,6 +59,9 @@ public class WorkScheduleController : OrganizationBaseController
         return ToResponse(await _service.CreateMyWorkScheduleAsync(slug, userId.Value, request));
     }
 
+    /// <summary>Update a work schedule for the current user.</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="id">Work schedule ID.</param>
     [HttpPut("{slug}/work-schedules/{id}")]
     [Authorize]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
@@ -60,6 +73,9 @@ public class WorkScheduleController : OrganizationBaseController
         return ToResponse(await _service.UpdateMyWorkScheduleAsync(slug, userId.Value, id, request));
     }
 
+    /// <summary>Delete a work schedule for the current user.</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="id">Work schedule ID.</param>
     [HttpDelete("{slug}/work-schedules/{id}")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -70,6 +86,8 @@ public class WorkScheduleController : OrganizationBaseController
         return ToResponse(await _service.DeleteMyWorkScheduleAsync(slug, userId.Value, id));
     }
 
+    /// <summary>Update the current user's initial overtime hours.</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpPut("{slug}/initial-overtime")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -83,6 +101,9 @@ public class WorkScheduleController : OrganizationBaseController
 
     // ── Admin endpoints ──
 
+    /// <summary>Get a specific member's active work schedule (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID.</param>
     [HttpGet("{slug}/members/{memberId}/work-schedule")]
     [Authorize]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
@@ -93,6 +114,9 @@ public class WorkScheduleController : OrganizationBaseController
         return ToResponse(await _service.GetMemberWorkScheduleAsync(slug, userId.Value, memberId));
     }
 
+    /// <summary>List all work schedules for a specific member (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID.</param>
     [HttpGet("{slug}/members/{memberId}/work-schedules")]
     [Authorize]
     [ProducesResponseType(typeof(List<WorkScheduleResponse>), StatusCodes.Status200OK)]
@@ -103,6 +127,9 @@ public class WorkScheduleController : OrganizationBaseController
         return ToResponse(await _service.GetMemberWorkSchedulesAsync(slug, userId.Value, memberId));
     }
 
+    /// <summary>Create a work schedule for a specific member (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID.</param>
     [HttpPost("{slug}/members/{memberId}/work-schedules")]
     [Authorize]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status201Created)]
@@ -114,6 +141,10 @@ public class WorkScheduleController : OrganizationBaseController
         return ToResponse(await _service.CreateMemberWorkScheduleAsync(slug, userId.Value, memberId, request));
     }
 
+    /// <summary>Update a work schedule for a specific member (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID.</param>
+    /// <param name="id">Work schedule ID.</param>
     [HttpPut("{slug}/members/{memberId}/work-schedules/{id}")]
     [Authorize]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
@@ -125,6 +156,10 @@ public class WorkScheduleController : OrganizationBaseController
         return ToResponse(await _service.UpdateMemberWorkScheduleAsync(slug, userId.Value, memberId, id, request));
     }
 
+    /// <summary>Delete a work schedule for a specific member (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID.</param>
+    /// <param name="id">Work schedule ID.</param>
     [HttpDelete("{slug}/members/{memberId}/work-schedules/{id}")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

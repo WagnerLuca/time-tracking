@@ -5,6 +5,9 @@ using TimeTracking.Api.Services;
 
 namespace TimeTracking.Api.Controllers;
 
+/// <summary>
+/// Manages personal time entries: start, stop, history, update and delete.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
@@ -17,6 +20,7 @@ public class TimeTrackingController : OrganizationBaseController
         _service = service;
     }
 
+    /// <summary>Start a new time entry (clock in).</summary>
     [HttpPost("start")]
     [ProducesResponseType(typeof(TimeEntryResponse), StatusCodes.Status201Created)]
     public async Task<IActionResult> Start([FromBody] StartTimeEntryRequest? request)
@@ -26,6 +30,7 @@ public class TimeTrackingController : OrganizationBaseController
         return ToCreatedResponse(await _service.StartAsync(userId.Value, request));
     }
 
+    /// <summary>Stop the currently running time entry (clock out).</summary>
     [HttpPost("stop")]
     [ProducesResponseType(typeof(TimeEntryResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Stop([FromBody] StopTimeEntryRequest? request)
@@ -35,6 +40,7 @@ public class TimeTrackingController : OrganizationBaseController
         return ToResponse(await _service.StopAsync(userId.Value, request));
     }
 
+    /// <summary>Get the currently running time entry, if any.</summary>
     [HttpGet("current")]
     [ProducesResponseType(typeof(TimeEntryResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetCurrent()
@@ -44,6 +50,12 @@ public class TimeTrackingController : OrganizationBaseController
         return ToResponse(await _service.GetCurrentAsync(userId.Value));
     }
 
+    /// <summary>Get past time entries with optional filters and pagination.</summary>
+    /// <param name="organizationId">Filter by organization ID.</param>
+    /// <param name="from">Start of date range.</param>
+    /// <param name="to">End of date range.</param>
+    /// <param name="limit">Max number of entries to return (default 50).</param>
+    /// <param name="offset">Number of entries to skip.</param>
     [HttpGet]
     [ProducesResponseType(typeof(List<TimeEntryResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetHistory(
@@ -58,6 +70,8 @@ public class TimeTrackingController : OrganizationBaseController
         return ToResponse(await _service.GetHistoryAsync(userId.Value, organizationId, from, to, limit, offset));
     }
 
+    /// <summary>Update an existing time entry.</summary>
+    /// <param name="id">Time entry ID.</param>
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(TimeEntryResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateTimeEntryRequest request)
@@ -67,6 +81,8 @@ public class TimeTrackingController : OrganizationBaseController
         return ToResponse(await _service.UpdateAsync(userId.Value, id, request));
     }
 
+    /// <summary>Delete a time entry.</summary>
+    /// <param name="id">Time entry ID.</param>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Delete(int id)

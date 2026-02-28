@@ -5,6 +5,9 @@ using TimeTracking.Api.Services;
 
 namespace TimeTracking.Api.Controllers;
 
+/// <summary>
+/// Manages user notifications: list, count, and mark as read.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
@@ -17,6 +20,8 @@ public class NotificationsController : OrganizationBaseController
         _service = service;
     }
 
+    /// <summary>Get notifications for the current user.</summary>
+    /// <param name="unreadOnly">When true, return only unread notifications.</param>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetNotifications([FromQuery] bool unreadOnly = false)
@@ -26,6 +31,7 @@ public class NotificationsController : OrganizationBaseController
         return ToResponse(await _service.GetNotificationsAsync(userId.Value, unreadOnly));
     }
 
+    /// <summary>Get the number of unread notifications.</summary>
     [HttpGet("unread-count")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUnreadCount()
@@ -35,6 +41,8 @@ public class NotificationsController : OrganizationBaseController
         return ToResponse(await _service.GetUnreadCountAsync(userId.Value));
     }
 
+    /// <summary>Mark a single notification as read.</summary>
+    /// <param name="id">Notification ID.</param>
     [HttpPut("{id}/read")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> MarkAsRead(int id)
@@ -44,6 +52,7 @@ public class NotificationsController : OrganizationBaseController
         return ToResponse(await _service.MarkAsReadAsync(userId.Value, id));
     }
 
+    /// <summary>Mark all notifications as read for the current user.</summary>
     [HttpPut("read-all")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> MarkAllAsRead()

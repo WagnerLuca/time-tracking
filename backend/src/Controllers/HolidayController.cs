@@ -5,6 +5,9 @@ using TimeTracking.Api.Services;
 
 namespace TimeTracking.Api.Controllers;
 
+/// <summary>
+/// Manages organization holidays and holiday preset imports.
+/// </summary>
 [ApiController]
 [Route("api/organizations")]
 public class HolidayController : OrganizationBaseController
@@ -16,6 +19,8 @@ public class HolidayController : OrganizationBaseController
         _service = service;
     }
 
+    /// <summary>List all holidays for an organization.</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpGet("{slug}/holidays")]
     [Authorize]
     [ProducesResponseType(typeof(List<HolidayResponse>), StatusCodes.Status200OK)]
@@ -26,6 +31,8 @@ public class HolidayController : OrganizationBaseController
         return ToResponse(await _service.GetHolidaysAsync(slug, userId.Value));
     }
 
+    /// <summary>Create a new holiday for the organization.</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/holidays")]
     [Authorize]
     [ProducesResponseType(typeof(HolidayResponse), StatusCodes.Status200OK)]
@@ -36,6 +43,9 @@ public class HolidayController : OrganizationBaseController
         return ToResponse(await _service.CreateHolidayAsync(slug, userId.Value, request));
     }
 
+    /// <summary>Update an existing holiday.</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="id">Holiday ID.</param>
     [HttpPut("{slug}/holidays/{id}")]
     [Authorize]
     [ProducesResponseType(typeof(HolidayResponse), StatusCodes.Status200OK)]
@@ -46,6 +56,9 @@ public class HolidayController : OrganizationBaseController
         return ToResponse(await _service.UpdateHolidayAsync(slug, userId.Value, id, request));
     }
 
+    /// <summary>Delete a holiday.</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="id">Holiday ID.</param>
     [HttpDelete("{slug}/holidays/{id}")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -56,6 +69,10 @@ public class HolidayController : OrganizationBaseController
         return ToResponse(await _service.DeleteHolidayAsync(slug, userId.Value, id));
     }
 
+    /// <summary>Import preset holidays (e.g. German public holidays) for a given year.</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="preset">Preset code, e.g. "de" (default).</param>
+    /// <param name="year">Year to import for. Defaults to current year.</param>
     [HttpPost("{slug}/holidays/import-preset")]
     [Authorize]
     [ProducesResponseType(typeof(List<HolidayResponse>), StatusCodes.Status200OK)]
@@ -67,6 +84,7 @@ public class HolidayController : OrganizationBaseController
         return ToResponse(await _service.ImportPresetHolidaysAsync(slug, userId.Value, preset, year));
     }
 
+    /// <summary>List available holiday preset codes.</summary>
     [HttpGet("/api/organizations/holiday-presets")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]

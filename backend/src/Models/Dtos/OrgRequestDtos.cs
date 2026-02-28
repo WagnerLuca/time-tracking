@@ -1,7 +1,10 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace TimeTracking.Api.Models.Dtos;
 
 // Generic Organization Request DTOs
 
+/// <summary>Response representing an organization request (join, edit entry, etc.).</summary>
 public record OrgRequestResponse
 {
     public int Id { get; init; }
@@ -22,9 +25,12 @@ public record OrgRequestResponse
     public string? RespondedByName { get; init; }
 }
 
+/// <summary>Request payload for creating a new organization request.</summary>
 public record CreateOrgRequestRequest
 {
+    [MaxLength(1000)]
     public string? Message { get; init; }
+
     public RequestType Type { get; init; } = RequestType.JoinOrganization;
     public int? RelatedEntityId { get; init; }
     public string? RequestData { get; init; }

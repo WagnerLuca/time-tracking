@@ -5,6 +5,9 @@ using TimeTracking.Api.Services;
 
 namespace TimeTracking.Api.Controllers;
 
+/// <summary>
+/// Manages absence days (sick days, vacation, etc.) for organization members.
+/// </summary>
 [ApiController]
 [Route("api/organizations")]
 public class AbsenceDayController : OrganizationBaseController
@@ -16,6 +19,11 @@ public class AbsenceDayController : OrganizationBaseController
         _service = service;
     }
 
+    /// <summary>List absences for the organization with optional filters.</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="userId">Filter by user ID.</param>
+    /// <param name="from">Start of date range.</param>
+    /// <param name="to">End of date range.</param>
     [HttpGet("{slug}/absences")]
     [Authorize]
     [ProducesResponseType(typeof(List<AbsenceDayResponse>), StatusCodes.Status200OK)]
@@ -27,6 +35,8 @@ public class AbsenceDayController : OrganizationBaseController
         return ToResponse(await _service.GetAbsencesAsync(slug, callerId.Value, userId, from, to));
     }
 
+    /// <summary>Create an absence day for the current user.</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/absences")]
     [Authorize]
     [ProducesResponseType(typeof(AbsenceDayResponse), StatusCodes.Status200OK)]
@@ -37,6 +47,8 @@ public class AbsenceDayController : OrganizationBaseController
         return ToResponse(await _service.CreateAbsenceAsync(slug, userId.Value, request));
     }
 
+    /// <summary>Create an absence day for any member (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/absences/admin")]
     [Authorize]
     [ProducesResponseType(typeof(AbsenceDayResponse), StatusCodes.Status200OK)]
@@ -47,6 +59,9 @@ public class AbsenceDayController : OrganizationBaseController
         return ToResponse(await _service.AdminCreateAbsenceAsync(slug, callerId.Value, request));
     }
 
+    /// <summary>Delete an absence day.</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="id">Absence day ID.</param>
     [HttpDelete("{slug}/absences/{id}")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
