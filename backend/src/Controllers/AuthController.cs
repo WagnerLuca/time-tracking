@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TimeTracking.Api.Models.Dtos;
 using TimeTracking.Api.Services;
 
@@ -23,6 +24,7 @@ public class AuthController : ControllerBase
     /// Register a new user
     /// </summary>
     [HttpPost("register")]
+    [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
@@ -41,6 +43,7 @@ public class AuthController : ControllerBase
     /// Login with email and password
     /// </summary>
     [HttpPost("login")]
+    [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
@@ -59,6 +62,7 @@ public class AuthController : ControllerBase
     /// Refresh access token using refresh token
     /// </summary>
     [HttpPost("refresh")]
+    [EnableRateLimiting("AuthModerate")]
     [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
@@ -91,6 +95,7 @@ public class AuthController : ControllerBase
     /// </summary>
     [HttpPost("change-password")]
     [Authorize]
+    [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)

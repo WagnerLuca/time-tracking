@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TimeTracking.Api.Data;
@@ -156,6 +158,30 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Add Rate Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Strict policy for login/register (prevent brute-force & credential stuffing)
+    options.AddFixedWindowLimiter("AuthStrict", opt =>
+    {
+        opt.PermitLimit = 10;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+
+    // Moderate policy for token refresh & other auth actions
+    options.AddFixedWindowLimiter("AuthModerate", opt =>
+    {
+        opt.PermitLimit = 30;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+});
+
 var app = builder.Build();
 
 // Auto-migrate database on startup
@@ -193,6 +219,9 @@ app.UseSwaggerUI();
 
 // Enable CORS
 app.UseCors("AllowOrigins");
+
+// Enable Rate Limiting
+app.UseRateLimiter();
 
 // Disable HTTPS redirection in development for testing
 if (!app.Environment.IsDevelopment())
