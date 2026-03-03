@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import '../app.css';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
@@ -9,6 +9,7 @@
 	import { requestsApi, organizationsApi } from '$lib/apiClient';
 	import type { OrgRequestResponse } from '$lib/api';
 	import { parseRequestData, formatRequestTypeFull, formatRequestType, formatTimeAgo } from '$lib/utils/formatters';
+	import { theme } from '$lib/stores/theme.svelte';
 
 	let { children } = $props();
 
@@ -28,6 +29,7 @@
 	onMount(() => {
 		auth.init();
 		orgContext.init();
+		theme.load();
 	});
 
 	$effect(() => {
@@ -131,66 +133,66 @@
 </svelte:head>
 
 {#if auth.loading}
-	<div class="loading-screen">
+	<div class="min-h-screen flex items-center justify-center text-base-content/60">
 		<p>Loading...</p>
 	</div>
 {:else if auth.isAuthenticated}
-	<nav class="top-nav">
-		<div class="nav-left">
-			<a href="/" class="nav-brand">Time Tracking</a>
+	<nav class="navbar bg-base-100 shadow-sm border-b border-base-300 sticky top-0 z-50 px-4">
+		<div class="flex items-center gap-6">
+			<a href="/" class="text-lg font-bold text-primary no-underline">Time Tracking</a>
 			{#if orgContext.selectedOrg}
-				<span class="nav-org-name">{orgContext.selectedOrg.name}</span>
+				<span class="text-xs font-medium text-base-content/50 bg-base-200 px-2.5 py-1 rounded-md truncate max-w-40">{orgContext.selectedOrg.name}</span>
 			{/if}
-			<a href="/time" class="nav-link">Timer</a>
-			<a href="/history" class="nav-link">History</a>
+			<a href="/time" class="text-sm font-medium text-base-content/70 no-underline hover:text-base-content border-b-2 border-transparent hover:border-primary transition-colors">Timer</a>
+			<a href="/history" class="text-sm font-medium text-base-content/70 no-underline hover:text-base-content border-b-2 border-transparent hover:border-primary transition-colors">History</a>
 			{#if orgContext.selectedOrg}
-				<a href="/organizations/{orgContext.selectedOrgSlug}" class="nav-link">Organization</a>
+				<a href="/organizations/{orgContext.selectedOrgSlug}" class="text-sm font-medium text-base-content/70 no-underline hover:text-base-content border-b-2 border-transparent hover:border-primary transition-colors">Organization</a>
 			{/if}
 		</div>
-		<div class="nav-right">
+		<div class="flex items-center gap-4">
 			<!-- Notification bell -->
-			<div class="notif-wrapper">
-				<button class="notif-bell" onclick={toggleNotifPanel} title="Notifications">
+			<div class="relative">
+				<button class="btn btn-ghost btn-sm btn-square" onclick={toggleNotifPanel} title="Notifications">
 					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 						<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
 						<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
 					</svg>
 					{#if totalNotifCount > 0}
-						<span class="notif-badge">{totalNotifCount}</span>
+						<span class="badge badge-error badge-xs absolute -top-1 -right-1">{totalNotifCount}</span>
 					{/if}
 				</button>
 
 				{#if showNotifPanel}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="notif-backdrop" onclick={closeNotifPanel}></div>
-					<div class="notif-panel">
-						<div class="notif-header">
-							<span class="notif-title">Notifications</span>
-							<button class="notif-close" onclick={closeNotifPanel}>&times;</button>
+					<div class="fixed inset-0 z-[199]" onclick={closeNotifPanel}></div>
+					<div class="absolute top-full mt-2 right-0 w-80 max-h-[420px] bg-base-100 border border-base-300 rounded-xl shadow-xl z-[200] overflow-hidden flex flex-col">
+						<div class="flex items-center justify-between px-4 py-3 border-b border-base-200">
+							<span class="font-semibold text-sm">Notifications</span>
+							<button class="btn btn-ghost btn-xs btn-square" onclick={closeNotifPanel}>&times;</button>
 						</div>
 
 						<!-- User notifications (responses to my requests) -->
 						{#if userNotifRequests.length > 0}
-							<div class="notif-section">
-								<div class="notif-section-header">
-									<span class="notif-section-title">My Request Updates</span>
-									<button class="notif-dismiss-all" onclick={dismissAllUserNotifs}>Dismiss all</button>
+							<div class="py-1">
+								<div class="flex items-center justify-between px-3 py-2">
+									<span class="text-xs font-bold uppercase tracking-wider text-base-content/40">My Request Updates</span>
+									<button class="btn btn-ghost btn-xs text-primary" onclick={dismissAllUserNotifs}>Dismiss all</button>
 								</div>
-								<div class="notif-list">
+								<div class="overflow-y-auto max-h-[360px]">
 									{#each userNotifRequests as req}
-										<button class="notif-item-btn user-notif-item" class:notif-accepted={req.status === 'Accepted'} class:notif-declined={req.status === 'Declined'} onclick={() => openNotifDetail(req)}>
-											<div class="notif-item-info">
-												<span class="notif-item-status-badge" class:accepted={req.status === 'Accepted'} class:declined={req.status === 'Declined'}>
-													{req.status === 'Accepted' ? '✓ Accepted' : '✗ Declined'}
+										<button class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors border-l-4 {req.status === 'Accepted' ? 'border-l-success' : req.status === 'Declined' ? 'border-l-error' : 'border-l-transparent'}" onclick={() => openNotifDetail(req)}>
+											<div class="flex flex-col gap-0.5 flex-1 min-w-0">
+												<span class="{req.status === 'Accepted' ? 'badge badge-success badge-xs' : 'badge badge-error badge-xs'}">
+													{req.status === 'Accepted' ? 'âœ“ Accepted' : 'âœ— Declined'}
 												</span>
-												<span class="notif-item-type">{formatRequestType(req.type)}</span>
-												<span class="notif-item-org">{req.organizationName}</span>
+												<span class="font-semibold text-xs text-primary">{formatRequestType(req.type)}</span>
+												<span class="text-xs text-base-content/50">{req.organizationName}</span>
 												{#if req.respondedByName}
-													<span class="notif-item-msg">by {req.respondedByName}</span>
+													<span class="text-xs text-base-content/40 italic truncate">by {req.respondedByName}</span>
 												{/if}
-												<span class="notif-item-time">{formatTimeAgo(req.respondedAt)}</span>
+												<span class="text-[0.7rem] text-base-content/40">{formatTimeAgo(req.respondedAt)}</span>
 											</div>
-											<span class="notif-item-expand">›</span>
+											<span class="text-base-content/40 text-lg flex-shrink-0">â€º</span>
 										</button>
 									{/each}
 								</div>
@@ -199,23 +201,23 @@
 
 						<!-- Admin pending requests -->
 						{#if pendingRequests.length > 0}
-							<div class="notif-section">
-								<div class="notif-section-header">
-									<span class="notif-section-title">Pending Requests</span>
+							<div class="py-1">
+								<div class="flex items-center justify-between px-3 py-2">
+									<span class="text-xs font-bold uppercase tracking-wider text-base-content/40">Pending Requests</span>
 								</div>
-								<div class="notif-list">
+								<div class="overflow-y-auto max-h-[360px]">
 									{#each pendingRequests as req}
-										<button class="notif-item-btn" onclick={() => openNotifDetail(req)}>
-											<div class="notif-item-info">
-												<span class="notif-item-type">{formatRequestType(req.type)}</span>
-												<span class="notif-item-user">{req.userFirstName} {req.userLastName}</span>
-												<span class="notif-item-org">{req.organizationName}</span>
+										<button class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors border-l-4 border-l-transparent" onclick={() => openNotifDetail(req)}>
+											<div class="flex flex-col gap-0.5 flex-1 min-w-0">
+												<span class="font-semibold text-xs text-primary">{formatRequestType(req.type)}</span>
+												<span class="text-sm font-medium">{req.userFirstName} {req.userLastName}</span>
+												<span class="text-xs text-base-content/50">{req.organizationName}</span>
 												{#if req.message}
-													<span class="notif-item-msg">"{req.message}"</span>
+													<span class="text-xs text-base-content/40 italic truncate">"{req.message}"</span>
 												{/if}
-												<span class="notif-item-time">{formatTimeAgo(req.createdAt)}</span>
+												<span class="text-[0.7rem] text-base-content/40">{formatTimeAgo(req.createdAt)}</span>
 											</div>
-											<span class="notif-item-expand">›</span>
+											<span class="text-base-content/40 text-lg flex-shrink-0">â€º</span>
 										</button>
 									{/each}
 								</div>
@@ -223,85 +225,99 @@
 						{/if}
 
 						{#if pendingRequests.length === 0 && userNotifRequests.length === 0}
-							<div class="notif-empty">No notifications</div>
+							<div class="py-8 px-4 text-center text-base-content/40 text-sm">No notifications</div>
 						{/if}
 					</div>
 				{/if}
 			</div>
 
-			<a href="/settings" class="nav-user-link" title="Settings">{auth.user?.firstName} {auth.user?.lastName}</a>
-			<button class="btn-logout" onclick={handleLogout}>Sign Out</button>
+			<a href="/settings" class="text-sm font-medium text-base-content no-underline px-2 py-1 rounded-md hover:bg-base-200 transition-colors" title="Settings">{auth.user?.firstName} {auth.user?.lastName}</a>
+
+			<!-- Theme switcher -->
+			<div class="relative">
+				<select
+					class="select select-bordered select-xs text-xs"
+					value={theme.current}
+					onchange={(e) => theme.set((e.currentTarget as HTMLSelectElement).value as typeof theme.current)}
+				>
+					{#each theme.themes as t}
+						<option value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+					{/each}
+				</select>
+			</div>
+
+			<button class="btn btn-ghost btn-sm" onclick={handleLogout}>Sign Out</button>
 		</div>
 	</nav>
 
 	<!-- Notification detail popup -->
 	{#if detailReq}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="detail-backdrop" onclick={closeNotifDetail}></div>
-		<div class="detail-popup">
-			<div class="detail-popup-header">
-				<h3 class="detail-popup-title">{formatRequestTypeFull(detailReq.type)}</h3>
-				<button class="notif-close" onclick={closeNotifDetail}>&times;</button>
+		<div class="fixed inset-0 bg-black/35 z-[299]" onclick={closeNotifDetail}></div>
+		<div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] max-w-[92vw] max-h-[80vh] bg-base-100 rounded-2xl shadow-2xl z-[300] flex flex-col overflow-hidden">
+			<div class="flex items-center justify-between px-5 py-4 border-b border-base-200">
+				<h3 class="text-base font-bold">{formatRequestTypeFull(detailReq.type)}</h3>
+				<button class="btn btn-ghost btn-xs btn-square" onclick={closeNotifDetail}>&times;</button>
 			</div>
-			<div class="detail-popup-body">
+			<div class="px-5 py-4 overflow-y-auto flex-1">
 				{#if detailReq.status}
-					<div class="detail-row">
-						<span class="detail-label">Status</span>
-						<span class="detail-value">
-							<span class="notif-item-status-badge" class:accepted={detailReq.status === 'Accepted'} class:declined={detailReq.status === 'Declined'} class:pending={detailReq.status === 'Pending'}>
-								{detailReq.status === 'Accepted' ? '✓ Accepted' : detailReq.status === 'Declined' ? '✗ Declined' : '⏳ Pending'}
+					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
+						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Status</span>
+						<span class="text-sm font-medium text-right">
+							<span class="{detailReq.status === 'Accepted' ? 'badge badge-success badge-xs' : detailReq.status === 'Declined' ? 'badge badge-error badge-xs' : 'badge badge-warning badge-xs'}">
+								{detailReq.status === 'Accepted' ? 'âœ“ Accepted' : detailReq.status === 'Declined' ? 'âœ— Declined' : 'â³ Pending'}
 							</span>
 						</span>
 					</div>
 				{/if}
 
 				{#if detailReq.userFirstName || detailReq.userLastName}
-					<div class="detail-row">
-						<span class="detail-label">User</span>
-						<span class="detail-value">{detailReq.userFirstName} {detailReq.userLastName}</span>
+					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
+						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">User</span>
+						<span class="text-sm font-medium text-right">{detailReq.userFirstName} {detailReq.userLastName}</span>
 					</div>
 				{/if}
 
 				{#if detailReq.organizationName}
-					<div class="detail-row">
-						<span class="detail-label">Organization</span>
-						<span class="detail-value">{detailReq.organizationName}</span>
+					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
+						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Organization</span>
+						<span class="text-sm font-medium text-right">{detailReq.organizationName}</span>
 					</div>
 				{/if}
 
 				{#if detailReq.createdAt}
-					<div class="detail-row">
-						<span class="detail-label">Created</span>
-						<span class="detail-value">{new Date(detailReq.createdAt).toLocaleString()}</span>
+					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
+						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Created</span>
+						<span class="text-sm font-medium text-right">{new Date(detailReq.createdAt).toLocaleString()}</span>
 					</div>
 				{/if}
 
 				{#if detailReq.respondedAt}
-					<div class="detail-row">
-						<span class="detail-label">Responded</span>
-						<span class="detail-value">{new Date(detailReq.respondedAt).toLocaleString()}</span>
+					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
+						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Responded</span>
+						<span class="text-sm font-medium text-right">{new Date(detailReq.respondedAt).toLocaleString()}</span>
 					</div>
 				{/if}
 
 				{#if detailReq.respondedByName}
-					<div class="detail-row">
-						<span class="detail-label">Responded by</span>
-						<span class="detail-value">{detailReq.respondedByName}</span>
+					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
+						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Responded by</span>
+						<span class="text-sm font-medium text-right">{detailReq.respondedByName}</span>
 					</div>
 				{/if}
 
 				{#if detailReq.message}
-					<div class="detail-row">
-						<span class="detail-label">Message</span>
-						<span class="detail-value detail-value-msg">"{detailReq.message}"</span>
+					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
+						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Message</span>
+						<span class="text-sm font-medium text-right italic text-base-content/50">"{detailReq.message}"</span>
 					</div>
 				{/if}
 
 				{#if parseRequestData(detailReq.type, detailReq.requestData).length > 0}
-					<div class="detail-section">
-						<span class="detail-section-title">Request Details</span>
+					<div class="mt-3 pt-3 border-t border-base-300">
+						<span class="block text-xs font-bold uppercase tracking-wider text-base-content/40 mb-2">Request Details</span>
 						{#each parseRequestData(detailReq.type, detailReq.requestData) as line}
-							<div class="detail-data-row">{line}</div>
+							<div class="text-sm font-medium py-1">{line}</div>
 						{/each}
 					</div>
 				{/if}
@@ -309,556 +325,25 @@
 
 			<!-- Action buttons for pending admin requests -->
 			{#if detailReq.status === 'Pending' && pendingRequests.some(r => r.id === detailReq?.id)}
-				<div class="detail-popup-actions">
-					<button class="detail-accept" onclick={() => { respondToRequest(detailReq!, true); closeNotifDetail(); }}>Accept</button>
-					<button class="detail-decline" onclick={() => { respondToRequest(detailReq!, false); closeNotifDetail(); }}>Decline</button>
+				<div class="flex gap-2 px-5 py-3 border-t border-base-200">
+					<button class="btn btn-success flex-1" onclick={() => { respondToRequest(detailReq!, true); closeNotifDetail(); }}>Accept</button>
+					<button class="btn btn-error flex-1" onclick={() => { respondToRequest(detailReq!, false); closeNotifDetail(); }}>Decline</button>
 				</div>
 			{/if}
 
 			<!-- Dismiss button for user notifications -->
 			{#if detailReq.status !== 'Pending' && userNotifRequests.some(r => r.id === detailReq?.id)}
-				<div class="detail-popup-actions">
-					<button class="detail-dismiss-btn" onclick={() => { dismissUserNotif(detailReq!.id!); closeNotifDetail(); }}>Dismiss Notification</button>
+				<div class="flex gap-2 px-5 py-3 border-t border-base-200">
+					<button class="btn btn-ghost flex-1" onclick={() => { dismissUserNotif(detailReq!.id!); closeNotifDetail(); }}>Dismiss Notification</button>
 				</div>
 			{/if}
 		</div>
 	{/if}
 
-	<main class="app-main">
+	<main class="max-w-5xl mx-auto px-6 py-8">
 		{@render children?.()}
 	</main>
 {:else}
 	{@render children?.()}
 {/if}
-
-<style>
-	:global(body) {
-		margin: 0;
-		padding: 0;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		background: #f0f2f5;
-		color: #1a1a2e;
-	}
-
-	.loading-screen {
-		min-height: 100vh;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: #6b7280;
-	}
-
-	.top-nav {
-		background: white;
-		border-bottom: 1px solid #e5e7eb;
-		padding: 0 1.5rem;
-		height: 56px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		position: sticky;
-		top: 0;
-		z-index: 100;
-	}
-
-	.nav-left {
-		display: flex;
-		align-items: center;
-		gap: 1.5rem;
-	}
-
-	.nav-brand {
-		font-weight: 700;
-		font-size: 1.125rem;
-		color: #3b82f6;
-		text-decoration: none;
-	}
-
-	.nav-org-name {
-		color: #6b7280;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		padding: 0.25rem 0.625rem;
-		background: #f3f4f6;
-		border-radius: 6px;
-		white-space: nowrap;
-		max-width: 160px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.nav-link {
-		color: #4b5563;
-		text-decoration: none;
-		font-size: 0.9375rem;
-		font-weight: 500;
-		padding: 0.25rem 0;
-		border-bottom: 2px solid transparent;
-		transition: color 0.15s, border-color 0.15s;
-	}
-
-	.nav-link:hover {
-		color: #1a1a2e;
-		border-bottom-color: #3b82f6;
-	}
-
-	.nav-right {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-	}
-
-	.nav-user-link {
-		color: #374151;
-		font-size: 0.875rem;
-		font-weight: 500;
-		text-decoration: none;
-		padding: 0.25rem 0.5rem;
-		border-radius: 6px;
-		transition: background 0.15s, color 0.15s;
-	}
-
-	.nav-user-link:hover {
-		background: #f3f4f6;
-		color: #1a1a2e;
-	}
-
-
-
-	.btn-logout {
-		background: none;
-		border: 1px solid #d1d5db;
-		color: #4b5563;
-		padding: 0.375rem 0.75rem;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		cursor: pointer;
-		transition: background 0.15s, color 0.15s;
-	}
-
-	.btn-logout:hover {
-		background: #f3f4f6;
-		color: #1a1a2e;
-	}
-
-	.app-main {
-		max-width: 1100px;
-		margin: 0 auto;
-		padding: 2rem 1.5rem;
-	}
-
-	/* Notification bell & panel */
-	.notif-wrapper {
-		position: relative;
-	}
-
-	.notif-bell {
-		background: none;
-		border: none;
-		color: #4b5563;
-		cursor: pointer;
-		padding: 0.35rem;
-		border-radius: 6px;
-		position: relative;
-		display: flex;
-		align-items: center;
-		transition: background 0.15s, color 0.15s;
-	}
-
-	.notif-bell:hover {
-		background: #f3f4f6;
-		color: #1a1a2e;
-	}
-
-	.notif-badge {
-		position: absolute;
-		top: -2px;
-		right: -4px;
-		background: #ef4444;
-		color: white;
-		font-size: 0.65rem;
-		font-weight: 700;
-		min-width: 16px;
-		height: 16px;
-		border-radius: 99px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 0 3px;
-		line-height: 1;
-	}
-
-	.notif-backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 199;
-	}
-
-	.notif-panel {
-		position: absolute;
-		top: calc(100% + 8px);
-		right: 0;
-		width: 340px;
-		max-height: 420px;
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-		z-index: 200;
-		overflow: hidden;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.notif-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.75rem 1rem;
-		border-bottom: 1px solid #f3f4f6;
-	}
-
-	.notif-title {
-		font-weight: 600;
-		font-size: 0.9rem;
-		color: #1a1a2e;
-	}
-
-	.notif-close {
-		background: none;
-		border: none;
-		font-size: 1.25rem;
-		color: #9ca3af;
-		cursor: pointer;
-		padding: 0;
-		line-height: 1;
-	}
-
-	.notif-close:hover { color: #4b5563; }
-
-	.notif-empty {
-		padding: 2rem 1rem;
-		text-align: center;
-		color: #9ca3af;
-		font-size: 0.875rem;
-	}
-
-	.notif-list {
-		overflow-y: auto;
-		max-height: 360px;
-	}
-
-	.notif-item-info {
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-		flex: 1;
-		min-width: 0;
-	}
-
-	.notif-item-type {
-		font-weight: 600;
-		font-size: 0.8rem;
-		color: #3b82f6;
-	}
-
-	.notif-item-user {
-		font-size: 0.85rem;
-		font-weight: 500;
-		color: #1a1a2e;
-	}
-
-	.notif-item-org {
-		font-size: 0.75rem;
-		color: #6b7280;
-	}
-
-	.notif-item-msg {
-		font-size: 0.75rem;
-		color: #9ca3af;
-		font-style: italic;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.notif-item-time {
-		font-size: 0.7rem;
-		color: #9ca3af;
-	}
-
-	/* User notification styles */
-	.notif-section {
-		padding: 0.25rem 0;
-	}
-
-	.notif-section-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.5rem 0.75rem;
-	}
-
-	.notif-section-title {
-		font-size: 0.6875rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: #9ca3af;
-	}
-
-	.notif-dismiss-all {
-		background: none;
-		border: none;
-		color: #3b82f6;
-		font-size: 0.75rem;
-		cursor: pointer;
-		padding: 0;
-	}
-
-	.notif-dismiss-all:hover {
-		text-decoration: underline;
-	}
-
-	.notif-item-status-badge {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		padding: 0.0625rem 0.375rem;
-		border-radius: 8px;
-	}
-
-	.notif-item-status-badge.accepted {
-		background: #d1fae5;
-		color: #065f46;
-	}
-
-	.notif-item-status-badge.declined {
-		background: #fee2e2;
-		color: #991b1b;
-	}
-
-	.user-notif-item {
-		border-left: 3px solid transparent;
-	}
-
-	.notif-accepted {
-		border-left-color: #10b981;
-	}
-
-	.notif-declined {
-		border-left-color: #ef4444;
-	}
-
-	.notif-dismiss {
-		background: none;
-		border: none;
-		color: #9ca3af;
-		font-size: 1rem;
-		cursor: pointer;
-		padding: 0.125rem 0.25rem;
-		border-radius: 4px;
-		line-height: 1;
-	}
-
-	.notif-dismiss:hover {
-		color: #6b7280;
-		background: #f3f4f6;
-	}
-
-	/* Clickable notification items */
-	.notif-item-btn {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.65rem 1rem;
-		border-bottom: 1px solid #f3f4f6;
-		gap: 0.5rem;
-		width: 100%;
-		background: none;
-		border-left: 3px solid transparent;
-		border-top: none;
-		border-right: none;
-		cursor: pointer;
-		text-align: left;
-		font-family: inherit;
-		transition: background 0.15s;
-	}
-
-	.notif-item-btn:hover {
-		background: #f8fafc;
-	}
-
-	.notif-item-btn:last-child {
-		border-bottom: none;
-	}
-
-	.notif-item-expand {
-		color: #9ca3af;
-		font-size: 1.1rem;
-		flex-shrink: 0;
-		transition: color 0.15s;
-	}
-
-	.notif-item-btn:hover .notif-item-expand {
-		color: #3b82f6;
-	}
-
-	.notif-item-status-badge.pending {
-		background: #fef3c7;
-		color: #92400e;
-	}
-
-	/* Detail popup */
-	.detail-backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.35);
-		z-index: 299;
-	}
-
-	.detail-popup {
-		position: fixed;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		width: 400px;
-		max-width: 92vw;
-		max-height: 80vh;
-		background: white;
-		border-radius: 14px;
-		box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
-		z-index: 300;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-	}
-
-	.detail-popup-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 1rem 1.25rem;
-		border-bottom: 1px solid #f3f4f6;
-	}
-
-	.detail-popup-title {
-		margin: 0;
-		font-size: 1rem;
-		font-weight: 700;
-		color: #1a1a2e;
-	}
-
-	.detail-popup-body {
-		padding: 1rem 1.25rem;
-		overflow-y: auto;
-		flex: 1;
-	}
-
-	.detail-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: baseline;
-		padding: 0.4rem 0;
-		border-bottom: 1px solid #f9fafb;
-	}
-
-	.detail-row:last-child {
-		border-bottom: none;
-	}
-
-	.detail-label {
-		font-size: 0.8rem;
-		color: #6b7280;
-		font-weight: 500;
-		flex-shrink: 0;
-		margin-right: 0.75rem;
-	}
-
-	.detail-value {
-		font-size: 0.85rem;
-		color: #1a1a2e;
-		font-weight: 500;
-		text-align: right;
-	}
-
-	.detail-value-msg {
-		font-style: italic;
-		color: #6b7280;
-	}
-
-	.detail-section {
-		margin-top: 0.75rem;
-		padding-top: 0.75rem;
-		border-top: 1px solid #e5e7eb;
-	}
-
-	.detail-section-title {
-		display: block;
-		font-size: 0.6875rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: #9ca3af;
-		margin-bottom: 0.5rem;
-	}
-
-	.detail-data-row {
-		font-size: 0.85rem;
-		color: #1a1a2e;
-		padding: 0.3rem 0;
-		font-weight: 500;
-	}
-
-	.detail-popup-actions {
-		display: flex;
-		gap: 0.5rem;
-		padding: 0.75rem 1.25rem;
-		border-top: 1px solid #f3f4f6;
-	}
-
-	.detail-accept {
-		flex: 1;
-		padding: 0.5rem;
-		border: none;
-		border-radius: 8px;
-		background: #10b981;
-		color: white;
-		font-weight: 600;
-		font-size: 0.85rem;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.detail-accept:hover { background: #059669; }
-
-	.detail-decline {
-		flex: 1;
-		padding: 0.5rem;
-		border: none;
-		border-radius: 8px;
-		background: #ef4444;
-		color: white;
-		font-weight: 600;
-		font-size: 0.85rem;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.detail-decline:hover { background: #dc2626; }
-
-	.detail-dismiss-btn {
-		flex: 1;
-		padding: 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 8px;
-		background: white;
-		color: #4b5563;
-		font-weight: 500;
-		font-size: 0.85rem;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.detail-dismiss-btn:hover { background: #f3f4f6; }
-</style>
 
