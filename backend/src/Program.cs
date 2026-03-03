@@ -244,8 +244,11 @@ app.UseSwaggerUI();
 // Enable CORS
 app.UseCors("AllowOrigins");
 
-// Enable Rate Limiting
-app.UseRateLimiter();
+// Enable Rate Limiting (disabled in Testing environment for integration tests)
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseRateLimiter();
+}
 
 // Disable HTTPS redirection in development for testing
 if (!app.Environment.IsDevelopment())
@@ -268,3 +271,8 @@ app.MapGet("/health", () => Results.Ok(new
 }));
 
 app.Run();
+
+/// <summary>
+/// Partial class declaration to make Program accessible for WebApplicationFactory in integration tests.
+/// </summary>
+public partial class Program { }
