@@ -33,13 +33,28 @@ jobs:
         working-directory: backend
 
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build --no-restore --configuration Release
         working-directory: backend
 
-      - name: Test
-        run: dotnet test --no-restore --verbosity normal
+      - name: Run tests
+        run: dotnet test --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
         working-directory: backend
-        continue-on-error: true
+        env:
+          ASPNETCORE_ENVIRONMENT: Testing
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: backend/**/test-results.trx
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: backend/**/coverage.cobertura.xml
 
   build-and-push:
     needs: test
