@@ -1,4 +1,5 @@
 <script lang="ts">
+	import '../app.css';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { page } from '$app/stores';
