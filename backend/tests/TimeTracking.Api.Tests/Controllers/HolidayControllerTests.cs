@@ -22,7 +22,7 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/holidays");
+        var response = await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/holidays");
         response.EnsureSuccessStatusCode();
 
         var holidays = await response.Content.ReadFromJsonAsync<List<HolidayResponseDto>>(TestHelpers.JsonOptions);
@@ -39,7 +39,7 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Holiday Test", "holiday-test-org");
 
-        var response = await client.PostAsJsonAsync("/api/organizations/holiday-test-org/holidays", new
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/holiday-test-org/holidays", new
         {
             date = "2026-12-25",
             name = "Christmas",
@@ -59,14 +59,14 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Dup Holiday", "dup-holiday-org");
 
-        await client.PostAsJsonAsync("/api/organizations/dup-holiday-org/holidays", new
+        await client.PostAsJsonAsync("/api/v1/organizations/dup-holiday-org/holidays", new
         {
             date = "2026-06-15",
             name = "Holiday A",
             isRecurring = false
         });
 
-        var response = await client.PostAsJsonAsync("/api/organizations/dup-holiday-org/holidays", new
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/dup-holiday-org/holidays", new
         {
             date = "2026-06-15",
             name = "Holiday B",
@@ -82,7 +82,7 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
-        var response = await client.PostAsJsonAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/holidays", new
+        var response = await client.PostAsJsonAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/holidays", new
         {
             date = "2026-11-11",
             name = "Veterans Day",
@@ -101,7 +101,7 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Holiday Update", "holiday-update-org");
 
-        var createResp = await client.PostAsJsonAsync("/api/organizations/holiday-update-org/holidays", new
+        var createResp = await client.PostAsJsonAsync("/api/v1/organizations/holiday-update-org/holidays", new
         {
             date = "2026-01-01",
             name = "New Year",
@@ -110,7 +110,7 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
         var created = await createResp.Content.ReadFromJsonAsync<HolidayResponseDto>(TestHelpers.JsonOptions);
 
         var updateResp = await client.PutAsJsonAsync(
-            $"/api/organizations/holiday-update-org/holidays/{created!.Id}", new
+            $"/api/v1/organizations/holiday-update-org/holidays/{created!.Id}", new
             {
                 name = "New Year's Day"
             });
@@ -129,7 +129,7 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Holiday Delete", "holiday-delete-org");
 
-        var createResp = await client.PostAsJsonAsync("/api/organizations/holiday-delete-org/holidays", new
+        var createResp = await client.PostAsJsonAsync("/api/v1/organizations/holiday-delete-org/holidays", new
         {
             date = "2026-07-04",
             name = "Independence Day",
@@ -138,7 +138,7 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
         var created = await createResp.Content.ReadFromJsonAsync<HolidayResponseDto>(TestHelpers.JsonOptions);
 
         var deleteResp = await client.DeleteAsync(
-            $"/api/organizations/holiday-delete-org/holidays/{created!.Id}");
+            $"/api/v1/organizations/holiday-delete-org/holidays/{created!.Id}");
         deleteResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
@@ -150,7 +150,7 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync("/api/organizations/holiday-presets");
+        var response = await client.GetAsync("/api/v1/organizations/holiday-presets");
         response.EnsureSuccessStatusCode();
     }
 
@@ -162,7 +162,7 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.CreateOrganizationAsync(client, "Preset Test", "preset-test-org");
 
         var response = await client.PostAsync(
-            "/api/organizations/preset-test-org/holidays/import-preset?preset=de&year=2026", null);
+            "/api/v1/organizations/preset-test-org/holidays/import-preset?preset=de&year=2026", null);
         response.EnsureSuccessStatusCode();
 
         var holidays = await response.Content.ReadFromJsonAsync<List<HolidayResponseDto>>(TestHelpers.JsonOptions);
@@ -178,7 +178,7 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
     {
         var client = _factory.CreateClient();
         var response = await client.PostAsJsonAsync(
-            $"/api/organizations/{TestHelpers.SeedOrgSlug}/holidays", new
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/holidays", new
             {
                 date = "2026-10-03",
                 name = "Test",

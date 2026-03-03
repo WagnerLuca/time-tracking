@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TimeTracking.Api.Models.Dtos;
@@ -9,7 +10,8 @@ namespace TimeTracking.Api.Controllers;
 /// Manages organization holidays and holiday preset imports.
 /// </summary>
 [ApiController]
-[Route("api/organizations")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/organizations")]
 public class HolidayController : OrganizationBaseController
 {
     private readonly IHolidayService _service;
@@ -85,7 +87,7 @@ public class HolidayController : OrganizationBaseController
     }
 
     /// <summary>List available holiday preset codes.</summary>
-    [HttpGet("/api/organizations/holiday-presets")]
+    [HttpGet("holiday-presets")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult GetAvailablePresets()

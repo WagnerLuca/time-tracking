@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TimeTracking.Api.Models.Dtos;
@@ -10,7 +11,8 @@ namespace TimeTracking.Api.Controllers;
 /// Includes self-service endpoints and admin endpoints for managing other members.
 /// </summary>
 [ApiController]
-[Route("api/organizations")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/organizations")]
 public class WorkScheduleController : OrganizationBaseController
 {
     private readonly IWorkScheduleService _service;

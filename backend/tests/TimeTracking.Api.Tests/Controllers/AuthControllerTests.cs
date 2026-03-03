@@ -40,7 +40,7 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
         // First registration
         await TestHelpers.RegisterAsync(client, "dup@test.com", "StrongPass1!", "A", "B");
         // Second with same email
-        var response = await client.PostAsJsonAsync("/api/Auth/register", new
+        var response = await client.PostAsJsonAsync("/api/v1/Auth/register", new
         {
             email = "dup@test.com",
             password = "StrongPass1!",
@@ -55,7 +55,7 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
     public async Task Register_WeakPassword_Returns400()
     {
         var client = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/Auth/register", new
+        var response = await client.PostAsJsonAsync("/api/v1/Auth/register", new
         {
             email = "weakpw@test.com",
             password = "short",
@@ -73,7 +73,7 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
     public async Task Register_InvalidInput_Returns400(string email, string password, string first, string last)
     {
         var client = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/Auth/register", new
+        var response = await client.PostAsJsonAsync("/api/v1/Auth/register", new
         {
             email,
             password,
@@ -102,7 +102,7 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
     public async Task Login_WrongPassword_Returns401()
     {
         var client = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/Auth/login", new
+        var response = await client.PostAsJsonAsync("/api/v1/Auth/login", new
         {
             email = TestHelpers.SeedOwnerEmail,
             password = "WrongPassword!"
@@ -115,7 +115,7 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
     public async Task Login_NonExistentUser_Returns401()
     {
         var client = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/Auth/login", new
+        var response = await client.PostAsJsonAsync("/api/v1/Auth/login", new
         {
             email = "nobody@test.com",
             password = "Password123"
@@ -133,7 +133,7 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
         var login = await TestHelpers.LoginAsync(
             client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.PostAsJsonAsync("/api/Auth/refresh", new
+        var response = await client.PostAsJsonAsync("/api/v1/Auth/refresh", new
         {
             refreshToken = login.RefreshToken
         });
@@ -151,7 +151,7 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
     public async Task RefreshToken_InvalidToken_Returns401()
     {
         var client = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/Auth/refresh", new
+        var response = await client.PostAsJsonAsync("/api/v1/Auth/refresh", new
         {
             refreshToken = "invalid-token-string"
         });
@@ -167,11 +167,11 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
             client, TestHelpers.SeedAdminEmail, TestHelpers.SeedPassword);
 
         // First refresh succeeds
-        var first = await client.PostAsJsonAsync("/api/Auth/refresh", new { refreshToken = login.RefreshToken });
+        var first = await client.PostAsJsonAsync("/api/v1/Auth/refresh", new { refreshToken = login.RefreshToken });
         first.EnsureSuccessStatusCode();
 
         // Reusing the same old token should fail
-        var second = await client.PostAsJsonAsync("/api/Auth/refresh", new { refreshToken = login.RefreshToken });
+        var second = await client.PostAsJsonAsync("/api/v1/Auth/refresh", new { refreshToken = login.RefreshToken });
         second.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -184,7 +184,7 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
         var login = await TestHelpers.AuthenticateAsync(
             client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync("/api/Auth/me");
+        var response = await client.GetAsync("/api/v1/Auth/me");
         response.EnsureSuccessStatusCode();
 
         var user = await response.Content.ReadFromJsonAsync<UserInfoDto>(TestHelpers.JsonOptions);
@@ -197,7 +197,7 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
     public async Task GetMe_Unauthenticated_Returns401()
     {
         var client = _factory.CreateClient();
-        var response = await client.GetAsync("/api/Auth/me");
+        var response = await client.GetAsync("/api/v1/Auth/me");
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -211,7 +211,7 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.RegisterAsync(client, "chpw@test.com", "OldPass123!", "A", "B");
         await TestHelpers.AuthenticateAsync(client, "chpw@test.com", "OldPass123!");
 
-        var response = await client.PostAsJsonAsync("/api/Auth/change-password", new
+        var response = await client.PostAsJsonAsync("/api/v1/Auth/change-password", new
         {
             currentPassword = "OldPass123!",
             newPassword = "NewPass456!"
@@ -231,7 +231,7 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.RegisterAsync(client, "chpw2@test.com", "OldPass123!", "A", "B");
         await TestHelpers.AuthenticateAsync(client, "chpw2@test.com", "OldPass123!");
 
-        var response = await client.PostAsJsonAsync("/api/Auth/change-password", new
+        var response = await client.PostAsJsonAsync("/api/v1/Auth/change-password", new
         {
             currentPassword = "WrongPassword!",
             newPassword = "NewPass456!"
@@ -249,14 +249,14 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
             client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
         TestHelpers.SetBearerToken(client, login.AccessToken);
 
-        var logoutResponse = await client.PostAsJsonAsync("/api/Auth/logout", new
+        var logoutResponse = await client.PostAsJsonAsync("/api/v1/Auth/logout", new
         {
             refreshToken = login.RefreshToken
         });
         logoutResponse.EnsureSuccessStatusCode();
 
         // The refresh token should no longer work
-        var refreshResponse = await client.PostAsJsonAsync("/api/Auth/refresh", new
+        var refreshResponse = await client.PostAsJsonAsync("/api/v1/Auth/refresh", new
         {
             refreshToken = login.RefreshToken
         });
@@ -272,12 +272,12 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.RegisterAsync(client, "deleteme@test.com", "Password123!", "Del", "Ete");
         await TestHelpers.AuthenticateAsync(client, "deleteme@test.com", "Password123!");
 
-        var response = await client.DeleteAsync("/api/Auth/account");
+        var response = await client.DeleteAsync("/api/v1/Auth/account");
         response.EnsureSuccessStatusCode();
 
         // Can no longer login
         TestHelpers.ClearAuth(client);
-        var loginResponse = await client.PostAsJsonAsync("/api/Auth/login", new
+        var loginResponse = await client.PostAsJsonAsync("/api/v1/Auth/login", new
         {
             email = "deleteme@test.com",
             password = "Password123!"

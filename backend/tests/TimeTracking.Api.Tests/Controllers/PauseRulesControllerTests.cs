@@ -21,7 +21,7 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/pause-rules");
+        var response = await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/pause-rules");
         response.EnsureSuccessStatusCode();
 
         var rules = await response.Content.ReadFromJsonAsync<List<PauseRuleResponseDto>>(TestHelpers.JsonOptions);
@@ -38,7 +38,7 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Pause Rule Test", "pause-rule-test");
 
-        var response = await client.PostAsJsonAsync("/api/organizations/pause-rule-test/pause-rules", new
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/pause-rule-test/pause-rules", new
         {
             minHours = 6.0,
             pauseMinutes = 30
@@ -57,13 +57,13 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Dup Pause", "dup-pause-org");
 
-        await client.PostAsJsonAsync("/api/organizations/dup-pause-org/pause-rules", new
+        await client.PostAsJsonAsync("/api/v1/organizations/dup-pause-org/pause-rules", new
         {
             minHours = 8.0,
             pauseMinutes = 45
         });
 
-        var response = await client.PostAsJsonAsync("/api/organizations/dup-pause-org/pause-rules", new
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/dup-pause-org/pause-rules", new
         {
             minHours = 8.0,
             pauseMinutes = 30
@@ -83,7 +83,7 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
         var response = await client.PostAsJsonAsync(
-            $"/api/organizations/{TestHelpers.SeedOrgSlug}/pause-rules", new
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/pause-rules", new
             {
                 minHours,
                 pauseMinutes
@@ -99,7 +99,7 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
         var response = await client.PostAsJsonAsync(
-            $"/api/organizations/{TestHelpers.SeedOrgSlug}/pause-rules", new
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/pause-rules", new
             {
                 minHours = 10.0,
                 pauseMinutes = 60
@@ -117,7 +117,7 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Update Pause", "update-pause-org");
 
-        var createResp = await client.PostAsJsonAsync("/api/organizations/update-pause-org/pause-rules", new
+        var createResp = await client.PostAsJsonAsync("/api/v1/organizations/update-pause-org/pause-rules", new
         {
             minHours = 4.0,
             pauseMinutes = 15
@@ -125,7 +125,7 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
         var created = await createResp.Content.ReadFromJsonAsync<PauseRuleResponseDto>(TestHelpers.JsonOptions);
 
         var updateResp = await client.PutAsJsonAsync(
-            $"/api/organizations/update-pause-org/pause-rules/{created!.Id}", new
+            $"/api/v1/organizations/update-pause-org/pause-rules/{created!.Id}", new
             {
                 minHours = 5.0,
                 pauseMinutes = 20
@@ -146,7 +146,7 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Delete Pause", "delete-pause-org");
 
-        var createResp = await client.PostAsJsonAsync("/api/organizations/delete-pause-org/pause-rules", new
+        var createResp = await client.PostAsJsonAsync("/api/v1/organizations/delete-pause-org/pause-rules", new
         {
             minHours = 3.0,
             pauseMinutes = 10
@@ -154,7 +154,7 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
         var created = await createResp.Content.ReadFromJsonAsync<PauseRuleResponseDto>(TestHelpers.JsonOptions);
 
         var deleteResp = await client.DeleteAsync(
-            $"/api/organizations/delete-pause-org/pause-rules/{created!.Id}");
+            $"/api/v1/organizations/delete-pause-org/pause-rules/{created!.Id}");
         deleteResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
@@ -165,7 +165,7 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
     {
         var client = _factory.CreateClient();
         var response = await client.PostAsJsonAsync(
-            $"/api/organizations/{TestHelpers.SeedOrgSlug}/pause-rules", new
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/pause-rules", new
             {
                 minHours = 6.0,
                 pauseMinutes = 30
@@ -180,7 +180,7 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
     public async Task GetPauseRules_Unauthenticated_ReturnsOk()
     {
         var client = _factory.CreateClient();
-        var response = await client.GetAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/pause-rules");
+        var response = await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/pause-rules");
         response.EnsureSuccessStatusCode();
     }
 }

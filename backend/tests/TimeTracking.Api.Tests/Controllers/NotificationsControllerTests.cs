@@ -23,7 +23,7 @@ public class NotificationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync("/api/Notifications");
+        var response = await client.GetAsync("/api/v1/Notifications");
         response.EnsureSuccessStatusCode();
     }
 
@@ -33,7 +33,7 @@ public class NotificationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync("/api/Notifications?unreadOnly=true");
+        var response = await client.GetAsync("/api/v1/Notifications?unreadOnly=true");
         response.EnsureSuccessStatusCode();
     }
 
@@ -45,7 +45,7 @@ public class NotificationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync("/api/Notifications/unread-count");
+        var response = await client.GetAsync("/api/v1/Notifications/unread-count");
         response.EnsureSuccessStatusCode();
     }
 
@@ -57,7 +57,7 @@ public class NotificationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.PutAsync("/api/Notifications/999999/read", null);
+        var response = await client.PutAsync("/api/v1/Notifications/999999/read", null);
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -69,11 +69,11 @@ public class NotificationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.PutAsync("/api/Notifications/read-all", null);
+        var response = await client.PutAsync("/api/v1/Notifications/read-all", null);
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Now unread count should be 0
-        var countResponse = await client.GetAsync("/api/Notifications/unread-count");
+        var countResponse = await client.GetAsync("/api/v1/Notifications/unread-count");
         countResponse.EnsureSuccessStatusCode();
     }
 
@@ -90,18 +90,18 @@ public class NotificationsControllerTests : IClassFixture<TimeTrackingApiFactory
         await TestHelpers.AuthenticateAsync(tomClient, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
         // Mark all read first
-        await tomClient.PutAsync("/api/Notifications/read-all", null);
+        await tomClient.PutAsync("/api/v1/Notifications/read-all", null);
 
-        var beforeCount = await tomClient.GetFromJsonAsync<object>("/api/Notifications/unread-count");
+        var beforeCount = await tomClient.GetFromJsonAsync<object>("/api/v1/Notifications/unread-count");
 
         // Owner changes settings
-        await client.PutAsJsonAsync($"/api/Organizations/{TestHelpers.SeedOrgSlug}/settings", new
+        await client.PutAsJsonAsync($"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}/settings", new
         {
             editPastEntriesMode = 0 // Disabled
         });
 
         // Tom should have a new notification
-        var afterResponse = await tomClient.GetAsync("/api/Notifications?unreadOnly=true");
+        var afterResponse = await tomClient.GetAsync("/api/v1/Notifications?unreadOnly=true");
         afterResponse.EnsureSuccessStatusCode();
     }
 
@@ -112,9 +112,9 @@ public class NotificationsControllerTests : IClassFixture<TimeTrackingApiFactory
     {
         var client = _factory.CreateClient();
 
-        (await client.GetAsync("/api/Notifications")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await client.GetAsync("/api/Notifications/unread-count")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await client.PutAsync("/api/Notifications/1/read", null)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await client.PutAsync("/api/Notifications/read-all", null)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await client.GetAsync("/api/v1/Notifications")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await client.GetAsync("/api/v1/Notifications/unread-count")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await client.PutAsync("/api/v1/Notifications/1/read", null)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await client.PutAsync("/api/v1/Notifications/read-all", null)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

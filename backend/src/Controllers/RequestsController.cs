@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TimeTracking.Api.Models;
@@ -10,7 +11,8 @@ namespace TimeTracking.Api.Controllers;
 /// Manages organization requests (join, edit entries) and their notifications.
 /// </summary>
 [ApiController]
-[Route("api/organizations")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/organizations")]
 public class RequestsController : OrganizationBaseController
 {
     private readonly IRequestService _service;

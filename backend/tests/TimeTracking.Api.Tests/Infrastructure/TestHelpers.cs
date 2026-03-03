@@ -27,7 +27,7 @@ public static class TestHelpers
     public static async Task<LoginResponseDto> RegisterAsync(
         HttpClient client, string email, string password, string firstName, string lastName)
     {
-        var response = await client.PostAsJsonAsync("/api/Auth/register", new
+        var response = await client.PostAsJsonAsync("/api/v1/Auth/register", new
         {
             email,
             password,
@@ -41,7 +41,7 @@ public static class TestHelpers
     /// <summary>Login with credentials and return the login response.</summary>
     public static async Task<LoginResponseDto> LoginAsync(HttpClient client, string email, string password)
     {
-        var response = await client.PostAsJsonAsync("/api/Auth/login", new
+        var response = await client.PostAsJsonAsync("/api/v1/Auth/login", new
         {
             email,
             password
@@ -74,7 +74,7 @@ public static class TestHelpers
     public static async Task<OrganizationResponseDto> CreateOrganizationAsync(
         HttpClient client, string name, string slug, string? description = null)
     {
-        var response = await client.PostAsJsonAsync("/api/Organizations", new
+        var response = await client.PostAsJsonAsync("/api/v1/Organizations", new
         {
             name,
             slug,

@@ -23,7 +23,7 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/absences");
+        var response = await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences");
         response.EnsureSuccessStatusCode();
 
         var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<AbsenceDayResponseDto>>(TestHelpers.JsonOptions);
@@ -38,7 +38,7 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         // Far future — should be empty
         var response = await client.GetAsync(
-            $"/api/organizations/{TestHelpers.SeedOrgSlug}/absences?from=2099-01-01&to=2099-12-31");
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences?from=2099-01-01&to=2099-12-31");
         response.EnsureSuccessStatusCode();
 
         var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<AbsenceDayResponseDto>>(TestHelpers.JsonOptions);
@@ -55,7 +55,7 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
         var response = await client.PostAsJsonAsync(
-            $"/api/organizations/{TestHelpers.SeedOrgSlug}/absences", new
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences", new
             {
                 date = "2026-11-15",
                 type = 0, // SickDay
@@ -75,7 +75,7 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
         var response = await client.PostAsJsonAsync(
-            $"/api/organizations/{TestHelpers.SeedOrgSlug}/absences", new
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences", new
             {
                 date = "2026-12-20",
                 type = 1, // Vacation
@@ -94,13 +94,13 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Abs Dup Test", "abs-dup-test");
 
-        await client.PostAsJsonAsync("/api/organizations/abs-dup-test/absences", new
+        await client.PostAsJsonAsync("/api/v1/organizations/abs-dup-test/absences", new
         {
             date = "2026-03-15",
             type = 0
         });
 
-        var response = await client.PostAsJsonAsync("/api/organizations/abs-dup-test/absences", new
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/abs-dup-test/absences", new
         {
             date = "2026-03-15",
             type = 1
@@ -119,11 +119,11 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         // Get Tom's user ID
         var detail = await client.GetFromJsonAsync<OrganizationDetailResponseDto>(
-            $"/api/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
         var tom = detail!.Members.First(m => m.Email == TestHelpers.SeedMemberEmail);
 
         var response = await client.PostAsJsonAsync(
-            $"/api/organizations/{TestHelpers.SeedOrgSlug}/absences/admin", new
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences/admin", new
             {
                 userId = tom.Id,
                 date = "2026-10-20",
@@ -143,7 +143,7 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
         var response = await client.PostAsJsonAsync(
-            $"/api/organizations/{TestHelpers.SeedOrgSlug}/absences/admin", new
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences/admin", new
             {
                 userId = 1,
                 date = "2026-10-21",
@@ -162,14 +162,14 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Abs Del Test", "abs-del-test");
 
-        var createResp = await client.PostAsJsonAsync("/api/organizations/abs-del-test/absences", new
+        var createResp = await client.PostAsJsonAsync("/api/v1/organizations/abs-del-test/absences", new
         {
             date = "2026-08-01",
             type = 0
         });
         var created = await createResp.Content.ReadFromJsonAsync<AbsenceDayResponseDto>(TestHelpers.JsonOptions);
 
-        var deleteResp = await client.DeleteAsync($"/api/organizations/abs-del-test/absences/{created!.Id}");
+        var deleteResp = await client.DeleteAsync($"/api/v1/organizations/abs-del-test/absences/{created!.Id}");
         deleteResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
@@ -180,7 +180,7 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
         var response = await client.DeleteAsync(
-            $"/api/organizations/{TestHelpers.SeedOrgSlug}/absences/999999");
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences/999999");
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -191,11 +191,11 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
     {
         var client = _factory.CreateClient();
 
-        (await client.GetAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/absences"))
+        (await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences"))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await client.PostAsJsonAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/absences", new { date = "2026-01-01", type = 0 }))
+        (await client.PostAsJsonAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences", new { date = "2026-01-01", type = 0 }))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await client.DeleteAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/absences/1"))
+        (await client.DeleteAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences/1"))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

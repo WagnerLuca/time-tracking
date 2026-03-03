@@ -23,7 +23,7 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/work-schedules");
+        var response = await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/work-schedules");
         response.EnsureSuccessStatusCode();
 
         var schedules = await response.Content.ReadFromJsonAsync<List<WorkScheduleResponseDto>>(TestHelpers.JsonOptions);
@@ -36,7 +36,7 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/work-schedule");
+        var response = await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/work-schedule");
         // May return 200 or 404 depending on seed data
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
     }
@@ -53,12 +53,12 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.CreateOrganizationAsync(client, "WS Create Test", "ws-create-test");
 
         // Ensure mode is Allowed
-        await client.PutAsJsonAsync("/api/Organizations/ws-create-test/settings", new
+        await client.PutAsJsonAsync("/api/v1/Organizations/ws-create-test/settings", new
         {
             workScheduleChangeMode = 2 // Allowed
         });
 
-        var response = await client.PostAsJsonAsync("/api/organizations/ws-create-test/work-schedules", new
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/ws-create-test/work-schedules", new
         {
             validFrom = "2026-04-01",
             weeklyWorkHours = 40.0,
@@ -78,9 +78,9 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "WS Manual Test", "ws-manual-test");
-        await client.PutAsJsonAsync("/api/Organizations/ws-manual-test/settings", new { workScheduleChangeMode = 2 });
+        await client.PutAsJsonAsync("/api/v1/Organizations/ws-manual-test/settings", new { workScheduleChangeMode = 2 });
 
-        var response = await client.PostAsJsonAsync("/api/organizations/ws-manual-test/work-schedules", new
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/ws-manual-test/work-schedules", new
         {
             validFrom = "2026-05-01",
             distributeEvenly = false,
@@ -105,10 +105,10 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "WS Update Test", "ws-update-test");
-        await client.PutAsJsonAsync("/api/Organizations/ws-update-test/settings", new { workScheduleChangeMode = 2 });
+        await client.PutAsJsonAsync("/api/v1/Organizations/ws-update-test/settings", new { workScheduleChangeMode = 2 });
 
         // Create a schedule
-        var createResp = await client.PostAsJsonAsync("/api/organizations/ws-update-test/work-schedules", new
+        var createResp = await client.PostAsJsonAsync("/api/v1/organizations/ws-update-test/work-schedules", new
         {
             validFrom = "2026-06-01",
             weeklyWorkHours = 35.0,
@@ -118,7 +118,7 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         // Update it
         var updateResp = await client.PutAsJsonAsync(
-            $"/api/organizations/ws-update-test/work-schedules/{created!.Id}", new
+            $"/api/v1/organizations/ws-update-test/work-schedules/{created!.Id}", new
             {
                 weeklyWorkHours = 30.0,
                 distributeEvenly = true
@@ -137,9 +137,9 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "WS Delete Test", "ws-delete-test");
-        await client.PutAsJsonAsync("/api/Organizations/ws-delete-test/settings", new { workScheduleChangeMode = 2 });
+        await client.PutAsJsonAsync("/api/v1/Organizations/ws-delete-test/settings", new { workScheduleChangeMode = 2 });
 
-        var createResp = await client.PostAsJsonAsync("/api/organizations/ws-delete-test/work-schedules", new
+        var createResp = await client.PostAsJsonAsync("/api/v1/organizations/ws-delete-test/work-schedules", new
         {
             validFrom = "2026-07-01",
             weeklyWorkHours = 40.0,
@@ -147,7 +147,7 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
         });
         var created = await createResp.Content.ReadFromJsonAsync<WorkScheduleResponseDto>(TestHelpers.JsonOptions);
 
-        var deleteResp = await client.DeleteAsync($"/api/organizations/ws-delete-test/work-schedules/{created!.Id}");
+        var deleteResp = await client.DeleteAsync($"/api/v1/organizations/ws-delete-test/work-schedules/{created!.Id}");
         deleteResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
@@ -161,14 +161,14 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.CreateOrganizationAsync(client, "WS Disabled Test", "ws-disabled-test");
 
         // Set mode to Disabled
-        await client.PutAsJsonAsync("/api/Organizations/ws-disabled-test/settings", new { workScheduleChangeMode = 0 });
+        await client.PutAsJsonAsync("/api/v1/Organizations/ws-disabled-test/settings", new { workScheduleChangeMode = 0 });
 
         // Register a new member
         var newClient = _factory.CreateClient();
         var newUser = await TestHelpers.RegisterAsync(newClient, "ws-disabled@test.com", "Password123!", "WS", "Disabled");
 
         // Add as member
-        await client.PostAsJsonAsync("/api/Organizations/ws-disabled-test/members", new
+        await client.PostAsJsonAsync("/api/v1/Organizations/ws-disabled-test/members", new
         {
             userId = newUser.User.Id,
             role = 0
@@ -176,7 +176,7 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         TestHelpers.SetBearerToken(newClient, newUser.AccessToken);
 
-        var response = await newClient.PostAsJsonAsync("/api/organizations/ws-disabled-test/work-schedules", new
+        var response = await newClient.PostAsJsonAsync("/api/v1/organizations/ws-disabled-test/work-schedules", new
         {
             validFrom = "2026-08-01",
             weeklyWorkHours = 40.0,
@@ -197,14 +197,14 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         // Add Tom
         var tomLogin = await TestHelpers.LoginAsync(_factory.CreateClient(), TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
-        await client.PostAsJsonAsync("/api/Organizations/admin-ws-test/members", new
+        await client.PostAsJsonAsync("/api/v1/Organizations/admin-ws-test/members", new
         {
             userId = tomLogin.User.Id,
             role = 0
         });
 
         var response = await client.PostAsJsonAsync(
-            $"/api/organizations/admin-ws-test/members/{tomLogin.User.Id}/work-schedules", new
+            $"/api/v1/organizations/admin-ws-test/members/{tomLogin.User.Id}/work-schedules", new
             {
                 validFrom = "2026-09-01",
                 weeklyWorkHours = 20.0,
@@ -225,11 +225,11 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         // Get Tom's schedules from the seeded org
         var detail = await client.GetFromJsonAsync<OrganizationDetailResponseDto>(
-            $"/api/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
         var tom = detail!.Members.First(m => m.Email == TestHelpers.SeedMemberEmail);
 
         var response = await client.GetAsync(
-            $"/api/organizations/{TestHelpers.SeedOrgSlug}/members/{tom.Id}/work-schedules");
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/members/{tom.Id}/work-schedules");
         response.EnsureSuccessStatusCode();
 
         var schedules = await response.Content.ReadFromJsonAsync<List<WorkScheduleResponseDto>>(TestHelpers.JsonOptions);
@@ -244,9 +244,9 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "IO Test", "io-test-org");
-        await client.PutAsJsonAsync("/api/Organizations/io-test-org/settings", new { initialOvertimeMode = 2 });
+        await client.PutAsJsonAsync("/api/v1/Organizations/io-test-org/settings", new { initialOvertimeMode = 2 });
 
-        var response = await client.PutAsJsonAsync("/api/organizations/io-test-org/initial-overtime", new
+        var response = await client.PutAsJsonAsync("/api/v1/organizations/io-test-org/initial-overtime", new
         {
             initialOvertimeHours = 10.5
         });

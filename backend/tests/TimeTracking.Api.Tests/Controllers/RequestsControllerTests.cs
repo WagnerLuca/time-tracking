@@ -27,7 +27,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.CreateOrganizationAsync(client, "Join Test Org", "join-test-org");
 
         // Update join policy to RequiresApproval
-        await client.PutAsJsonAsync("/api/Organizations/join-test-org/settings", new
+        await client.PutAsJsonAsync("/api/v1/Organizations/join-test-org/settings", new
         {
             joinPolicy = 1 // RequiresApproval
         });
@@ -38,7 +38,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         TestHelpers.SetBearerToken(newClient, newUser.AccessToken);
 
         // Create join request
-        var createResponse = await newClient.PostAsJsonAsync("/api/organizations/join-test-org/requests", new
+        var createResponse = await newClient.PostAsJsonAsync("/api/v1/organizations/join-test-org/requests", new
         {
             message = "Please let me join!",
             type = 0 // JoinOrganization
@@ -51,14 +51,14 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         request.Message.Should().Be("Please let me join!");
 
         // Owner checks admin notifications
-        var adminNotifResponse = await client.GetAsync("/api/organizations/notifications");
+        var adminNotifResponse = await client.GetAsync("/api/v1/organizations/notifications");
         adminNotifResponse.EnsureSuccessStatusCode();
         var adminNotif = await adminNotifResponse.Content.ReadFromJsonAsync<AdminNotificationResponseDto>(TestHelpers.JsonOptions);
         adminNotif!.PendingRequests.Should().BeGreaterThanOrEqualTo(1);
 
         // Owner accepts the request
         var respondResponse = await client.PutAsJsonAsync(
-            $"/api/organizations/join-test-org/requests/{request.Id}", new { accept = true });
+            $"/api/v1/organizations/join-test-org/requests/{request.Id}", new { accept = true });
         respondResponse.EnsureSuccessStatusCode();
 
         var responded = await respondResponse.Content.ReadFromJsonAsync<OrgRequestResponseDto>(TestHelpers.JsonOptions);
@@ -67,7 +67,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         // Verify user is now a member
         var orgDetail = await client.GetFromJsonAsync<OrganizationDetailResponseDto>(
-            "/api/Organizations/join-test-org", TestHelpers.JsonOptions);
+            "/api/v1/Organizations/join-test-org", TestHelpers.JsonOptions);
         orgDetail!.Members.Should().Contain(m => m.Email == "joiner@test.com");
     }
 
@@ -77,14 +77,14 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Decline Test", "decline-test-org");
-        await client.PutAsJsonAsync("/api/Organizations/decline-test-org/settings", new { joinPolicy = 1 });
+        await client.PutAsJsonAsync("/api/v1/Organizations/decline-test-org/settings", new { joinPolicy = 1 });
 
         // New user requests to join
         var newClient = _factory.CreateClient();
         var newUser = await TestHelpers.RegisterAsync(newClient, "declined@test.com", "Password123!", "Dec", "Lined");
         TestHelpers.SetBearerToken(newClient, newUser.AccessToken);
 
-        var createResponse = await newClient.PostAsJsonAsync("/api/organizations/decline-test-org/requests", new
+        var createResponse = await newClient.PostAsJsonAsync("/api/v1/organizations/decline-test-org/requests", new
         {
             type = 0
         });
@@ -92,7 +92,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         // Owner declines
         var respondResponse = await client.PutAsJsonAsync(
-            $"/api/organizations/decline-test-org/requests/{request!.Id}", new { accept = false });
+            $"/api/v1/organizations/decline-test-org/requests/{request!.Id}", new { accept = false });
         respondResponse.EnsureSuccessStatusCode();
 
         var responded = await respondResponse.Content.ReadFromJsonAsync<OrgRequestResponseDto>(TestHelpers.JsonOptions);
@@ -100,7 +100,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         // User should NOT be a member
         var orgDetail = await client.GetFromJsonAsync<OrganizationDetailResponseDto>(
-            "/api/Organizations/decline-test-org", TestHelpers.JsonOptions);
+            "/api/v1/Organizations/decline-test-org", TestHelpers.JsonOptions);
         orgDetail!.Members.Should().NotContain(m => m.Email == "declined@test.com");
     }
 
@@ -112,7 +112,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/requests");
+        var response = await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/requests");
         response.EnsureSuccessStatusCode();
 
         var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<OrgRequestResponseDto>>(TestHelpers.JsonOptions);
@@ -125,7 +125,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/requests");
+        var response = await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/requests");
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
@@ -137,7 +137,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync("/api/organizations/my-requests");
+        var response = await client.GetAsync("/api/v1/organizations/my-requests");
         response.EnsureSuccessStatusCode();
 
         var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<OrgRequestResponseDto>>(TestHelpers.JsonOptions);
@@ -152,7 +152,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync("/api/organizations/user-notifications");
+        var response = await client.GetAsync("/api/v1/organizations/user-notifications");
         response.EnsureSuccessStatusCode();
 
         var notifs = await response.Content.ReadFromJsonAsync<UserNotificationResponseDto>(TestHelpers.JsonOptions);
@@ -166,7 +166,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
         // Post empty list (still valid)
-        var response = await client.PostAsJsonAsync("/api/organizations/user-notifications/mark-seen", new List<int>());
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/user-notifications/mark-seen", new List<int>());
         response.EnsureSuccessStatusCode();
     }
 
@@ -178,18 +178,18 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Dup Req Test", "dup-req-test");
-        await client.PutAsJsonAsync("/api/Organizations/dup-req-test/settings", new { joinPolicy = 1 });
+        await client.PutAsJsonAsync("/api/v1/Organizations/dup-req-test/settings", new { joinPolicy = 1 });
 
         var newClient = _factory.CreateClient();
         var newUser = await TestHelpers.RegisterAsync(newClient, "dupreq@test.com", "Password123!", "Dup", "Req");
         TestHelpers.SetBearerToken(newClient, newUser.AccessToken);
 
         // First request succeeds
-        var first = await newClient.PostAsJsonAsync("/api/organizations/dup-req-test/requests", new { type = 0 });
+        var first = await newClient.PostAsJsonAsync("/api/v1/organizations/dup-req-test/requests", new { type = 0 });
         first.StatusCode.Should().Be(HttpStatusCode.Created);
 
         // Second identical request should fail
-        var second = await newClient.PostAsJsonAsync("/api/organizations/dup-req-test/requests", new { type = 0 });
+        var second = await newClient.PostAsJsonAsync("/api/v1/organizations/dup-req-test/requests", new { type = 0 });
         second.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
@@ -202,12 +202,12 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "WSC Test", "wsc-test-org");
         // Set work schedule change to RequiresApproval
-        await client.PutAsJsonAsync("/api/Organizations/wsc-test-org/settings", new { workScheduleChangeMode = 1 });
+        await client.PutAsJsonAsync("/api/v1/Organizations/wsc-test-org/settings", new { workScheduleChangeMode = 1 });
 
         // Add Tom as a member
         var tomLogin = await TestHelpers.LoginAsync(_factory.CreateClient(), TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
-        await client.PostAsJsonAsync("/api/Organizations/wsc-test-org/members", new
+        await client.PostAsJsonAsync("/api/v1/Organizations/wsc-test-org/members", new
         {
             userId = tomLogin.User.Id,
             role = 0
@@ -224,7 +224,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
             distributeEvenly = true
         });
 
-        var createResponse = await tomClient.PostAsJsonAsync("/api/organizations/wsc-test-org/requests", new
+        var createResponse = await tomClient.PostAsJsonAsync("/api/v1/organizations/wsc-test-org/requests", new
         {
             type = 4, // WorkScheduleChange
             message = "I'd like to change my schedule",
@@ -235,7 +235,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         // Owner accepts
         var acceptResponse = await client.PutAsJsonAsync(
-            $"/api/organizations/wsc-test-org/requests/{req!.Id}", new { accept = true });
+            $"/api/v1/organizations/wsc-test-org/requests/{req!.Id}", new { accept = true });
         acceptResponse.EnsureSuccessStatusCode();
     }
 }

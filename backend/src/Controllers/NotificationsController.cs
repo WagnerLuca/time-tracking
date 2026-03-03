@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TimeTracking.Api.Models.Dtos;
@@ -9,7 +10,8 @@ namespace TimeTracking.Api.Controllers;
 /// Manages user notifications: list, count, and mark as read.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Authorize]
 public class NotificationsController : OrganizationBaseController
 {

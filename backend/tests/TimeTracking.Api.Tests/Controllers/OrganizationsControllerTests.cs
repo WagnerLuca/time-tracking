@@ -20,7 +20,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
     public async Task GetOrganizations_ReturnsSeededOrg()
     {
         var client = _factory.CreateClient();
-        var response = await client.GetAsync("/api/Organizations");
+        var response = await client.GetAsync("/api/v1/Organizations");
         response.EnsureSuccessStatusCode();
 
         var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<OrganizationResponseDto>>(TestHelpers.JsonOptions);
@@ -32,7 +32,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
     public async Task GetOrganization_BySlug_ReturnsDetail()
     {
         var client = _factory.CreateClient();
-        var response = await client.GetAsync($"/api/Organizations/{TestHelpers.SeedOrgSlug}");
+        var response = await client.GetAsync($"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}");
         response.EnsureSuccessStatusCode();
 
         var org = await response.Content.ReadFromJsonAsync<OrganizationDetailResponseDto>(TestHelpers.JsonOptions);
@@ -45,7 +45,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
     public async Task GetOrganization_NonExistent_Returns404()
     {
         var client = _factory.CreateClient();
-        var response = await client.GetAsync("/api/Organizations/does-not-exist");
+        var response = await client.GetAsync("/api/v1/Organizations/does-not-exist");
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -55,7 +55,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var client = _factory.CreateClient();
         var login = await TestHelpers.LoginAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync($"/api/Organizations/user/{login.User.Id}");
+        var response = await client.GetAsync($"/api/v1/Organizations/user/{login.User.Id}");
         response.EnsureSuccessStatusCode();
 
         var userOrgs = await response.Content.ReadFromJsonAsync<List<UserOrganizationResponseDto>>(TestHelpers.JsonOptions);
@@ -84,7 +84,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.PostAsJsonAsync("/api/Organizations", new
+        var response = await client.PostAsJsonAsync("/api/v1/Organizations", new
         {
             name = "Duplicate",
             slug = TestHelpers.SeedOrgSlug
@@ -99,7 +99,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.PostAsJsonAsync("/api/Organizations", new
+        var response = await client.PostAsJsonAsync("/api/v1/Organizations", new
         {
             name = "Bad Slug",
             slug = "INVALID SLUG!!"
@@ -112,7 +112,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
     public async Task CreateOrganization_Unauthenticated_Returns401()
     {
         var client = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/Organizations", new
+        var response = await client.PostAsJsonAsync("/api/v1/Organizations", new
         {
             name = "Auth Test",
             slug = "auth-test"
@@ -132,7 +132,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         // Create a new org to update
         await TestHelpers.CreateOrganizationAsync(client, "Update Me", "update-me-org");
 
-        var response = await client.PutAsJsonAsync("/api/Organizations/update-me-org", new
+        var response = await client.PutAsJsonAsync("/api/v1/Organizations/update-me-org", new
         {
             name = "Updated Name",
             description = "Updated desc"
@@ -150,7 +150,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         // Tom is a Member in the seed org
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
-        var response = await client.PutAsJsonAsync($"/api/Organizations/{TestHelpers.SeedOrgSlug}", new
+        var response = await client.PutAsJsonAsync($"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}", new
         {
             name = "Should Fail"
         });
@@ -168,11 +168,11 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
 
         await TestHelpers.CreateOrganizationAsync(client, "ToDelete", "to-delete-org");
 
-        var response = await client.DeleteAsync("/api/Organizations/to-delete-org");
+        var response = await client.DeleteAsync("/api/v1/Organizations/to-delete-org");
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Verify it's gone
-        var getResponse = await client.GetAsync("/api/Organizations/to-delete-org");
+        var getResponse = await client.GetAsync("/api/v1/Organizations/to-delete-org");
         getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -191,7 +191,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var newClient = _factory.CreateClient();
         var newUser = await TestHelpers.RegisterAsync(newClient, "addme@test.com", "Password123!", "Add", "Me");
 
-        var response = await client.PostAsJsonAsync("/api/Organizations/member-test-org/members", new
+        var response = await client.PostAsJsonAsync("/api/v1/Organizations/member-test-org/members", new
         {
             userId = newUser.User.Id,
             role = 0 // Member
@@ -211,12 +211,12 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
 
         // Get the org detail to find Anna's member ID
         var detail = await client.GetFromJsonAsync<OrganizationDetailResponseDto>(
-            $"/api/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
         var anna = detail!.Members.First(m => m.Email == TestHelpers.SeedAdminEmail);
 
         // Change Anna to Member
         var response = await client.PutAsJsonAsync(
-            $"/api/Organizations/{TestHelpers.SeedOrgSlug}/members/{anna.Id}", new { role = 0 });
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}/members/{anna.Id}", new { role = 0 });
         response.EnsureSuccessStatusCode();
 
         // Verify
@@ -225,7 +225,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
 
         // Restore to Admin
         await client.PutAsJsonAsync(
-            $"/api/Organizations/{TestHelpers.SeedOrgSlug}/members/{anna.Id}", new { role = 1 });
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}/members/{anna.Id}", new { role = 1 });
     }
 
     [Fact]
@@ -240,14 +240,14 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var newClient = _factory.CreateClient();
         var newUser = await TestHelpers.RegisterAsync(newClient, "removeme@test.com", "Password123!", "Rem", "Ove");
 
-        await client.PostAsJsonAsync("/api/Organizations/remove-test-org/members", new
+        await client.PostAsJsonAsync("/api/v1/Organizations/remove-test-org/members", new
         {
             userId = newUser.User.Id,
             role = 0
         });
 
         var response = await client.DeleteAsync(
-            $"/api/Organizations/remove-test-org/members/{newUser.User.Id}");
+            $"/api/v1/Organizations/remove-test-org/members/{newUser.User.Id}");
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
@@ -261,7 +261,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
 
         await TestHelpers.CreateOrganizationAsync(client, "Settings Test", "settings-test-org");
 
-        var response = await client.PutAsJsonAsync("/api/Organizations/settings-test-org/settings", new
+        var response = await client.PutAsJsonAsync("/api/v1/Organizations/settings-test-org/settings", new
         {
             autoPauseEnabled = false,
             editPastEntriesMode = 1, // RequiresApproval
@@ -271,7 +271,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
 
         // Verify
         var detail = await client.GetFromJsonAsync<OrganizationDetailResponseDto>(
-            "/api/Organizations/settings-test-org", TestHelpers.JsonOptions);
+            "/api/v1/Organizations/settings-test-org", TestHelpers.JsonOptions);
         detail!.AutoPauseEnabled.Should().BeFalse();
         detail.EditPastEntriesMode.Should().Be("RequiresApproval");
         detail.MemberTimeEntryVisibility.Should().BeTrue();
@@ -284,7 +284,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
         var response = await client.PutAsJsonAsync(
-            $"/api/Organizations/{TestHelpers.SeedOrgSlug}/settings", new
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}/settings", new
             {
                 autoPauseEnabled = false
             });
@@ -300,7 +300,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync($"/api/Organizations/{TestHelpers.SeedOrgSlug}/time-overview");
+        var response = await client.GetAsync($"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}/time-overview");
         response.EnsureSuccessStatusCode();
 
         var overview = await response.Content.ReadFromJsonAsync<List<MemberTimeOverviewResponseDto>>(TestHelpers.JsonOptions);
@@ -314,7 +314,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync($"/api/Organizations/{TestHelpers.SeedOrgSlug}/time-overview");
+        var response = await client.GetAsync($"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}/time-overview");
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
@@ -328,11 +328,11 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
 
         // Get Anna's user ID
         var detail = await client.GetFromJsonAsync<OrganizationDetailResponseDto>(
-            $"/api/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
         var anna = detail!.Members.First(m => m.Email == TestHelpers.SeedAdminEmail);
 
         var response = await client.GetAsync(
-            $"/api/Organizations/{TestHelpers.SeedOrgSlug}/member-entries/{anna.Id}");
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}/member-entries/{anna.Id}");
         response.EnsureSuccessStatusCode();
 
         var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
@@ -349,11 +349,11 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
 
         // Get Tom's member ID
         var detail = await client.GetFromJsonAsync<OrganizationDetailResponseDto>(
-            $"/api/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
         var tom = detail!.Members.First(m => m.Email == TestHelpers.SeedMemberEmail);
 
         var response = await client.PutAsJsonAsync(
-            $"/api/Organizations/{TestHelpers.SeedOrgSlug}/members/{tom.Id}/initial-overtime",
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}/members/{tom.Id}/initial-overtime",
             new { initialOvertimeHours = 5.0 });
         response.EnsureSuccessStatusCode();
     }

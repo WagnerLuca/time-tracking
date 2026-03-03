@@ -1,3 +1,4 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TimeTracking.Api.Models.Dtos;
@@ -9,7 +10,8 @@ namespace TimeTracking.Api.Controllers;
 /// Manages automatic pause rules for an organization.
 /// </summary>
 [ApiController]
-[Route("api/organizations")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/organizations")]
 public class PauseRulesController : OrganizationBaseController
 {
     private readonly IPauseRuleService _service;
