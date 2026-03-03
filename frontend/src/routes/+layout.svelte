@@ -7,6 +7,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { requestsApi, organizationsApi } from '$lib/apiClient';
 	import type { OrgRequestResponse } from '$lib/api';
+	import { parseRequestData, formatRequestTypeFull, formatRequestType, formatTimeAgo } from '$lib/utils/formatters';
 
 	let { children } = $props();
 
@@ -116,53 +117,6 @@
 
 	function closeNotifDetail() {
 		detailReq = null;
-	}
-
-	function parseRequestData(type: string | null | undefined, data: string | null | undefined): string[] {
-		if (!data) return [];
-		try {
-			if (type === 'EditPastEntry') {
-				const obj = JSON.parse(data);
-				const parts: string[] = [];
-				if (obj.startTime) parts.push(`New Start: ${new Date(obj.startTime).toLocaleString()}`);
-				if (obj.endTime) parts.push(`New End: ${new Date(obj.endTime).toLocaleString()}`);
-				if (obj.description !== undefined) parts.push(`Note: ${obj.description}`);
-				return parts;
-			} else if (type === 'EditPause') {
-				return [`New Pause: ${data} minutes`];
-			} else if (type === 'SetInitialOvertime') {
-				return [`Overtime: ${data}h`];
-			}
-		} catch { /* fallback */ }
-		return data ? [data] : [];
-	}
-
-	function formatRequestTypeFull(type: string | null | undefined): string {
-		if (type === 'JoinOrganization') return 'Join Organization';
-		if (type === 'EditPastEntry') return 'Edit Past Time Entry';
-		if (type === 'EditPause') return 'Edit Pause Duration';
-		if (type === 'SetInitialOvertime') return 'Set Initial Overtime';
-		return type ?? 'Unknown';
-	}
-
-	function formatRequestType(type: string | null | undefined): string {
-		if (type === 'JoinOrganization') return 'Join';
-		if (type === 'EditPastEntry') return 'Edit Entry';
-		if (type === 'EditPause') return 'Edit Pause';
-		if (type === 'SetInitialOvertime') return 'Set Overtime';
-		return type ?? 'Unknown';
-	}
-
-	function formatTimeAgo(dateStr: string | null | undefined): string {
-		if (!dateStr) return '';
-		const diff = Date.now() - new Date(dateStr).getTime();
-		const mins = Math.floor(diff / 60000);
-		if (mins < 1) return 'just now';
-		if (mins < 60) return `${mins}m ago`;
-		const hours = Math.floor(mins / 60);
-		if (hours < 24) return `${hours}h ago`;
-		const days = Math.floor(hours / 24);
-		return `${days}d ago`;
 	}
 
 	async function handleLogout() {

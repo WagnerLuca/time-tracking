@@ -4,6 +4,9 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { timeTrackingApi, workScheduleApi, holidayApi, absenceDayApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, WorkScheduleResponse } from '$lib/api';
+	import { formatHours, formatDelta, barWidth } from '$lib/utils/formatters';
+	import { dateKey } from '$lib/utils/dateHelpers';
+	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, getHeatColor } from '$lib/utils/scheduleHelpers';
 
 	// View mode
 	let viewMode = $state<'month' | 'year'>('month');
@@ -202,8 +205,8 @@
 				const endDate = now < lastDayOfMonth ? now : lastDayOfMonth;
 				while (dayCursor <= endDate) {
 					const d = new Date(dayCursor);
-					target += getDayTarget(d);
-					absCredits += getAbsenceCredit(d);
+					target += getDayTarget(d, workSchedule, holidayDates, schedulePeriods);
+					absCredits += getAbsenceCredit(d, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods);
 					dayCursor.setDate(dayCursor.getDate() + 1);
 				}
 				monthlyTargets.set(mk, target);
@@ -260,73 +263,6 @@
 	}
 
 	// Helpers
-	function dateKey(d: Date): string {
-		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-	}
-
-	function getDayType(key: string): string | null {
-		if (holidayDates.has(key)) return 'holiday';
-		if (sickDayDates.has(key)) return 'sick';
-		if (vacationDates.has(key)) return 'vacation';
-		if (otherAbsenceDates.has(key)) return 'other-absence';
-		return null;
-	}
-
-	function getDayTypeLabel(key: string): string {
-		if (holidayDates.has(key)) return holidayDates.get(key) ?? 'Holiday';
-		if (sickDayDates.has(key)) return 'Sick Day';
-		if (vacationDates.has(key)) return 'Vacation';
-		if (otherAbsenceDates.has(key)) return 'Other Absence';
-		return '';
-	}
-
-	function getDayTarget(date: Date): number {
-		if (!workSchedule) return 0;
-		const key = dateKey(date);
-		// Only holidays reduce the target to 0; absences still have a target
-		if (holidayDates.has(key)) return 0;
-		// Check schedule periods first
-		const dateOnly = key;
-		for (const p of schedulePeriods) {
-			if (p.validFrom && p.validFrom <= dateOnly && (!p.validTo || p.validTo >= dateOnly)) {
-				const dow = date.getDay();
-				const targets: Record<number, number> = {
-					1: (p.targetMon ?? 0) * 60, 2: (p.targetTue ?? 0) * 60, 3: (p.targetWed ?? 0) * 60,
-					4: (p.targetThu ?? 0) * 60, 5: (p.targetFri ?? 0) * 60
-				};
-				return targets[dow] ?? 0;
-			}
-		}
-		const dow = date.getDay();
-		const targets: Record<number, number> = {
-			1: (workSchedule.targetMon ?? 0) * 60, 2: (workSchedule.targetTue ?? 0) * 60, 3: (workSchedule.targetWed ?? 0) * 60,
-			4: (workSchedule.targetThu ?? 0) * 60, 5: (workSchedule.targetFri ?? 0) * 60
-		};
-		return targets[dow] ?? 0;
-	}
-
-	function getAbsenceCredit(date: Date): number {
-		const key = dateKey(date);
-		if (sickDayDates.has(key) || vacationDates.has(key) || otherAbsenceDates.has(key)) {
-			return getDayTarget(date);
-		}
-		return 0;
-	}
-
-	function formatHours(minutes: number): string {
-		if (minutes === 0) return '0h';
-		const h = Math.floor(Math.abs(minutes) / 60);
-		const m = Math.round(Math.abs(minutes) % 60);
-		const sign = minutes < 0 ? '-' : '';
-		if (m === 0) return `${sign}${h}h`;
-		if (h === 0) return `${sign}${m}m`;
-		return `${sign}${h}h ${m}m`;
-	}
-
-	function formatDelta(minutes: number): string {
-		const sign = minutes >= 0 ? '+' : '';
-		return sign + formatHours(minutes);
-	}
 
 	function getYearCumulative(year: number): number {
 		// Find the latest month in this year that has cumulative data
@@ -389,8 +325,8 @@
 			const isToday = cursor.toDateString() === today.toDateString();
 			const isWeekend = cursor.getDay() === 0 || cursor.getDay() === 6;
 			const entryData = entryMap.get(key) ?? { minutes: 0, count: 0 };
-			const targetMinutes = isCurrentMonth ? getDayTarget(new Date(cursor)) : 0;
-			const absCredit = isCurrentMonth ? getAbsenceCredit(new Date(cursor)) : 0;
+			const targetMinutes = isCurrentMonth ? getDayTarget(new Date(cursor), workSchedule, holidayDates, schedulePeriods) : 0;
+			const absCredit = isCurrentMonth ? getAbsenceCredit(new Date(cursor), workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods) : 0;
 			const effectiveWorked = entryData.minutes + absCredit;
 
 			days.push({
@@ -403,8 +339,8 @@
 				workedMinutes: effectiveWorked,
 				targetMinutes,
 				entryCount: entryData.count,
-				dayType: getDayType(key),
-				dayTypeLabel: getDayTypeLabel(key),
+				dayType: getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates),
+				dayTypeLabel: getDayTypeLabel(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates),
 				delta: effectiveWorked - targetMinutes
 			});
 
@@ -452,15 +388,15 @@
 			const cursor = new Date(firstDay);
 			while (cursor <= lastDay) {
 				const key = dateKey(cursor);
-				const dt = getDayType(key);
+				const dt = getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates);
 				if (dt === 'holiday') holidays++;
 				else if (dt === 'sick') sickDays++;
 				else if (dt === 'vacation') vacationDays++;
 
-				const target = getDayTarget(new Date(cursor));
+				const target = getDayTarget(new Date(cursor), workSchedule, holidayDates, schedulePeriods);
 				if (target > 0) workDays++;
 				targetMinutes += target;
-				absenceCredits += getAbsenceCredit(new Date(cursor));
+				absenceCredits += getAbsenceCredit(new Date(cursor), workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods);
 
 				cursor.setDate(cursor.getDate() + 1);
 			}
@@ -492,20 +428,6 @@
 		return months;
 	}
 
-	function getHeatColor(minutes: number, target: number): string {
-		if (minutes === 0) return 'transparent';
-		if (target === 0) return 'rgba(59, 130, 246, 0.3)';
-		const ratio = minutes / target;
-		if (ratio >= 1) return 'rgba(34, 197, 94, 0.5)';
-		if (ratio >= 0.75) return 'rgba(34, 197, 94, 0.3)';
-		if (ratio >= 0.5) return 'rgba(250, 204, 21, 0.3)';
-		return 'rgba(239, 68, 68, 0.2)';
-	}
-
-	function barWidth(worked: number, target: number): number {
-		if (target <= 0) return worked > 0 ? 100 : 0;
-		return Math.min((worked / target) * 100, 100);
-	}
 </script>
 
 <div class="history-page">

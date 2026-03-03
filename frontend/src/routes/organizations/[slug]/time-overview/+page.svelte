@@ -3,6 +3,8 @@
 	import { page } from '$app/stores';
 	import { organizationsApi } from '$lib/apiClient';
 	import type { MemberTimeOverviewResponse, OrganizationDetailResponse, TimeEntryResponse } from '$lib/api';
+	import { formatHoursDecimal, formatTime, formatDateShort, formatWeekLabel, formatDuration } from '$lib/utils/formatters';
+	import { getWeekRange } from '$lib/utils/dateHelpers';
 
 	let orgSlug: string;
 	let orgName = $state('');
@@ -24,18 +26,6 @@
 		loadOrg();
 		loadOverview();
 	});
-
-	function getWeekRange(offset: number) {
-		const now = new Date();
-		const start = new Date(now);
-		const dayOfWeek = now.getDay() || 7;
-		start.setDate(now.getDate() - dayOfWeek + 1 + offset * 7);
-		start.setHours(0, 0, 0, 0);
-		const end = new Date(start);
-		end.setDate(start.getDate() + 6);
-		end.setHours(23, 59, 59, 999);
-		return { start, end };
-	}
 
 	async function loadOrg() {
 		try {
@@ -90,31 +80,6 @@
 		}
 	}
 
-	function formatHours(minutes: number): string {
-		if (minutes === 0) return '-';
-		return (minutes / 60).toFixed(1) + 'h';
-	}
-
-	function formatTime(iso: string): string {
-		return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-	}
-
-	function formatDateShort(iso: string): string {
-		return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
-	}
-
-	function formatWeekLabel(range: { start: Date; end: Date }): string {
-		const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
-		return `${range.start.toLocaleDateString([], opts)} – ${range.end.toLocaleDateString([], opts)}`;
-	}
-
-	function formatDuration(minutes?: number): string {
-		if (minutes == null || minutes === 0) return '-';
-		const h = Math.floor(minutes / 60);
-		const m = Math.round(minutes % 60);
-		if (h > 0) return `${h}h ${m}m`;
-		return `${m}m`;
-	}
 </script>
 
 <svelte:head>
@@ -169,8 +134,8 @@
 						<span class="col-target">
 							{member.weeklyWorkHours ? `${member.weeklyWorkHours}h` : '-'}
 						</span>
-						<span class="col-tracked">{formatHours(member.totalTrackedMinutes ?? 0)}</span>
-						<span class="col-net">{formatHours(member.netTrackedMinutes ?? 0)}</span>
+						<span class="col-tracked">{formatHoursDecimal(member.totalTrackedMinutes ?? 0)}</span>
+						<span class="col-net">{formatHoursDecimal(member.netTrackedMinutes ?? 0)}</span>
 						<span class="col-entries">{member.entryCount}</span>
 						<span class="col-status">
 							{#if targetMinutes > 0}

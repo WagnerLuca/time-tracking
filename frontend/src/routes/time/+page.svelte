@@ -5,6 +5,10 @@
 	import { timeTrackingApi, organizationsApi, workScheduleApi, requestsApi, holidayApi, absenceDayApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/api';
 	import { RequestType } from '$lib/api';
+	import { formatHoursDecimal, formatDelta, formatDuration, formatTime, formatDateShort, formatWeekLabel, formatHours } from '$lib/utils/formatters';
+	import { dateKey, isToday, getWeekRange, toLocalDateTimeInput, sumMinutes } from '$lib/utils/dateHelpers';
+	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel } from '$lib/utils/scheduleHelpers';
+	import { DAY_NAMES, MAX_ENTRIES_FOR_OVERTIME } from '$lib/utils/constants';
 
 	let current = $state<TimeEntryResponse | null>(null);
 	let weekEntries = $state<TimeEntryResponse[]>([]);
@@ -75,33 +79,15 @@
 		if (timerInterval) clearInterval(timerInterval);
 	});
 
-	function getWeekRange(offset: number) {
-		const now = new Date();
-		const start = new Date(now);
-		const dayOfWeek = now.getDay() || 7; // Sunday = 7 (end of Mon-Sun week)
-		start.setDate(now.getDate() - dayOfWeek + 1 + offset * 7); // Monday
-		start.setHours(0, 0, 0, 0);
-		const end = new Date(start);
-		end.setDate(start.getDate() + 6);
-		end.setHours(23, 59, 59, 999);
-		return { start, end };
-	}
-
 	function computeDailyTotals(entries: TimeEntryResponse[], range: { start: Date; end: Date }, schedule: WorkScheduleResponse | null) {
-		const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-		const targets = schedule
-			? [schedule.targetMon, schedule.targetTue, schedule.targetWed, schedule.targetThu, schedule.targetFri, 0, 0]
-			: [0, 0, 0, 0, 0, 0, 0];
+		const days = DAY_NAMES;
 		const now = new Date();
 		now.setHours(23, 59, 59, 999);
 		const totals = days.map((name, i) => {
 			const date = new Date(range.start);
 			date.setDate(range.start.getDate() + i);
 			const isPastOrToday = date <= now;
-			// Check if day off
-			const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-			const off = daysOffSet.has(dateStr);
-			return { name, date: new Date(date), minutes: 0, targetMinutes: off ? 0 : (targets[i] ?? 0) * 60, entryCount: 0, isPastOrToday };
+			return { name, date: new Date(date), minutes: 0, targetMinutes: getDayTarget(date, schedule, holidayDates), entryCount: 0, isPastOrToday };
 		});
 
 		for (const entry of entries) {
@@ -186,52 +172,6 @@
 		}
 	}
 
-	function getDayTarget(date: Date): number {
-		if (!workSchedule) return 0;
-		const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-		// Only holidays reduce the target to 0; absences still have a target
-		if (holidayDates.has(dateStr)) return 0;
-		const dayOfWeek = date.getDay();
-		const targets: Record<number, number> = {
-			1: (workSchedule.targetMon ?? 0) * 60,
-			2: (workSchedule.targetTue ?? 0) * 60,
-			3: (workSchedule.targetWed ?? 0) * 60,
-			4: (workSchedule.targetThu ?? 0) * 60,
-			5: (workSchedule.targetFri ?? 0) * 60,
-		};
-		return targets[dayOfWeek] ?? 0;
-	}
-
-	function getAbsenceCredit(date: Date): number {
-		const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-		if (sickDayDates.has(dateStr) || vacationDates.has(dateStr) || otherAbsenceDates.has(dateStr)) {
-			return getDayTarget(date);
-		}
-		return 0;
-	}
-
-	function dateKey(d: Date): string {
-		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-	}
-
-	function getDayType(d: Date): string | null {
-		const k = dateKey(d);
-		if (holidayDates.has(k)) return 'holiday';
-		if (sickDayDates.has(k)) return 'sick';
-		if (vacationDates.has(k)) return 'vacation';
-		if (otherAbsenceDates.has(k)) return 'other-absence';
-		return null;
-	}
-
-	function getDayTypeLabel(d: Date): string {
-		const k = dateKey(d);
-		if (holidayDates.has(k)) return holidayDates.get(k) ?? 'Holiday';
-		if (sickDayDates.has(k)) return 'Sick Day';
-		if (vacationDates.has(k)) return 'Vacation';
-		if (otherAbsenceDates.has(k)) return 'Other Absence';
-		return '';
-	}
-
 	async function loadCumulativeOvertime() {
 		// Load holidays + absences for days-off calculation
 		if (orgContext.selectedOrgSlug) {
@@ -286,15 +226,12 @@
 		}
 		try {
 			const orgId = orgContext.selectedOrgId ?? undefined;
-			const { data: allEntries } = await timeTrackingApi.apiTimeTrackingGet(orgId, undefined, undefined, 10000);
+			const { data: allEntries } = await timeTrackingApi.apiTimeTrackingGet(orgId, undefined, undefined, MAX_ENTRIES_FOR_OVERTIME);
 			const sorted = [...allEntries]
 				.filter(e => !e.isRunning && e.endTime)
 				.sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime());
 
 			if (sorted.length > 0) {
-				const sumMinutes = (entries: TimeEntryResponse[]) =>
-					entries.reduce((s, e) => s + (e.netDurationMinutes ?? e.durationMinutes ?? 0), 0);
-
 				const firstDate = new Date(sorted[0].startTime!);
 				firstDate.setHours(0, 0, 0, 0);
 				const today = new Date();
@@ -305,8 +242,8 @@
 				let totalAbsenceCredits = 0;
 				const cursor = new Date(firstDate);
 				while (cursor <= today) {
-					totalTargetMins += getDayTarget(cursor);
-					totalAbsenceCredits += getAbsenceCredit(cursor);
+					totalTargetMins += getDayTarget(cursor, workSchedule, holidayDates);
+					totalAbsenceCredits += getAbsenceCredit(cursor, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates);
 					cursor.setDate(cursor.getDate() + 1);
 				}
 
@@ -376,45 +313,6 @@
 		loadWeek();
 	}
 
-	function formatDuration(minutes?: number): string {
-		if (minutes == null || minutes === 0) return '-';
-		const h = Math.floor(minutes / 60);
-		const m = Math.round(minutes % 60);
-		if (h > 0) return `${h}h ${m}m`;
-		return `${m}m`;
-	}
-
-	function formatHours(minutes: number): string {
-		if (minutes === 0) return '-';
-		return (minutes / 60).toFixed(1) + 'h';
-	}
-
-	function formatDelta(minutes: number): string {
-		if (minutes === 0) return '±0h';
-		const sign = minutes > 0 ? '+' : '';
-		return sign + (minutes / 60).toFixed(1) + 'h';
-	}
-
-	function formatTime(iso: string): string {
-		return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-	}
-
-	function formatDateShort(date: Date): string {
-		return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-	}
-
-	function formatWeekLabel(range: { start: Date; end: Date }): string {
-		const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
-		return `${range.start.toLocaleDateString([], opts)} – ${range.end.toLocaleDateString([], opts)}`;
-	}
-
-	function isToday(date: Date): boolean {
-		const now = new Date();
-		return date.getFullYear() === now.getFullYear() &&
-			date.getMonth() === now.getMonth() &&
-			date.getDate() === now.getDate();
-	}
-
 	// Edit entry
 	let editingEntryId = $state<number | null>(null);
 	let editStartTime = $state('');
@@ -423,12 +321,6 @@
 	let editPause = $state<number>(0);
 	let editError = $state('');
 	let editSaving = $state(false);
-
-	function toLocalDateTimeInput(iso: string): string {
-		const d = new Date(iso);
-		const pad = (n: number) => String(n).padStart(2, '0');
-		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-	}
 
 	function startEditEntry(entry: TimeEntryResponse) {
 		editingEntryId = entry.id ?? null;
@@ -598,7 +490,7 @@
 				<div class="week-title">
 					<span class="week-label">{formatWeekLabel(weekRange)}</span>
 					<span class="week-total">
-						{formatHours(weekTotal)}{#if weekTargetFull > 0} / {formatHours(weekTargetFull)}{/if}
+						{formatHoursDecimal(weekTotal)}{#if weekTargetFull > 0} / {formatHoursDecimal(weekTargetFull)}{/if}
 						{#if weekTargetSoFar > 0}
 							{@const weekDelta = weekTotal - weekTargetSoFar}
 							<span class="week-delta" class:positive={weekDelta > 0} class:negative={weekDelta < 0}>
@@ -623,10 +515,10 @@
 					{@const pct = maxMins > 0 ? Math.min((day.minutes / maxMins) * 100, 100) : 0}
 					{@const targetPct = maxMins > 0 && day.targetMinutes > 0 ? Math.min((day.targetMinutes / maxMins) * 100, 100) : 0}
 					{@const delta = day.isPastOrToday && day.targetMinutes > 0 ? day.minutes - day.targetMinutes : 0}
-					{@const dayType = getDayType(day.date)}
+					{@const dayType = getDayType(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}
 					<div class="day-row" class:today={isToday(day.date)} class:future={!day.isPastOrToday} class:day-holiday={dayType === 'holiday'} class:day-sick={dayType === 'sick'} class:day-vacation={dayType === 'vacation'} class:day-other={dayType === 'other-absence'}>
 						<span class="day-name">{day.name}</span>
-						<span class="day-date">{formatDateShort(day.date)}{#if dayType} <span class="day-type-dot day-type-{dayType}" title={getDayTypeLabel(day.date)}></span>{/if}</span>
+						<span class="day-date">{formatDateShort(day.date)}{#if dayType} <span class="day-type-dot day-type-{dayType}" title={getDayTypeLabel(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}></span>{/if}</span>
 						<div class="day-bar-track">
 							{#if targetPct > 0}
 								<div class="day-bar-target" style="left: {targetPct}%"></div>
@@ -634,7 +526,7 @@
 							<div class="day-bar-fill" style="width: {pct}%"></div>
 						</div>
 						<span class="day-hours">
-							{formatHours(day.minutes)}{#if day.targetMinutes > 0}<span class="day-target-label"> / {formatHours(day.targetMinutes)}</span>{/if}
+							{formatHoursDecimal(day.minutes)}{#if day.targetMinutes > 0}<span class="day-target-label"> / {formatHoursDecimal(day.targetMinutes)}</span>{/if}
 							{#if delta !== 0}
 								<span class="day-delta" class:positive={delta > 0} class:negative={delta < 0}>
 									{delta > 0 ? '+' : ''}{formatHours(delta)}

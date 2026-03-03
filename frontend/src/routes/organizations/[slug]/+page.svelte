@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { organizationsApi, pauseRulesApi, workScheduleApi, requestsApi, holidayApi, absenceDayApi, notificationsApi } from '$lib/apiClient';
+	import { formatRequestType, formatTimeAgo, statusBadgeClass, parseRequestData, absenceTypeLabel, absenceTypeBadge } from '$lib/utils/formatters';
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationRequest,
@@ -320,55 +321,7 @@
 		return requestHistory.filter(r => r.status === requestHistoryFilter);
 	}
 
-	function formatRequestType(type?: string | null): string {
-		switch (type) {
-			case 'JoinOrganization': return 'Join';
-			case 'EditPastEntry': return 'Edit Entry';
-			case 'EditPause': return 'Edit Pause';
-			case 'SetInitialOvertime': return 'Set Overtime';
-			default: return type ?? 'Unknown';
-		}
-	}
 
-	function formatTimeAgo(dateStr?: string): string {
-		if (!dateStr) return '';
-		const diff = Date.now() - new Date(dateStr).getTime();
-		const mins = Math.floor(diff / 60000);
-		if (mins < 1) return 'just now';
-		if (mins < 60) return `${mins}m ago`;
-		const hours = Math.floor(mins / 60);
-		if (hours < 24) return `${hours}h ago`;
-		const days = Math.floor(hours / 24);
-		return `${days}d ago`;
-	}
-
-	function statusBadgeClass(status?: string | null): string {
-		switch (status) {
-			case 'Accepted': return 'status-accepted';
-			case 'Declined': return 'status-declined';
-			case 'Pending': return 'status-pending';
-			default: return '';
-		}
-	}
-
-	function parseRequestData(type?: string | null, data?: string | null): string {
-		if (!data) return '';
-		try {
-			if (type === 'EditPastEntry') {
-				const obj = JSON.parse(data);
-				const parts: string[] = [];
-				if (obj.startTime) parts.push(`Start: ${new Date(obj.startTime).toLocaleString()}`);
-				if (obj.endTime) parts.push(`End: ${new Date(obj.endTime).toLocaleString()}`);
-				if (obj.description !== undefined) parts.push(`Note: ${obj.description}`);
-				return parts.join(', ');
-			} else if (type === 'EditPause') {
-				return `Pause: ${data} min`;
-			} else if (type === 'SetInitialOvertime') {
-				return `Overtime: ${data}h`;
-			}
-		} catch { /* fallback */ }
-		return data;
-	}
 
 	// ── Admin: Member Schedule ──
 	async function openMemberSchedule(memberId: number) {
@@ -995,22 +948,7 @@
 		}
 	}
 
-	function absenceTypeLabel(type?: string | null): string {
-		switch (type) {
-			case 'SickDay': return 'Sick Day';
-			case 'Vacation': return 'Vacation';
-			case 'Other': return 'Other';
-			default: return type ?? 'Unknown';
-		}
-	}
 
-	function absenceTypeBadge(type?: string | null): string {
-		switch (type) {
-			case 'SickDay': return 'absence-sick';
-			case 'Vacation': return 'absence-vacation';
-			default: return 'absence-other';
-		}
-	}
 
 	async function addAbsence(e: Event) {
 		e.preventDefault();
@@ -2077,7 +2015,7 @@
 													<span class="request-email">{req.userEmail}</span>
 												</div>
 												{#if req.requestData}
-													<div class="request-data">{parseRequestData(req.type, req.requestData)}</div>
+													<div class="request-data">{parseRequestData(req.type, req.requestData).join(', ')}</div>
 												{/if}
 												{#if req.message}
 													<div class="request-message">"{req.message}"</div>

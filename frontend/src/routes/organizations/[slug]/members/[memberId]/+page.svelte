@@ -4,6 +4,8 @@
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { organizationsApi, workScheduleApi, absenceDayApi } from '$lib/apiClient';
+	import { formatHoursDecimal, formatWeekLabel, formatTime, formatDateShort, formatDateFull, formatDuration, absenceTypeLabel, absenceTypeBadge, getInitials } from '$lib/utils/formatters';
+	import { getWeekRange } from '$lib/utils/dateHelpers';
 	import type {
 		OrganizationDetailResponse,
 		OrganizationMemberResponse,
@@ -90,18 +92,6 @@
 	let actionError = $state('');
 
 	const weekRange = $derived(getWeekRange(weekOffset));
-
-	function getWeekRange(offset: number) {
-		const now = new Date();
-		const start = new Date(now);
-		const dayOfWeek = now.getDay() || 7;
-		start.setDate(now.getDate() - dayOfWeek + 1 + offset * 7);
-		start.setHours(0, 0, 0, 0);
-		const end = new Date(start);
-		end.setDate(start.getDate() + 6);
-		end.setHours(23, 59, 59, 999);
-		return { start, end };
-	}
 
 	onMount(() => {
 		orgSlug = $page.params.slug ?? '';
@@ -401,52 +391,7 @@
 		}
 	}
 
-	// ── Formatters ──
-	function formatHours(minutes: number | undefined): string {
-		if (!minutes) return '0h';
-		return (minutes / 60).toFixed(1) + 'h';
-	}
 
-	function formatWeekLabel(range: { start: Date; end: Date }): string {
-		const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
-		return `${range.start.toLocaleDateString([], opts)} – ${range.end.toLocaleDateString([], opts)}`;
-	}
-
-	function formatTime(iso: string): string {
-		return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-	}
-
-	function formatDate(iso: string): string {
-		return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-	}
-
-	function formatDateShort(iso: string): string {
-		return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
-	}
-
-	function formatDuration(minutes?: number): string {
-		if (minutes == null || minutes === 0) return '-';
-		const h = Math.floor(minutes / 60);
-		const m = Math.round(minutes % 60);
-		if (h > 0) return `${h}h ${m}m`;
-		return `${m}m`;
-	}
-
-	function absenceTypeLabel(type: string | null): string {
-		if (type === 'SickDay' || type === '0') return 'Sick Day';
-		if (type === 'Vacation' || type === '1') return 'Vacation';
-		return 'Other';
-	}
-
-	function absenceTypeBadge(type: string | null): string {
-		if (type === 'SickDay' || type === '0') return 'badge-sick';
-		if (type === 'Vacation' || type === '1') return 'badge-vacation';
-		return 'badge-other';
-	}
-
-	function getInitials(first: string | null, last: string | null): string {
-		return ((first?.[0] ?? '') + (last?.[0] ?? '')).toUpperCase() || '?';
-	}
 </script>
 
 <svelte:head>
@@ -479,7 +424,7 @@
 				<div class="member-meta">
 					<span class="role-badge role-{member.role?.toLowerCase()}">{member.role}</span>
 					{#if member.joinedAt}
-						<span class="joined">Joined {formatDate(member.joinedAt)}</span>
+						<span class="joined">Joined {formatDateFull(member.joinedAt)}</span>
 					{/if}
 					{#if isSelf}
 						<span class="you-badge">You</span>
@@ -526,11 +471,11 @@
 				{@const diff = (overview.netTrackedMinutes ?? 0) - targetMinutes}
 				<div class="stats-grid">
 					<div class="stat-card">
-						<span class="stat-value">{formatHours(overview.totalTrackedMinutes)}</span>
+						<span class="stat-value">{formatHoursDecimal(overview.totalTrackedMinutes)}</span>
 						<span class="stat-label">Total Tracked</span>
 					</div>
 					<div class="stat-card">
-						<span class="stat-value">{formatHours(overview.netTrackedMinutes)}</span>
+						<span class="stat-value">{formatHoursDecimal(overview.netTrackedMinutes)}</span>
 						<span class="stat-label">Net (after pauses)</span>
 					</div>
 					<div class="stat-card">
@@ -538,7 +483,7 @@
 						<span class="stat-label">Weekly Target</span>
 					</div>
 					<div class="stat-card {diff >= 0 ? 'stat-positive' : 'stat-negative'}">
-						<span class="stat-value">{diff >= 0 ? '+' : ''}{formatHours(Math.abs(diff))}</span>
+						<span class="stat-value">{diff >= 0 ? '+' : ''}{formatHoursDecimal(Math.abs(diff))}</span>
 						<span class="stat-label">Overtime</span>
 					</div>
 					<div class="stat-card">
@@ -601,11 +546,11 @@
 				{@const cumulativeOT = (allTimeOverview.netTrackedMinutes ?? 0) - expectedMinutes + initialOTMinutes}
 				<div class="stats-grid">
 					<div class="stat-card stat-highlight {cumulativeOT >= 0 ? 'stat-positive' : 'stat-negative'}">
-						<span class="stat-value">{cumulativeOT >= 0 ? '+' : ''}{formatHours(Math.abs(cumulativeOT))}</span>
+						<span class="stat-value">{cumulativeOT >= 0 ? '+' : ''}{formatHoursDecimal(Math.abs(cumulativeOT))}</span>
 						<span class="stat-label">Cumulative Overtime</span>
 					</div>
 					<div class="stat-card">
-						<span class="stat-value">{formatHours(allTimeOverview.netTrackedMinutes)}</span>
+						<span class="stat-value">{formatHoursDecimal(allTimeOverview.netTrackedMinutes)}</span>
 						<span class="stat-label">All-Time Net Tracked</span>
 					</div>
 					<div class="stat-card">
@@ -668,7 +613,7 @@
 				<div class="absence-list">
 					{#each absences as absence}
 						<div class="absence-row">
-							<span class="absence-date">{formatDate(absence.date!)}</span>
+							<span class="absence-date">{formatDateFull(absence.date!)}</span>
 							<span class="absence-type {absenceTypeBadge(absence.type)}">{absenceTypeLabel(absence.type)}</span>
 							{#if absence.note}
 								<span class="absence-note">{absence.note}</span>
@@ -840,9 +785,9 @@
 					{#each periods as period}
 						<div class="period-row">
 							<div class="period-dates">
-								<span class="period-from">{formatDate(period.validFrom!)}</span>
+								<span class="period-from">{formatDateFull(period.validFrom!)}</span>
 								<span class="period-arrow">→</span>
-								<span class="period-to">{period.validTo ? formatDate(period.validTo) : 'Ongoing'}</span>
+								<span class="period-to">{period.validTo ? formatDateFull(period.validTo) : 'Ongoing'}</span>
 							</div>
 							<span class="period-hours">{period.weeklyWorkHours ?? '-'}h/week</span>
 							{#if canEdit}

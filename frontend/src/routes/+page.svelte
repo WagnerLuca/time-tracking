@@ -4,6 +4,10 @@
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { timeTrackingApi, organizationsApi, workScheduleApi, holidayApi, absenceDayApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, StartTimeEntryRequest, WorkScheduleResponse } from '$lib/api';
+	import { formatHours, formatDelta, barWidth, getMonthName } from '$lib/utils/formatters';
+	import { isToday, isFuture, sumMinutes } from '$lib/utils/dateHelpers';
+	import { getDayTarget, getAbsenceCredit, absenceCreditsForRange, getDayType, getDayTypeLabel, getTargetForRange } from '$lib/utils/scheduleHelpers';
+	import { DAY_NAMES, MAX_ENTRIES_FOR_OVERTIME, WEEKLY_ENTRY_LIMIT, MONTHLY_ENTRY_LIMIT } from '$lib/utils/constants';
 
 	let currentEntry = $state<TimeEntryResponse | null>(null);
 	let todayMinutes = $state(0);
@@ -88,80 +92,6 @@
 		}
 	}
 
-	function getDayTarget(date: Date): number {
-		if (!workSchedule) return 0;
-		const dayOfWeek = date.getDay();
-		const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-		// Only holidays reduce the target to 0; absences still have a target
-		if (holidayDates.has(dateStr)) return 0;
-		const targets: Record<number, number> = {
-			1: workSchedule.targetMon ?? 0,
-			2: workSchedule.targetTue ?? 0,
-			3: workSchedule.targetWed ?? 0,
-			4: workSchedule.targetThu ?? 0,
-			5: workSchedule.targetFri ?? 0,
-		};
-		return (targets[dayOfWeek] ?? 0) * 60; // convert hours to minutes
-	}
-
-	function getAbsenceCredit(date: Date): number {
-		const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-		if (sickDayDates.has(dateStr) || vacationDates.has(dateStr) || otherAbsenceDates.has(dateStr)) {
-			return getDayTarget(date);
-		}
-		return 0;
-	}
-
-	function absenceCreditsForRange(from: Date, to: Date): number {
-		let credits = 0;
-		const cursor = new Date(from);
-		cursor.setHours(0, 0, 0, 0);
-		const end = new Date(to);
-		end.setHours(23, 59, 59, 999);
-		while (cursor <= end) {
-			credits += getAbsenceCredit(cursor);
-			cursor.setDate(cursor.getDate() + 1);
-		}
-		return credits;
-	}
-
-	function getWeekTargetMinutes(): number {
-		if (!workSchedule) return 0;
-		const now = new Date();
-		const dayOfWeek = now.getDay() || 7;
-		const weekStart = new Date(now);
-		weekStart.setDate(now.getDate() - dayOfWeek + 1);
-		weekStart.setHours(0, 0, 0, 0);
-		const todayEnd = new Date(now);
-		todayEnd.setHours(23, 59, 59, 999);
-		return getTargetSinceFirstEntry(weekStart, todayEnd);
-	}
-
-	function getMonthTargetMinutes(year: number, month: number): number {
-		if (!workSchedule) return 0;
-		const monthStart = new Date(year, month, 1);
-		const now = new Date();
-		const isCurrentMonth = now.getFullYear() === year && now.getMonth() === month;
-		const monthEnd = isCurrentMonth ? new Date(now) : new Date(year, month + 1, 0);
-		monthEnd.setHours(23, 59, 59, 999);
-		return getTargetSinceFirstEntry(monthStart, monthEnd);
-	}
-
-	function getTargetSinceFirstEntry(rangeStart: Date, rangeEnd: Date): number {
-		if (!workSchedule) return 0;
-		const effectiveStart = firstEntryDate && firstEntryDate > rangeStart ? firstEntryDate : rangeStart;
-		if (effectiveStart > rangeEnd) return 0;
-
-		let total = 0;
-		const cursor = new Date(effectiveStart);
-		cursor.setHours(0, 0, 0, 0);
-		while (cursor <= rangeEnd) {
-			total += getDayTarget(cursor);
-			cursor.setDate(cursor.getDate() + 1);
-		}
-		return total;
-	}
-
 	async function loadStats() {
 		try {
 			// Load holidays + absences for days-off calculation and color coding
@@ -233,19 +163,15 @@
 
 			const orgId = orgContext.selectedOrgId ?? undefined;
 			const [todayRes, weekRes, monthRes, allRes] = await Promise.all([
-				timeTrackingApi.apiTimeTrackingGet(orgId, todayStart.toISOString(), todayEnd.toISOString(), 200),
-				timeTrackingApi.apiTimeTrackingGet(orgId, weekStart.toISOString(), weekEnd.toISOString(), 200),
-				timeTrackingApi.apiTimeTrackingGet(orgId, monthStart.toISOString(), monthEnd.toISOString(), 500),
-				timeTrackingApi.apiTimeTrackingGet(orgId, undefined, undefined, 10000)
+				timeTrackingApi.apiTimeTrackingGet(orgId, todayStart.toISOString(), todayEnd.toISOString(), WEEKLY_ENTRY_LIMIT),
+				timeTrackingApi.apiTimeTrackingGet(orgId, weekStart.toISOString(), weekEnd.toISOString(), WEEKLY_ENTRY_LIMIT),
+				timeTrackingApi.apiTimeTrackingGet(orgId, monthStart.toISOString(), monthEnd.toISOString(), MONTHLY_ENTRY_LIMIT),
+				timeTrackingApi.apiTimeTrackingGet(orgId, undefined, undefined, MAX_ENTRIES_FOR_OVERTIME)
 			]);
 			const todayEntries = todayRes.data;
 			const weekEntries = weekRes.data;
 			const monthEntries = monthRes.data;
 			const allEntries = allRes.data;
-
-			const sumMinutes = (entries: TimeEntryResponse[]) =>
-				entries.filter(e => !e.isRunning && (e.netDurationMinutes ?? e.durationMinutes))
-					.reduce((s, e) => s + (e.netDurationMinutes ?? e.durationMinutes ?? 0), 0);
 
 			// Find first entry date (for target calculations)
 			const sorted = [...allEntries].filter(e => !e.isRunning && e.endTime)
@@ -257,17 +183,17 @@
 				firstEntryDate = null;
 			}
 
-			todayMinutes = sumMinutes(todayEntries) + getAbsenceCredit(now);
-			weekMinutes = sumMinutes(weekEntries) + absenceCreditsForRange(weekStart, weekEnd);
-			monthMinutes = sumMinutes(monthEntries) + absenceCreditsForRange(monthStart, monthEnd);
+			todayMinutes = sumMinutes(todayEntries) + getAbsenceCredit(now, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates);
+			weekMinutes = sumMinutes(weekEntries) + absenceCreditsForRange(weekStart, weekEnd, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates);
+			monthMinutes = sumMinutes(monthEntries) + absenceCreditsForRange(monthStart, monthEnd, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates);
 
 			// Compute targets — only since first tracked entry
-			todayTarget = getDayTarget(now);
-			weekTarget = getWeekTargetMinutes();
-			monthTarget = getMonthTargetMinutes(now.getFullYear(), now.getMonth());
+			todayTarget = getDayTarget(now, workSchedule, holidayDates);
+			weekTarget = getTargetForRange(weekStart, todayEnd, workSchedule, holidayDates, [], firstEntryDate);
+			monthTarget = getTargetForRange(monthStart, todayEnd, workSchedule, holidayDates, [], firstEntryDate);
 
 			// Build weekly breakdown (Mon-Sun)
-			const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+			const dayNames = DAY_NAMES;
 			const tempWeekDays: typeof weekDays = [];
 			for (let i = 0; i < 7; i++) {
 				const d = new Date(weekStart);
@@ -278,7 +204,7 @@
 					const t = new Date(e.startTime!);
 					return t >= dStart && t <= dEnd;
 				});
-				tempWeekDays.push({ label: dayNames[i], date: d, worked: sumMinutes(dayEntries) + getAbsenceCredit(d), target: getDayTarget(d) });
+				tempWeekDays.push({ label: dayNames[i], date: d, worked: sumMinutes(dayEntries) + getAbsenceCredit(d, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates), target: getDayTarget(d, workSchedule, holidayDates) });
 			}
 			weekDays = tempWeekDays;
 
@@ -306,7 +232,7 @@
 				tempMonthWeeks.push({
 					label: `${wkStart.getDate()}–${wkEnd.getDate()}`,
 					worked: sumMinutes(wkEntries),
-					target: getTargetSinceFirstEntry(wkS, wkEnd)
+					target: getTargetForRange(wkS, wkEnd, workSchedule, holidayDates, [], firstEntryDate)
 				});
 				wkStart = new Date(wkEnd);
 				wkStart.setDate(wkStart.getDate() + 1);
@@ -324,7 +250,7 @@
 				let totalTargetMins = 0;
 				const cursor = new Date(fDate);
 				while (cursor <= today2) {
-					totalTargetMins += getDayTarget(cursor);
+					totalTargetMins += getDayTarget(cursor, workSchedule, holidayDates);
 					cursor.setDate(cursor.getDate() + 1);
 				}
 				const initialOvertimeMins = (workSchedule?.initialOvertimeMode !== 'Disabled' && workSchedule?.initialOvertimeHours) ? workSchedule.initialOvertimeHours * 60 : 0;
@@ -386,61 +312,6 @@
 		}
 	}
 
-	function formatHours(minutes: number): string {
-		if (minutes === 0) return '0h';
-		const sign = minutes < 0 ? '-' : '';
-		return sign + (Math.abs(minutes) / 60).toFixed(1) + 'h';
-	}
-
-	function formatDelta(minutes: number): string {
-		if (minutes === 0) return '±0h';
-		const sign = minutes > 0 ? '+' : '';
-		return sign + (minutes / 60).toFixed(1) + 'h';
-	}
-
-	function getMonthName(): string {
-		return new Date().toLocaleDateString([], { month: 'long' });
-	}
-
-	function isToday(date: Date): boolean {
-		const now = new Date();
-		return date.getDate() === now.getDate() && date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-	}
-
-	function isFuture(date: Date): boolean {
-		const now = new Date();
-		now.setHours(0, 0, 0, 0);
-		const d = new Date(date);
-		d.setHours(0, 0, 0, 0);
-		return d > now;
-	}
-
-	function barWidth(worked: number, target: number): number {
-		if (target <= 0) return worked > 0 ? 100 : 0;
-		return Math.min(100, (worked / target) * 100);
-	}
-
-	function dateKey(d: Date): string {
-		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-	}
-
-	function getDayType(d: Date): 'holiday' | 'sick' | 'vacation' | 'other-absence' | null {
-		const key = dateKey(d);
-		if (holidayDates.has(key)) return 'holiday';
-		if (sickDayDates.has(key)) return 'sick';
-		if (vacationDates.has(key)) return 'vacation';
-		if (otherAbsenceDates.has(key)) return 'other-absence';
-		return null;
-	}
-
-	function getDayTypeLabel(d: Date): string {
-		const key = dateKey(d);
-		if (holidayDates.has(key)) return holidayDates.get(key)!;
-		if (sickDayDates.has(key)) return 'Sick Day';
-		if (vacationDates.has(key)) return 'Vacation';
-		if (otherAbsenceDates.has(key)) return 'Absence';
-		return '';
-	}
 </script>
 
 <svelte:head>
@@ -546,11 +417,11 @@
 			<h2 class="breakdown-title">This Week</h2>
 			<div class="breakdown-rows">
 				{#each weekDays as day}
-					{@const dayType = getDayType(day.date)}
+					{@const dayType = getDayType(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}
 					<div class="breakdown-row" class:today={isToday(day.date)} class:future={isFuture(day.date)} class:day-holiday={dayType === 'holiday'} class:day-sick={dayType === 'sick'} class:day-vacation={dayType === 'vacation'} class:day-other={dayType === 'other-absence'}>
 						<span class="breakdown-day">{day.label}</span>
 						{#if dayType}
-							<span class="day-type-dot day-type-{dayType}" title={getDayTypeLabel(day.date)}></span>
+							<span class="day-type-dot day-type-{dayType}" title={getDayTypeLabel(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}></span>
 						{/if}
 						<div class="breakdown-bar-track">
 							<div class="breakdown-bar-fill" class:over={day.worked > day.target && day.target > 0} style="width: {barWidth(isToday(day.date) ? day.worked + runningMinutes : day.worked, day.target)}%"></div>
