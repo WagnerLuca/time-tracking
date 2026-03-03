@@ -16,10 +16,12 @@ namespace TimeTracking.Api.Controllers;
 public class NotificationsController : OrganizationBaseController
 {
     private readonly INotificationService _service;
+    private readonly ILogger<NotificationsController> _logger;
 
-    public NotificationsController(INotificationService service)
+    public NotificationsController(INotificationService service, ILogger<NotificationsController> logger)
     {
         _service = service;
+        _logger = logger;
     }
 
     /// <summary>Get notifications for the current user.</summary>

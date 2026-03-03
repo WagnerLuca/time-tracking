@@ -16,10 +16,12 @@ namespace TimeTracking.Api.Controllers;
 public class WorkScheduleController : OrganizationBaseController
 {
     private readonly IWorkScheduleService _service;
+    private readonly ILogger<WorkScheduleController> _logger;
 
-    public WorkScheduleController(IWorkScheduleService service)
+    public WorkScheduleController(IWorkScheduleService service, ILogger<WorkScheduleController> logger)
     {
         _service = service;
+        _logger = logger;
     }
 
     // ── Self endpoints ──

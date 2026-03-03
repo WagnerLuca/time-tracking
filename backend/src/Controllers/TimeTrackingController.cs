@@ -16,10 +16,12 @@ namespace TimeTracking.Api.Controllers;
 public class TimeTrackingController : OrganizationBaseController
 {
     private readonly ITimeTrackingService _service;
+    private readonly ILogger<TimeTrackingController> _logger;
 
-    public TimeTrackingController(ITimeTrackingService service)
+    public TimeTrackingController(ITimeTrackingService service, ILogger<TimeTrackingController> logger)
     {
         _service = service;
+        _logger = logger;
     }
 
     /// <summary>Start a new time entry (clock in).</summary>

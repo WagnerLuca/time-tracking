@@ -7,10 +7,12 @@ namespace TimeTracking.Api.Services;
 public class NotificationService : INotificationService
 {
     private readonly TimeTrackingDbContext _context;
+    private readonly ILogger<NotificationService> _logger;
 
-    public NotificationService(TimeTrackingDbContext context)
+    public NotificationService(TimeTrackingDbContext context, ILogger<NotificationService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<ServiceResult<PaginatedResponse<object>>> GetNotificationsAsync(int userId, bool unreadOnly, int limit, int offset)
@@ -69,6 +71,7 @@ public class NotificationService : INotificationService
 
         notification.IsRead = true;
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Notification {NotificationId} marked as read by user {UserId}", notificationId, userId);
 
         return ServiceResult.Ok();
     }
@@ -83,6 +86,7 @@ public class NotificationService : INotificationService
             n.IsRead = true;
 
         await _context.SaveChangesAsync();
+        _logger.LogInformation("All notifications marked as read for user {UserId}", userId);
         return ServiceResult.Ok();
     }
 }

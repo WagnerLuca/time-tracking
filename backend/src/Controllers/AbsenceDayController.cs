@@ -15,10 +15,12 @@ namespace TimeTracking.Api.Controllers;
 public class AbsenceDayController : OrganizationBaseController
 {
     private readonly IAbsenceDayService _service;
+    private readonly ILogger<AbsenceDayController> _logger;
 
-    public AbsenceDayController(IAbsenceDayService service)
+    public AbsenceDayController(IAbsenceDayService service, ILogger<AbsenceDayController> logger)
     {
         _service = service;
+        _logger = logger;
     }
 
     /// <summary>List absences for the organization with optional filters.</summary>

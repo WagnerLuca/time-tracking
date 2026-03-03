@@ -8,10 +8,12 @@ namespace TimeTracking.Api.Services;
 public class AbsenceDayService : IAbsenceDayService
 {
     private readonly TimeTrackingDbContext _context;
+    private readonly ILogger<AbsenceDayService> _logger;
 
-    public AbsenceDayService(TimeTrackingDbContext context)
+    public AbsenceDayService(TimeTrackingDbContext context, ILogger<AbsenceDayService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<ServiceResult<PaginatedResponse<AbsenceDayResponse>>> GetAbsencesAsync(
@@ -96,6 +98,7 @@ public class AbsenceDayService : IAbsenceDayService
 
         _context.AbsenceDays.Add(absence);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Absence {AbsenceId} created for user {UserId} in org {OrgSlug}", absence.Id, userId, slug);
 
         var user = await _context.Users.FindAsync(userId);
         return ServiceResult.Ok(MapToResponse(absence, user));
@@ -133,6 +136,7 @@ public class AbsenceDayService : IAbsenceDayService
 
         _context.AbsenceDays.Add(absence);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Admin absence {AbsenceId} created for user {TargetUserId} in org {OrgSlug} by user {CallerId}", absence.Id, request.UserId, slug, callerUserId);
 
         var user = await _context.Users.FindAsync(request.UserId);
         return ServiceResult.Ok(MapToResponse(absence, user));
@@ -159,6 +163,7 @@ public class AbsenceDayService : IAbsenceDayService
 
         _context.AbsenceDays.Remove(absence);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Absence {AbsenceId} deleted from org {OrgSlug} by user {UserId}", absenceId, slug, callerUserId);
         return ServiceResult.Ok();
     }
 

@@ -15,10 +15,12 @@ namespace TimeTracking.Api.Controllers;
 public class PauseRulesController : OrganizationBaseController
 {
     private readonly IPauseRuleService _service;
+    private readonly ILogger<PauseRulesController> _logger;
 
-    public PauseRulesController(IPauseRuleService service)
+    public PauseRulesController(IPauseRuleService service, ILogger<PauseRulesController> logger)
     {
         _service = service;
+        _logger = logger;
     }
 
     /// <summary>List all pause rules for an organization.</summary>

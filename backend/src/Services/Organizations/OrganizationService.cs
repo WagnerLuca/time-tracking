@@ -8,10 +8,12 @@ namespace TimeTracking.Api.Services;
 public class OrganizationService : IOrganizationService
 {
     private readonly TimeTrackingDbContext _context;
+    private readonly ILogger<OrganizationService> _logger;
 
-    public OrganizationService(TimeTrackingDbContext context)
+    public OrganizationService(TimeTrackingDbContext context, ILogger<OrganizationService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     // ────────────────────────────────────────────────────
@@ -161,6 +163,8 @@ public class OrganizationService : IOrganizationService
         });
         await _context.SaveChangesAsync();
 
+        _logger.LogInformation("Organization {Slug} created by user {UserId}", organization.Slug, callerUserId);
+
         return ServiceResult.Ok(new OrganizationResponse
         {
             Id = organization.Id,
@@ -204,6 +208,8 @@ public class OrganizationService : IOrganizationService
 
         await _context.SaveChangesAsync();
 
+        _logger.LogInformation("Organization {Slug} updated by user {UserId}", organization.Slug, callerUserId);
+
         return ServiceResult.Ok(new OrganizationResponse
         {
             Id = organization.Id,
@@ -238,6 +244,9 @@ public class OrganizationService : IOrganizationService
             membership.IsActive = false;
 
         await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Organization {Slug} soft-deleted by user {UserId}", slug, callerUserId);
+
         return ServiceResult.Ok();
     }
 
@@ -292,6 +301,8 @@ public class OrganizationService : IOrganizationService
 
         await _context.SaveChangesAsync();
 
+        _logger.LogInformation("User {MemberId} added to organization {OrgId} by user {CallerId}", request.UserId, org.Id, callerUserId);
+
         return ServiceResult.Ok(new OrganizationMemberResponse
         {
             Id = user.Id,
@@ -337,6 +348,8 @@ public class OrganizationService : IOrganizationService
         membership.Role = request.Role;
         await _context.SaveChangesAsync();
 
+        _logger.LogInformation("Member {UserId} role updated to {Role} in org {OrgId} by user {CallerId}", userId, membership.Role, org.Id, callerUserId);
+
         return ServiceResult.Ok(new OrganizationMemberResponse
         {
             Id = membership.User.Id,
@@ -380,6 +393,9 @@ public class OrganizationService : IOrganizationService
         }
 
         membership.IsActive = false;
+
+        _logger.LogInformation("Member {UserId} removed from org {OrgId} by user {CallerId}", userId, org.Id, callerUserId);
+
         await _context.SaveChangesAsync();
 
         return ServiceResult.Ok();
@@ -411,6 +427,8 @@ public class OrganizationService : IOrganizationService
         org.UpdatedAt = DateTime.UtcNow;
         org.SettingsUpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Settings updated for organization {Slug} by user {UserId}", slug, callerUserId);
 
         // Notify all org members except the caller
         var memberUserIds = await _context.UserOrganizations
@@ -604,6 +622,8 @@ public class OrganizationService : IOrganizationService
 
         membership.InitialOvertimeHours = request.InitialOvertimeHours;
         await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Initial overtime set to {Hours}h for user {UserId} in org {OrgId} by user {CallerId}", request.InitialOvertimeHours, userId, org.Id, callerUserId);
 
         return ServiceResult.Ok<object>(new { userId, InitialOvertimeHours = membership.InitialOvertimeHours });
     }

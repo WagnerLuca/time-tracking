@@ -8,10 +8,12 @@ namespace TimeTracking.Api.Services;
 public class WorkScheduleService : IWorkScheduleService
 {
     private readonly TimeTrackingDbContext _context;
+    private readonly ILogger<WorkScheduleService> _logger;
 
-    public WorkScheduleService(TimeTrackingDbContext context)
+    public WorkScheduleService(TimeTrackingDbContext context, ILogger<WorkScheduleService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     // ────────────────────────────────────────────────────
@@ -70,6 +72,7 @@ public class WorkScheduleService : IWorkScheduleService
         _context.WorkSchedules.Add(schedule);
         await CloseOpenScheduleAsync(userId, org.Id, request.ValidFrom);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Work schedule {ScheduleId} created by user {UserId} in org {OrgSlug}", schedule.Id, userId, slug);
 
         return ServiceResult.Ok(MapToResponse(schedule, userId, org, membership));
     }
@@ -96,6 +99,7 @@ public class WorkScheduleService : IWorkScheduleService
 
         ApplyUpdate(schedule, request);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Work schedule {ScheduleId} updated by user {UserId}", scheduleId, userId);
 
         return ServiceResult.Ok(MapToResponse(schedule, userId, org, membership));
     }
@@ -117,6 +121,7 @@ public class WorkScheduleService : IWorkScheduleService
 
         _context.WorkSchedules.Remove(schedule);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Work schedule {ScheduleId} deleted by user {UserId}", scheduleId, userId);
         return ServiceResult.Ok();
     }
 
@@ -138,6 +143,7 @@ public class WorkScheduleService : IWorkScheduleService
 
         membership.InitialOvertimeHours = request.InitialOvertimeHours;
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Self initial overtime set to {Hours}h by user {UserId} in org {OrgSlug}", request.InitialOvertimeHours, userId, slug);
 
         return ServiceResult.Ok<object>(new { initialOvertimeHours = membership.InitialOvertimeHours });
     }
@@ -208,6 +214,7 @@ public class WorkScheduleService : IWorkScheduleService
         _context.WorkSchedules.Add(schedule);
         await CloseOpenScheduleAsync(memberId, org.Id, request.ValidFrom);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Work schedule set for member {MemberId} in org {OrgSlug} by admin {CallerId}", memberId, slug, callerUserId);
 
         return ServiceResult.Ok(MapToResponse(schedule, memberId, org, membership));
     }

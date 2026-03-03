@@ -8,10 +8,12 @@ namespace TimeTracking.Api.Services;
 public class PauseRuleService : IPauseRuleService
 {
     private readonly TimeTrackingDbContext _context;
+    private readonly ILogger<PauseRuleService> _logger;
 
-    public PauseRuleService(TimeTrackingDbContext context)
+    public PauseRuleService(TimeTrackingDbContext context, ILogger<PauseRuleService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<ServiceResult<List<PauseRuleResponse>>> GetPauseRulesAsync(string slug)
@@ -66,6 +68,7 @@ public class PauseRuleService : IPauseRuleService
 
         _context.PauseRules.Add(rule);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Pause rule {RuleId} created in org {OrgSlug} by user {UserId}", rule.Id, slug, callerUserId);
 
         return ServiceResult.Ok(MapToResponse(rule));
     }
@@ -89,6 +92,7 @@ public class PauseRuleService : IPauseRuleService
         rule.MinHours = request.MinHours;
         rule.PauseMinutes = request.PauseMinutes;
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Pause rule {RuleId} updated in org {OrgSlug} by user {UserId}", ruleId, slug, callerUserId);
 
         return ServiceResult.Ok(MapToResponse(rule));
     }
@@ -110,6 +114,7 @@ public class PauseRuleService : IPauseRuleService
 
         _context.PauseRules.Remove(rule);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Pause rule {RuleId} deleted from org {OrgSlug} by user {UserId}", ruleId, slug, callerUserId);
         return ServiceResult.Ok();
     }
 

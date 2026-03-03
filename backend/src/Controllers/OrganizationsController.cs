@@ -15,10 +15,12 @@ namespace TimeTracking.Api.Controllers;
 public class OrganizationsController : OrganizationBaseController
 {
     private readonly IOrganizationService _service;
+    private readonly ILogger<OrganizationsController> _logger;
 
-    public OrganizationsController(IOrganizationService service)
+    public OrganizationsController(IOrganizationService service, ILogger<OrganizationsController> logger)
     {
         _service = service;
+        _logger = logger;
     }
 
     /// <summary>List all organizations.</summary>

@@ -8,10 +8,12 @@ namespace TimeTracking.Api.Services;
 public class HolidayService : IHolidayService
 {
     private readonly TimeTrackingDbContext _context;
+    private readonly ILogger<HolidayService> _logger;
 
-    public HolidayService(TimeTrackingDbContext context)
+    public HolidayService(TimeTrackingDbContext context, ILogger<HolidayService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<ServiceResult<List<HolidayResponse>>> GetHolidaysAsync(string slug, int callerUserId)
@@ -67,6 +69,7 @@ public class HolidayService : IHolidayService
 
         _context.Holidays.Add(holiday);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Holiday {HolidayId} created in org {OrgSlug} by user {UserId}", holiday.Id, slug, callerUserId);
 
         return ServiceResult.Ok(MapToResponse(holiday));
     }
@@ -112,6 +115,7 @@ public class HolidayService : IHolidayService
 
         _context.Holidays.Remove(holiday);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Holiday {HolidayId} deleted from org {OrgSlug} by user {UserId}", holidayId, slug, callerUserId);
         return ServiceResult.Ok();
     }
 
@@ -161,6 +165,7 @@ public class HolidayService : IHolidayService
         }
 
         await _context.SaveChangesAsync();
+        _logger.LogInformation("{Count} holidays imported from preset {Preset} for org {OrgSlug} by user {UserId}", added.Count, preset, slug, callerUserId);
         return ServiceResult.Ok(added);
     }
 

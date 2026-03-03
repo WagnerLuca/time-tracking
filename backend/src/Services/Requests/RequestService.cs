@@ -9,10 +9,12 @@ namespace TimeTracking.Api.Services;
 public class RequestService : IRequestService
 {
     private readonly TimeTrackingDbContext _context;
+    private readonly ILogger<RequestService> _logger;
 
-    public RequestService(TimeTrackingDbContext context)
+    public RequestService(TimeTrackingDbContext context, ILogger<RequestService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<ServiceResult<OrgRequestResponse>> CreateRequestAsync(
@@ -109,6 +111,7 @@ public class RequestService : IRequestService
 
         _context.OrgRequests.Add(orgRequest);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Request {RequestId} of type {Type} created by user {UserId} for org {OrgSlug}", orgRequest.Id, orgRequest.Type, userId, slug);
 
         orgRequest.User = user;
         return ServiceResult.Ok(MapToResponse(orgRequest, org.Name, org.Slug));
@@ -185,6 +188,7 @@ public class RequestService : IRequestService
         }
 
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Request {RequestId} {Action} by user {UserId}", requestId, request.Accept ? "accepted" : "declined", callerUserId);
 
         var responder = await _context.Users.FindAsync(callerUserId);
         return ServiceResult.Ok(MapToResponse(orgRequest, org.Name, org.Slug,

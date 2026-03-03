@@ -15,10 +15,12 @@ namespace TimeTracking.Api.Controllers;
 public class HolidayController : OrganizationBaseController
 {
     private readonly IHolidayService _service;
+    private readonly ILogger<HolidayController> _logger;
 
-    public HolidayController(IHolidayService service)
+    public HolidayController(IHolidayService service, ILogger<HolidayController> logger)
     {
         _service = service;
+        _logger = logger;
     }
 
     /// <summary>List all holidays for an organization.</summary>

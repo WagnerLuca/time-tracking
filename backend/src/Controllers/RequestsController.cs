@@ -16,10 +16,12 @@ namespace TimeTracking.Api.Controllers;
 public class RequestsController : OrganizationBaseController
 {
     private readonly IRequestService _service;
+    private readonly ILogger<RequestsController> _logger;
 
-    public RequestsController(IRequestService service)
+    public RequestsController(IRequestService service, ILogger<RequestsController> logger)
     {
         _service = service;
+        _logger = logger;
     }
 
     /// <summary>Create a new request for the organization (e.g. join, edit entry).</summary>

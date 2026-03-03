@@ -8,10 +8,12 @@ namespace TimeTracking.Api.Services;
 public class TimeTrackingService : ITimeTrackingService
 {
     private readonly TimeTrackingDbContext _context;
+    private readonly ILogger<TimeTrackingService> _logger;
 
-    public TimeTrackingService(TimeTrackingDbContext context)
+    public TimeTrackingService(TimeTrackingDbContext context, ILogger<TimeTrackingService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<ServiceResult<TimeEntryResponse>> StartAsync(int userId, StartTimeEntryRequest? request)
@@ -58,6 +60,7 @@ public class TimeTrackingService : ITimeTrackingService
 
         _context.TimeEntries.Add(entry);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Time entry {EntryId} started by user {UserId}", entry.Id, userId);
 
         // Reload organization name for response
         await _context.Entry(entry).Reference(e => e.Organization).LoadAsync();
@@ -83,6 +86,7 @@ public class TimeTrackingService : ITimeTrackingService
 
         await ApplyPauseRulesAsync(running);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Time entry {EntryId} stopped by user {UserId}", running.Id, userId);
 
         return ServiceResult.Ok(MapToResponse(running));
     }
@@ -194,6 +198,7 @@ public class TimeTrackingService : ITimeTrackingService
         }
 
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Time entry {EntryId} updated by user {UserId}", entry.Id, userId);
         return ServiceResult.Ok(MapToResponse(entry));
     }
 
@@ -207,6 +212,7 @@ public class TimeTrackingService : ITimeTrackingService
 
         _context.TimeEntries.Remove(entry);
         await _context.SaveChangesAsync();
+        _logger.LogInformation("Time entry {EntryId} deleted by user {UserId}", entry.Id, userId);
 
         return ServiceResult.Ok();
     }
