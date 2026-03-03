@@ -47,13 +47,15 @@ public class RefreshTokenCleanupService : BackgroundService
 
         var cutoff = DateTime.UtcNow;
 
-        var deleted = await context.RefreshTokens
+        var expiredTokens = await context.RefreshTokens
             .Where(rt => rt.ExpiresAt < cutoff || rt.IsRevoked)
-            .ExecuteDeleteAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        if (deleted > 0)
+        if (expiredTokens.Count > 0)
         {
-            _logger.LogInformation("Cleaned up {Count} expired/revoked refresh tokens.", deleted);
+            context.RefreshTokens.RemoveRange(expiredTokens);
+            await context.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Cleaned up {Count} expired/revoked refresh tokens.", expiredTokens.Count);
         }
     }
 }

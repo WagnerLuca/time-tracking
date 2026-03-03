@@ -94,7 +94,7 @@ public class RequestService : IRequestService
                         && r.Type == request.Type
                         && r.Status == RequestStatus.Pending);
         if (pendingExists)
-            return ServiceResult.BadRequest<OrgRequestResponse>("You already have a pending request of this type for this organization.");
+            return ServiceResult.Conflict<OrgRequestResponse>("You already have a pending request of this type for this organization.");
 
         var orgRequest = new OrgRequest
         {

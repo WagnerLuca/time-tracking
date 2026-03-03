@@ -54,7 +54,7 @@ public class PauseRuleService : IPauseRuleService
         var exists = await _context.PauseRules
             .AnyAsync(pr => pr.OrganizationId == org.Id && Math.Abs(pr.MinHours - request.MinHours) < 0.01);
         if (exists)
-            return ServiceResult.BadRequest<PauseRuleResponse>("A pause rule with this threshold already exists.");
+            return ServiceResult.Conflict<PauseRuleResponse>("A pause rule with this threshold already exists.");
 
         var rule = new PauseRule
         {

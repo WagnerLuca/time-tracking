@@ -56,7 +56,7 @@ public class WorkScheduleController : OrganizationBaseController
     {
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
-        return ToResponse(await _service.CreateMyWorkScheduleAsync(slug, userId.Value, request));
+        return ToCreatedResponse(await _service.CreateMyWorkScheduleAsync(slug, userId.Value, request));
     }
 
     /// <summary>Update a work schedule for the current user.</summary>
@@ -138,7 +138,7 @@ public class WorkScheduleController : OrganizationBaseController
     {
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
-        return ToResponse(await _service.CreateMemberWorkScheduleAsync(slug, userId.Value, memberId, request));
+        return ToCreatedResponse(await _service.CreateMemberWorkScheduleAsync(slug, userId.Value, memberId, request));
     }
 
     /// <summary>Update a work schedule for a specific member (admin only).</summary>

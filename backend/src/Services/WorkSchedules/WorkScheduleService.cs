@@ -60,7 +60,7 @@ public class WorkScheduleService : IWorkScheduleService
 
         var ruleModeError = CheckRuleMode(org.WorkScheduleChangeMode, "Schedule changes");
         if (ruleModeError != null)
-            return ServiceResult.BadRequest<WorkScheduleResponse>(ruleModeError);
+            return ServiceResult.Fail<WorkScheduleResponse>(ruleModeError.Value.Type, ruleModeError.Value.Message);
 
         var overlapError = await CheckOverlapAsync(userId, org.Id, request.ValidFrom, request.ValidTo);
         if (overlapError != null)
@@ -87,7 +87,7 @@ public class WorkScheduleService : IWorkScheduleService
 
         var ruleModeError = CheckRuleMode(org.WorkScheduleChangeMode, "Schedule changes");
         if (ruleModeError != null)
-            return ServiceResult.BadRequest<WorkScheduleResponse>(ruleModeError);
+            return ServiceResult.Fail<WorkScheduleResponse>(ruleModeError.Value.Type, ruleModeError.Value.Message);
 
         var schedule = await _context.WorkSchedules
             .FirstOrDefaultAsync(s => s.Id == scheduleId && s.UserId == userId && s.OrganizationId == org.Id);
@@ -108,7 +108,7 @@ public class WorkScheduleService : IWorkScheduleService
 
         var ruleModeError = CheckRuleMode(org.WorkScheduleChangeMode, "Schedule changes");
         if (ruleModeError != null)
-            return ServiceResult.BadRequest(ruleModeError);
+            return ServiceResult.Fail(ruleModeError.Value.Type, ruleModeError.Value.Message);
 
         var schedule = await _context.WorkSchedules
             .FirstOrDefaultAsync(s => s.Id == scheduleId && s.UserId == userId && s.OrganizationId == org.Id);
@@ -261,12 +261,12 @@ public class WorkScheduleService : IWorkScheduleService
     //  Private helpers
     // ────────────────────────────────────────────────────
 
-    private static string? CheckRuleMode(RuleMode mode, string featureName)
+    private static (ServiceErrorType Type, string Message)? CheckRuleMode(RuleMode mode, string featureName)
     {
         return mode switch
         {
-            RuleMode.Disabled         => $"{featureName} are disabled for this organization.",
-            RuleMode.RequiresApproval => $"{featureName} require admin approval. Please submit a WorkScheduleChange request via the organization requests endpoint.",
+            RuleMode.Disabled         => (ServiceErrorType.Forbidden, $"{featureName} are disabled for this organization."),
+            RuleMode.RequiresApproval => (ServiceErrorType.BadRequest, $"{featureName} require admin approval. Please submit a WorkScheduleChange request via the organization requests endpoint."),
             _                         => null
         };
     }

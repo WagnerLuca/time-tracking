@@ -63,10 +63,14 @@ public class NotificationService : INotificationService
 
     public async Task<ServiceResult> MarkAllAsReadAsync(int userId)
     {
-        await _context.Notifications
+        var unread = await _context.Notifications
             .Where(n => n.UserId == userId && !n.IsRead)
-            .ExecuteUpdateAsync(n => n.SetProperty(x => x.IsRead, true));
+            .ToListAsync();
 
+        foreach (var n in unread)
+            n.IsRead = true;
+
+        await _context.SaveChangesAsync();
         return ServiceResult.Ok();
     }
 }

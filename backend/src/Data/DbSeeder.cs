@@ -70,7 +70,8 @@ public static class DbSeeder
             EditPauseMode = RuleMode.Allowed,
             InitialOvertimeMode = RuleMode.Allowed,
             JoinPolicy = RuleMode.Allowed, // open for joining
-            WorkScheduleChangeMode = RuleMode.Allowed
+            WorkScheduleChangeMode = RuleMode.Allowed,
+            MemberTimeEntryVisibility = true
         };
 
         context.Organizations.Add(org);
