@@ -100,9 +100,11 @@ public class TimeTrackingService : ITimeTrackingService
         return ServiceResult.Ok(MapToResponse(running));
     }
 
-    public async Task<ServiceResult<List<TimeEntryResponse>>> GetHistoryAsync(
+    public async Task<ServiceResult<PaginatedResponse<TimeEntryResponse>>> GetHistoryAsync(
         int userId, int? organizationId, DateTime? from, DateTime? to, int limit, int offset)
     {
+        (limit, offset) = PaginationDefaults.Normalize(limit, offset);
+
         var query = _context.TimeEntries
             .AsNoTracking()
             .Include(e => e.Organization)
@@ -116,13 +118,21 @@ public class TimeTrackingService : ITimeTrackingService
         if (to.HasValue)
             query = query.Where(e => e.StartTime <= to.Value);
 
+        var totalCount = await query.CountAsync();
+
         var entries = await query
             .OrderByDescending(e => e.StartTime)
             .Skip(offset)
-            .Take(Math.Min(limit, 10000))
+            .Take(limit)
             .ToListAsync();
 
-        return ServiceResult.Ok(entries.Select(MapToResponse).ToList());
+        return ServiceResult.Ok(new PaginatedResponse<TimeEntryResponse>
+        {
+            Items = entries.Select(MapToResponse).ToList(),
+            TotalCount = totalCount,
+            Limit = limit,
+            Offset = offset
+        });
     }
 
     public async Task<ServiceResult<TimeEntryResponse>> UpdateAsync(

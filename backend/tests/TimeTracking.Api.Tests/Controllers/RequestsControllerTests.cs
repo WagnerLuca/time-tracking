@@ -115,8 +115,8 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         var response = await client.GetAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/requests");
         response.EnsureSuccessStatusCode();
 
-        var requests = await response.Content.ReadFromJsonAsync<List<OrgRequestResponseDto>>(TestHelpers.JsonOptions);
-        requests.Should().NotBeNull();
+        var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<OrgRequestResponseDto>>(TestHelpers.JsonOptions);
+        page.Should().NotBeNull();
     }
 
     [Fact]
@@ -140,8 +140,8 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         var response = await client.GetAsync("/api/organizations/my-requests");
         response.EnsureSuccessStatusCode();
 
-        var requests = await response.Content.ReadFromJsonAsync<List<OrgRequestResponseDto>>(TestHelpers.JsonOptions);
-        requests.Should().NotBeNull();
+        var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<OrgRequestResponseDto>>(TestHelpers.JsonOptions);
+        page.Should().NotBeNull();
     }
 
     // ── User notifications ───────────────────────────────────────────────

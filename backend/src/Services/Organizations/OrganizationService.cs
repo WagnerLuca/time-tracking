@@ -18,10 +18,19 @@ public class OrganizationService : IOrganizationService
     //  Organization CRUD
     // ────────────────────────────────────────────────────
 
-    public async Task<ServiceResult<List<OrganizationResponse>>> GetOrganizationsAsync()
+    public async Task<ServiceResult<PaginatedResponse<OrganizationResponse>>> GetOrganizationsAsync(int limit, int offset)
     {
-        var organizations = await _context.Organizations
-            .Where(o => o.IsActive)
+        (limit, offset) = PaginationDefaults.Normalize(limit, offset);
+
+        var query = _context.Organizations
+            .Where(o => o.IsActive);
+
+        var totalCount = await query.CountAsync();
+
+        var organizations = await query
+            .OrderBy(o => o.Name)
+            .Skip(offset)
+            .Take(limit)
             .Select(o => new OrganizationResponse
             {
                 Id = o.Id,
@@ -36,7 +45,13 @@ public class OrganizationService : IOrganizationService
             })
             .ToListAsync();
 
-        return ServiceResult.Ok(organizations);
+        return ServiceResult.Ok(new PaginatedResponse<OrganizationResponse>
+        {
+            Items = organizations,
+            TotalCount = totalCount,
+            Limit = limit,
+            Offset = offset
+        });
     }
 
     public async Task<ServiceResult<OrganizationDetailResponse>> GetOrganizationAsync(string slug)
@@ -505,16 +520,18 @@ public class OrganizationService : IOrganizationService
         return ServiceResult.Ok(result);
     }
 
-    public async Task<ServiceResult<List<object>>> GetMemberEntriesAsync(
-        string slug, int callerUserId, int userId, DateTime? from, DateTime? to)
+    public async Task<ServiceResult<PaginatedResponse<object>>> GetMemberEntriesAsync(
+        string slug, int callerUserId, int userId, DateTime? from, DateTime? to, int limit, int offset)
     {
         var org = await GetOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound<List<object>>("Organization not found");
+            return ServiceResult.NotFound<PaginatedResponse<object>>("Organization not found");
 
         var callerRole = await GetRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin || !org.MemberTimeEntryVisibility)
-            return ServiceResult.Forbidden<List<object>>();
+            return ServiceResult.Forbidden<PaginatedResponse<object>>();
+
+        (limit, offset) = PaginationDefaults.Normalize(limit, offset);
 
         var now = DateTime.UtcNow;
         var dayOfWeek = (int)now.DayOfWeek;
@@ -522,12 +539,18 @@ public class OrganizationService : IOrganizationService
         var weekStart = from ?? now.Date.AddDays(-(dayOfWeek - 1));
         var weekEnd = to ?? weekStart.AddDays(7);
 
-        var entries = await _context.TimeEntries
+        var query = _context.TimeEntries
             .Where(te => te.UserId == userId
                       && te.OrganizationId == org.Id
                       && te.StartTime >= weekStart
-                      && te.StartTime < weekEnd)
+                      && te.StartTime < weekEnd);
+
+        var totalCount = await query.CountAsync();
+
+        var entries = await query
             .OrderByDescending(te => te.StartTime)
+            .Skip(offset)
+            .Take(limit)
             .Select(te => (object)new
             {
                 te.Id,
@@ -548,7 +571,13 @@ public class OrganizationService : IOrganizationService
             })
             .ToListAsync();
 
-        return ServiceResult.Ok(entries);
+        return ServiceResult.Ok(new PaginatedResponse<object>
+        {
+            Items = entries,
+            TotalCount = totalCount,
+            Limit = limit,
+            Offset = offset
+        });
     }
 
     // ────────────────────────────────────────────────────

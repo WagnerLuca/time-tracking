@@ -36,15 +36,18 @@ public class RequestsController : OrganizationBaseController
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="type">Filter by request type.</param>
     /// <param name="status">Filter by request status.</param>
+    /// <param name="limit">Max items per page (default 50, max 200).</param>
+    /// <param name="offset">Number of items to skip.</param>
     [HttpGet("{slug}/requests")]
     [Authorize]
-    [ProducesResponseType(typeof(List<OrgRequestResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PaginatedResponse<OrgRequestResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRequests(
-        string slug, [FromQuery] RequestType? type, [FromQuery] RequestStatus? status)
+        string slug, [FromQuery] RequestType? type, [FromQuery] RequestStatus? status,
+        [FromQuery] int limit = 50, [FromQuery] int offset = 0)
     {
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
-        return ToResponse(await _service.GetRequestsAsync(slug, userId.Value, type, status));
+        return ToResponse(await _service.GetRequestsAsync(slug, userId.Value, type, status, limit, offset));
     }
 
     /// <summary>Accept or decline a pending request (admin only).</summary>
@@ -63,14 +66,18 @@ public class RequestsController : OrganizationBaseController
 
     /// <summary>List the current user's requests across all organizations.</summary>
     /// <param name="type">Filter by request type.</param>
+    /// <param name="limit">Max items per page (default 50, max 200).</param>
+    /// <param name="offset">Number of items to skip.</param>
     [HttpGet("my-requests")]
     [Authorize]
-    [ProducesResponseType(typeof(List<OrgRequestResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMyRequests([FromQuery] RequestType? type)
+    [ProducesResponseType(typeof(PaginatedResponse<OrgRequestResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMyRequests(
+        [FromQuery] RequestType? type,
+        [FromQuery] int limit = 50, [FromQuery] int offset = 0)
     {
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
-        return ToResponse(await _service.GetMyRequestsAsync(userId.Value, type));
+        return ToResponse(await _service.GetMyRequestsAsync(userId.Value, type, limit, offset));
     }
 
     /// <summary>Get pending request notifications for admins.</summary>

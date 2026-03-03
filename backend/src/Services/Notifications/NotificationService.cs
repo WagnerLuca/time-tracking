@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TimeTracking.Api.Data;
+using TimeTracking.Api.Models.Dtos;
 
 namespace TimeTracking.Api.Services;
 
@@ -12,8 +13,10 @@ public class NotificationService : INotificationService
         _context = context;
     }
 
-    public async Task<ServiceResult<List<object>>> GetNotificationsAsync(int userId, bool unreadOnly)
+    public async Task<ServiceResult<PaginatedResponse<object>>> GetNotificationsAsync(int userId, bool unreadOnly, int limit, int offset)
     {
+        (limit, offset) = PaginationDefaults.Normalize(limit, offset);
+
         var query = _context.Notifications
             .Where(n => n.UserId == userId)
             .AsQueryable();
@@ -21,9 +24,12 @@ public class NotificationService : INotificationService
         if (unreadOnly)
             query = query.Where(n => !n.IsRead);
 
+        var totalCount = await query.CountAsync();
+
         var notifications = await query
             .OrderByDescending(n => n.CreatedAt)
-            .Take(50)
+            .Skip(offset)
+            .Take(limit)
             .Select(n => (object)new
             {
                 n.Id,
@@ -36,7 +42,13 @@ public class NotificationService : INotificationService
             })
             .ToListAsync();
 
-        return ServiceResult.Ok(notifications);
+        return ServiceResult.Ok(new PaginatedResponse<object>
+        {
+            Items = notifications,
+            TotalCount = totalCount,
+            Limit = limit,
+            Offset = offset
+        });
     }
 
     public async Task<ServiceResult<object>> GetUnreadCountAsync(int userId)

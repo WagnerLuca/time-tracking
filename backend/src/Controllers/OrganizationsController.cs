@@ -20,10 +20,13 @@ public class OrganizationsController : OrganizationBaseController
     }
 
     /// <summary>List all organizations.</summary>
+    /// <param name="limit">Max items per page (default 50, max 200).</param>
+    /// <param name="offset">Number of items to skip.</param>
     [HttpGet]
-    [ProducesResponseType(typeof(List<OrganizationResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetOrganizations()
-        => ToResponse(await _service.GetOrganizationsAsync());
+    [ProducesResponseType(typeof(PaginatedResponse<OrganizationResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOrganizations(
+        [FromQuery] int limit = 50, [FromQuery] int offset = 0)
+        => ToResponse(await _service.GetOrganizationsAsync(limit, offset));
 
     /// <summary>Get organization details by slug.</summary>
     /// <param name="slug">Organization URL slug.</param>
@@ -144,15 +147,19 @@ public class OrganizationsController : OrganizationBaseController
     /// <param name="memberId">Member ID whose entries to retrieve.</param>
     /// <param name="from">Start of date range filter.</param>
     /// <param name="to">End of date range filter.</param>
+    /// <param name="limit">Max items per page (default 50, max 200).</param>
+    /// <param name="offset">Number of items to skip.</param>
     [HttpGet("{slug}/member-entries/{memberId}")]
     [Authorize]
-    [ProducesResponseType(typeof(List<TimeEntryResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PaginatedResponse<TimeEntryResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMemberEntries(
-        string slug, int memberId, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
+        string slug, int memberId,
+        [FromQuery] DateTime? from, [FromQuery] DateTime? to,
+        [FromQuery] int limit = 50, [FromQuery] int offset = 0)
     {
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
-        return ToResponse(await _service.GetMemberEntriesAsync(slug, userId.Value, memberId, from, to));
+        return ToResponse(await _service.GetMemberEntriesAsync(slug, userId.Value, memberId, from, to, limit, offset));
     }
 
     /// <summary>Set a member's initial overtime hours (admin only).</summary>

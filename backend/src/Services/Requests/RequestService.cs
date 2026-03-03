@@ -114,16 +114,18 @@ public class RequestService : IRequestService
         return ServiceResult.Ok(MapToResponse(orgRequest, org.Name, org.Slug));
     }
 
-    public async Task<ServiceResult<List<OrgRequestResponse>>> GetRequestsAsync(
-        string slug, int callerUserId, RequestType? type, RequestStatus? status)
+    public async Task<ServiceResult<PaginatedResponse<OrgRequestResponse>>> GetRequestsAsync(
+        string slug, int callerUserId, RequestType? type, RequestStatus? status, int limit, int offset)
     {
         var org = await GetOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound<List<OrgRequestResponse>>("Organization not found");
+            return ServiceResult.NotFound<PaginatedResponse<OrgRequestResponse>>("Organization not found");
 
         var callerRole = await GetRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
-            return ServiceResult.Forbidden<List<OrgRequestResponse>>();
+            return ServiceResult.Forbidden<PaginatedResponse<OrgRequestResponse>>();
+
+        (limit, offset) = PaginationDefaults.Normalize(limit, offset);
 
         var query = _context.OrgRequests
             .AsNoTracking()
@@ -134,11 +136,21 @@ public class RequestService : IRequestService
         if (type.HasValue)   query = query.Where(r => r.Type == type.Value);
         if (status.HasValue) query = query.Where(r => r.Status == status.Value);
 
+        var totalCount = await query.CountAsync();
+
         var requests = await query
             .OrderByDescending(r => r.CreatedAt)
+            .Skip(offset)
+            .Take(limit)
             .ToListAsync();
 
-        return ServiceResult.Ok(requests.Select(r => MapToResponse(r, org.Name, org.Slug)).ToList());
+        return ServiceResult.Ok(new PaginatedResponse<OrgRequestResponse>
+        {
+            Items = requests.Select(r => MapToResponse(r, org.Name, org.Slug)).ToList(),
+            TotalCount = totalCount,
+            Limit = limit,
+            Offset = offset
+        });
     }
 
     public async Task<ServiceResult<OrgRequestResponse>> RespondToRequestAsync(
@@ -179,8 +191,10 @@ public class RequestService : IRequestService
             responder != null ? $"{responder.FirstName} {responder.LastName}" : null));
     }
 
-    public async Task<ServiceResult<List<OrgRequestResponse>>> GetMyRequestsAsync(int userId, RequestType? type)
+    public async Task<ServiceResult<PaginatedResponse<OrgRequestResponse>>> GetMyRequestsAsync(int userId, RequestType? type, int limit, int offset)
     {
+        (limit, offset) = PaginationDefaults.Normalize(limit, offset);
+
         var query = _context.OrgRequests
             .AsNoTracking()
             .Include(r => r.Organization)
@@ -190,21 +204,31 @@ public class RequestService : IRequestService
         if (type.HasValue)
             query = query.Where(r => r.Type == type.Value);
 
+        var totalCount = await query.CountAsync();
+
         var requests = await query
             .OrderByDescending(r => r.CreatedAt)
+            .Skip(offset)
+            .Take(limit)
             .ToListAsync();
 
         var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null)
-            return ServiceResult.Fail<List<OrgRequestResponse>>(ServiceErrorType.Unauthorized, "Unauthorized");
+            return ServiceResult.Fail<PaginatedResponse<OrgRequestResponse>>(ServiceErrorType.Unauthorized, "Unauthorized");
 
-        var result = requests.Select(r =>
+        var items = requests.Select(r =>
         {
             r.User = user;
             return MapToResponse(r, r.Organization.Name, r.Organization.Slug);
         }).ToList();
 
-        return ServiceResult.Ok(result);
+        return ServiceResult.Ok(new PaginatedResponse<OrgRequestResponse>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Limit = limit,
+            Offset = offset
+        });
     }
 
     public async Task<ServiceResult<AdminNotificationResponse>> GetAdminNotificationsAsync(int userId)

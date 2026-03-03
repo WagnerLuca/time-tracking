@@ -14,16 +14,18 @@ public class AbsenceDayService : IAbsenceDayService
         _context = context;
     }
 
-    public async Task<ServiceResult<List<AbsenceDayResponse>>> GetAbsencesAsync(
-        string slug, int callerUserId, int? filterUserId, DateOnly? from, DateOnly? to)
+    public async Task<ServiceResult<PaginatedResponse<AbsenceDayResponse>>> GetAbsencesAsync(
+        string slug, int callerUserId, int? filterUserId, DateOnly? from, DateOnly? to, int limit, int offset)
     {
         var org = await GetOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound<List<AbsenceDayResponse>>("Organization not found");
+            return ServiceResult.NotFound<PaginatedResponse<AbsenceDayResponse>>("Organization not found");
 
         var callerRole = await GetRoleAsync(callerUserId, org.Id);
         if (callerRole == null)
-            return ServiceResult.Forbidden<List<AbsenceDayResponse>>();
+            return ServiceResult.Forbidden<PaginatedResponse<AbsenceDayResponse>>();
+
+        (limit, offset) = PaginationDefaults.Normalize(limit, offset);
 
         var query = _context.AbsenceDays
             .Include(a => a.User)
@@ -38,8 +40,12 @@ public class AbsenceDayService : IAbsenceDayService
         if (from.HasValue) query = query.Where(a => a.Date >= from.Value);
         if (to.HasValue)   query = query.Where(a => a.Date <= to.Value);
 
+        var totalCount = await query.CountAsync();
+
         var absences = await query
             .OrderBy(a => a.Date)
+            .Skip(offset)
+            .Take(limit)
             .Select(a => new AbsenceDayResponse
             {
                 Id = a.Id,
@@ -53,7 +59,13 @@ public class AbsenceDayService : IAbsenceDayService
             })
             .ToListAsync();
 
-        return ServiceResult.Ok(absences);
+        return ServiceResult.Ok(new PaginatedResponse<AbsenceDayResponse>
+        {
+            Items = absences,
+            TotalCount = totalCount,
+            Limit = limit,
+            Offset = offset
+        });
     }
 
     public async Task<ServiceResult<AbsenceDayResponse>> CreateAbsenceAsync(

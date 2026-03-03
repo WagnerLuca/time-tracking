@@ -22,13 +22,17 @@ public class NotificationsController : OrganizationBaseController
 
     /// <summary>Get notifications for the current user.</summary>
     /// <param name="unreadOnly">When true, return only unread notifications.</param>
+    /// <param name="limit">Max items per page (default 50, max 200).</param>
+    /// <param name="offset">Number of items to skip.</param>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetNotifications([FromQuery] bool unreadOnly = false)
+    public async Task<IActionResult> GetNotifications(
+        [FromQuery] bool unreadOnly = false,
+        [FromQuery] int limit = 50, [FromQuery] int offset = 0)
     {
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
-        return ToResponse(await _service.GetNotificationsAsync(userId.Value, unreadOnly));
+        return ToResponse(await _service.GetNotificationsAsync(userId.Value, unreadOnly, limit, offset));
     }
 
     /// <summary>Get the number of unread notifications.</summary>

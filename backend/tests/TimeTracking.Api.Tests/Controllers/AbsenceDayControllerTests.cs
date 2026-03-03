@@ -26,8 +26,8 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
         var response = await client.GetAsync($"/api/organizations/{TestHelpers.SeedOrgSlug}/absences");
         response.EnsureSuccessStatusCode();
 
-        var absences = await response.Content.ReadFromJsonAsync<List<AbsenceDayResponseDto>>(TestHelpers.JsonOptions);
-        absences.Should().NotBeNull();
+        var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<AbsenceDayResponseDto>>(TestHelpers.JsonOptions);
+        page.Should().NotBeNull();
     }
 
     [Fact]
@@ -41,9 +41,9 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
             $"/api/organizations/{TestHelpers.SeedOrgSlug}/absences?from=2099-01-01&to=2099-12-31");
         response.EnsureSuccessStatusCode();
 
-        var absences = await response.Content.ReadFromJsonAsync<List<AbsenceDayResponseDto>>(TestHelpers.JsonOptions);
-        absences.Should().NotBeNull();
-        absences!.Should().BeEmpty();
+        var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<AbsenceDayResponseDto>>(TestHelpers.JsonOptions);
+        page.Should().NotBeNull();
+        page!.Items.Should().BeEmpty();
     }
 
     // ── Create absence (user) ────────────────────────────────────────────

@@ -23,9 +23,9 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var response = await client.GetAsync("/api/Organizations");
         response.EnsureSuccessStatusCode();
 
-        var orgs = await response.Content.ReadFromJsonAsync<List<OrganizationResponseDto>>(TestHelpers.JsonOptions);
-        orgs.Should().NotBeNull();
-        orgs!.Should().Contain(o => o.Slug == TestHelpers.SeedOrgSlug);
+        var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<OrganizationResponseDto>>(TestHelpers.JsonOptions);
+        page.Should().NotBeNull();
+        page!.Items.Should().Contain(o => o.Slug == TestHelpers.SeedOrgSlug);
     }
 
     [Fact]
@@ -335,8 +335,8 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
             $"/api/Organizations/{TestHelpers.SeedOrgSlug}/member-entries/{anna.Id}");
         response.EnsureSuccessStatusCode();
 
-        var entries = await response.Content.ReadFromJsonAsync<List<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
-        entries.Should().NotBeNull();
+        var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
+        page.Should().NotBeNull();
     }
 
     // ── Initial overtime ─────────────────────────────────────────────────

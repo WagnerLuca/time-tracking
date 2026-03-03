@@ -303,3 +303,13 @@ public record MemberTimeOverviewResponseDto
     public double NetTrackedMinutes { get; init; }
     public int EntryCount { get; init; }
 }
+
+/// <summary>Generic paginated response wrapper used by list endpoints.</summary>
+public record PaginatedResponseDto<T>
+{
+    public List<T> Items { get; init; } = new();
+    public int TotalCount { get; init; }
+    public int Limit { get; init; }
+    public int Offset { get; init; }
+    public bool HasMore { get; init; }
+}

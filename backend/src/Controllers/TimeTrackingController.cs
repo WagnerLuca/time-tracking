@@ -54,10 +54,10 @@ public class TimeTrackingController : OrganizationBaseController
     /// <param name="organizationId">Filter by organization ID.</param>
     /// <param name="from">Start of date range.</param>
     /// <param name="to">End of date range.</param>
-    /// <param name="limit">Max number of entries to return (default 50).</param>
-    /// <param name="offset">Number of entries to skip.</param>
+    /// <param name="limit">Max items per page (default 50, max 200).</param>
+    /// <param name="offset">Number of items to skip.</param>
     [HttpGet]
-    [ProducesResponseType(typeof(List<TimeEntryResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PaginatedResponse<TimeEntryResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetHistory(
         [FromQuery] int? organizationId,
         [FromQuery] DateTime? from,

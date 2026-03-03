@@ -62,8 +62,8 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
         // 5. View history
         var historyResp = await client.GetAsync("/api/TimeTracking");
         historyResp.EnsureSuccessStatusCode();
-        var entries = await historyResp.Content.ReadFromJsonAsync<List<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
-        entries!.Should().Contain(e => e.Description == "Done for now");
+        var historyPage = await historyResp.Content.ReadFromJsonAsync<PaginatedResponseDto<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
+        historyPage!.Items.Should().Contain(e => e.Description == "Done for now");
 
         // 6. Change password
         var pwResp = await client.PostAsJsonAsync("/api/Auth/change-password", new
@@ -141,8 +141,8 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
         var entriesResp = await ownerClient.GetAsync(
             $"/api/Organizations/multi-user-org/member-entries/{empLogin.User.Id}");
         entriesResp.EnsureSuccessStatusCode();
-        var empEntries = await entriesResp.Content.ReadFromJsonAsync<List<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
-        empEntries!.Should().HaveCountGreaterThanOrEqualTo(1);
+        var empPage = await entriesResp.Content.ReadFromJsonAsync<PaginatedResponseDto<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
+        empPage!.Items.Should().HaveCountGreaterThanOrEqualTo(1);
 
         // Owner creates work schedule for employee
 
@@ -190,8 +190,8 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
         // User checks their requests
         var myReqResp = await userClient.GetAsync("/api/organizations/my-requests");
         myReqResp.EnsureSuccessStatusCode();
-        var myReqs = await myReqResp.Content.ReadFromJsonAsync<List<OrgRequestResponseDto>>(TestHelpers.JsonOptions);
-        myReqs!.Should().Contain(r => r.Id == request!.Id);
+        var myReqsPage = await myReqResp.Content.ReadFromJsonAsync<PaginatedResponseDto<OrgRequestResponseDto>>(TestHelpers.JsonOptions);
+        myReqsPage!.Items.Should().Contain(r => r.Id == request!.Id);
 
         // Owner sees admin notifications
         var notifResp = await ownerClient.GetAsync("/api/organizations/notifications");
@@ -266,8 +266,8 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
         // Owner views all absences
         var allAbsResp = await ownerClient.GetAsync("/api/organizations/hab-org/absences");
         allAbsResp.EnsureSuccessStatusCode();
-        var absences = await allAbsResp.Content.ReadFromJsonAsync<List<AbsenceDayResponseDto>>(TestHelpers.JsonOptions);
-        absences!.Should().Contain(a => a.Note == "Year-end break");
+        var absPage = await allAbsResp.Content.ReadFromJsonAsync<PaginatedResponseDto<AbsenceDayResponseDto>>(TestHelpers.JsonOptions);
+        absPage!.Items.Should().Contain(a => a.Note == "Year-end break");
 
         // Owner creates absence for member
         var adminAbsResp = await ownerClient.PostAsJsonAsync("/api/organizations/hab-org/absences/admin", new

@@ -122,9 +122,9 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         var response = await client.GetAsync("/api/TimeTracking");
         response.EnsureSuccessStatusCode();
 
-        var entries = await response.Content.ReadFromJsonAsync<List<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
-        entries.Should().NotBeNull();
-        entries!.Should().HaveCountGreaterThanOrEqualTo(1);
+        var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
+        page.Should().NotBeNull();
+        page!.Items.Should().HaveCountGreaterThanOrEqualTo(1);
     }
 
     [Fact]
@@ -136,9 +136,9 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         var response = await client.GetAsync("/api/TimeTracking?limit=2&offset=0");
         response.EnsureSuccessStatusCode();
 
-        var entries = await response.Content.ReadFromJsonAsync<List<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
-        entries.Should().NotBeNull();
-        entries!.Count.Should().BeLessThanOrEqualTo(2);
+        var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
+        page.Should().NotBeNull();
+        page!.Items.Count.Should().BeLessThanOrEqualTo(2);
     }
 
     [Fact]
@@ -151,9 +151,9 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         var response = await client.GetAsync("/api/TimeTracking?from=2099-01-01&to=2099-12-31");
         response.EnsureSuccessStatusCode();
 
-        var entries = await response.Content.ReadFromJsonAsync<List<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
-        entries.Should().NotBeNull();
-        entries!.Should().BeEmpty();
+        var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<TimeEntryResponseDto>>(TestHelpers.JsonOptions);
+        page.Should().NotBeNull();
+        page!.Items.Should().BeEmpty();
     }
 
     // ── Update ───────────────────────────────────────────────────────────
@@ -165,10 +165,11 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
         // Get existing entries
-        var entries = await client.GetFromJsonAsync<List<TimeEntryResponseDto>>(
+        var page = await client.GetFromJsonAsync<PaginatedResponseDto<TimeEntryResponseDto>>(
             "/api/TimeTracking?limit=1", TestHelpers.JsonOptions);
-        entries.Should().NotBeNullOrEmpty();
-        var entry = entries!.First();
+        page.Should().NotBeNull();
+        page!.Items.Should().NotBeEmpty();
+        var entry = page.Items.First();
 
         var response = await client.PutAsJsonAsync($"/api/TimeTracking/{entry.Id}", new
         {
@@ -189,9 +190,9 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
         // Get an entry ID from Max
-        var entries = await client.GetFromJsonAsync<List<TimeEntryResponseDto>>(
+        var page = await client.GetFromJsonAsync<PaginatedResponseDto<TimeEntryResponseDto>>(
             "/api/TimeTracking?limit=1", TestHelpers.JsonOptions);
-        var entryId = entries!.First().Id;
+        var entryId = page!.Items.First().Id;
 
         // Login as Tom (member)
         TestHelpers.ClearAuth(client);

@@ -8,7 +8,7 @@ namespace TimeTracking.Api.Services;
 public interface IOrganizationService
 {
     // ── Organization CRUD ──
-    Task<ServiceResult<List<OrganizationResponse>>> GetOrganizationsAsync();
+    Task<ServiceResult<PaginatedResponse<OrganizationResponse>>> GetOrganizationsAsync(int limit, int offset);
     Task<ServiceResult<OrganizationDetailResponse>> GetOrganizationAsync(string slug);
     Task<ServiceResult<List<UserOrganizationResponse>>> GetUserOrganizationsAsync(int userId);
     Task<ServiceResult<OrganizationResponse>> CreateOrganizationAsync(int callerUserId, CreateOrganizationRequest request);
@@ -25,7 +25,7 @@ public interface IOrganizationService
 
     // ── Time overview (admin) ──
     Task<ServiceResult<List<MemberTimeOverviewResponse>>> GetTimeOverviewAsync(string slug, int callerUserId, DateTime? from, DateTime? to);
-    Task<ServiceResult<List<object>>> GetMemberEntriesAsync(string slug, int callerUserId, int userId, DateTime? from, DateTime? to);
+    Task<ServiceResult<PaginatedResponse<object>>> GetMemberEntriesAsync(string slug, int callerUserId, int userId, DateTime? from, DateTime? to, int limit, int offset);
 
     // ── Initial overtime (admin) ──
     Task<ServiceResult<object>> SetMemberInitialOvertimeAsync(string slug, int callerUserId, int userId, SetInitialOvertimeRequest request);
