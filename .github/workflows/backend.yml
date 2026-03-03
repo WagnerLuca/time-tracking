@@ -28,16 +28,8 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
-      - name: Restore dependencies
-        run: dotnet restore
-        working-directory: backend
-
-      - name: Build
-        run: dotnet build --no-restore --configuration Release
-        working-directory: backend
-
       - name: Run tests
-        run: dotnet test --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
+        run: dotnet test tests\TimeTracking.Api.Tests --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
         working-directory: backend
         env:
           ASPNETCORE_ENVIRONMENT: Testing
