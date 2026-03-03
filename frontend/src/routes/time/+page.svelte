@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 	import { timeTrackingApi, organizationsApi, workScheduleApi, requestsApi, holidayApi, absenceDayApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/api';
 	import { RequestType } from '$lib/api';
@@ -187,9 +188,9 @@
 
 	function getDayTarget(date: Date): number {
 		if (!workSchedule) return 0;
-		// Skip holidays and absences
 		const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-		if (daysOffSet.has(dateStr)) return 0;
+		// Only holidays reduce the target to 0; absences still have a target
+		if (holidayDates.has(dateStr)) return 0;
 		const dayOfWeek = date.getDay();
 		const targets: Record<number, number> = {
 			1: (workSchedule.targetMon ?? 0) * 60,
@@ -199,6 +200,14 @@
 			5: (workSchedule.targetFri ?? 0) * 60,
 		};
 		return targets[dayOfWeek] ?? 0;
+	}
+
+	function getAbsenceCredit(date: Date): number {
+		const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+		if (sickDayDates.has(dateStr) || vacationDates.has(dateStr) || otherAbsenceDates.has(dateStr)) {
+			return getDayTarget(date);
+		}
+		return 0;
 	}
 
 	function dateKey(d: Date): string {
@@ -229,7 +238,7 @@
 			try {
 				const [holRes, absRes] = await Promise.all([
 					holidayApi.apiOrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
-					absenceDayApi.apiOrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug)
+					absenceDayApi.apiOrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug, auth.user?.id)
 				]);
 				const offDates = new Set<string>();
 				const hDates = new Map<string, string>();
@@ -293,15 +302,17 @@
 
 				const totalWorked = sumMinutes(sorted);
 				let totalTargetMins = 0;
+				let totalAbsenceCredits = 0;
 				const cursor = new Date(firstDate);
 				while (cursor <= today) {
 					totalTargetMins += getDayTarget(cursor);
+					totalAbsenceCredits += getAbsenceCredit(cursor);
 					cursor.setDate(cursor.getDate() + 1);
 				}
 
 				const initialOvertimeHours = (workSchedule?.initialOvertimeMode !== 'Disabled' && workSchedule?.initialOvertimeHours) ? workSchedule.initialOvertimeHours * 60 : 0;
 				const initialOvertime = initialOvertimeHours;
-				cumulativeOvertime = totalWorked - totalTargetMins + initialOvertime;
+				cumulativeOvertime = totalWorked + totalAbsenceCredits - totalTargetMins + initialOvertime;
 				hasOvertimeData = true;
 			} else {
 				cumulativeOvertime = 0;

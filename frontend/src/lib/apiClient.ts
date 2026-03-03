@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Configuration, AbsenceDayApi, AuthApi, HolidayApi, OrganizationsApi, PauseRulesApi, RequestsApi, TimeTrackingApi, UsersApi, WorkScheduleApi, WorkSchedulePeriodApi } from '$lib/api';
+import { Configuration, AbsenceDayApi, AuthApi, HolidayApi, NotificationsApi, OrganizationsApi, PauseRulesApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
 
 // Detect base URL: browser uses current hostname, SSR uses Docker service name
 const getApiBaseUrl = (): string => {
@@ -55,10 +55,9 @@ const config = new Configuration({
 export const authApi = new AuthApi(config, undefined, axiosInstance);
 export const absenceDayApi = new AbsenceDayApi(config, undefined, axiosInstance);
 export const holidayApi = new HolidayApi(config, undefined, axiosInstance);
+export const notificationsApi = new NotificationsApi(config, undefined, axiosInstance);
 export const organizationsApi = new OrganizationsApi(config, undefined, axiosInstance);
 export const pauseRulesApi = new PauseRulesApi(config, undefined, axiosInstance);
 export const requestsApi = new RequestsApi(config, undefined, axiosInstance);
 export const timeTrackingApi = new TimeTrackingApi(config, undefined, axiosInstance);
-export const usersApi = new UsersApi(config, undefined, axiosInstance);
 export const workScheduleApi = new WorkScheduleApi(config, undefined, axiosInstance);
-export const workSchedulePeriodApi = new WorkSchedulePeriodApi(config, undefined, axiosInstance);

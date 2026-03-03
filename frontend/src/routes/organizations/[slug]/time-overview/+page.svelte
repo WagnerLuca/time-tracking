@@ -81,7 +81,7 @@
 		try {
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
-			const { data } = await organizationsApi.apiOrganizationsSlugMemberEntriesUserIdGet(orgSlug, userId, from, to);
+			const { data } = await organizationsApi.apiOrganizationsSlugMemberEntriesMemberIdGet(orgSlug, userId, from, to);
 			memberEntries = data;
 		} catch {
 			memberEntries = [];

@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { organizationsApi, pauseRulesApi, usersApi, workScheduleApi, requestsApi, holidayApi, absenceDayApi, workSchedulePeriodApi } from '$lib/apiClient';
+	import { organizationsApi, pauseRulesApi, workScheduleApi, requestsApi, holidayApi, absenceDayApi, notificationsApi } from '$lib/apiClient';
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationRequest,
@@ -16,7 +16,6 @@
 		OrgRequestResponse,
 		HolidayResponse,
 		AbsenceDayResponse,
-		WorkSchedulePeriodResponse,
 		AbsenceType,
 		MemberTimeOverviewResponse
 	} from '$lib/api';
@@ -147,7 +146,7 @@
 	let adminAbsenceFilter = $state<number | null>(null); // userId filter
 
 	// Schedule periods
-	let schedulePeriods = $state<WorkSchedulePeriodResponse[]>([]);
+	let schedulePeriods = $state<WorkScheduleResponse[]>([]);
 	let schedulePeriodsLoading = $state(false);
 	let schedulePeriodsLoaded = $state(false);
 	let showAddPeriod = $state(false);
@@ -164,7 +163,7 @@
 	let periodError = $state('');
 	// Admin schedule periods for member
 	let adminPeriodsForMember = $state<number | null>(null);
-	let adminPeriods = $state<WorkSchedulePeriodResponse[]>([]);
+	let adminPeriods = $state<WorkScheduleResponse[]>([]);
 	let adminPeriodsLoading = $state(false);
 	let showAdminAddPeriod = $state(false);
 	let adminNewPeriodFrom = $state('');
@@ -179,6 +178,10 @@
 	let addingAdminPeriod = $state(false);
 	let adminPeriodError = $state('');
 
+	// Settings change notification
+	let showSettingsChangedBanner = $state(false);
+	let settingsNotificationIds: number[] = $state([]);
+
 	let orgSlug: string;
 
 	onMount(() => {
@@ -192,6 +195,23 @@
 		try {
 			const { data } = await organizationsApi.apiOrganizationsSlugGet(orgSlug);
 			org = data;
+
+			// Check for unread settings-change notifications from backend
+			try {
+				const resp = await notificationsApi.apiNotificationsGet(true) as any;
+				const notifications = resp.data as any[];
+				const orgId = org!.id;
+				const settingsNotifs = notifications.filter(
+					(n: any) => n.type === 'SettingsChanged' && n.organizationId === orgId && !n.isRead
+				);
+				if (settingsNotifs.length > 0) {
+					showSettingsChangedBanner = true;
+					settingsNotificationIds = settingsNotifs.map((n: any) => n.id);
+				}
+			} catch {
+				// Ignore notification fetch errors
+			}
+
 			// Load work schedule for the current user
 			try {
 				const { data: ws } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgSlug);
@@ -208,6 +228,19 @@
 		}
 	}
 
+	async function dismissSettingsNotifications() {
+		showSettingsChangedBanner = false;
+		// Mark all settings-change notifications as read on the backend
+		for (const nid of settingsNotificationIds) {
+			try {
+				await notificationsApi.apiNotificationsIdReadPut(nid);
+			} catch {
+				// Ignore errors
+			}
+		}
+		settingsNotificationIds = [];
+	}
+
 	function loadAllSections() {
 		loadHolidays();
 		loadAbsences();
@@ -217,9 +250,9 @@
 		loadTeamOverview();
 	}
 
-	/** Load admin time overview for current week */
+	/** Load time overview for current week (admins only, when visibility enabled) */
 	async function loadTeamOverview() {
-		if (teamOverviewLoaded || !canEdit) return;
+		if (teamOverviewLoaded || !canEdit || !org?.memberTimeEntryVisibility) return;
 		teamOverviewLoading = true;
 		try {
 			const now = new Date();
@@ -370,17 +403,38 @@
 		memberScheduleSaving = true;
 		memberScheduleError = '';
 		try {
-			const payload = {
-				weeklyWorkHours: memberWeeklyHours ?? undefined,
-				distributeEvenly: memberDistributeEvenly,
-				targetMon: memberDistributeEvenly ? undefined : memberTargetMon,
-				targetTue: memberDistributeEvenly ? undefined : memberTargetTue,
-				targetWed: memberDistributeEvenly ? undefined : memberTargetWed,
-				targetThu: memberDistributeEvenly ? undefined : memberTargetThu,
-				targetFri: memberDistributeEvenly ? undefined : memberTargetFri,
-				initialOvertimeHours: memberOvertimeHours
-			};
-			const { data } = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulePut(orgSlug, editingMemberSchedule, payload);
+			const scheduleId = memberSchedule?.id;
+			let data: WorkScheduleResponse;
+			if (scheduleId && scheduleId > 0) {
+				// Update existing schedule
+				const payload = {
+					weeklyWorkHours: memberWeeklyHours ?? undefined,
+					distributeEvenly: memberDistributeEvenly,
+					targetMon: memberDistributeEvenly ? undefined : memberTargetMon,
+					targetTue: memberDistributeEvenly ? undefined : memberTargetTue,
+					targetWed: memberDistributeEvenly ? undefined : memberTargetWed,
+					targetThu: memberDistributeEvenly ? undefined : memberTargetThu,
+					targetFri: memberDistributeEvenly ? undefined : memberTargetFri,
+				};
+				const resp = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesIdPut(orgSlug, editingMemberSchedule, scheduleId, payload);
+				data = resp.data;
+			} else {
+				// Create new schedule
+				const today = new Date();
+				const validFrom = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+				const payload = {
+					validFrom,
+					weeklyWorkHours: memberWeeklyHours ?? undefined,
+					distributeEvenly: memberDistributeEvenly,
+					targetMon: memberDistributeEvenly ? undefined : memberTargetMon,
+					targetTue: memberDistributeEvenly ? undefined : memberTargetTue,
+					targetWed: memberDistributeEvenly ? undefined : memberTargetWed,
+					targetThu: memberDistributeEvenly ? undefined : memberTargetThu,
+					targetFri: memberDistributeEvenly ? undefined : memberTargetFri,
+				};
+				const resp = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesPost(orgSlug, editingMemberSchedule, payload);
+				data = resp.data;
+			}
 			memberSchedule = data;
 			memberWeeklyHours = data.weeklyWorkHours ?? null;
 			memberTargetMon = data.targetMon ?? 0;
@@ -414,16 +468,36 @@
 		myScheduleSaving = true;
 		myScheduleError = '';
 		try {
-			const payload = {
-				weeklyWorkHours: myWeeklyHours ?? undefined,
-				distributeEvenly: myDistributeEvenly,
-				targetMon: myDistributeEvenly ? undefined : myTargetMon,
-				targetTue: myDistributeEvenly ? undefined : myTargetTue,
-				targetWed: myDistributeEvenly ? undefined : myTargetWed,
-				targetThu: myDistributeEvenly ? undefined : myTargetThu,
-				targetFri: myDistributeEvenly ? undefined : myTargetFri,
-			};
-			const { data } = await workScheduleApi.apiOrganizationsSlugWorkSchedulePut(orgSlug, payload);
+			const scheduleId = workSchedule?.id;
+			let data: WorkScheduleResponse;
+			if (scheduleId && scheduleId > 0) {
+				const payload = {
+					weeklyWorkHours: myWeeklyHours ?? undefined,
+					distributeEvenly: myDistributeEvenly,
+					targetMon: myDistributeEvenly ? undefined : myTargetMon,
+					targetTue: myDistributeEvenly ? undefined : myTargetTue,
+					targetWed: myDistributeEvenly ? undefined : myTargetWed,
+					targetThu: myDistributeEvenly ? undefined : myTargetThu,
+					targetFri: myDistributeEvenly ? undefined : myTargetFri,
+				};
+				const resp = await workScheduleApi.apiOrganizationsSlugWorkSchedulesIdPut(orgSlug, scheduleId, payload);
+				data = resp.data;
+			} else {
+				const today = new Date();
+				const validFrom = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+				const payload = {
+					validFrom,
+					weeklyWorkHours: myWeeklyHours ?? undefined,
+					distributeEvenly: myDistributeEvenly,
+					targetMon: myDistributeEvenly ? undefined : myTargetMon,
+					targetTue: myDistributeEvenly ? undefined : myTargetTue,
+					targetWed: myDistributeEvenly ? undefined : myTargetWed,
+					targetThu: myDistributeEvenly ? undefined : myTargetThu,
+					targetFri: myDistributeEvenly ? undefined : myTargetFri,
+				};
+				const resp = await workScheduleApi.apiOrganizationsSlugWorkSchedulesPost(orgSlug, payload);
+				data = resp.data;
+			}
 			workSchedule = data;
 			editingMySchedule = false;
 		} catch (err: any) {
@@ -459,7 +533,7 @@
 	async function loadUsersForDropdown() {
 		if (usersLoaded) return;
 		try {
-			const { data: users } = await usersApi.apiUsersGet();
+			const { data: users } = await organizationsApi.apiOrganizationsSlugGet(orgSlug).then(r => r.data?.members ?? []) as any[];
 			allUsers = users.map((u: any) => ({
 				id: u.id,
 				email: u.email,
@@ -553,7 +627,7 @@
 	async function updateMemberRole(userId: number, newRole: number) {
 		actionError = '';
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersUserIdPut(orgSlug, userId, { role: newRole as any });
+			await organizationsApi.apiOrganizationsSlugMembersMemberIdPut(orgSlug, userId, { role: newRole as any });
 			await reloadOrg();
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to update member role.';
@@ -564,7 +638,7 @@
 		if (!confirm(`Remove ${memberName} from this organization?`)) return;
 		actionError = '';
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersUserIdDelete(orgSlug, userId);
+			await organizationsApi.apiOrganizationsSlugMembersMemberIdDelete(orgSlug, userId);
 			await reloadOrg();
 		} catch (err: any) {
 			actionError = err.response?.data?.message || 'Failed to remove member.';
@@ -803,7 +877,7 @@
 		editOvertimeSaving = true;
 		editOvertimeError = '';
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersUserIdInitialOvertimePut(
+			await organizationsApi.apiOrganizationsSlugMembersMemberIdInitialOvertimePut(
 				orgSlug, userId, { initialOvertimeHours: editOvertimeMinutes }
 			);
 			editingOvertimeMemberId = null;
@@ -1030,8 +1104,8 @@
 		schedulePeriodsLoading = true;
 		periodError = '';
 		try {
-			const { data } = await workSchedulePeriodApi.apiOrganizationsSlugSchedulePeriodsGet(orgSlug);
-			schedulePeriods = (data as WorkSchedulePeriodResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
+			const { data } = await workScheduleApi.apiOrganizationsSlugWorkSchedulesGet(orgSlug);
+			schedulePeriods = (data as WorkScheduleResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
 			schedulePeriodsLoaded = true;
 		} catch {
 			schedulePeriods = [];
@@ -1045,7 +1119,7 @@
 		addingPeriod = true;
 		periodError = '';
 		try {
-			await workSchedulePeriodApi.apiOrganizationsSlugSchedulePeriodsPost(orgSlug, {
+			await workScheduleApi.apiOrganizationsSlugWorkSchedulesPost(orgSlug, {
 				validFrom: newPeriodFrom,
 				validTo: newPeriodTo || undefined,
 				weeklyWorkHours: newPeriodWeeklyHours,
@@ -1072,7 +1146,7 @@
 	async function deleteSchedulePeriod(id: number) {
 		if (!confirm('Delete this schedule period?')) return;
 		try {
-			await workSchedulePeriodApi.apiOrganizationsSlugSchedulePeriodsIdDelete(orgSlug, id);
+			await workScheduleApi.apiOrganizationsSlugWorkSchedulesIdDelete(orgSlug, id);
 			schedulePeriodsLoaded = false;
 			await loadSchedulePeriods();
 		} catch (err: any) {
@@ -1090,8 +1164,8 @@
 		adminPeriodsLoading = true;
 		adminPeriodError = '';
 		try {
-			const { data } = await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(orgSlug, memberId);
-			adminPeriods = (data as WorkSchedulePeriodResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
+			const { data } = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesGet(orgSlug, memberId);
+			adminPeriods = (data as WorkScheduleResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
 		} catch {
 			adminPeriods = [];
 		} finally {
@@ -1105,7 +1179,7 @@
 		addingAdminPeriod = true;
 		adminPeriodError = '';
 		try {
-			await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost(orgSlug, adminPeriodsForMember, {
+			await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesPost(orgSlug, adminPeriodsForMember, {
 				validFrom: adminNewPeriodFrom,
 				validTo: adminNewPeriodTo || undefined,
 				weeklyWorkHours: adminNewPeriodWeeklyHours,
@@ -1117,8 +1191,8 @@
 				targetFri: adminNewPeriodDistributeEvenly ? undefined : adminNewPeriodFri
 			});
 			// reload
-			const { data } = await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(orgSlug, adminPeriodsForMember);
-			adminPeriods = (data as WorkSchedulePeriodResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
+			const { data } = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesGet(orgSlug, adminPeriodsForMember);
+			adminPeriods = (data as WorkScheduleResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
 			showAdminAddPeriod = false;
 			adminNewPeriodFrom = '';
 			adminNewPeriodTo = '';
@@ -1133,9 +1207,9 @@
 	async function deleteAdminSchedulePeriod(memberId: number, periodId: number) {
 		if (!confirm('Delete this schedule period?')) return;
 		try {
-			await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete(orgSlug, memberId, periodId);
-			const { data } = await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(orgSlug, memberId);
-			adminPeriods = (data as WorkSchedulePeriodResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
+			await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesIdDelete(orgSlug, memberId, periodId);
+			const { data } = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesGet(orgSlug, memberId);
+			adminPeriods = (data as WorkScheduleResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
 		} catch (err: any) {
 			adminPeriodError = err.response?.data?.message || 'Failed to delete period.';
 		}
@@ -1152,6 +1226,23 @@
 			const next = modes[(current + 1) % 3] as RuleMode;
 			const payload: UpdateOrganizationSettingsRequest = {
 				workScheduleChangeMode: next
+			};
+			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
+			await reloadOrg();
+		} catch (err: any) {
+			settingsError = err.response?.data?.message || 'Failed to update setting.';
+		} finally {
+			settingsSaving = false;
+		}
+	}
+
+	async function toggleMemberTimeEntryVisibility() {
+		if (!org) return;
+		settingsSaving = true;
+		settingsError = '';
+		try {
+			const payload: UpdateOrganizationSettingsRequest = {
+				memberTimeEntryVisibility: !org.memberTimeEntryVisibility
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
@@ -1234,7 +1325,9 @@
 				</div>
 				{#if canEdit}
 					<div class="header-actions">
-						<a href="/organizations/{orgSlug}/time-overview" class="btn-secondary">Time Overview</a>
+						{#if org.memberTimeEntryVisibility}
+							<a href="/organizations/{orgSlug}/time-overview" class="btn-secondary">Time Overview</a>
+						{/if}
 						<button class="btn-secondary" onclick={startEdit}>Edit</button>
 						{#if isOwner}
 							<button class="btn-danger" onclick={deleteOrg}>Delete</button>
@@ -1242,6 +1335,21 @@
 					</div>
 				{/if}
 			</div>
+
+			{#if !canEdit && org.memberTimeEntryVisibility}
+				<div class="visibility-warning">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+					Your administrator can view your tracked working hours.
+				</div>
+			{/if}
+
+			{#if showSettingsChangedBanner}
+				<div class="settings-changed-banner">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+					Organization rules have been updated. Check the <button class="link-btn" onclick={() => { activeTab = 'settings'; dismissSettingsNotifications(); }}>Rules</button> tab for details.
+					<button class="dismiss-btn" onclick={() => dismissSettingsNotifications()}>&times;</button>
+				</div>
+			{/if}
 
 			{#if org.description}
 				<p class="description">{org.description}</p>
@@ -1261,12 +1369,10 @@
 					<svg class="tab-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
 					Team
 				</button>
-				{#if canEdit}
-					<button class="tab-btn" class:active={activeTab === 'settings'} onclick={() => (activeTab = 'settings')}>
-						<svg class="tab-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
-						Settings
-					</button>
-				{/if}
+				<button class="tab-btn" class:active={activeTab === 'settings'} onclick={() => (activeTab = 'settings')}>
+					<svg class="tab-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+					{canEdit ? 'Settings' : 'Rules'}
+				</button>
 			</div>
 
 			<!-- ==================== MY SCHEDULE TAB ==================== -->
@@ -1617,7 +1723,7 @@
 											{/if}
 										</div>
 										<div class="team-card-email">{member.email}</div>
-										{#if canEdit && overview}
+										{#if canEdit && org.memberTimeEntryVisibility && overview}
 											<div class="team-card-stats">
 												<span class="stat" title="Tracked this week">
 													<svg viewBox="0 0 16 16" fill="currentColor" class="stat-icon"><path d="M8 3.5a.5.5 0 00-1 0V8a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 7.71V3.5z"/><path d="M8 16A8 8 0 108 0a8 8 0 000 16zm7-8A7 7 0 111 8a7 7 0 0114 0z"/></svg>
@@ -1841,6 +1947,22 @@
 									{ruleModeLabel(org.workScheduleChangeMode)}
 								</button>
 							</div>
+
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Member Time Visibility</div>
+									<div class="setting-desc">When enabled, admins can view members' tracked working hours. Members will see a notification about this.</div>
+								</div>
+								<button
+									class="toggle-switch"
+									class:active={org.memberTimeEntryVisibility}
+									onclick={toggleMemberTimeEntryVisibility}
+									disabled={settingsSaving}
+									aria-label="Toggle member time entry visibility"
+								>
+									<span class="toggle-knob"></span>
+								</button>
+							</div>
 						</div>
 
 						<!-- Pause Rules -->
@@ -1999,12 +2121,192 @@
 						{/if}
 					</section>
 				</div>
+
+			<!-- ==================== RULES TAB (Member read-only) ==================== -->
+			{:else if activeTab === 'settings'}
+				<div class="tab-content">
+					<p class="tab-description">Current organization rules and policies. Only admins can change these settings.</p>
+
+					<section class="settings-section">
+						<h2>Organization Rules</h2>
+
+						<div class="settings-grid">
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Auto-Pause Tracking</div>
+									<div class="setting-desc">Automatically deduct break time from tracked hours based on configurable rules.</div>
+								</div>
+								<span class="rule-status" class:active={org.autoPauseEnabled}>{org.autoPauseEnabled ? 'On' : 'Off'}</span>
+							</div>
+
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Edit Past Entries</div>
+									<div class="setting-desc">Control whether members can edit start/end times of completed time entries.</div>
+								</div>
+								<span class="rule-status-badge {ruleModeColor(org.editPastEntriesMode)}">{ruleModeLabel(org.editPastEntriesMode)}</span>
+							</div>
+
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Edit Pause Duration</div>
+									<div class="setting-desc">Control whether members can override auto-deducted break time.</div>
+								</div>
+								<span class="rule-status-badge {ruleModeColor(org.editPauseMode)}">{ruleModeLabel(org.editPauseMode)}</span>
+							</div>
+
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Initial Overtime</div>
+									<div class="setting-desc">Control whether members can set their own initial overtime balance.</div>
+								</div>
+								<span class="rule-status-badge {ruleModeColor(org.initialOvertimeMode)}">{ruleModeLabel(org.initialOvertimeMode)}</span>
+							</div>
+
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Join Policy</div>
+									<div class="setting-desc">Control how new members can join the organization.</div>
+								</div>
+								<span class="rule-status-badge {ruleModeColor(org.joinPolicy)}">{joinPolicyLabel(org.joinPolicy)}</span>
+							</div>
+
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Schedule Periods</div>
+									<div class="setting-desc">Control whether members can create/modify their own schedule periods.</div>
+								</div>
+								<span class="rule-status-badge {ruleModeColor(org.workScheduleChangeMode)}">{ruleModeLabel(org.workScheduleChangeMode)}</span>
+							</div>
+
+							<div class="setting-row">
+								<div class="setting-info">
+									<div class="setting-label">Member Time Visibility</div>
+									<div class="setting-desc">Whether admins can view members' tracked working hours.</div>
+								</div>
+								<span class="rule-status" class:active={org.memberTimeEntryVisibility}>{org.memberTimeEntryVisibility ? 'On' : 'Off'}</span>
+							</div>
+						</div>
+
+						{#if org.autoPauseEnabled}
+							<div class="pause-rules-readonly">
+								<h3>Pause Rules</h3>
+								{#if (org.pauseRules ?? []).length === 0}
+									<p class="muted">No pause rules configured.</p>
+								{:else}
+									<div class="rules-list">
+										{#each (org.pauseRules ?? []) as rule}
+											<div class="rule-item-readonly">
+												<strong>&ge; {rule.minHours}h</strong> tracked &rarr; <strong>{rule.pauseMinutes} min</strong> pause deducted
+											</div>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						{/if}
+					</section>
+				</div>
 			{/if}
 		{/if}
 	{/if}
 </div>
 
 <style>
+	.visibility-warning {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1rem;
+		background: #fffbeb;
+		border: 1px solid #f59e0b;
+		border-radius: 8px;
+		color: #92400e;
+		font-size: 0.875rem;
+		margin-bottom: 1rem;
+	}
+	.visibility-warning svg {
+		flex-shrink: 0;
+		color: #f59e0b;
+	}
+
+	.settings-changed-banner {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1rem;
+		background: #eff6ff;
+		border: 1px solid #3b82f6;
+		border-radius: 8px;
+		color: #1e40af;
+		font-size: 0.875rem;
+		margin-bottom: 1rem;
+	}
+	.settings-changed-banner svg {
+		flex-shrink: 0;
+		color: #3b82f6;
+	}
+	.settings-changed-banner .link-btn {
+		background: none;
+		border: none;
+		color: #2563eb;
+		font-weight: 600;
+		text-decoration: underline;
+		cursor: pointer;
+		padding: 0;
+		font-size: inherit;
+	}
+	.settings-changed-banner .dismiss-btn {
+		margin-left: auto;
+		background: none;
+		border: none;
+		color: #6b7280;
+		cursor: pointer;
+		font-size: 1.25rem;
+		padding: 0 0.25rem;
+		line-height: 1;
+	}
+	.settings-changed-banner .dismiss-btn:hover { color: #1e40af; }
+
+	.rule-status {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		padding: 0.25rem 0.75rem;
+		border-radius: 999px;
+		background: #f3f4f6;
+		color: #6b7280;
+	}
+	.rule-status.active {
+		background: #dcfce7;
+		color: #16a34a;
+	}
+
+	.rule-status-badge {
+		font-size: 0.75rem;
+		font-weight: 600;
+		padding: 0.25rem 0.75rem;
+		border-radius: 999px;
+	}
+
+	.pause-rules-readonly {
+		margin-top: 1.5rem;
+		padding-top: 1rem;
+		border-top: 1px solid #e5e7eb;
+	}
+	.pause-rules-readonly h3 {
+		font-size: 1rem;
+		margin: 0 0 0.75rem;
+		color: #1a1a2e;
+	}
+	.rule-item-readonly {
+		padding: 0.5rem 0.75rem;
+		background: #f9fafb;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		font-size: 0.875rem;
+		color: #374151;
+		margin-bottom: 0.5rem;
+	}
+
 	.back-link {
 		color: #6b7280;
 		text-decoration: none;

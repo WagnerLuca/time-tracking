@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { organizationsApi, workScheduleApi, absenceDayApi, workSchedulePeriodApi } from '$lib/apiClient';
+	import { organizationsApi, workScheduleApi, absenceDayApi } from '$lib/apiClient';
 	import type {
 		OrganizationDetailResponse,
 		OrganizationMemberResponse,
@@ -11,7 +11,6 @@
 		TimeEntryResponse,
 		WorkScheduleResponse,
 		AbsenceDayResponse,
-		WorkSchedulePeriodResponse,
 		AbsenceType
 	} from '$lib/api';
 
@@ -26,6 +25,7 @@
 	let myRole = $derived(org?.members?.find(m => m.id === auth.user?.id)?.role ?? null);
 	let canEdit = $derived(myRole === 'Owner' || myRole === 'Admin');
 	let isSelf = $derived(auth.user?.id === memberId);
+	let canViewTime = $derived(isSelf || (canEdit && (org?.memberTimeEntryVisibility ?? false)));
 
 	// Time overview
 	let weekOffset = $state(0);
@@ -62,7 +62,7 @@
 	let scheduleError = $state('');
 
 	// Schedule periods
-	let periods = $state<WorkSchedulePeriodResponse[]>([]);
+	let periods = $state<WorkScheduleResponse[]>([]);
 	let periodsLoading = $state(false);
 	let showAddPeriod = $state(false);
 	let periodFrom = $state('');
@@ -288,15 +288,31 @@
 		scheduleSaving = true;
 		scheduleError = '';
 		try {
-			await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulePut(orgSlug, memberId, {
-				weeklyWorkHours: schedWeeklyHours,
-				distributeEvenly: schedDistribute,
-				targetMon: schedDistribute ? null : schedMon,
-				targetTue: schedDistribute ? null : schedTue,
-				targetWed: schedDistribute ? null : schedWed,
-				targetThu: schedDistribute ? null : schedThu,
-				targetFri: schedDistribute ? null : schedFri
-			});
+			const scheduleId = schedule?.id;
+			if (scheduleId && scheduleId > 0) {
+				await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesIdPut(orgSlug, memberId, scheduleId, {
+					weeklyWorkHours: schedWeeklyHours,
+					distributeEvenly: schedDistribute,
+					targetMon: schedDistribute ? null : schedMon,
+					targetTue: schedDistribute ? null : schedTue,
+					targetWed: schedDistribute ? null : schedWed,
+					targetThu: schedDistribute ? null : schedThu,
+					targetFri: schedDistribute ? null : schedFri
+				});
+			} else {
+				const today = new Date();
+				const validFrom = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+				await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesPost(orgSlug, memberId, {
+					validFrom,
+					weeklyWorkHours: schedWeeklyHours,
+					distributeEvenly: schedDistribute,
+					targetMon: schedDistribute ? null : schedMon,
+					targetTue: schedDistribute ? null : schedTue,
+					targetWed: schedDistribute ? null : schedWed,
+					targetThu: schedDistribute ? null : schedThu,
+					targetFri: schedDistribute ? null : schedFri
+				});
+			}
 			editingSchedule = false;
 			loadSchedule();
 		} catch (e: any) {
@@ -309,7 +325,7 @@
 	async function loadPeriods() {
 		periodsLoading = true;
 		try {
-			const { data } = await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsGet(orgSlug, memberId);
+			const { data } = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesGet(orgSlug, memberId);
 			periods = data;
 		} catch { periods = []; }
 		periodsLoading = false;
@@ -320,7 +336,7 @@
 		periodSaving = true;
 		periodError = '';
 		try {
-			await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsPost(orgSlug, memberId, {
+			await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesPost(orgSlug, memberId, {
 				validFrom: new Date(periodFrom).toISOString(),
 				validTo: periodTo ? new Date(periodTo).toISOString() : undefined,
 				weeklyWorkHours: periodWeekly,
@@ -345,7 +361,7 @@
 
 	async function deletePeriod(periodId: number) {
 		try {
-			await workSchedulePeriodApi.apiOrganizationsSlugMembersMemberIdSchedulePeriodsIdDelete(orgSlug, memberId, periodId);
+			await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesIdDelete(orgSlug, memberId, periodId);
 			loadPeriods();
 		} catch (e: any) {
 			actionError = e.response?.data?.message || 'Failed to delete period.';
@@ -356,7 +372,7 @@
 	async function saveOvertime() {
 		overtimeSaving = true;
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersUserIdInitialOvertimePut(orgSlug, memberId, { initialOvertimeHours: overtimeHours });
+			await organizationsApi.apiOrganizationsSlugMembersMemberIdInitialOvertimePut(orgSlug, memberId, { initialOvertimeHours: overtimeHours });
 			editingOvertime = false;
 			loadSchedule();
 		} catch (e: any) {
@@ -368,7 +384,7 @@
 	// ── Member Management ──
 	async function changeMemberRole(newRole: number) {
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersUserIdPut(orgSlug, memberId, { role: newRole as any });
+			await organizationsApi.apiOrganizationsSlugMembersMemberIdPut(orgSlug, memberId, { role: newRole as any });
 			loadAll();
 		} catch (e: any) {
 			actionError = e.response?.data?.message || 'Failed to change role.';
@@ -378,7 +394,7 @@
 	async function removeMember() {
 		if (!confirm(`Remove ${member?.firstName} ${member?.lastName} from this organization?`)) return;
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersUserIdDelete(orgSlug, memberId);
+			await organizationsApi.apiOrganizationsSlugMembersMemberIdDelete(orgSlug, memberId);
 			goto(`/organizations/${orgSlug}`);
 		} catch (e: any) {
 			actionError = e.response?.data?.message || 'Failed to remove member.';
@@ -488,6 +504,7 @@
 		{/if}
 
 		<!-- ═══ Time Overview ═══ -->
+		{#if canViewTime}
 		<section class="card">
 			<div class="card-header">
 				<h2>
@@ -604,8 +621,10 @@
 				<p class="muted">No cumulative data available.</p>
 			{/if}
 		</section>
+		{/if}
 
 		<!-- ═══ Absences ═══ -->
+		{#if isSelf || canEdit}
 		<section class="card">
 			<div class="card-header">
 				<h2>
@@ -664,6 +683,7 @@
 				</div>
 			{/if}
 		</section>
+		{/if}
 
 		<!-- ═══ Work Schedule ═══ -->
 		<section class="card">

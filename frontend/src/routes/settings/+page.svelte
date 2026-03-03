@@ -4,7 +4,7 @@
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { goto } from '$app/navigation';
 	import { organizationsApi, authApi, workScheduleApi } from '$lib/apiClient';
-	import type { WorkScheduleResponse, UpdateWorkScheduleRequest } from '$lib/api';
+	import type { WorkScheduleResponse, UpdateWorkScheduleRequest, CreateWorkScheduleRequest } from '$lib/api';
 
 	let changePasswordError = $state('');
 	let changePasswordSuccess = $state('');
@@ -13,6 +13,7 @@
 	let saving = $state(false);
 
 	// Work schedule state
+	let currentScheduleId = $state<number | null>(null);
 	let weeklyHours = $state<number | null>(null);
 	let distributeEvenly = $state(true);
 	let targetMon = $state(0);
@@ -48,6 +49,7 @@
 		scheduleLoading = true;
 		try {
 			const { data: schedule } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgSlug);
+			currentScheduleId = schedule.id ?? null;
 			weeklyHours = schedule.weeklyWorkHours ?? null;
 			targetMon = schedule.targetMon ?? 0;
 			targetTue = schedule.targetTue ?? 0;
@@ -72,17 +74,39 @@
 		scheduleError = '';
 		scheduleSuccess = '';
 		try {
-			const payload: UpdateWorkScheduleRequest = {
-				weeklyWorkHours: weeklyHours ?? undefined,
-				distributeEvenly,
-				targetMon: distributeEvenly ? undefined : targetMon,
-				targetTue: distributeEvenly ? undefined : targetTue,
-				targetWed: distributeEvenly ? undefined : targetWed,
-				targetThu: distributeEvenly ? undefined : targetThu,
-				targetFri: distributeEvenly ? undefined : targetFri
-			};
-			const { data: result } = await workScheduleApi.apiOrganizationsSlugWorkSchedulePut(orgContext.selectedOrgSlug, payload);
+			let result: WorkScheduleResponse;
+			if (currentScheduleId && currentScheduleId > 0) {
+				// Update existing schedule
+				const payload: UpdateWorkScheduleRequest = {
+					weeklyWorkHours: weeklyHours ?? undefined,
+					distributeEvenly,
+					targetMon: distributeEvenly ? undefined : targetMon,
+					targetTue: distributeEvenly ? undefined : targetTue,
+					targetWed: distributeEvenly ? undefined : targetWed,
+					targetThu: distributeEvenly ? undefined : targetThu,
+					targetFri: distributeEvenly ? undefined : targetFri
+				};
+				const { data } = await workScheduleApi.apiOrganizationsSlugWorkSchedulesIdPut(orgContext.selectedOrgSlug, currentScheduleId, payload);
+				result = data;
+			} else {
+				// Create new schedule
+				const today = new Date();
+				const validFrom = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+				const payload: CreateWorkScheduleRequest = {
+					validFrom,
+					weeklyWorkHours: weeklyHours ?? undefined,
+					distributeEvenly,
+					targetMon: distributeEvenly ? undefined : targetMon,
+					targetTue: distributeEvenly ? undefined : targetTue,
+					targetWed: distributeEvenly ? undefined : targetWed,
+					targetThu: distributeEvenly ? undefined : targetThu,
+					targetFri: distributeEvenly ? undefined : targetFri
+				};
+				const { data } = await workScheduleApi.apiOrganizationsSlugWorkSchedulesPost(orgContext.selectedOrgSlug, payload);
+				result = data;
+			}
 			// Update local state with server response
+			currentScheduleId = result.id ?? null;
 			weeklyHours = result.weeklyWorkHours ?? null;
 			targetMon = result.targetMon ?? 0;
 			targetTue = result.targetTue ?? 0;

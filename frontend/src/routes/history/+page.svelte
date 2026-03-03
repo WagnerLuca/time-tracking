@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { timeTrackingApi, workScheduleApi, holidayApi, absenceDayApi, workSchedulePeriodApi } from '$lib/apiClient';
-	import type { TimeEntryResponse, WorkScheduleResponse, WorkSchedulePeriodResponse } from '$lib/api';
+	import { auth } from '$lib/stores/auth.svelte';
+	import { timeTrackingApi, workScheduleApi, holidayApi, absenceDayApi } from '$lib/apiClient';
+	import type { TimeEntryResponse, WorkScheduleResponse } from '$lib/api';
 
 	// View mode
 	let viewMode = $state<'month' | 'year'>('month');
@@ -15,7 +16,7 @@
 	let loading = $state(true);
 	let entries = $state<TimeEntryResponse[]>([]);
 	let workSchedule = $state<WorkScheduleResponse | null>(null);
-	let schedulePeriods = $state<WorkSchedulePeriodResponse[]>([]);
+	let schedulePeriods = $state<WorkScheduleResponse[]>([]);
 
 	// Day-type maps
 	let holidayDates = $state<Map<string, string>>(new Map());
@@ -112,7 +113,7 @@
 	async function loadSchedulePeriods() {
 		if (!orgContext.selectedOrgSlug) { schedulePeriods = []; return; }
 		try {
-			const { data } = await workSchedulePeriodApi.apiOrganizationsSlugSchedulePeriodsGet(orgContext.selectedOrgSlug);
+			const { data } = await workScheduleApi.apiOrganizationsSlugWorkSchedulesGet(orgContext.selectedOrgSlug);
 			schedulePeriods = data;
 		} catch { schedulePeriods = []; }
 	}
@@ -125,7 +126,7 @@
 		try {
 			const [holRes, absRes] = await Promise.all([
 				holidayApi.apiOrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
-				absenceDayApi.apiOrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug)
+				absenceDayApi.apiOrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug, auth.user?.id)
 			]);
 			const off = new Set<string>();
 			const hDates = new Map<string, string>();
@@ -183,14 +184,16 @@
 				monthlyWorked.set(mk, (monthlyWorked.get(mk) ?? 0) + (e.netDurationMinutes ?? e.durationMinutes ?? 0));
 			}
 
-			// Compute targets per month from first entry month to now
+			// Compute targets and absence credits per month from first entry month to now
 			const now = new Date();
 			const monthlyTargets = new Map<string, number>();
+			const monthlyAbsCredits = new Map<string, number>();
 			const cursor = new Date(firstDate.getFullYear(), firstDate.getMonth(), 1);
 			while (cursor <= now) {
 				const mk = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
 				const lastDayOfMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
 				let target = 0;
+				let absCredits = 0;
 				const dayCursor = new Date(cursor);
 				// Start from actual first entry date in the first month
 				if (cursor.getFullYear() === firstDate.getFullYear() && cursor.getMonth() === firstDate.getMonth()) {
@@ -198,10 +201,13 @@
 				}
 				const endDate = now < lastDayOfMonth ? now : lastDayOfMonth;
 				while (dayCursor <= endDate) {
-					target += getDayTarget(new Date(dayCursor));
+					const d = new Date(dayCursor);
+					target += getDayTarget(d);
+					absCredits += getAbsenceCredit(d);
 					dayCursor.setDate(dayCursor.getDate() + 1);
 				}
 				monthlyTargets.set(mk, target);
+				monthlyAbsCredits.set(mk, absCredits);
 				cursor.setMonth(cursor.getMonth() + 1);
 			}
 
@@ -220,8 +226,9 @@
 
 			for (const mk of monthKeys) {
 				const worked = monthlyWorked.get(mk) ?? 0;
+				const absCredits = monthlyAbsCredits.get(mk) ?? 0;
 				const target = monthlyTargets.get(mk) ?? 0;
-				cumulative += worked - target;
+				cumulative += worked + absCredits - target;
 				balances.set(mk, cumulative);
 			}
 
@@ -276,7 +283,8 @@
 	function getDayTarget(date: Date): number {
 		if (!workSchedule) return 0;
 		const key = dateKey(date);
-		if (daysOffSet.has(key)) return 0;
+		// Only holidays reduce the target to 0; absences still have a target
+		if (holidayDates.has(key)) return 0;
 		// Check schedule periods first
 		const dateOnly = key;
 		for (const p of schedulePeriods) {
@@ -295,6 +303,14 @@
 			4: (workSchedule.targetThu ?? 0) * 60, 5: (workSchedule.targetFri ?? 0) * 60
 		};
 		return targets[dow] ?? 0;
+	}
+
+	function getAbsenceCredit(date: Date): number {
+		const key = dateKey(date);
+		if (sickDayDates.has(key) || vacationDates.has(key) || otherAbsenceDates.has(key)) {
+			return getDayTarget(date);
+		}
+		return 0;
 	}
 
 	function formatHours(minutes: number): string {
@@ -374,6 +390,8 @@
 			const isWeekend = cursor.getDay() === 0 || cursor.getDay() === 6;
 			const entryData = entryMap.get(key) ?? { minutes: 0, count: 0 };
 			const targetMinutes = isCurrentMonth ? getDayTarget(new Date(cursor)) : 0;
+			const absCredit = isCurrentMonth ? getAbsenceCredit(new Date(cursor)) : 0;
+			const effectiveWorked = entryData.minutes + absCredit;
 
 			days.push({
 				date: new Date(cursor),
@@ -382,12 +400,12 @@
 				isCurrentMonth,
 				isToday,
 				isWeekend,
-				workedMinutes: entryData.minutes,
+				workedMinutes: effectiveWorked,
 				targetMinutes,
 				entryCount: entryData.count,
 				dayType: getDayType(key),
 				dayTypeLabel: getDayTypeLabel(key),
-				delta: entryData.minutes - targetMinutes
+				delta: effectiveWorked - targetMinutes
 			});
 
 			cursor.setDate(cursor.getDate() + 1);
@@ -430,7 +448,7 @@
 			const lastDay = new Date(year, m + 1, 0);
 
 			// Count work days, holidays, sick days, vacation days
-			let workDays = 0, holidays = 0, sickDays = 0, vacationDays = 0, targetMinutes = 0;
+			let workDays = 0, holidays = 0, sickDays = 0, vacationDays = 0, targetMinutes = 0, absenceCredits = 0;
 			const cursor = new Date(firstDay);
 			while (cursor <= lastDay) {
 				const key = dateKey(cursor);
@@ -442,6 +460,7 @@
 				const target = getDayTarget(new Date(cursor));
 				if (target > 0) workDays++;
 				targetMinutes += target;
+				absenceCredits += getAbsenceCredit(new Date(cursor));
 
 				cursor.setDate(cursor.getDate() + 1);
 			}
@@ -460,9 +479,9 @@
 			months.push({
 				month: m,
 				name: monthName,
-				workedMinutes,
+				workedMinutes: workedMinutes + absenceCredits,
 				targetMinutes,
-				delta: workedMinutes - targetMinutes,
+				delta: workedMinutes + absenceCredits - targetMinutes,
 				workDays,
 				holidays,
 				sickDays,

@@ -91,9 +91,9 @@
 	function getDayTarget(date: Date): number {
 		if (!workSchedule) return 0;
 		const dayOfWeek = date.getDay();
-		// Check if this date is a holiday or absence day
 		const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-		if (daysOffSet.has(dateStr)) return 0;
+		// Only holidays reduce the target to 0; absences still have a target
+		if (holidayDates.has(dateStr)) return 0;
 		const targets: Record<number, number> = {
 			1: workSchedule.targetMon ?? 0,
 			2: workSchedule.targetTue ?? 0,
@@ -102,6 +102,27 @@
 			5: workSchedule.targetFri ?? 0,
 		};
 		return (targets[dayOfWeek] ?? 0) * 60; // convert hours to minutes
+	}
+
+	function getAbsenceCredit(date: Date): number {
+		const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+		if (sickDayDates.has(dateStr) || vacationDates.has(dateStr) || otherAbsenceDates.has(dateStr)) {
+			return getDayTarget(date);
+		}
+		return 0;
+	}
+
+	function absenceCreditsForRange(from: Date, to: Date): number {
+		let credits = 0;
+		const cursor = new Date(from);
+		cursor.setHours(0, 0, 0, 0);
+		const end = new Date(to);
+		end.setHours(23, 59, 59, 999);
+		while (cursor <= end) {
+			credits += getAbsenceCredit(cursor);
+			cursor.setDate(cursor.getDate() + 1);
+		}
+		return credits;
 	}
 
 	function getWeekTargetMinutes(): number {
@@ -148,7 +169,7 @@
 				try {
 					const [holRes, absRes] = await Promise.all([
 						holidayApi.apiOrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
-						absenceDayApi.apiOrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug)
+						absenceDayApi.apiOrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug, auth.user?.id)
 					]);
 					const offDates = new Set<string>();
 					const holidays = new Map<string, string>();
@@ -236,9 +257,9 @@
 				firstEntryDate = null;
 			}
 
-			todayMinutes = sumMinutes(todayEntries);
-			weekMinutes = sumMinutes(weekEntries);
-			monthMinutes = sumMinutes(monthEntries);
+			todayMinutes = sumMinutes(todayEntries) + getAbsenceCredit(now);
+			weekMinutes = sumMinutes(weekEntries) + absenceCreditsForRange(weekStart, weekEnd);
+			monthMinutes = sumMinutes(monthEntries) + absenceCreditsForRange(monthStart, monthEnd);
 
 			// Compute targets — only since first tracked entry
 			todayTarget = getDayTarget(now);
@@ -257,7 +278,7 @@
 					const t = new Date(e.startTime!);
 					return t >= dStart && t <= dEnd;
 				});
-				tempWeekDays.push({ label: dayNames[i], date: d, worked: sumMinutes(dayEntries), target: getDayTarget(d) });
+				tempWeekDays.push({ label: dayNames[i], date: d, worked: sumMinutes(dayEntries) + getAbsenceCredit(d), target: getDayTarget(d) });
 			}
 			weekDays = tempWeekDays;
 
