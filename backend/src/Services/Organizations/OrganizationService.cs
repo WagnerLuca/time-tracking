@@ -23,7 +23,7 @@ public class OrganizationService : IOrganizationService
         (limit, offset) = PaginationDefaults.Normalize(limit, offset);
 
         var query = _context.Organizations
-            .Where(o => o.IsActive);
+            .AsQueryable();
 
         var totalCount = await query.CountAsync();
 
@@ -40,7 +40,7 @@ public class OrganizationService : IOrganizationService
                 Website = o.Website,
                 LogoUrl = o.LogoUrl,
                 CreatedAt = o.CreatedAt,
-                MemberCount = o.UserOrganizations.Count(uo => uo.IsActive),
+                MemberCount = o.UserOrganizations.Count(),
                 JoinPolicy = o.JoinPolicy.ToString()
             })
             .ToListAsync();
@@ -57,7 +57,7 @@ public class OrganizationService : IOrganizationService
     public async Task<ServiceResult<OrganizationDetailResponse>> GetOrganizationAsync(string slug)
     {
         var organization = await _context.Organizations
-            .Where(o => o.Slug == slug && o.IsActive)
+            .Where(o => o.Slug == slug)
             .Select(o => new OrganizationDetailResponse
             {
                 Id = o.Id,
@@ -76,7 +76,6 @@ public class OrganizationService : IOrganizationService
                 SettingsUpdatedAt = o.SettingsUpdatedAt,
                 CreatedAt = o.CreatedAt,
                 Members = o.UserOrganizations
-                    .Where(uo => uo.IsActive)
                     .Select(uo => new OrganizationMemberResponse
                     {
                         Id = uo.User.Id,
@@ -115,7 +114,7 @@ public class OrganizationService : IOrganizationService
             return ServiceResult.NotFound<List<UserOrganizationResponse>>("User not found");
 
         var organizations = await _context.UserOrganizations
-            .Where(uo => uo.UserId == userId && uo.IsActive)
+            .Where(uo => uo.UserId == userId)
             .Select(uo => new UserOrganizationResponse
             {
                 OrganizationId = uo.Organization.Id,
@@ -124,7 +123,7 @@ public class OrganizationService : IOrganizationService
                 Slug = uo.Organization.Slug,
                 Role = uo.Role.ToString(),
                 JoinedAt = uo.JoinedAt,
-                MemberCount = uo.Organization.UserOrganizations.Count(x => x.IsActive)
+                MemberCount = uo.Organization.UserOrganizations.Count()
             })
             .ToListAsync();
 
@@ -134,7 +133,7 @@ public class OrganizationService : IOrganizationService
     public async Task<ServiceResult<OrganizationResponse>> CreateOrganizationAsync(
         int callerUserId, CreateOrganizationRequest request)
     {
-        if (await _context.Organizations.AnyAsync(o => o.Slug == request.Slug && o.IsActive))
+        if (await _context.Organizations.AnyAsync(o => o.Slug == request.Slug))
             return ServiceResult.Conflict<OrganizationResponse>("An organization with this slug already exists");
 
         var organization = new Organization
@@ -181,7 +180,7 @@ public class OrganizationService : IOrganizationService
     {
         var organization = await _context.Organizations
             .Include(o => o.UserOrganizations)
-            .FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+            .FirstOrDefaultAsync(o => o.Slug == slug);
 
         if (organization == null)
             return ServiceResult.NotFound<OrganizationResponse>("Organization not found");
@@ -192,7 +191,7 @@ public class OrganizationService : IOrganizationService
 
         if (request.Slug != null && request.Slug != organization.Slug)
         {
-            if (await _context.Organizations.AnyAsync(o => o.Slug == request.Slug && o.IsActive && o.Id != organization.Id))
+            if (await _context.Organizations.AnyAsync(o => o.Slug == request.Slug && o.Id != organization.Id))
                 return ServiceResult.Conflict<OrganizationResponse>("An organization with this slug already exists");
         }
 
@@ -214,7 +213,7 @@ public class OrganizationService : IOrganizationService
             Website = organization.Website,
             LogoUrl = organization.LogoUrl,
             CreatedAt = organization.CreatedAt,
-            MemberCount = organization.UserOrganizations.Count(uo => uo.IsActive),
+            MemberCount = organization.UserOrganizations.Count(),
             JoinPolicy = organization.JoinPolicy.ToString()
         });
     }
@@ -223,7 +222,7 @@ public class OrganizationService : IOrganizationService
     {
         var organization = await _context.Organizations
             .Include(o => o.UserOrganizations)
-            .FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+            .FirstOrDefaultAsync(o => o.Slug == slug);
 
         if (organization == null)
             return ServiceResult.NotFound("Organization not found");
@@ -264,7 +263,9 @@ public class OrganizationService : IOrganizationService
         if (user == null)
             return ServiceResult.NotFound<OrganizationMemberResponse>("User not found");
 
+        // Use IgnoreQueryFilters to find previously soft-deleted memberships for re-activation
         var existing = await _context.UserOrganizations
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == request.UserId);
 
         if (existing != null)
@@ -317,7 +318,7 @@ public class OrganizationService : IOrganizationService
 
         var membership = await _context.UserOrganizations
             .Include(uo => uo.User)
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId && uo.IsActive);
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
 
         if (membership == null)
             return ServiceResult.NotFound<OrganizationMemberResponse>("Member not found in this organization");
@@ -360,7 +361,7 @@ public class OrganizationService : IOrganizationService
             return ServiceResult.Forbidden();
 
         var membership = await _context.UserOrganizations
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId && uo.IsActive);
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
 
         if (membership == null)
             return ServiceResult.NotFound("Member not found in this organization");
@@ -413,7 +414,7 @@ public class OrganizationService : IOrganizationService
 
         // Notify all org members except the caller
         var memberUserIds = await _context.UserOrganizations
-            .Where(uo => uo.OrganizationId == org.Id && uo.IsActive && uo.UserId != callerUserId)
+            .Where(uo => uo.OrganizationId == org.Id && uo.UserId != callerUserId)
             .Select(uo => uo.UserId)
             .ToListAsync();
 
@@ -467,7 +468,7 @@ public class OrganizationService : IOrganizationService
 
         var members = await _context.UserOrganizations
             .AsNoTracking()
-            .Where(uo => uo.OrganizationId == org.Id && uo.IsActive)
+            .Where(uo => uo.OrganizationId == org.Id)
             .Include(uo => uo.User)
             .ToListAsync();
 
@@ -596,7 +597,7 @@ public class OrganizationService : IOrganizationService
             return ServiceResult.Forbidden<object>();
 
         var membership = await _context.UserOrganizations
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId && uo.IsActive);
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
 
         if (membership == null)
             return ServiceResult.NotFound<object>("Member not found in this organization.");
@@ -613,15 +614,14 @@ public class OrganizationService : IOrganizationService
 
     private async Task<Organization?> GetOrgBySlugAsync(string slug)
     {
-        return await _context.Organizations.FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+        return await _context.Organizations.FirstOrDefaultAsync(o => o.Slug == slug);
     }
 
     private async Task<OrganizationRole?> GetRoleAsync(int userId, int organizationId)
     {
         var membership = await _context.UserOrganizations
             .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
-                                    && uo.UserId == userId
-                                    && uo.IsActive);
+                                    && uo.UserId == userId);
         return membership?.Role;
     }
 }

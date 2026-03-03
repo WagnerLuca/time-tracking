@@ -30,7 +30,7 @@ public class RequestService : IRequestService
         if (request.Type == RequestType.JoinOrganization)
         {
             var isMember = await _context.UserOrganizations
-                .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId && uo.IsActive);
+                .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
             if (isMember)
                 return ServiceResult.BadRequest<OrgRequestResponse>("You are already a member of this organization.");
 
@@ -68,7 +68,7 @@ public class RequestService : IRequestService
         {
             // Non-join requests require membership
             var isMember = await _context.UserOrganizations
-                .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId && uo.IsActive);
+                .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
             if (!isMember)
                 return ServiceResult.BadRequest<OrgRequestResponse>("You must be a member of this organization.");
 
@@ -234,7 +234,7 @@ public class RequestService : IRequestService
     public async Task<ServiceResult<AdminNotificationResponse>> GetAdminNotificationsAsync(int userId)
     {
         var adminOrgIds = await _context.UserOrganizations
-            .Where(uo => uo.UserId == userId && uo.IsActive && uo.Role >= OrganizationRole.Admin)
+            .Where(uo => uo.UserId == userId && uo.Role >= OrganizationRole.Admin)
             .Select(uo => uo.OrganizationId)
             .ToListAsync();
 
@@ -327,7 +327,7 @@ public class RequestService : IRequestService
                 {
                     var membership = await _context.UserOrganizations
                         .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id
-                                                && uo.UserId == orgRequest.UserId && uo.IsActive);
+                                                && uo.UserId == orgRequest.UserId);
                     if (membership != null)
                         membership.InitialOvertimeHours = hours;
                 }
@@ -464,7 +464,7 @@ public class RequestService : IRequestService
 
     private async Task<Organization?> GetOrgBySlugAsync(string slug)
     {
-        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug);
     }
 
     private async Task<OrganizationRole?> GetRoleAsync(int userId, int organizationId)
@@ -472,8 +472,7 @@ public class RequestService : IRequestService
         var membership = await _context.UserOrganizations
             .AsNoTracking()
             .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
-                                    && uo.UserId == userId
-                                    && uo.IsActive);
+                                    && uo.UserId == userId);
         return membership?.Role;
     }
 }

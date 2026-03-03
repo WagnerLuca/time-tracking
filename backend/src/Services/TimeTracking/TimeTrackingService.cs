@@ -33,14 +33,14 @@ public class TimeTrackingService : ITimeTrackingService
         {
             var orgBySlug = await _context.Organizations
                 .AsNoTracking()
-                .FirstOrDefaultAsync(o => o.Slug == request.OrganizationSlug && o.IsActive);
+                .FirstOrDefaultAsync(o => o.Slug == request.OrganizationSlug);
             if (orgBySlug == null)
                 return ServiceResult.BadRequest<TimeEntryResponse>("Organization not found.");
             orgId = orgBySlug.Id;
         }
         if (orgId != null)
         {
-            var orgExists = await _context.Organizations.AnyAsync(o => o.Id == orgId && o.IsActive);
+            var orgExists = await _context.Organizations.AnyAsync(o => o.Id == orgId);
             if (!orgExists)
                 return ServiceResult.BadRequest<TimeEntryResponse>("Organization not found.");
         }
@@ -153,7 +153,7 @@ public class TimeTrackingService : ITimeTrackingService
         {
             var org = await _context.Organizations
                 .AsNoTracking()
-                .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId && o.IsActive);
+                .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId);
 
             if (org != null && org.EditPastEntriesMode == RuleMode.Disabled)
                 return ServiceResult.Forbidden<TimeEntryResponse>("Editing past entries is disabled in this organization.");
@@ -179,7 +179,7 @@ public class TimeTrackingService : ITimeTrackingService
             {
                 var pauseOrg = await _context.Organizations
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId && o.IsActive);
+                    .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId);
                 if (pauseOrg != null && pauseOrg.EditPauseMode == RuleMode.Disabled)
                     return ServiceResult.Forbidden<TimeEntryResponse>("Editing pause duration is disabled in this organization.");
                 if (pauseOrg != null && pauseOrg.EditPauseMode == RuleMode.RequiresApproval)

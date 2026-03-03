@@ -62,6 +62,9 @@ public class TimeTrackingDbContext : DbContext
             
             // Create unique index on Slug
             entity.HasIndex(e => e.Slug).IsUnique();
+
+            // Global query filter: automatically exclude soft-deleted organizations
+            entity.HasQueryFilter(e => e.IsActive);
         });
 
         // Configure UserOrganization entity
@@ -78,6 +81,9 @@ public class TimeTrackingDbContext : DbContext
             
             // Create unique index on UserId and OrganizationId combination
             entity.HasIndex(e => new { e.UserId, e.OrganizationId }).IsUnique();
+
+            // Global query filter: automatically exclude soft-deleted memberships
+            entity.HasQueryFilter(e => e.IsActive);
             
             // Configure relationships
             entity.HasOne(e => e.User)

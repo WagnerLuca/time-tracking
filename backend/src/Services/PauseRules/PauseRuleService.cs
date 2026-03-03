@@ -127,7 +127,7 @@ public class PauseRuleService : IPauseRuleService
 
     private async Task<Organization?> GetOrgBySlugAsync(string slug)
     {
-        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug);
     }
 
     private async Task<OrganizationRole?> GetRoleAsync(int userId, int organizationId)
@@ -135,8 +135,7 @@ public class PauseRuleService : IPauseRuleService
         var membership = await _context.UserOrganizations
             .AsNoTracking()
             .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
-                                    && uo.UserId == userId
-                                    && uo.IsActive);
+                                    && uo.UserId == userId);
         return membership?.Role;
     }
 }

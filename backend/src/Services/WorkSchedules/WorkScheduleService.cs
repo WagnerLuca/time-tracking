@@ -436,13 +436,13 @@ public class WorkScheduleService : IWorkScheduleService
 
     private async Task<Organization?> GetOrgBySlugAsync(string slug)
     {
-        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug);
     }
 
     private async Task<UserOrganization?> GetMembershipAsync(int userId, int orgId)
     {
         return await _context.UserOrganizations
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == orgId && uo.UserId == userId && uo.IsActive);
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == orgId && uo.UserId == userId);
     }
 
     private async Task<OrganizationRole?> GetRoleAsync(int userId, int orgId)

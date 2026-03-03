@@ -21,7 +21,7 @@ public class HolidayService : IHolidayService
             return ServiceResult.NotFound<List<HolidayResponse>>("Organization not found");
 
         var isMember = await _context.UserOrganizations
-            .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == callerUserId && uo.IsActive);
+            .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == callerUserId);
         if (!isMember)
             return ServiceResult.Forbidden<List<HolidayResponse>>();
 
@@ -189,7 +189,7 @@ public class HolidayService : IHolidayService
 
     private async Task<Organization?> GetOrgBySlugAsync(string slug)
     {
-        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug);
     }
 
     private async Task<OrganizationRole?> GetRoleAsync(int userId, int organizationId)
@@ -197,8 +197,7 @@ public class HolidayService : IHolidayService
         var membership = await _context.UserOrganizations
             .AsNoTracking()
             .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
-                                    && uo.UserId == userId
-                                    && uo.IsActive);
+                                    && uo.UserId == userId);
         return membership?.Role;
     }
 

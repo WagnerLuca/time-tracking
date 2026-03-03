@@ -76,7 +76,7 @@ public class AbsenceDayService : IAbsenceDayService
             return ServiceResult.NotFound<AbsenceDayResponse>("Organization not found");
 
         var isMember = await _context.UserOrganizations
-            .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId && uo.IsActive);
+            .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
         if (!isMember)
             return ServiceResult.Forbidden<AbsenceDayResponse>();
 
@@ -113,7 +113,7 @@ public class AbsenceDayService : IAbsenceDayService
             return ServiceResult.Forbidden<AbsenceDayResponse>();
 
         var isMember = await _context.UserOrganizations
-            .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == request.UserId && uo.IsActive);
+            .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == request.UserId);
         if (!isMember)
             return ServiceResult.NotFound<AbsenceDayResponse>("User is not a member of this organization.");
 
@@ -180,7 +180,7 @@ public class AbsenceDayService : IAbsenceDayService
 
     private async Task<Organization?> GetOrgBySlugAsync(string slug)
     {
-        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug && o.IsActive);
+        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug);
     }
 
     private async Task<OrganizationRole?> GetRoleAsync(int userId, int organizationId)
@@ -188,8 +188,7 @@ public class AbsenceDayService : IAbsenceDayService
         var membership = await _context.UserOrganizations
             .AsNoTracking()
             .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
-                                    && uo.UserId == userId
-                                    && uo.IsActive);
+                                    && uo.UserId == userId);
         return membership?.Role;
     }
 }
