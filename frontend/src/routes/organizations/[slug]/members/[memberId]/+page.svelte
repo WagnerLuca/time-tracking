@@ -156,7 +156,7 @@
 
 		// Find the date of the first time entry to compute weeks accurately
 		try {
-			const { data: allEntries } = await organizationsApi.apiOrganizationsSlugMemberEntriesUserIdGet(
+			const { data: allEntries } = await organizationsApi.apiOrganizationsSlugMemberEntriesMemberIdGet(
 				orgSlug, memberId,
 				'2000-01-01T00:00:00.000Z',
 				'2099-12-31T23:59:59.999Z'
@@ -182,7 +182,7 @@
 		try {
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
-			const { data } = await organizationsApi.apiOrganizationsSlugMemberEntriesUserIdGet(orgSlug, memberId, from, to);
+			const { data } = await organizationsApi.apiOrganizationsSlugMemberEntriesMemberIdGet(orgSlug, memberId, from, to);
 			entries = data;
 		} catch { entries = []; }
 		entriesLoading = false;

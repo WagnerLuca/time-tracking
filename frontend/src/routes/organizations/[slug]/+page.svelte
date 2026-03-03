@@ -486,7 +486,8 @@
 	async function loadUsersForDropdown() {
 		if (usersLoaded) return;
 		try {
-			const { data: users } = await organizationsApi.apiOrganizationsSlugGet(orgSlug).then(r => r.data?.members ?? []) as any[];
+			const { data: orgData } = await organizationsApi.apiOrganizationsSlugGet(orgSlug);
+			const users = orgData?.members ?? [];
 			allUsers = users.map((u: any) => ({
 				id: u.id,
 				email: u.email,
