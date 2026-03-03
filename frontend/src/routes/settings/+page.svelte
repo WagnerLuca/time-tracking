@@ -5,6 +5,7 @@
 	import { goto } from '$app/navigation';
 	import { organizationsApi, authApi, workScheduleApi } from '$lib/apiClient';
 	import type { WorkScheduleResponse, UpdateWorkScheduleRequest, CreateWorkScheduleRequest } from '$lib/api';
+	import { extractErrorMessage } from '$lib/utils/errorHandler';
 
 	let changePasswordError = $state('');
 	let changePasswordSuccess = $state('');
@@ -115,8 +116,8 @@
 			targetFri = result.targetFri ?? 0;
 			scheduleSuccess = 'Work schedule saved.';
 			setTimeout(() => (scheduleSuccess = ''), 3000);
-		} catch (err: any) {
-			scheduleError = err.response?.data?.message || 'Failed to save work schedule.';
+		} catch (err) {
+			scheduleError = extractErrorMessage(err, 'Failed to save work schedule.');
 		} finally {
 			scheduleSaving = false;
 		}
@@ -133,8 +134,8 @@
 			});
 			overtimeSuccess = 'Initial overtime saved.';
 			setTimeout(() => (overtimeSuccess = ''), 3000);
-		} catch (err: any) {
-			overtimeError = err.response?.data?.message || 'Failed to save initial overtime.';
+		} catch (err) {
+			overtimeError = extractErrorMessage(err, 'Failed to save initial overtime.');
 		} finally {
 			overtimeSaving = false;
 		}
@@ -164,8 +165,8 @@
 			changePasswordSuccess = 'Password changed successfully.';
 			currentPassword = '';
 			newPassword = '';
-		} catch (err: any) {
-			changePasswordError = err.response?.data?.message || 'Failed to change password.';
+		} catch (err) {
+			changePasswordError = extractErrorMessage(err, 'Failed to change password.');
 		} finally {
 			saving = false;
 		}

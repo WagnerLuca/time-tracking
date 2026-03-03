@@ -8,6 +8,7 @@
 	import { isToday, isFuture, sumMinutes } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, absenceCreditsForRange, getDayType, getDayTypeLabel, getTargetForRange } from '$lib/utils/scheduleHelpers';
 	import { DAY_NAMES, MAX_ENTRIES_FOR_OVERTIME, WEEKLY_ENTRY_LIMIT, MONTHLY_ENTRY_LIMIT } from '$lib/utils/constants';
+	import { extractErrorMessage } from '$lib/utils/errorHandler';
 
 	let currentEntry = $state<TimeEntryResponse | null>(null);
 	let todayMinutes = $state(0);
@@ -288,8 +289,8 @@
 			currentEntry = data;
 			timerInterval = setInterval(updateElapsed, 1000);
 			updateElapsed();
-		} catch (err: any) {
-			actionError = err.response?.data?.message || 'Failed to start timer.';
+		} catch (err) {
+			actionError = extractErrorMessage(err, 'Failed to start timer.');
 		} finally {
 			starting = false;
 		}
@@ -305,8 +306,8 @@
 			elapsed = '00:00:00';
 			runningMinutes = 0;
 			await loadStats();
-		} catch (err: any) {
-			actionError = err.response?.data?.message || 'Failed to stop timer.';
+		} catch (err) {
+			actionError = extractErrorMessage(err, 'Failed to stop timer.');
 		} finally {
 			stopping = false;
 		}

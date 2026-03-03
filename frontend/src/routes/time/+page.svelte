@@ -9,6 +9,7 @@
 	import { dateKey, isToday, getWeekRange, toLocalDateTimeInput, sumMinutes } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel } from '$lib/utils/scheduleHelpers';
 	import { DAY_NAMES, MAX_ENTRIES_FOR_OVERTIME } from '$lib/utils/constants';
+	import { extractErrorMessage } from '$lib/utils/errorHandler';
 
 	let current = $state<TimeEntryResponse | null>(null);
 	let weekEntries = $state<TimeEntryResponse[]>([]);
@@ -273,8 +274,8 @@
 			current = data;
 			startTimer();
 			await loadWeek();
-		} catch (err: any) {
-			actionError = err.response?.data?.message || 'Failed to start timer.';
+		} catch (err) {
+			actionError = extractErrorMessage(err, 'Failed to start timer.');
 		} finally {
 			starting = false;
 		}
@@ -291,8 +292,8 @@
 			note = '';
 			loadCumulativeOvertime();
 			await loadWeek();
-		} catch (err: any) {
-			actionError = err.response?.data?.message || 'Failed to stop timer.';
+		} catch (err) {
+			actionError = extractErrorMessage(err, 'Failed to stop timer.');
 		} finally {
 			stopping = false;
 		}
@@ -303,8 +304,8 @@
 		try {
 			await timeTrackingApi.apiTimeTrackingIdDelete(id);
 			weekEntries = weekEntries.filter((e) => e.id !== id);
-		} catch (err: any) {
-			actionError = err.response?.data?.message || 'Failed to delete entry.';
+		} catch (err) {
+			actionError = extractErrorMessage(err, 'Failed to delete entry.');
 		}
 	}
 
@@ -350,8 +351,8 @@
 			await timeTrackingApi.apiTimeTrackingIdPut(entryId, payload);
 			await loadWeek();
 			editingEntryId = null;
-		} catch (err: any) {
-			editError = err.response?.data?.message || err.response?.data || 'Failed to update entry.';
+		} catch (err) {
+			editError = extractErrorMessage(err, 'Failed to update entry.');
 		} finally {
 			editSaving = false;
 		}
@@ -416,8 +417,8 @@
 			requestType = null;
 			requestMessage = '';
 			setTimeout(() => (requestSuccess = ''), 4000);
-		} catch (err: any) {
-			actionError = err.response?.data?.message || 'Failed to submit request.';
+		} catch (err) {
+			actionError = extractErrorMessage(err, 'Failed to submit request.');
 		} finally {
 			requestSending = false;
 		}

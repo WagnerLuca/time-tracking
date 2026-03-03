@@ -6,6 +6,7 @@
 	import { organizationsApi, workScheduleApi, absenceDayApi } from '$lib/apiClient';
 	import { formatHoursDecimal, formatWeekLabel, formatTime, formatDateShort, formatDateFull, formatDuration, absenceTypeLabel, absenceTypeBadge, getInitials } from '$lib/utils/formatters';
 	import { getWeekRange } from '$lib/utils/dateHelpers';
+	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import type {
 		OrganizationDetailResponse,
 		OrganizationMemberResponse,
@@ -108,8 +109,8 @@
 			org = data;
 			member = data.members?.find(m => m.id === memberId) ?? null;
 			if (!member) { error = 'Member not found.'; loading = false; return; }
-		} catch (e: any) {
-			error = e.response?.data?.message || 'Failed to load organization.';
+		} catch (e) {
+			error = extractErrorMessage(e, 'Failed to load organization.');
 			loading = false;
 			return;
 		}
@@ -236,8 +237,8 @@
 			absenceType = 0;
 			absenceNote = '';
 			loadAbsences();
-		} catch (e: any) {
-			absenceError = e.response?.data?.message || 'Failed to add absence.';
+		} catch (e) {
+			absenceError = extractErrorMessage(e, 'Failed to add absence.');
 		}
 		absenceSaving = false;
 	}
@@ -246,8 +247,8 @@
 		try {
 			await absenceDayApi.apiOrganizationsSlugAbsencesIdDelete(orgSlug, id);
 			loadAbsences();
-		} catch (e: any) {
-			actionError = e.response?.data?.message || 'Failed to delete absence.';
+		} catch (e) {
+			actionError = extractErrorMessage(e, 'Failed to delete absence.');
 		}
 	}
 
@@ -305,8 +306,8 @@
 			}
 			editingSchedule = false;
 			loadSchedule();
-		} catch (e: any) {
-			scheduleError = e.response?.data?.message || 'Failed to update schedule.';
+		} catch (e) {
+			scheduleError = extractErrorMessage(e, 'Failed to update schedule.');
 		}
 		scheduleSaving = false;
 	}
@@ -343,8 +344,8 @@
 			periodWeekly = null;
 			periodDistribute = true;
 			loadPeriods();
-		} catch (e: any) {
-			periodError = e.response?.data?.message || 'Failed to add period.';
+		} catch (e) {
+			periodError = extractErrorMessage(e, 'Failed to add period.');
 		}
 		periodSaving = false;
 	}
@@ -353,8 +354,8 @@
 		try {
 			await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesIdDelete(orgSlug, memberId, periodId);
 			loadPeriods();
-		} catch (e: any) {
-			actionError = e.response?.data?.message || 'Failed to delete period.';
+		} catch (e) {
+			actionError = extractErrorMessage(e, 'Failed to delete period.');
 		}
 	}
 
@@ -365,8 +366,8 @@
 			await organizationsApi.apiOrganizationsSlugMembersMemberIdInitialOvertimePut(orgSlug, memberId, { initialOvertimeHours: overtimeHours });
 			editingOvertime = false;
 			loadSchedule();
-		} catch (e: any) {
-			actionError = e.response?.data?.message || 'Failed to update overtime.';
+		} catch (e) {
+			actionError = extractErrorMessage(e, 'Failed to update overtime.');
 		}
 		overtimeSaving = false;
 	}
@@ -376,8 +377,8 @@
 		try {
 			await organizationsApi.apiOrganizationsSlugMembersMemberIdPut(orgSlug, memberId, { role: newRole as any });
 			loadAll();
-		} catch (e: any) {
-			actionError = e.response?.data?.message || 'Failed to change role.';
+		} catch (e) {
+			actionError = extractErrorMessage(e, 'Failed to change role.');
 		}
 	}
 
@@ -386,8 +387,8 @@
 		try {
 			await organizationsApi.apiOrganizationsSlugMembersMemberIdDelete(orgSlug, memberId);
 			goto(`/organizations/${orgSlug}`);
-		} catch (e: any) {
-			actionError = e.response?.data?.message || 'Failed to remove member.';
+		} catch (e) {
+			actionError = extractErrorMessage(e, 'Failed to remove member.');
 		}
 	}
 

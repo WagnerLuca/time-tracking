@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth.svelte';
 	import { goto } from '$app/navigation';
+	import { extractErrorMessage } from '$lib/utils/errorHandler';
 
 	let email = $state('');
 	let password = $state('');
@@ -27,8 +28,8 @@
 		try {
 			await auth.register({ email, password, firstName, lastName });
 			goto('/organizations');
-		} catch (err: any) {
-			error = err.response?.data?.message || 'Registration failed. Please try again.';
+		} catch (err) {
+			error = extractErrorMessage(err, 'Registration failed. Please try again.');
 		} finally {
 			submitting = false;
 		}

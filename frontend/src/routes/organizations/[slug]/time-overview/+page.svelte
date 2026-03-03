@@ -5,6 +5,7 @@
 	import type { MemberTimeOverviewResponse, OrganizationDetailResponse, TimeEntryResponse } from '$lib/api';
 	import { formatHoursDecimal, formatTime, formatDateShort, formatWeekLabel, formatDuration } from '$lib/utils/formatters';
 	import { getWeekRange } from '$lib/utils/dateHelpers';
+	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 
 	let orgSlug: string;
 	let orgName = $state('');
@@ -42,11 +43,11 @@
 			const to = weekRange.end.toISOString();
 			const { data } = await organizationsApi.apiOrganizationsSlugTimeOverviewGet(orgSlug, from, to);
 			members = data;
-		} catch (err: any) {
-			if (err.response?.status === 403) {
+		} catch (err) {
+			if (getErrorStatus(err) === 403) {
 				error = 'You need Admin or Owner role to view this page.';
 			} else {
-				error = err.response?.data?.message || 'Failed to load time overview.';
+				error = extractErrorMessage(err, 'Failed to load time overview.');
 			}
 		} finally {
 			loading = false;

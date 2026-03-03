@@ -2,6 +2,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { goto } from '$app/navigation';
+	import { extractErrorMessage } from '$lib/utils/errorHandler';
 
 	let email = $state('');
 	let password = $state('');
@@ -25,8 +26,8 @@
 			} else {
 				goto('/organizations');
 			}
-		} catch (err: any) {
-			error = err.response?.data?.message || 'Login failed. Please check your credentials.';
+		} catch (err) {
+			error = extractErrorMessage(err, 'Login failed. Please check your credentials.');
 		} finally {
 			submitting = false;
 		}

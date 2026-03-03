@@ -5,6 +5,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { organizationsApi, pauseRulesApi, workScheduleApi, requestsApi, holidayApi, absenceDayApi, notificationsApi } from '$lib/apiClient';
 	import { formatRequestType, formatTimeAgo, statusBadgeClass, parseRequestData, absenceTypeLabel, absenceTypeBadge } from '$lib/utils/formatters';
+	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationRequest,
@@ -222,8 +223,9 @@
 			}
 			// Auto-load all lazy sections in parallel
 			loadAllSections();
-		} catch (err: any) {
-			error = err.response?.status === 404 ? 'Organization not found.' : 'Failed to load organization.';
+		} catch (err) {
+			if (getErrorStatus(err) === 404) { error = 'Organization not found.'; }
+			else { error = 'Failed to load organization.'; }
 		} finally {
 			loading = false;
 		}
@@ -297,8 +299,8 @@
 			} catch {
 				workSchedule = null;
 			}
-		} catch (err: any) {
-			actionError = err.response?.data?.message || 'Failed to reload organization.';
+		} catch (err) {
+			actionError = extractErrorMessage(err, 'Failed to reload organization.');
 		}
 	}
 
@@ -397,8 +399,8 @@
 			memberTargetFri = data.targetFri ?? 0;
 			memberOvertimeHours = data.initialOvertimeHours ?? 0;
 			actionError = '';
-		} catch (err: any) {
-			memberScheduleError = err.response?.data?.message || 'Failed to save schedule.';
+		} catch (err) {
+			memberScheduleError = extractErrorMessage(err, 'Failed to save schedule.');
 		} finally {
 			memberScheduleSaving = false;
 		}
@@ -453,8 +455,8 @@
 			}
 			workSchedule = data;
 			editingMySchedule = false;
-		} catch (err: any) {
-			myScheduleError = err.response?.data?.message || 'Failed to save schedule.';
+		} catch (err) {
+			myScheduleError = extractErrorMessage(err, 'Failed to save schedule.');
 		} finally {
 			myScheduleSaving = false;
 		}
@@ -476,8 +478,8 @@
 			const { data: ws } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgSlug);
 			workSchedule = ws;
 			editingMyOvertime = false;
-		} catch (err: any) {
-			myOvertimeError = err.response?.data?.message || 'Failed to save overtime.';
+		} catch (err) {
+			myOvertimeError = extractErrorMessage(err, 'Failed to save overtime.');
 		} finally {
 			myOvertimeSaving = false;
 		}
@@ -533,8 +535,8 @@
 			await organizationsApi.apiOrganizationsSlugPut(orgSlug, payload);
 			await reloadOrg();
 			editing = false;
-		} catch (err: any) {
-			editError = err.response?.data?.message || 'Failed to update organization.';
+		} catch (err) {
+			editError = extractErrorMessage(err, 'Failed to update organization.');
 		} finally {
 			editSaving = false;
 		}
@@ -546,8 +548,8 @@
 		try {
 			await organizationsApi.apiOrganizationsSlugDelete(orgSlug);
 			goto('/organizations');
-		} catch (err: any) {
-			actionError = err.response?.data?.message || 'Failed to delete organization.';
+		} catch (err) {
+			actionError = extractErrorMessage(err, 'Failed to delete organization.');
 		}
 	}
 
@@ -571,8 +573,8 @@
 			showAddMember = false;
 			selectedUserId = null;
 			newMemberRole = 0;
-		} catch (err: any) {
-			addMemberError = err.response?.data?.message || 'Failed to add member.';
+		} catch (err) {
+			addMemberError = extractErrorMessage(err, 'Failed to add member.');
 		} finally {
 			addingMember = false;
 		}
@@ -583,8 +585,8 @@
 		try {
 			await organizationsApi.apiOrganizationsSlugMembersMemberIdPut(orgSlug, userId, { role: newRole as any });
 			await reloadOrg();
-		} catch (err: any) {
-			actionError = err.response?.data?.message || 'Failed to update member role.';
+		} catch (err) {
+			actionError = extractErrorMessage(err, 'Failed to update member role.');
 		}
 	}
 
@@ -594,8 +596,8 @@
 		try {
 			await organizationsApi.apiOrganizationsSlugMembersMemberIdDelete(orgSlug, userId);
 			await reloadOrg();
-		} catch (err: any) {
-			actionError = err.response?.data?.message || 'Failed to remove member.';
+		} catch (err) {
+			actionError = extractErrorMessage(err, 'Failed to remove member.');
 		}
 	}
 
@@ -622,8 +624,8 @@
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
-		} catch (err: any) {
-			settingsError = err.response?.data?.message || 'Failed to update setting.';
+		} catch (err) {
+			settingsError = extractErrorMessage(err, 'Failed to update setting.');
 		} finally {
 			settingsSaving = false;
 		}
@@ -642,8 +644,8 @@
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
-		} catch (err: any) {
-			settingsError = err.response?.data?.message || 'Failed to update setting.';
+		} catch (err) {
+			settingsError = extractErrorMessage(err, 'Failed to update setting.');
 		} finally {
 			settingsSaving = false;
 		}
@@ -662,8 +664,8 @@
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
-		} catch (err: any) {
-			settingsError = err.response?.data?.message || 'Failed to update setting.';
+		} catch (err) {
+			settingsError = extractErrorMessage(err, 'Failed to update setting.');
 		} finally {
 			settingsSaving = false;
 		}
@@ -682,8 +684,8 @@
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
-		} catch (err: any) {
-			settingsError = err.response?.data?.message || 'Failed to update setting.';
+		} catch (err) {
+			settingsError = extractErrorMessage(err, 'Failed to update setting.');
 		} finally {
 			settingsSaving = false;
 		}
@@ -702,8 +704,8 @@
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
-		} catch (err: any) {
-			settingsError = err.response?.data?.message || 'Failed to update setting.';
+		} catch (err) {
+			settingsError = extractErrorMessage(err, 'Failed to update setting.');
 		} finally {
 			settingsSaving = false;
 		}
@@ -771,8 +773,8 @@
 			showAddRule = false;
 			newRuleMinHours = 6;
 			newRulePauseMinutes = 30;
-		} catch (err: any) {
-			addRuleError = err.response?.data?.message || err.response?.data || 'Failed to add rule.';
+		} catch (err) {
+			addRuleError = extractErrorMessage(err, 'Failed to add rule.');
 		} finally {
 			addingRule = false;
 		}
@@ -799,8 +801,8 @@
 			});
 			await reloadOrg();
 			editingRuleId = null;
-		} catch (err: any) {
-			editRuleError = err.response?.data?.message || err.response?.data || 'Failed to update rule.';
+		} catch (err) {
+			editRuleError = extractErrorMessage(err, 'Failed to update rule.');
 		} finally {
 			editingRuleSaving = false;
 		}
@@ -811,8 +813,8 @@
 		try {
 			await pauseRulesApi.apiOrganizationsSlugPauseRulesRuleIdDelete(orgSlug, ruleId);
 			await reloadOrg();
-		} catch (err: any) {
-			settingsError = err.response?.data?.message || 'Failed to delete rule.';
+		} catch (err) {
+			settingsError = extractErrorMessage(err, 'Failed to delete rule.');
 		}
 	}
 
@@ -836,8 +838,8 @@
 			);
 			editingOvertimeMemberId = null;
 			await reloadOrg();
-		} catch (err: any) {
-			editOvertimeError = err.response?.data?.message || 'Failed to update overtime.';
+		} catch (err) {
+			editOvertimeError = extractErrorMessage(err, 'Failed to update overtime.');
 		} finally {
 			editOvertimeSaving = false;
 		}
@@ -881,8 +883,8 @@
 			newHolidayName = '';
 			newHolidayDate = '';
 			newHolidayRecurring = false;
-		} catch (err: any) {
-			holidayError = err.response?.data?.message || 'Failed to add holiday.';
+		} catch (err) {
+			holidayError = extractErrorMessage(err, 'Failed to add holiday.');
 		} finally {
 			addingHoliday = false;
 		}
@@ -907,8 +909,8 @@
 			editingHolidayId = null;
 			holidaysLoaded = false;
 			await loadHolidays();
-		} catch (err: any) {
-			holidayError = err.response?.data?.message || 'Failed to update holiday.';
+		} catch (err) {
+			holidayError = extractErrorMessage(err, 'Failed to update holiday.');
 		} finally {
 			editHolidaySaving = false;
 		}
@@ -920,8 +922,8 @@
 			await holidayApi.apiOrganizationsSlugHolidaysIdDelete(orgSlug, id);
 			holidaysLoaded = false;
 			await loadHolidays();
-		} catch (err: any) {
-			holidayError = err.response?.data?.message || 'Failed to delete holiday.';
+		} catch (err) {
+			holidayError = extractErrorMessage(err, 'Failed to delete holiday.');
 		}
 	}
 
@@ -987,8 +989,8 @@
 			newAbsenceToDate = '';
 			newAbsenceType = 0;
 			newAbsenceNote = '';
-		} catch (err: any) {
-			absenceError = err.response?.data?.message || 'Failed to add absence.';
+		} catch (err) {
+			absenceError = extractErrorMessage(err, 'Failed to add absence.');
 		} finally {
 			addingAbsence = false;
 		}
@@ -1000,8 +1002,8 @@
 			await absenceDayApi.apiOrganizationsSlugAbsencesIdDelete(orgSlug, id);
 			absencesLoaded = false;
 			await loadAbsences();
-		} catch (err: any) {
-			absenceError = err.response?.data?.message || 'Failed to delete absence.';
+		} catch (err) {
+			absenceError = extractErrorMessage(err, 'Failed to delete absence.');
 		}
 	}
 
@@ -1025,8 +1027,8 @@
 			adminAbsenceType = 0;
 			adminAbsenceNote = '';
 			adminAbsenceUserId = null;
-		} catch (err: any) {
-			adminAbsenceError = err.response?.data?.message || 'Failed to add absence.';
+		} catch (err) {
+			adminAbsenceError = extractErrorMessage(err, 'Failed to add absence.');
 		} finally {
 			addingAdminAbsence = false;
 		}
@@ -1075,8 +1077,8 @@
 			newPeriodFrom = '';
 			newPeriodTo = '';
 			newPeriodWeeklyHours = null;
-		} catch (err: any) {
-			periodError = err.response?.data?.message || 'Failed to add schedule period.';
+		} catch (err) {
+			periodError = extractErrorMessage(err, 'Failed to add schedule period.');
 		} finally {
 			addingPeriod = false;
 		}
@@ -1088,8 +1090,8 @@
 			await workScheduleApi.apiOrganizationsSlugWorkSchedulesIdDelete(orgSlug, id);
 			schedulePeriodsLoaded = false;
 			await loadSchedulePeriods();
-		} catch (err: any) {
-			periodError = err.response?.data?.message || 'Failed to delete period.';
+		} catch (err) {
+			periodError = extractErrorMessage(err, 'Failed to delete period.');
 		}
 	}
 
@@ -1136,8 +1138,8 @@
 			adminNewPeriodFrom = '';
 			adminNewPeriodTo = '';
 			adminNewPeriodWeeklyHours = null;
-		} catch (err: any) {
-			adminPeriodError = err.response?.data?.message || 'Failed to add schedule period.';
+		} catch (err) {
+			adminPeriodError = extractErrorMessage(err, 'Failed to add schedule period.');
 		} finally {
 			addingAdminPeriod = false;
 		}
@@ -1149,8 +1151,8 @@
 			await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesIdDelete(orgSlug, memberId, periodId);
 			const { data } = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesGet(orgSlug, memberId);
 			adminPeriods = (data as WorkScheduleResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
-		} catch (err: any) {
-			adminPeriodError = err.response?.data?.message || 'Failed to delete period.';
+		} catch (err) {
+			adminPeriodError = extractErrorMessage(err, 'Failed to delete period.');
 		}
 	}
 
@@ -1168,8 +1170,8 @@
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
-		} catch (err: any) {
-			settingsError = err.response?.data?.message || 'Failed to update setting.';
+		} catch (err) {
+			settingsError = extractErrorMessage(err, 'Failed to update setting.');
 		} finally {
 			settingsSaving = false;
 		}
@@ -1185,8 +1187,8 @@
 			};
 			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
-		} catch (err: any) {
-			settingsError = err.response?.data?.message || 'Failed to update setting.';
+		} catch (err) {
+			settingsError = extractErrorMessage(err, 'Failed to update setting.');
 		} finally {
 			settingsSaving = false;
 		}
@@ -1199,8 +1201,8 @@
 			await holidayApi.apiOrganizationsSlugHolidaysImportPresetPost(orgSlug, importPreset, importYear);
 			holidaysLoaded = false;
 			await loadHolidays();
-		} catch (err: any) {
-			holidayError = err.response?.data?.message || 'Failed to import holidays.';
+		} catch (err) {
+			holidayError = extractErrorMessage(err, 'Failed to import holidays.');
 		} finally {
 			importingHolidays = false;
 		}
@@ -2038,8 +2040,8 @@
 															await requestsApi.apiOrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: true });
 															requestHistoryLoaded = false;
 															await loadRequestHistory();
-														} catch (e: any) {
-															actionError = e.response?.data?.message || 'Failed to accept';
+														} catch (e) {
+															actionError = extractErrorMessage(e, 'Failed to accept');
 														}
 													}}>Accept</button>
 													<button class="btn-decline-sm" onclick={async () => {
@@ -2047,8 +2049,8 @@
 															await requestsApi.apiOrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: false });
 															requestHistoryLoaded = false;
 															await loadRequestHistory();
-														} catch (e: any) {
-															actionError = e.response?.data?.message || 'Failed to decline';
+														} catch (e) {
+															actionError = extractErrorMessage(e, 'Failed to decline');
 														}
 													}}>Decline</button>
 												</div>

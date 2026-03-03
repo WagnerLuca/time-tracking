@@ -6,6 +6,7 @@
 	import { organizationsApi, requestsApi } from '$lib/apiClient';
 	import type { OrganizationResponse } from '$lib/api';
 	import { RequestType } from '$lib/api';
+	import { extractErrorMessage } from '$lib/utils/errorHandler';
 
 	let organizations = $state<OrganizationResponse[]>([]);
 	let myOrgIds = $state<Set<number>>(new Set());
@@ -37,7 +38,7 @@
 				pendingJoinSlugs = new Set(pendingJoinSlugs);
 			} catch { /* ignore if endpoint fails */ }
 		} catch (err) {
-			error = 'Failed to load organizations.';
+			error = extractErrorMessage(err, 'Failed to load organizations.');
 			console.error(err);
 		} finally {
 			loading = false;
@@ -66,8 +67,8 @@
 				joinMessages = { ...joinMessages, [org.slug]: { type: 'success', text: 'Request sent! Waiting for admin approval.' } };
 				pendingJoinSlugs = new Set([...pendingJoinSlugs, org.slug]);
 			}
-		} catch (err: any) {
-			const msg = err.response?.data?.message || 'Failed to join.';
+		} catch (err) {
+			const msg = extractErrorMessage(err, 'Failed to join.');
 			joinMessages = { ...joinMessages, [org.slug!]: { type: 'error', text: msg } };
 		} finally {
 			joiningSlugs = new Set([...joiningSlugs].filter(s => s !== org.slug));

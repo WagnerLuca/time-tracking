@@ -1,0 +1,51 @@
+/**
+ * Shared error message extraction for API catch blocks.
+ *
+ * Replaces all `catch (err: any) { error = err.response?.data?.message || '...'; }` patterns
+ * with a type-safe `catch (err) { error = extractErrorMessage(err, 'Failed to ...'); }`.
+ */
+
+/**
+ * Extract a human-readable error message from an unknown error object.
+ *
+ * Checks (in order):
+ * 1. Axios-style `err.response.data.message` (string from backend ProblemDetails/JSON)
+ * 2. Axios-style `err.response.data` if it's a plain string (some endpoints return raw text)
+ * 3. Native `Error.message`
+ * 4. The provided fallback string
+ *
+ * @example
+ *   catch (err) { error = extractErrorMessage(err, 'Failed to start timer.'); }
+ */
+export function extractErrorMessage(err: unknown, fallback = 'An unexpected error occurred.'): string {
+	if (err && typeof err === 'object' && 'response' in err) {
+		const res = (err as { response?: { data?: { message?: string } | string } }).response;
+		if (res?.data) {
+			if (typeof res.data === 'object' && 'message' in res.data && typeof res.data.message === 'string') {
+				return res.data.message;
+			}
+			if (typeof res.data === 'string' && res.data.length > 0) {
+				return res.data;
+			}
+		}
+	}
+	if (err instanceof Error) return err.message;
+	return fallback;
+}
+
+/**
+ * Get the HTTP status code from an Axios error, or null if not available.
+ *
+ * @example
+ *   catch (err) {
+ *     if (getErrorStatus(err) === 404) { error = 'Not found.'; }
+ *     else { error = extractErrorMessage(err, 'Failed to load.'); }
+ *   }
+ */
+export function getErrorStatus(err: unknown): number | null {
+	if (err && typeof err === 'object' && 'response' in err) {
+		const res = (err as { response?: { status?: number } }).response;
+		if (typeof res?.status === 'number') return res.status;
+	}
+	return null;
+}

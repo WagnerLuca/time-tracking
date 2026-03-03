@@ -4,6 +4,7 @@
 	import { organizationsApi } from '$lib/apiClient';
 	import { goto } from '$app/navigation';
 	import type { CreateOrganizationRequest } from '$lib/api';
+	import { extractErrorMessage } from '$lib/utils/errorHandler';
 
 	let name = $state('');
 	let slug = $state('');
@@ -54,8 +55,8 @@
 				orgContext.select(created.id!);
 			}
 			goto(`/organizations/${created.slug}`);
-		} catch (err: any) {
-			error = err.response?.data?.message || 'Failed to create organization.';
+		} catch (err) {
+			error = extractErrorMessage(err, 'Failed to create organization.');
 		} finally {
 			submitting = false;
 		}

@@ -83,7 +83,7 @@
 				// Reload orgs if needed
 				if (auth.user?.id) orgContext.loadOrganizations(auth.user.id);
 			}
-		} catch (err: any) {
+		} catch (err) {
 			console.error('Failed to respond to request', err);
 		}
 	}
