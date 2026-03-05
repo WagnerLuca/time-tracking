@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
 	import '../app.css';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
@@ -183,7 +183,7 @@
 										<button class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors border-l-4 {req.status === 'Accepted' ? 'border-l-success' : req.status === 'Declined' ? 'border-l-error' : 'border-l-transparent'}" onclick={() => openNotifDetail(req)}>
 											<div class="flex flex-col gap-0.5 flex-1 min-w-0">
 												<span class="{req.status === 'Accepted' ? 'badge badge-success badge-xs' : 'badge badge-error badge-xs'}">
-													{req.status === 'Accepted' ? 'âœ“ Accepted' : 'âœ— Declined'}
+													{req.status === 'Accepted' ? 'âœ“ Accepted' : '✗ Declined'}
 												</span>
 												<span class="font-semibold text-xs text-primary">{formatRequestType(req.type)}</span>
 												<span class="text-xs text-base-content/50">{req.organizationName}</span>
@@ -192,7 +192,7 @@
 												{/if}
 												<span class="text-[0.7rem] text-base-content/40">{formatTimeAgo(req.respondedAt)}</span>
 											</div>
-											<span class="text-base-content/40 text-lg flex-shrink-0">â€º</span>
+											<span class="text-base-content/40 text-lg flex-shrink-0">›</span>
 										</button>
 									{/each}
 								</div>
@@ -217,7 +217,7 @@
 												{/if}
 												<span class="text-[0.7rem] text-base-content/40">{formatTimeAgo(req.createdAt)}</span>
 											</div>
-											<span class="text-base-content/40 text-lg flex-shrink-0">â€º</span>
+											<span class="text-base-content/40 text-lg flex-shrink-0">›</span>
 										</button>
 									{/each}
 								</div>
@@ -265,7 +265,7 @@
 						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Status</span>
 						<span class="text-sm font-medium text-right">
 							<span class="{detailReq.status === 'Accepted' ? 'badge badge-success badge-xs' : detailReq.status === 'Declined' ? 'badge badge-error badge-xs' : 'badge badge-warning badge-xs'}">
-								{detailReq.status === 'Accepted' ? 'âœ“ Accepted' : detailReq.status === 'Declined' ? 'âœ— Declined' : 'â³ Pending'}
+								{detailReq.status === 'Accepted' ? 'âœ“ Accepted' : detailReq.status === 'Declined' ? '✗ Declined' : 'â³ Pending'}
 							</span>
 						</span>
 					</div>
