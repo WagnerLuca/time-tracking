@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using TimeTracking.Api.Data;
 using TimeTracking.Api.Models;
 using TimeTracking.Api.Models.Dtos;
@@ -10,11 +11,13 @@ public class RequestService : IRequestService
 {
     private readonly TimeTrackingDbContext _context;
     private readonly ILogger<RequestService> _logger;
+    private readonly IMemoryCache _cache;
 
-    public RequestService(TimeTrackingDbContext context, ILogger<RequestService> logger)
+    public RequestService(TimeTrackingDbContext context, ILogger<RequestService> logger, IMemoryCache cache)
     {
         _context = context;
         _logger = logger;
+        _cache = cache;
     }
 
     public async Task<ServiceResult<OrgRequestResponse>> CreateRequestAsync(
@@ -61,6 +64,7 @@ public class RequestService : IRequestService
                     JoinedAt = DateTime.UtcNow
                 });
                 await _context.SaveChangesAsync();
+                _cache.Remove($"org_role:{slug}:{userId}");
                 autoRequest.User = user;
                 return ServiceResult.Ok(MapToResponse(autoRequest, org.Name, org.Slug));
             }
@@ -188,6 +192,13 @@ public class RequestService : IRequestService
         }
 
         await _context.SaveChangesAsync();
+
+        // Evict cached role for the affected user (join requests add new members)
+        if (request.Accept && orgRequest.Type == RequestType.JoinOrganization)
+        {
+            _cache.Remove($"org_role:{slug}:{orgRequest.UserId}");
+        }
+
         _logger.LogInformation("Request {RequestId} {Action} by user {UserId}", requestId, request.Accept ? "accepted" : "declined", callerUserId);
 
         var responder = await _context.Users.FindAsync(callerUserId);

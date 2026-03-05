@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using TimeTracking.Api.Data;
 using TimeTracking.Api.Models;
 using TimeTracking.Api.Models.Dtos;
@@ -9,11 +10,13 @@ public class OrganizationService : IOrganizationService
 {
     private readonly TimeTrackingDbContext _context;
     private readonly ILogger<OrganizationService> _logger;
+    private readonly IMemoryCache _cache;
 
-    public OrganizationService(TimeTrackingDbContext context, ILogger<OrganizationService> logger)
+    public OrganizationService(TimeTrackingDbContext context, ILogger<OrganizationService> logger, IMemoryCache cache)
     {
         _context = context;
         _logger = logger;
+        _cache = cache;
     }
 
     // ────────────────────────────────────────────────────
@@ -304,6 +307,7 @@ public class OrganizationService : IOrganizationService
 
         await _context.SaveChangesAsync();
 
+        _cache.Remove($"org_role:{slug}:{request.UserId}");
         _logger.LogInformation("User {MemberId} added to organization {OrgId} by user {CallerId}", request.UserId, org.Id, callerUserId);
 
         return ServiceResult.Ok(new OrganizationMemberResponse
@@ -351,6 +355,7 @@ public class OrganizationService : IOrganizationService
         membership.Role = request.Role;
         await _context.SaveChangesAsync();
 
+        _cache.Remove($"org_role:{slug}:{userId}");
         _logger.LogInformation("Member {UserId} role updated to {Role} in org {OrgId} by user {CallerId}", userId, membership.Role, org.Id, callerUserId);
 
         return ServiceResult.Ok(new OrganizationMemberResponse
@@ -397,6 +402,7 @@ public class OrganizationService : IOrganizationService
 
         membership.IsActive = false;
 
+        _cache.Remove($"org_role:{slug}:{userId}");
         _logger.LogInformation("Member {UserId} removed from org {OrgId} by user {CallerId}", userId, org.Id, callerUserId);
 
         await _context.SaveChangesAsync();
