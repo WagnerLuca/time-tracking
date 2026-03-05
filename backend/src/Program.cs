@@ -7,12 +7,22 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 using TimeTracking.Api.Data;
 using TimeTracking.Api.Middleware;
 using TimeTracking.Api.Models;
 using TimeTracking.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Serilog from appsettings.json
+// Sinks are config-driven: to add Grafana Loki later, just install
+// Serilog.Sinks.Grafana.Loki and add a "Loki" section under Serilog:WriteTo.
+builder.Host.UseSerilog((context, services, configuration) => configuration
+    .ReadFrom.Configuration(context.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Application", "TimeTracking.Api"));
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -254,6 +264,9 @@ using (var scope = app.Services.CreateScope())
 
 // Configure the HTTP request pipeline.
 app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+// Serilog HTTP request logging (replaces default Microsoft request logging)
+app.UseSerilogRequestLogging();
 
 app.UseSwagger();
 app.UseSwaggerUI();
