@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using TimeTracking.Api.Data;
+using TimeTracking.Api.Filters;
 using TimeTracking.Api.Middleware;
 using TimeTracking.Api.Models;
 using TimeTracking.Api.Services;
@@ -25,7 +26,11 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .Enrich.WithProperty("Application", "TimeTracking.Api"));
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    // Reject requests from deactivated users on every authenticated request
+    options.Filters.Add<ActiveUserFilter>();
+});
 builder.Services.AddEndpointsApiExplorer();
 
 // Add API Versioning
