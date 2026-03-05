@@ -45,6 +45,12 @@ public class TimeTrackingService : ITimeTrackingService
             var orgExists = await _context.Organizations.AnyAsync(o => o.Id == orgId);
             if (!orgExists)
                 return ServiceResult.BadRequest<TimeEntryResponse>("Organization not found.");
+
+            // Verify the user is a member of the organization
+            var isMember = await _context.UserOrganizations
+                .AnyAsync(uo => uo.OrganizationId == orgId && uo.UserId == userId);
+            if (!isMember)
+                return ServiceResult.Forbidden<TimeEntryResponse>("You are not a member of this organization.");
         }
 
         var entry = new TimeEntry

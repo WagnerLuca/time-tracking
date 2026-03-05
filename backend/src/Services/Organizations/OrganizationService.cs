@@ -56,7 +56,7 @@ public class OrganizationService : IOrganizationService
         });
     }
 
-    public async Task<ServiceResult<OrganizationDetailResponse>> GetOrganizationAsync(string slug)
+    public async Task<ServiceResult<OrganizationDetailResponse>> GetOrganizationAsync(string slug, int? callerUserId)
     {
         var organization = await _context.Organizations
             .Where(o => o.Slug == slug)
@@ -106,17 +106,20 @@ public class OrganizationService : IOrganizationService
         if (organization == null)
             return ServiceResult.NotFound<OrganizationDetailResponse>("Organization not found");
 
+        // Strip member PII for non-members: only members can see the full member list
+        var isMember = callerUserId.HasValue && organization.Members.Any(m => m.Id == callerUserId.Value);
+        if (!isMember)
+        {
+            return ServiceResult.Ok(organization with { Members = new List<OrganizationMemberResponse>() });
+        }
+
         return ServiceResult.Ok(organization);
     }
 
-    public async Task<ServiceResult<List<UserOrganizationResponse>>> GetUserOrganizationsAsync(int userId)
+    public async Task<ServiceResult<List<UserOrganizationResponse>>> GetUserOrganizationsAsync(int callerUserId)
     {
-        var userExists = await _context.Users.AnyAsync(u => u.Id == userId && u.IsActive);
-        if (!userExists)
-            return ServiceResult.NotFound<List<UserOrganizationResponse>>("User not found");
-
         var organizations = await _context.UserOrganizations
-            .Where(uo => uo.UserId == userId)
+            .Where(uo => uo.UserId == callerUserId)
             .Select(uo => new UserOrganizationResponse
             {
                 OrganizationId = uo.Organization.Id,

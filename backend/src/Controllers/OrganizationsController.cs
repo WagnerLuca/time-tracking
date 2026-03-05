@@ -29,6 +29,7 @@ public class OrganizationsController : OrganizationBaseController
     /// <param name="limit">Max items per page (default 50, max 200).</param>
     /// <param name="offset">Number of items to skip.</param>
     [HttpGet]
+    [Authorize]
     [ProducesResponseType(typeof(PaginatedResponse<OrganizationResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOrganizations(
         [FromQuery] int limit = 50, [FromQuery] int offset = 0)
@@ -37,16 +38,24 @@ public class OrganizationsController : OrganizationBaseController
     /// <summary>Get organization details by slug.</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpGet("{slug}")]
+    [Authorize]
     [ProducesResponseType(typeof(OrganizationDetailResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOrganization(string slug)
-        => ToResponse(await _service.GetOrganizationAsync(slug));
+    {
+        var userId = GetCurrentUserId();
+        return ToResponse(await _service.GetOrganizationAsync(slug, userId));
+    }
 
-    /// <summary>List organizations a specific user belongs to.</summary>
-    /// <param name="userId">Target user ID.</param>
-    [HttpGet("user/{userId}")]
+    /// <summary>List organizations the current user belongs to.</summary>
+    [HttpGet("mine")]
+    [Authorize]
     [ProducesResponseType(typeof(List<UserOrganizationResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetUserOrganizations(int userId)
-        => ToResponse(await _service.GetUserOrganizationsAsync(userId));
+    public async Task<IActionResult> GetMyOrganizations()
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.GetUserOrganizationsAsync(userId.Value));
+    }
 
     /// <summary>Create a new organization.</summary>
     [HttpPost]

@@ -9,8 +9,8 @@ public interface IOrganizationService
 {
     // ── Organization CRUD ──
     Task<ServiceResult<PaginatedResponse<OrganizationResponse>>> GetOrganizationsAsync(int limit, int offset);
-    Task<ServiceResult<OrganizationDetailResponse>> GetOrganizationAsync(string slug);
-    Task<ServiceResult<List<UserOrganizationResponse>>> GetUserOrganizationsAsync(int userId);
+    Task<ServiceResult<OrganizationDetailResponse>> GetOrganizationAsync(string slug, int? callerUserId);
+    Task<ServiceResult<List<UserOrganizationResponse>>> GetUserOrganizationsAsync(int callerUserId);
     Task<ServiceResult<OrganizationResponse>> CreateOrganizationAsync(int callerUserId, CreateOrganizationRequest request);
     Task<ServiceResult<OrganizationResponse>> UpdateOrganizationAsync(string slug, int callerUserId, UpdateOrganizationRequest request);
     Task<ServiceResult> DeleteOrganizationAsync(string slug, int callerUserId);

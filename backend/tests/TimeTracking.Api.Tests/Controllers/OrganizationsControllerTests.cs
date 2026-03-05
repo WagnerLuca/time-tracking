@@ -20,6 +20,8 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
     public async Task GetOrganizations_ReturnsSeededOrg()
     {
         var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
         var response = await client.GetAsync("/api/v1/Organizations");
         response.EnsureSuccessStatusCode();
 
@@ -29,9 +31,19 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
     }
 
     [Fact]
-    public async Task GetOrganization_BySlug_ReturnsDetail()
+    public async Task GetOrganizations_Unauthenticated_Returns401()
     {
         var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/v1/Organizations");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetOrganization_BySlug_AsMember_ReturnsDetailWithMembers()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
         var response = await client.GetAsync($"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}");
         response.EnsureSuccessStatusCode();
 
@@ -42,25 +54,59 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
     }
 
     [Fact]
+    public async Task GetOrganization_BySlug_AsNonMember_ReturnsDetailWithoutMembers()
+    {
+        // Register a new user who is NOT a member of the seed org
+        var (client, _) = await TestHelpers.CreateAuthenticatedUserAsync(
+            _factory, "nonmember-orgdetail@test.com", "Non", "Member");
+
+        var response = await client.GetAsync($"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}");
+        response.EnsureSuccessStatusCode();
+
+        var org = await response.Content.ReadFromJsonAsync<OrganizationDetailResponseDto>(TestHelpers.JsonOptions);
+        org.Should().NotBeNull();
+        org!.Slug.Should().Be(TestHelpers.SeedOrgSlug);
+        org.Members.Should().BeEmpty("non-members should not see member PII");
+    }
+
+    [Fact]
     public async Task GetOrganization_NonExistent_Returns404()
     {
         var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
         var response = await client.GetAsync("/api/v1/Organizations/does-not-exist");
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
-    public async Task GetUserOrganizations_ReturnsOrgForSeedUser()
+    public async Task GetOrganization_Unauthenticated_Returns401()
     {
         var client = _factory.CreateClient();
-        var login = await TestHelpers.LoginAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        var response = await client.GetAsync($"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
 
-        var response = await client.GetAsync($"/api/v1/Organizations/user/{login.User.Id}");
+    [Fact]
+    public async Task GetMyOrganizations_ReturnsOrgForCurrentUser()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        var response = await client.GetAsync("/api/v1/Organizations/mine");
         response.EnsureSuccessStatusCode();
 
         var userOrgs = await response.Content.ReadFromJsonAsync<List<UserOrganizationResponseDto>>(TestHelpers.JsonOptions);
         userOrgs.Should().NotBeNull();
         userOrgs!.Should().Contain(o => o.Slug == TestHelpers.SeedOrgSlug);
+    }
+
+    [Fact]
+    public async Task GetMyOrganizations_Unauthenticated_Returns401()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/v1/Organizations/mine");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     // ── Create ───────────────────────────────────────────────────────────

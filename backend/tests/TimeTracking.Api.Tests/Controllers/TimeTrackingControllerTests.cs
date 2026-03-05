@@ -75,6 +75,20 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     [Fact]
+    public async Task Start_WithOrganization_AsNonMember_ReturnsForbidden()
+    {
+        // Create a user who is NOT a member of the seed org
+        var (client, _) = await TestHelpers.CreateAuthenticatedUserAsync(
+            _factory, "nonmember-start@test.com", "Non", "Member");
+
+        var response = await client.PostAsJsonAsync("/api/v1/TimeTracking/start", new
+        {
+            organizationSlug = TestHelpers.SeedOrgSlug
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task Start_WithoutBody_Succeeds()
     {
         var client = _factory.CreateClient();

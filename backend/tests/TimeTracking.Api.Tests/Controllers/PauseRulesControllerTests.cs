@@ -17,9 +17,10 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
     // ── List pause rules ─────────────────────────────────────────────────
 
     [Fact]
-    public async Task GetPauseRules_SeededOrg_ReturnsRules()
+    public async Task GetPauseRules_AsMember_ReturnsRules()
     {
         var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
         var response = await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/pause-rules");
         response.EnsureSuccessStatusCode();
@@ -27,6 +28,16 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
         var rules = await response.Content.ReadFromJsonAsync<List<PauseRuleResponseDto>>(TestHelpers.JsonOptions);
         rules.Should().NotBeNull();
         rules!.Should().HaveCountGreaterThanOrEqualTo(1);
+    }
+
+    [Fact]
+    public async Task GetPauseRules_AsNonMember_ReturnsForbidden()
+    {
+        var (client, _) = await TestHelpers.CreateAuthenticatedUserAsync(
+            _factory, "nonmember-pause@test.com", "Non", "Member");
+
+        var response = await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/pause-rules");
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     // ── Create pause rule ────────────────────────────────────────────────
@@ -174,13 +185,13 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    // ── Read is public (no auth required for GET) ────────────────────────
+    // ── Read requires authentication and membership ────────────────────
 
     [Fact]
-    public async Task GetPauseRules_Unauthenticated_ReturnsOk()
+    public async Task GetPauseRules_Unauthenticated_Returns401()
     {
         var client = _factory.CreateClient();
         var response = await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/pause-rules");
-        response.EnsureSuccessStatusCode();
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

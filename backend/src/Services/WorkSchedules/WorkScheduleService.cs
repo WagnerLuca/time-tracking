@@ -110,6 +110,10 @@ public class WorkScheduleService : IWorkScheduleService
         if (org == null)
             return ServiceResult.NotFound("Organization not found");
 
+        var membership = await GetMembershipAsync(userId, org.Id);
+        if (membership == null)
+            return ServiceResult.Forbidden("You are not a member of this organization.");
+
         var ruleModeError = CheckRuleMode(org.WorkScheduleChangeMode, "Schedule changes");
         if (ruleModeError != null)
             return ServiceResult.Fail(ruleModeError.Value.Type, ruleModeError.Value.Message);
