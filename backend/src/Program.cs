@@ -196,14 +196,26 @@ builder.Services.AddDbContext<TimeTrackingDbContext>(options =>
     }
 });
 
-// Add CORS for frontend communication
+// Add CORS — restrict origins in production, allow any in development
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowOrigins", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+        if (allowedOrigins != null && allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
+        else
+        {
+            // Fallback for development — allow any origin
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
     });
 });
 
