@@ -13,6 +13,7 @@ namespace TimeTracking.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
+[Authorize]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
@@ -30,6 +31,7 @@ public class AuthController : ControllerBase
     /// Register a new user
     /// </summary>
     [HttpPost("register")]
+    [AllowAnonymous]
     [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -53,6 +55,7 @@ public class AuthController : ControllerBase
     /// Login with email and password
     /// </summary>
     [HttpPost("login")]
+    [AllowAnonymous]
     [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -76,6 +79,7 @@ public class AuthController : ControllerBase
     /// Refresh access token using refresh token
     /// </summary>
     [HttpPost("refresh")]
+    [AllowAnonymous]
     [EnableRateLimiting("AuthModerate")]
     [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -99,7 +103,6 @@ public class AuthController : ControllerBase
     /// Logout by revoking refresh token
     /// </summary>
     [HttpPost("logout")]
-    [Authorize]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Logout([FromBody] RefreshTokenRequest request)
     {
@@ -112,7 +115,6 @@ public class AuthController : ControllerBase
     /// Change password for authenticated user
     /// </summary>
     [HttpPost("change-password")]
-    [Authorize]
     [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -146,7 +148,6 @@ public class AuthController : ControllerBase
     /// Delete the authenticated user's account and all associated data
     /// </summary>
     [HttpDelete("account")]
-    [Authorize]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> DeleteAccount()
@@ -179,7 +180,6 @@ public class AuthController : ControllerBase
     /// Get current authenticated user info
     /// </summary>
     [HttpGet("me")]
-    [Authorize]
     [ProducesResponseType(typeof(UserInfo), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetCurrentUser()
     {
@@ -222,7 +222,6 @@ public class AuthController : ControllerBase
 
     /// <summary>Update the current user's profile (name, email).</summary>
     [HttpPut("profile")]
-    [Authorize]
     [ProducesResponseType(typeof(UserInfo), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
     {

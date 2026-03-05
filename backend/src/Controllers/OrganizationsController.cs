@@ -2,6 +2,8 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using TimeTracking.Api.Filters;
+using TimeTracking.Api.Models;
 using TimeTracking.Api.Models.Dtos;
 using TimeTracking.Api.Services;
 
@@ -13,6 +15,7 @@ namespace TimeTracking.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
+[Authorize]
 [EnableRateLimiting("General")]
 public class OrganizationsController : OrganizationBaseController
 {
@@ -29,16 +32,14 @@ public class OrganizationsController : OrganizationBaseController
     /// <param name="limit">Max items per page (default 50, max 200).</param>
     /// <param name="offset">Number of items to skip.</param>
     [HttpGet]
-    [Authorize]
     [ProducesResponseType(typeof(PaginatedResponse<OrganizationResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOrganizations(
         [FromQuery] int limit = 50, [FromQuery] int offset = 0)
         => ToResponse(await _service.GetOrganizationsAsync(limit, offset));
 
-    /// <summary>Get organization details by slug.</summary>
+    /// <summary>Get organization details by slug. Members see full details including member list; non-members see a limited view.</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpGet("{slug}")]
-    [Authorize]
     [ProducesResponseType(typeof(OrganizationDetailResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOrganization(string slug)
     {
@@ -48,7 +49,6 @@ public class OrganizationsController : OrganizationBaseController
 
     /// <summary>List organizations the current user belongs to.</summary>
     [HttpGet("mine")]
-    [Authorize]
     [ProducesResponseType(typeof(List<UserOrganizationResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyOrganizations()
     {
@@ -59,7 +59,6 @@ public class OrganizationsController : OrganizationBaseController
 
     /// <summary>Create a new organization.</summary>
     [HttpPost]
-    [Authorize]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateOrganization([FromBody] CreateOrganizationRequest request)
     {
@@ -68,10 +67,10 @@ public class OrganizationsController : OrganizationBaseController
         return ToCreatedResponse(await _service.CreateOrganizationAsync(userId.Value, request));
     }
 
-    /// <summary>Update an existing organization.</summary>
+    /// <summary>Update an existing organization (admin only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpPut("{slug}")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(OrganizationResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateOrganization(string slug, [FromBody] UpdateOrganizationRequest request)
     {
@@ -83,7 +82,7 @@ public class OrganizationsController : OrganizationBaseController
     /// <summary>Delete an organization (owner only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpDelete("{slug}")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Owner)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteOrganization(string slug)
     {
@@ -92,10 +91,10 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.DeleteOrganizationAsync(slug, userId.Value));
     }
 
-    /// <summary>Add a member to the organization.</summary>
+    /// <summary>Add a member to the organization (admin only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/members")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(OrganizationMemberResponse), StatusCodes.Status201Created)]
     public async Task<IActionResult> AddMember(string slug, [FromBody] AddMemberRequest request)
     {
@@ -104,11 +103,11 @@ public class OrganizationsController : OrganizationBaseController
         return ToCreatedResponse(await _service.AddMemberAsync(slug, userId.Value, request));
     }
 
-    /// <summary>Update a member's role in the organization.</summary>
+    /// <summary>Update a member's role in the organization (admin only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="memberId">Member ID to update.</param>
     [HttpPut("{slug}/members/{memberId}")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(OrganizationMemberResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateMemberRole(string slug, int memberId, [FromBody] UpdateMemberRoleRequest request)
     {
@@ -117,11 +116,11 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.UpdateMemberRoleAsync(slug, userId.Value, memberId, request));
     }
 
-    /// <summary>Remove a member from the organization.</summary>
+    /// <summary>Remove a member from the organization (self-leave or admin).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="memberId">Member ID to remove.</param>
     [HttpDelete("{slug}/members/{memberId}")]
-    [Authorize]
+    [RequireOrgRole]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> RemoveMember(string slug, int memberId)
     {
@@ -133,7 +132,7 @@ public class OrganizationsController : OrganizationBaseController
     /// <summary>Update organization settings (admin only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpPut("{slug}/settings")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateSettings(string slug, [FromBody] UpdateOrganizationSettingsRequest request)
     {
@@ -147,7 +146,7 @@ public class OrganizationsController : OrganizationBaseController
     /// <param name="from">Start of date range filter.</param>
     /// <param name="to">End of date range filter.</param>
     [HttpGet("{slug}/time-overview")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(List<MemberTimeOverviewResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTimeOverview(
         string slug, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
@@ -165,7 +164,7 @@ public class OrganizationsController : OrganizationBaseController
     /// <param name="limit">Max items per page (default 50, max 200).</param>
     /// <param name="offset">Number of items to skip.</param>
     [HttpGet("{slug}/member-entries/{memberId}")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(PaginatedResponse<TimeEntryResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMemberEntries(
         string slug, int memberId,
@@ -181,7 +180,7 @@ public class OrganizationsController : OrganizationBaseController
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="memberId">Member ID to update.</param>
     [HttpPut("{slug}/members/{memberId}/initial-overtime")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> SetMemberInitialOvertime(
         string slug, int memberId, [FromBody] SetInitialOvertimeRequest request)

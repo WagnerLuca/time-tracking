@@ -2,6 +2,8 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using TimeTracking.Api.Filters;
+using TimeTracking.Api.Models;
 using TimeTracking.Api.Models.Dtos;
 using TimeTracking.Api.Services;
 
@@ -13,6 +15,7 @@ namespace TimeTracking.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/organizations")]
+[Authorize]
 [EnableRateLimiting("General")]
 public class AbsenceDayController : OrganizationBaseController
 {
@@ -25,7 +28,7 @@ public class AbsenceDayController : OrganizationBaseController
         _logger = logger;
     }
 
-    /// <summary>List absences for the organization with optional filters.</summary>
+    /// <summary>List absences for the organization with optional filters (members only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="userId">Filter by user ID.</param>
     /// <param name="from">Start of date range.</param>
@@ -33,7 +36,7 @@ public class AbsenceDayController : OrganizationBaseController
     /// <param name="limit">Max items per page (default 50, max 200).</param>
     /// <param name="offset">Number of items to skip.</param>
     [HttpGet("{slug}/absences")]
-    [Authorize]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(PaginatedResponse<AbsenceDayResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAbsences(
         string slug, [FromQuery] int? userId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to,
@@ -44,10 +47,10 @@ public class AbsenceDayController : OrganizationBaseController
         return ToResponse(await _service.GetAbsencesAsync(slug, callerId.Value, userId, from, to, limit, offset));
     }
 
-    /// <summary>Create an absence day for the current user.</summary>
+    /// <summary>Create an absence day for the current user (members only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/absences")]
-    [Authorize]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(AbsenceDayResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateAbsence(string slug, [FromBody] CreateAbsenceDayRequest request)
     {
@@ -59,7 +62,7 @@ public class AbsenceDayController : OrganizationBaseController
     /// <summary>Create an absence day for any member (admin only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/absences/admin")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(AbsenceDayResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> AdminCreateAbsence(string slug, [FromBody] AdminCreateAbsenceDayRequest request)
     {
@@ -68,11 +71,11 @@ public class AbsenceDayController : OrganizationBaseController
         return ToResponse(await _service.AdminCreateAbsenceAsync(slug, callerId.Value, request));
     }
 
-    /// <summary>Delete an absence day.</summary>
+    /// <summary>Delete an absence day (members only; service enforces ownership rules).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="id">Absence day ID.</param>
     [HttpDelete("{slug}/absences/{id}")]
-    [Authorize]
+    [RequireOrgRole]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteAbsence(string slug, int id)
     {

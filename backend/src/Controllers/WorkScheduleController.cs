@@ -2,6 +2,8 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using TimeTracking.Api.Filters;
+using TimeTracking.Api.Models;
 using TimeTracking.Api.Models.Dtos;
 using TimeTracking.Api.Services;
 
@@ -14,6 +16,7 @@ namespace TimeTracking.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/organizations")]
+[Authorize]
 [EnableRateLimiting("General")]
 public class WorkScheduleController : OrganizationBaseController
 {
@@ -26,12 +29,12 @@ public class WorkScheduleController : OrganizationBaseController
         _logger = logger;
     }
 
-    // ── Self endpoints ──
+    // ── Self endpoints (members only) ──
 
     /// <summary>Get the current user's active work schedule.</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpGet("{slug}/work-schedule")]
-    [Authorize]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyWorkSchedule(string slug)
     {
@@ -43,7 +46,7 @@ public class WorkScheduleController : OrganizationBaseController
     /// <summary>List all work schedules for the current user.</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpGet("{slug}/work-schedules")]
-    [Authorize]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(List<WorkScheduleResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyWorkSchedules(string slug)
     {
@@ -55,7 +58,7 @@ public class WorkScheduleController : OrganizationBaseController
     /// <summary>Create a new work schedule for the current user.</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/work-schedules")]
-    [Authorize]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateMyWorkSchedule(
         string slug, [FromBody] CreateWorkScheduleRequest request)
@@ -69,7 +72,7 @@ public class WorkScheduleController : OrganizationBaseController
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="id">Work schedule ID.</param>
     [HttpPut("{slug}/work-schedules/{id}")]
-    [Authorize]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateMyWorkSchedule(
         string slug, int id, [FromBody] UpdateWorkScheduleRequest request)
@@ -83,7 +86,7 @@ public class WorkScheduleController : OrganizationBaseController
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="id">Work schedule ID.</param>
     [HttpDelete("{slug}/work-schedules/{id}")]
-    [Authorize]
+    [RequireOrgRole]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteMyWorkSchedule(string slug, int id)
     {
@@ -95,7 +98,7 @@ public class WorkScheduleController : OrganizationBaseController
     /// <summary>Update the current user's initial overtime hours.</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpPut("{slug}/initial-overtime")]
-    [Authorize]
+    [RequireOrgRole]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateMyInitialOvertime(
         string slug, [FromBody] SetInitialOvertimeRequest request)
@@ -111,7 +114,7 @@ public class WorkScheduleController : OrganizationBaseController
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="memberId">Member ID.</param>
     [HttpGet("{slug}/members/{memberId}/work-schedule")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMemberWorkSchedule(string slug, int memberId)
     {
@@ -124,7 +127,7 @@ public class WorkScheduleController : OrganizationBaseController
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="memberId">Member ID.</param>
     [HttpGet("{slug}/members/{memberId}/work-schedules")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(List<WorkScheduleResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMemberWorkSchedules(string slug, int memberId)
     {
@@ -137,7 +140,7 @@ public class WorkScheduleController : OrganizationBaseController
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="memberId">Member ID.</param>
     [HttpPost("{slug}/members/{memberId}/work-schedules")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateMemberWorkSchedule(
         string slug, int memberId, [FromBody] CreateWorkScheduleRequest request)
@@ -152,7 +155,7 @@ public class WorkScheduleController : OrganizationBaseController
     /// <param name="memberId">Member ID.</param>
     /// <param name="id">Work schedule ID.</param>
     [HttpPut("{slug}/members/{memberId}/work-schedules/{id}")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateMemberWorkSchedule(
         string slug, int memberId, int id, [FromBody] UpdateWorkScheduleRequest request)
@@ -167,7 +170,7 @@ public class WorkScheduleController : OrganizationBaseController
     /// <param name="memberId">Member ID.</param>
     /// <param name="id">Work schedule ID.</param>
     [HttpDelete("{slug}/members/{memberId}/work-schedules/{id}")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteMemberWorkSchedule(string slug, int memberId, int id)
     {

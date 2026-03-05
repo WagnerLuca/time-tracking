@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using TimeTracking.Api.Filters;
 using TimeTracking.Api.Models;
 using TimeTracking.Api.Models.Dtos;
 using TimeTracking.Api.Services;
@@ -14,6 +15,7 @@ namespace TimeTracking.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/organizations")]
+[Authorize]
 [EnableRateLimiting("General")]
 public class RequestsController : OrganizationBaseController
 {
@@ -26,10 +28,9 @@ public class RequestsController : OrganizationBaseController
         _logger = logger;
     }
 
-    /// <summary>Create a new request for the organization (e.g. join, edit entry).</summary>
+    /// <summary>Create a new request for the organization (e.g. join, edit entry). No membership required for join requests.</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/requests")]
-    [Authorize]
     [ProducesResponseType(typeof(OrgRequestResponse), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateRequest(string slug, [FromBody] CreateOrgRequestRequest request)
     {
@@ -38,14 +39,14 @@ public class RequestsController : OrganizationBaseController
         return ToCreatedResponse(await _service.CreateRequestAsync(slug, userId.Value, request));
     }
 
-    /// <summary>List requests for an organization with optional filters.</summary>
+    /// <summary>List requests for an organization with optional filters (admin only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="type">Filter by request type.</param>
     /// <param name="status">Filter by request status.</param>
     /// <param name="limit">Max items per page (default 50, max 200).</param>
     /// <param name="offset">Number of items to skip.</param>
     [HttpGet("{slug}/requests")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(PaginatedResponse<OrgRequestResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRequests(
         string slug, [FromQuery] RequestType? type, [FromQuery] RequestStatus? status,
@@ -60,7 +61,7 @@ public class RequestsController : OrganizationBaseController
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="id">Request ID.</param>
     [HttpPut("{slug}/requests/{id}")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(OrgRequestResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> RespondToRequest(
         string slug, int id, [FromBody] RespondToOrgRequestRequest request)
@@ -75,7 +76,6 @@ public class RequestsController : OrganizationBaseController
     /// <param name="limit">Max items per page (default 50, max 200).</param>
     /// <param name="offset">Number of items to skip.</param>
     [HttpGet("my-requests")]
-    [Authorize]
     [ProducesResponseType(typeof(PaginatedResponse<OrgRequestResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyRequests(
         [FromQuery] RequestType? type,
@@ -88,7 +88,6 @@ public class RequestsController : OrganizationBaseController
 
     /// <summary>Get pending request notifications for admins.</summary>
     [HttpGet("notifications")]
-    [Authorize]
     [ProducesResponseType(typeof(AdminNotificationResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAdminNotifications()
     {
@@ -99,7 +98,6 @@ public class RequestsController : OrganizationBaseController
 
     /// <summary>Get responded request notifications for the current user.</summary>
     [HttpGet("user-notifications")]
-    [Authorize]
     [ProducesResponseType(typeof(UserNotificationResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUserNotifications()
     {
@@ -111,7 +109,6 @@ public class RequestsController : OrganizationBaseController
     /// <summary>Mark request notifications as seen.</summary>
     /// <param name="requestIds">Optional list of specific request IDs to mark. If null, marks all.</param>
     [HttpPost("user-notifications/mark-seen")]
-    [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> MarkNotificationsSeen([FromBody] List<int>? requestIds = null)
     {

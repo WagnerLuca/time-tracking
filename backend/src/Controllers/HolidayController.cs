@@ -2,6 +2,8 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using TimeTracking.Api.Filters;
+using TimeTracking.Api.Models;
 using TimeTracking.Api.Models.Dtos;
 using TimeTracking.Api.Services;
 
@@ -13,6 +15,7 @@ namespace TimeTracking.Api.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/organizations")]
+[Authorize]
 [EnableRateLimiting("General")]
 public class HolidayController : OrganizationBaseController
 {
@@ -25,10 +28,10 @@ public class HolidayController : OrganizationBaseController
         _logger = logger;
     }
 
-    /// <summary>List all holidays for an organization.</summary>
+    /// <summary>List all holidays for an organization (members only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpGet("{slug}/holidays")]
-    [Authorize]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(List<HolidayResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetHolidays(string slug)
     {
@@ -37,10 +40,10 @@ public class HolidayController : OrganizationBaseController
         return ToResponse(await _service.GetHolidaysAsync(slug, userId.Value));
     }
 
-    /// <summary>Create a new holiday for the organization.</summary>
+    /// <summary>Create a new holiday for the organization (admin only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpPost("{slug}/holidays")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(HolidayResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateHoliday(string slug, [FromBody] CreateHolidayRequest request)
     {
@@ -49,11 +52,11 @@ public class HolidayController : OrganizationBaseController
         return ToResponse(await _service.CreateHolidayAsync(slug, userId.Value, request));
     }
 
-    /// <summary>Update an existing holiday.</summary>
+    /// <summary>Update an existing holiday (admin only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="id">Holiday ID.</param>
     [HttpPut("{slug}/holidays/{id}")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(HolidayResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateHoliday(string slug, int id, [FromBody] UpdateHolidayRequest request)
     {
@@ -62,11 +65,11 @@ public class HolidayController : OrganizationBaseController
         return ToResponse(await _service.UpdateHolidayAsync(slug, userId.Value, id, request));
     }
 
-    /// <summary>Delete a holiday.</summary>
+    /// <summary>Delete a holiday (admin only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="id">Holiday ID.</param>
     [HttpDelete("{slug}/holidays/{id}")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> DeleteHoliday(string slug, int id)
     {
@@ -75,12 +78,12 @@ public class HolidayController : OrganizationBaseController
         return ToResponse(await _service.DeleteHolidayAsync(slug, userId.Value, id));
     }
 
-    /// <summary>Import preset holidays (e.g. German public holidays) for a given year.</summary>
+    /// <summary>Import preset holidays (e.g. German public holidays) for a given year (admin only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="preset">Preset code, e.g. "de" (default).</param>
     /// <param name="year">Year to import for. Defaults to current year.</param>
     [HttpPost("{slug}/holidays/import-preset")]
-    [Authorize]
+    [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(List<HolidayResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ImportPresetHolidays(
         string slug, [FromQuery] string preset = "de", [FromQuery] int? year = null)
@@ -92,7 +95,6 @@ public class HolidayController : OrganizationBaseController
 
     /// <summary>List available holiday preset codes.</summary>
     [HttpGet("holiday-presets")]
-    [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult GetAvailablePresets()
     {
