@@ -247,5 +247,167 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         (await client.GetAsync("/api/v1/TimeTracking")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await client.PutAsJsonAsync("/api/v1/TimeTracking/1", new { })).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await client.DeleteAsync("/api/v1/TimeTracking/1")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await client.GetAsync("/api/v1/TimeTracking/export")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    // ── CSV Export ───────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ExportCsv_ReturnsValidCsvFile()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        var response = await client.GetAsync("/api/v1/TimeTracking/export");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("text/csv");
+        response.Content.Headers.ContentDisposition.Should().NotBeNull();
+        response.Content.Headers.ContentDisposition!.FileName.Should().EndWith(".csv");
+
+        var csv = await response.Content.ReadAsStringAsync();
+        csv.Should().Contain("Date,Start Time,End Time,Duration (h),Pause (min),Net Duration (h),Organization,Description");
+        // Seed data should produce at least one data row
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        lines.Length.Should().BeGreaterThanOrEqualTo(2); // header + at least one row
+    }
+
+    [Fact]
+    public async Task ExportCsv_WithDateFilter_FiltersCorrectly()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        // Far future date — should return only header
+        var response = await client.GetAsync("/api/v1/TimeTracking/export?from=2099-01-01&to=2099-12-31");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var csv = await response.Content.ReadAsStringAsync();
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        lines.Length.Should().Be(1); // Only header
+    }
+
+    [Fact]
+    public async Task ExportCsv_WithOrgFilter_FiltersCorrectly()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        // Non-existent org ID — should return only header
+        var response = await client.GetAsync("/api/v1/TimeTracking/export?organizationId=999999");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var csv = await response.Content.ReadAsStringAsync();
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        lines.Length.Should().Be(1); // Only header
+    }
+
+    [Fact]
+    public async Task ExportCsv_ExcludesRunningEntries()
+    {
+        var (client, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "csvrun@test.com");
+
+        // Start an entry (running, no end time)
+        await client.PostAsJsonAsync("/api/v1/TimeTracking/start", new { description = "Still running" });
+
+        var response = await client.GetAsync("/api/v1/TimeTracking/export");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var csv = await response.Content.ReadAsStringAsync();
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        // The running entry should not appear in export
+        lines.Length.Should().Be(1); // Only header
+        csv.Should().NotContain("Still running");
+
+        // Clean up
+        await client.PostAsJsonAsync("/api/v1/TimeTracking/stop", (object?)null);
+    }
+
+    // ── Daily Report Export ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task ExportDailyReport_ReturnsValidCsvWithHeaders()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        var response = await client.GetAsync(
+            $"/api/v1/TimeTracking/export/{TestHelpers.SeedOrgSlug}/daily-report");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("text/csv");
+
+        var csv = await response.Content.ReadAsStringAsync();
+        csv.Should().Contain("Date,Day,Target (h),Worked (h),Pause (min),Net Worked (h),Overtime (h),Cumulative Overtime (h),Status,Holiday,Absence Type,Absence Note,Entries");
+
+        // Should have header + at least one day row (defaults to current month)
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        lines.Length.Should().BeGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
+    public async Task ExportDailyReport_WithDateRange_ReturnsCorrectDays()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        // Request exactly 7 days
+        var response = await client.GetAsync(
+            $"/api/v1/TimeTracking/export/{TestHelpers.SeedOrgSlug}/daily-report?from=2026-01-05&to=2026-01-11");
+        response.EnsureSuccessStatusCode();
+
+        var csv = await response.Content.ReadAsStringAsync();
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        lines.Length.Should().Be(8); // header + 7 days
+
+        // Should contain the correct dates
+        csv.Should().Contain("2026-01-05");
+        csv.Should().Contain("2026-01-11");
+    }
+
+    [Fact]
+    public async Task ExportDailyReport_NonMember_ReturnsForbidden()
+    {
+        var (client, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "nonmember-export@test.com");
+
+        var response = await client.GetAsync(
+            $"/api/v1/TimeTracking/export/{TestHelpers.SeedOrgSlug}/daily-report");
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task ExportDailyReport_NonExistentOrg_ReturnsNotFound()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        var response = await client.GetAsync(
+            "/api/v1/TimeTracking/export/does-not-exist-org/daily-report");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task ExportDailyReport_ContainsWeekendStatus()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        // 2026-01-10 is a Saturday, 2026-01-11 is a Sunday
+        var response = await client.GetAsync(
+            $"/api/v1/TimeTracking/export/{TestHelpers.SeedOrgSlug}/daily-report?from=2026-01-10&to=2026-01-11");
+        response.EnsureSuccessStatusCode();
+
+        var csv = await response.Content.ReadAsStringAsync();
+        csv.Should().Contain("Weekend");
+        csv.Should().Contain("Sat");
+        csv.Should().Contain("Sun");
+    }
+
+    [Fact]
+    public async Task ExportDailyReport_Unauthenticated_Returns401()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.GetAsync(
+            $"/api/v1/TimeTracking/export/{TestHelpers.SeedOrgSlug}/daily-report");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

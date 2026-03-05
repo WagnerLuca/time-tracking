@@ -137,6 +137,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddScoped<ITimeTrackingService, TimeTrackingService>();
+builder.Services.AddScoped<ITimeEntryExportService, TimeEntryExportService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IRequestService, RequestService>();
 builder.Services.AddScoped<IHolidayService, HolidayService>();
