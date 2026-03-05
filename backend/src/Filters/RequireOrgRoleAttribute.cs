@@ -42,14 +42,18 @@ public class RequireOrgRoleAttribute : TypeFilterAttribute
 /// </summary>
 public class OrgRoleAuthorizationFilter : IAsyncActionFilter
 {
+    /// <summary>How long role lookups are cached. Short TTL balances performance vs. freshness.</summary>
+    internal static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(2);
 
     private readonly OrganizationRole _minimumRole;
     private readonly TimeTrackingDbContext _context;
+    private readonly IMemoryCache _cache;
 
     public OrgRoleAuthorizationFilter(OrganizationRole minimumRole, TimeTrackingDbContext context, IMemoryCache cache)
     {
         _minimumRole = minimumRole;
         _context = context;
+        _cache = cache;
     }
 
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
@@ -78,10 +82,15 @@ public class OrgRoleAuthorizationFilter : IAsyncActionFilter
         }
 
         // Check the user's role in this organization (cached)
+        var cacheKey = $"org_role:{slug}:{userId}";
+        var role = await _cache.GetOrCreateAsync(cacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = CacheDuration;
             return await _context.UserOrganizations
                 .Where(uo => uo.Organization.Slug == slug && uo.UserId == userId)
                 .Select(uo => (OrganizationRole?)uo.Role)
                 .FirstOrDefaultAsync();
+        });
 
         if (role == null)
         {

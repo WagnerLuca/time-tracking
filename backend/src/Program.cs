@@ -26,6 +26,7 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .Enrich.WithProperty("Application", "TimeTracking.Api"));
 
 // Add services to the container.
+builder.Services.AddMemoryCache();
 builder.Services.AddControllers(options =>
 {
     // Reject requests from deactivated users on every authenticated request
