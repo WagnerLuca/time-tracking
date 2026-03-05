@@ -25,13 +25,16 @@ public class PauseRulesController : OrganizationBaseController
         _logger = logger;
     }
 
-    /// <summary>List all pause rules for an organization.</summary>
+    /// <summary>List all pause rules for an organization (members only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     [HttpGet("{slug}/pause-rules")]
+    [Authorize]
     [ProducesResponseType(typeof(List<PauseRuleResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPauseRules(string slug)
     {
-        return ToResponse(await _service.GetPauseRulesAsync(slug));
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.GetPauseRulesAsync(slug, userId.Value));
     }
 
     /// <summary>Create a new pause rule (admin only).</summary>

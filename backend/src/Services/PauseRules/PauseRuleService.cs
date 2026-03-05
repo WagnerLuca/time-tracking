@@ -16,11 +16,15 @@ public class PauseRuleService : IPauseRuleService
         _logger = logger;
     }
 
-    public async Task<ServiceResult<List<PauseRuleResponse>>> GetPauseRulesAsync(string slug)
+    public async Task<ServiceResult<List<PauseRuleResponse>>> GetPauseRulesAsync(string slug, int callerUserId)
     {
         var org = await GetOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<List<PauseRuleResponse>>("Organization not found");
+
+        var role = await GetRoleAsync(callerUserId, org.Id);
+        if (role == null)
+            return ServiceResult.Forbidden<List<PauseRuleResponse>>();
 
         var rules = await _context.PauseRules
             .Where(pr => pr.OrganizationId == org.Id)

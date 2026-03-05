@@ -7,7 +7,7 @@ namespace TimeTracking.Api.Services;
 /// </summary>
 public interface IPauseRuleService
 {
-    Task<ServiceResult<List<PauseRuleResponse>>> GetPauseRulesAsync(string slug);
+    Task<ServiceResult<List<PauseRuleResponse>>> GetPauseRulesAsync(string slug, int callerUserId);
     Task<ServiceResult<PauseRuleResponse>> CreatePauseRuleAsync(string slug, int callerUserId, CreatePauseRuleRequest request);
     Task<ServiceResult<PauseRuleResponse>> UpdatePauseRuleAsync(string slug, int callerUserId, int ruleId, UpdatePauseRuleRequest request);
     Task<ServiceResult> DeletePauseRuleAsync(string slug, int callerUserId, int ruleId);
