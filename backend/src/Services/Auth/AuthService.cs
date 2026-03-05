@@ -297,6 +297,54 @@ public class AuthService : IAuthService
         }
     }
 
+    public async Task<(bool Success, string Message, UserInfo? User)> UpdateProfileAsync(int userId, UpdateProfileRequest request)
+    {
+        try
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                return (false, "User not found", null);
+
+            // Check if email is being changed and if it's already taken
+            if (!string.IsNullOrWhiteSpace(request.Email) &&
+                !request.Email.Equals(user.Email, StringComparison.OrdinalIgnoreCase))
+            {
+                var emailTaken = await _context.Users
+                    .AnyAsync(u => u.Email.ToLower() == request.Email.ToLower() && u.Id != userId);
+                if (emailTaken)
+                    return (false, "Email is already in use by another account.", null);
+
+                user.Email = request.Email.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.FirstName))
+                user.FirstName = request.FirstName.Trim();
+
+            if (!string.IsNullOrWhiteSpace(request.LastName))
+                user.LastName = request.LastName.Trim();
+
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} updated their profile", userId);
+
+            return (true, "Profile updated successfully", new UserInfo
+            {
+                Id = user.Id,
+                Email = user.Email,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                ProfileImageUrl = user.ProfileImageUrl,
+                EmailConfirmed = user.EmailConfirmed
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating profile for user {UserId}", userId);
+            return (false, "An error occurred while updating the profile", null);
+        }
+    }
+
     private static string? ValidatePasswordStrength(string password)
     {
         if (password.Length < 8)

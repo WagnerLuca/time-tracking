@@ -94,3 +94,19 @@ public record AuthResponse
     public required bool Success { get; init; }
     public required string Message { get; init; }
 }
+
+/// <summary>Request payload for updating the current user's profile.</summary>
+public record UpdateProfileRequest
+{
+    /// <summary>Updated first name.</summary>
+    [MaxLength(100)]
+    public string? FirstName { get; init; }
+
+    /// <summary>Updated last name.</summary>
+    [MaxLength(100)]
+    public string? LastName { get; init; }
+
+    /// <summary>Updated email address.</summary>
+    [EmailAddress, MaxLength(255)]
+    public string? Email { get; init; }
+}

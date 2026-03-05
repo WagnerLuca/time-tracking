@@ -294,4 +294,85 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
         var response = await client.GetAsync("/health");
         response.EnsureSuccessStatusCode();
     }
+
+    // ── Profile Update ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task UpdateProfile_ChangeName_ReturnsUpdatedUser()
+    {
+        var (client, login) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "profile-name@test.com");
+
+        var response = await client.PutAsJsonAsync("/api/v1/Auth/profile", new
+        {
+            firstName = "Updated",
+            lastName = "Name"
+        });
+        response.EnsureSuccessStatusCode();
+
+        var user = await response.Content.ReadFromJsonAsync<UserInfoDto>(TestHelpers.JsonOptions);
+        user!.FirstName.Should().Be("Updated");
+        user.LastName.Should().Be("Name");
+        user.Email.Should().Be("profile-name@test.com");
+    }
+
+    [Fact]
+    public async Task UpdateProfile_ChangeEmail_ReturnsUpdatedUser()
+    {
+        var (client, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "profile-email@test.com");
+
+        var response = await client.PutAsJsonAsync("/api/v1/Auth/profile", new
+        {
+            email = "new-profile-email@test.com"
+        });
+        response.EnsureSuccessStatusCode();
+
+        var user = await response.Content.ReadFromJsonAsync<UserInfoDto>(TestHelpers.JsonOptions);
+        user!.Email.Should().Be("new-profile-email@test.com");
+    }
+
+    [Fact]
+    public async Task UpdateProfile_DuplicateEmail_Returns400()
+    {
+        // Register two users
+        await TestHelpers.CreateAuthenticatedUserAsync(_factory, "dup-target@test.com");
+        var (client2, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "dup-source@test.com");
+
+        // Try to change client2's email to client1's email
+        var response = await client2.PutAsJsonAsync("/api/v1/Auth/profile", new
+        {
+            email = "dup-target@test.com"
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_Unauthenticated_Returns401()
+    {
+        var client = _factory.CreateClient();
+        var response = await client.PutAsJsonAsync("/api/v1/Auth/profile", new
+        {
+            firstName = "Hacker"
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_MeReflectsChanges()
+    {
+        var (client, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "profile-verify@test.com");
+
+        // Update profile
+        await client.PutAsJsonAsync("/api/v1/Auth/profile", new
+        {
+            firstName = "Verified",
+            lastName = "User"
+        });
+
+        // Check /me returns updated data
+        var meResponse = await client.GetAsync("/api/v1/Auth/me");
+        meResponse.EnsureSuccessStatusCode();
+        var me = await meResponse.Content.ReadFromJsonAsync<UserInfoDto>(TestHelpers.JsonOptions);
+        me!.FirstName.Should().Be("Verified");
+        me.LastName.Should().Be("User");
+    }
 }

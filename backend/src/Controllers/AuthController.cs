@@ -219,4 +219,40 @@ public class AuthController : ControllerBase
 
         return Ok(userInfo);
     }
+
+    /// <summary>Update the current user's profile (name, email).</summary>
+    [HttpPut("profile")]
+    [Authorize]
+    [ProducesResponseType(typeof(UserInfo), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Problem(
+                type: "https://httpstatuses.io/401",
+                title: "Unauthorized",
+                statusCode: StatusCodes.Status401Unauthorized,
+                detail: "Invalid token.");
+        }
+
+        var (success, message, user) = await _authService.UpdateProfileAsync(userId, request);
+        if (!success)
+        {
+            if (message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+                return Problem(
+                    type: "https://httpstatuses.io/404",
+                    title: "Not Found",
+                    statusCode: StatusCodes.Status404NotFound,
+                    detail: message);
+
+            return Problem(
+                type: "https://httpstatuses.io/400",
+                title: "Bad Request",
+                statusCode: StatusCodes.Status400BadRequest,
+                detail: message);
+        }
+
+        return Ok(user);
+    }
 }
