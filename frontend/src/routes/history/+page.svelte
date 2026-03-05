@@ -430,96 +430,94 @@
 
 </script>
 
-<div class="history-page">
-	<div class="history-header">
-		<h1>History</h1>
-		<div class="view-toggle">
-			<button class="toggle-btn" class:active={viewMode === 'month'} onclick={() => switchView('month')}>Month</button>
-			<button class="toggle-btn" class:active={viewMode === 'year'} onclick={() => switchView('year')}>Year</button>
+<div class="max-w-4xl mx-auto py-6 px-4">
+	<div class="flex items-center justify-between mb-6">
+		<h1 class="text-2xl font-bold text-base-content m-0">History</h1>
+		<div class="join">
+			<button class="join-item btn btn-sm {viewMode === 'month' ? 'btn-primary' : 'btn-ghost'}" onclick={() => switchView('month')}>Month</button>
+			<button class="join-item btn btn-sm {viewMode === 'year' ? 'btn-primary' : 'btn-ghost'}" onclick={() => switchView('year')}>Year</button>
 		</div>
 	</div>
 
 	{#if loading}
-		<div class="loading-state"><div class="spinner"></div><span>Loading...</span></div>
+		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>Loading...</span></div>
 	{:else if viewMode === 'month'}
 		<!-- MONTH VIEW -->
 		<div class="month-view">
 			<!-- Navigation -->
-			<div class="nav-row">
-				<button class="nav-btn" onclick={prevYear} title="Previous year">&laquo;</button>
-				<button class="nav-btn" onclick={prevMonth} title="Previous month">&lsaquo;</button>
-				<h2 class="nav-title">{monthName} {currentYear}</h2>
-				<button class="nav-btn" onclick={nextMonth} title="Next month">&rsaquo;</button>
-				<button class="nav-btn" onclick={nextYear} title="Next year">&raquo;</button>
+			<div class="flex items-center justify-center gap-3 mb-5">
+				<button class="btn btn-ghost btn-sm btn-square" onclick={prevYear} title="Previous year">&laquo;</button>
+				<button class="btn btn-ghost btn-sm btn-square" onclick={prevMonth} title="Previous month">&lsaquo;</button>
+				<h2 class="text-lg font-bold min-w-[180px] text-center m-0">{monthName} {currentYear}</h2>
+				<button class="btn btn-ghost btn-sm btn-square" onclick={nextMonth} title="Next month">&rsaquo;</button>
+				<button class="btn btn-ghost btn-sm btn-square" onclick={nextYear} title="Next year">&raquo;</button>
 			</div>
 
 			<!-- Month stats -->
-			<div class="stats-row">
-				<div class="stat-card">
-					<span class="stat-value">{formatHours(monthStats.totalWorked)}</span>
-					<span class="stat-label">Worked</span>
+			<div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4">
+				<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center">
+					<span class="block text-xl font-bold text-base-content">{formatHours(monthStats.totalWorked)}</span>
+					<span class="text-xs text-base-content/60">Worked</span>
 				</div>
-				<div class="stat-card">
-					<span class="stat-value">{formatHours(monthStats.totalTarget)}</span>
-					<span class="stat-label">Target</span>
+				<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center">
+					<span class="block text-xl font-bold text-base-content">{formatHours(monthStats.totalTarget)}</span>
+					<span class="text-xs text-base-content/60">Target</span>
 				</div>
-				<div class="stat-card">
-					<span class="stat-value" class:positive={monthStats.totalDelta > 0} class:negative={monthStats.totalDelta < 0}>{formatDelta(monthStats.totalDelta)}</span>
-					<span class="stat-label">Month Balance</span>
+				<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center">
+					<span class="block text-xl font-bold {monthStats.totalDelta > 0 ? 'text-success' : monthStats.totalDelta < 0 ? 'text-error' : 'text-base-content'}">{formatDelta(monthStats.totalDelta)}</span>
+					<span class="text-xs text-base-content/60">Month Balance</span>
 				</div>
-				<div class="stat-card cumulative-card">
-					<span class="stat-value" class:positive={currentMonthCumulative() > 0} class:negative={currentMonthCumulative() < 0}>{formatDelta(currentMonthCumulative())}</span>
-					<span class="stat-label">Cumulative</span>
+				<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center border-l-3 border-l-secondary">
+					<span class="block text-xl font-bold {currentMonthCumulative() > 0 ? 'text-success' : currentMonthCumulative() < 0 ? 'text-error' : 'text-base-content'}">{formatDelta(currentMonthCumulative())}</span>
+					<span class="text-xs text-base-content/60">Cumulative</span>
 				</div>
-				<div class="stat-card">
-					<span class="stat-value">{formatHours(monthStats.avgPerDay)}</span>
-					<span class="stat-label">Avg / Day</span>
+				<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center">
+					<span class="block text-xl font-bold text-base-content">{formatHours(monthStats.avgPerDay)}</span>
+					<span class="text-xs text-base-content/60">Avg / Day</span>
 				</div>
 			</div>
 
 			<!-- Summary badges -->
 			{#if monthStats.workDays > 0 || monthStats.holidays > 0 || monthStats.sickDays > 0 || monthStats.vacationDays > 0}
-				<div class="summary-badges">
-					<span class="badge badge-work">{monthStats.workDays} Work Days</span>
-					<span class="badge badge-worked">{monthStats.workedDays} Days Worked</span>
-					{#if monthStats.holidays > 0}<span class="badge badge-holiday">{monthStats.holidays} Holiday{monthStats.holidays > 1 ? 's' : ''}</span>{/if}
-					{#if monthStats.sickDays > 0}<span class="badge badge-sick">{monthStats.sickDays} Sick Day{monthStats.sickDays > 1 ? 's' : ''}</span>{/if}
-					{#if monthStats.vacationDays > 0}<span class="badge badge-vacation">{monthStats.vacationDays} Vacation Day{monthStats.vacationDays > 1 ? 's' : ''}</span>{/if}
+				<div class="flex flex-wrap gap-2 mb-5">
+					<span class="badge badge-ghost badge-sm">{monthStats.workDays} Work Days</span>
+					<span class="badge badge-info badge-sm">{monthStats.workedDays} Days Worked</span>
+					{#if monthStats.holidays > 0}<span class="badge badge-secondary badge-sm">{monthStats.holidays} Holiday{monthStats.holidays > 1 ? 's' : ''}</span>{/if}
+					{#if monthStats.sickDays > 0}<span class="badge badge-error badge-sm">{monthStats.sickDays} Sick Day{monthStats.sickDays > 1 ? 's' : ''}</span>{/if}
+					{#if monthStats.vacationDays > 0}<span class="badge badge-accent badge-sm">{monthStats.vacationDays} Vacation Day{monthStats.vacationDays > 1 ? 's' : ''}</span>{/if}
 				</div>
 			{/if}
 
 			<!-- Calendar grid -->
-			<div class="calendar">
-				<div class="calendar-header">
-					<span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+			<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden mb-5">
+				<div class="grid grid-cols-7 bg-base-200/50 border-b border-base-300">
+					<span class="text-center text-xs font-semibold text-base-content/60 py-2">Mon</span>
+					<span class="text-center text-xs font-semibold text-base-content/60 py-2">Tue</span>
+					<span class="text-center text-xs font-semibold text-base-content/60 py-2">Wed</span>
+					<span class="text-center text-xs font-semibold text-base-content/60 py-2">Thu</span>
+					<span class="text-center text-xs font-semibold text-base-content/60 py-2">Fri</span>
+					<span class="text-center text-xs font-semibold text-base-content/60 py-2">Sat</span>
+					<span class="text-center text-xs font-semibold text-base-content/60 py-2">Sun</span>
 				</div>
-				<div class="calendar-grid">
+				<div class="grid grid-cols-7">
 					{#each calendarDays as day}
 						<div
-							class="calendar-cell"
-							class:other-month={!day.isCurrentMonth}
-							class:today={day.isToday}
-							class:weekend={day.isWeekend}
-							class:has-entries={day.workedMinutes > 0}
-							class:day-holiday={day.dayType === 'holiday'}
-							class:day-sick={day.dayType === 'sick'}
-							class:day-vacation={day.dayType === 'vacation'}
-							class:day-other={day.dayType === 'other-absence'}
+							class="min-h-[72px] p-1.5 border-r border-b border-base-200 [&:nth-child(7n)]:border-r-0 flex flex-col gap-0.5 relative transition-colors {!day.isCurrentMonth ? 'opacity-30' : ''} {day.isWeekend ? 'bg-base-200/30' : ''} {day.isToday ? 'outline-2 outline-primary -outline-offset-2 rounded' : ''} {day.dayType === 'holiday' ? 'bg-secondary/10' : day.dayType === 'sick' ? 'bg-error/10' : day.dayType === 'vacation' ? 'bg-accent/10' : day.dayType === 'other-absence' ? 'bg-base-content/10' : ''}"
 							title={day.dayTypeLabel || (day.workedMinutes > 0 ? `${formatHours(day.workedMinutes)} worked` : '')}
 						>
-							<span class="cell-day">{day.dayOfMonth}</span>
+							<span class="text-xs font-medium {day.isToday ? 'text-primary font-bold' : 'text-base-content/70'}">{day.dayOfMonth}</span>
 							{#if day.isCurrentMonth}
 								{#if day.workedMinutes > 0}
-									<span class="cell-hours">{formatHours(day.workedMinutes)}</span>
+									<span class="text-xs font-semibold text-base-content">{formatHours(day.workedMinutes)}</span>
 									{#if day.targetMinutes > 0}
-										<div class="cell-bar">
-											<div class="cell-bar-fill" style="width: {barWidth(day.workedMinutes, day.targetMinutes)}%; background: {getHeatColor(day.workedMinutes, day.targetMinutes)}"></div>
+										<div class="h-[3px] bg-base-200 rounded-sm overflow-hidden mt-auto">
+											<div class="h-full rounded-sm min-w-[2px]" style="width: {barWidth(day.workedMinutes, day.targetMinutes)}%; background: {getHeatColor(day.workedMinutes, day.targetMinutes)}"></div>
 										</div>
 									{/if}
 								{:else if day.dayType}
-									<span class="cell-type-label">{day.dayType === 'holiday' ? '🏖️' : day.dayType === 'sick' ? '🤒' : day.dayType === 'vacation' ? '✈️' : '📋'}</span>
+									<span class="text-xs mt-0.5">{day.dayType === 'holiday' ? '🏖️' : day.dayType === 'sick' ? '🤒' : day.dayType === 'vacation' ? '✈️' : '📋'}</span>
 								{:else if day.targetMinutes > 0 && !day.isToday && day.date < new Date()}
-									<span class="cell-missed">—</span>
+									<span class="text-xs text-base-content/20 mt-0.5">—</span>
 								{/if}
 							{/if}
 						</div>
@@ -528,36 +526,36 @@
 			</div>
 
 			<!-- Legend -->
-			<div class="day-type-legend">
-				<span class="legend-item"><span class="legend-dot legend-worked"></span> Work Done</span>
-				{#if holidayDates.size > 0}<span class="legend-item"><span class="legend-dot legend-holiday"></span> Holiday</span>{/if}
-				{#if sickDayDates.size > 0}<span class="legend-item"><span class="legend-dot legend-sick"></span> Sick Day</span>{/if}
-				{#if vacationDates.size > 0}<span class="legend-item"><span class="legend-dot legend-vacation"></span> Vacation</span>{/if}
-				{#if otherAbsenceDates.size > 0}<span class="legend-item"><span class="legend-dot legend-other"></span> Other Absence</span>{/if}
-				<span class="legend-item"><span class="legend-dot legend-target-met"></span> Target Met</span>
-				<span class="legend-item"><span class="legend-dot legend-under"></span> Under Target</span>
+			<div class="flex gap-4 flex-wrap text-xs text-base-content/60 mb-6">
+				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 bg-primary/30"></span> Work Done</span>
+				{#if holidayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 bg-secondary/40"></span> Holiday</span>{/if}
+				{#if sickDayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 bg-error/40"></span> Sick Day</span>{/if}
+				{#if vacationDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 bg-accent/40"></span> Vacation</span>{/if}
+				{#if otherAbsenceDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 bg-base-content/30"></span> Other Absence</span>{/if}
+				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 bg-success/50"></span> Target Met</span>
+				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 bg-warning/30"></span> Under Target</span>
 			</div>
 
 			<!-- Daily breakdown for month -->
-			<div class="month-breakdown">
-				<h3>Daily Breakdown</h3>
-				<div class="breakdown-rows">
+			<div class="card bg-base-100 border border-base-300 p-4">
+				<h3 class="text-[0.9375rem] font-bold mb-3 m-0">Daily Breakdown</h3>
+				<div class="flex flex-col gap-1.5">
 					{#each calendarDays.filter(d => d.isCurrentMonth && (d.workedMinutes > 0 || d.targetMinutes > 0 || d.dayType)) as day}
 						{@const dayName = day.date.toLocaleDateString('en-US', { weekday: 'short' })}
-						<div class="breakdown-row" class:today={day.isToday} class:day-holiday={day.dayType === 'holiday'} class:day-sick={day.dayType === 'sick'} class:day-vacation={day.dayType === 'vacation'} class:day-other={day.dayType === 'other-absence'}>
-							<span class="bk-day">{dayName}</span>
-							<span class="bk-date">{day.dayOfMonth}</span>
+						<div class="flex items-center gap-2 py-1 px-1.5 rounded {day.isToday ? 'font-semibold' : ''} {day.dayType === 'holiday' ? 'bg-secondary/5' : day.dayType === 'sick' ? 'bg-error/5' : day.dayType === 'vacation' ? 'bg-accent/5' : day.dayType === 'other-absence' ? 'bg-base-content/5' : ''}">
+							<span class="w-7 text-xs text-base-content/60 shrink-0">{dayName}</span>
+							<span class="w-5 text-xs text-base-content/40 shrink-0 text-right">{day.dayOfMonth}</span>
 							{#if day.dayType}
-								<span class="day-type-dot day-type-{day.dayType}" title={day.dayTypeLabel}></span>
+								<span class="w-2 h-2 rounded-full shrink-0 {day.dayType === 'holiday' ? 'bg-secondary' : day.dayType === 'sick' ? 'bg-error' : day.dayType === 'vacation' ? 'bg-accent' : 'bg-base-content/40'}" title={day.dayTypeLabel}></span>
 							{:else}
-								<span class="day-type-dot-placeholder"></span>
+								<span class="w-2 shrink-0"></span>
 							{/if}
-							<div class="bk-bar-track">
-								<div class="bk-bar-fill" class:over={day.workedMinutes > day.targetMinutes && day.targetMinutes > 0} style="width: {barWidth(day.workedMinutes, day.targetMinutes)}%"></div>
+							<div class="flex-1 h-1.5 bg-base-200 rounded-full overflow-hidden">
+								<div class="h-full {day.workedMinutes > day.targetMinutes && day.targetMinutes > 0 ? 'bg-success' : 'bg-primary'} rounded-full transition-all duration-300" style="width: {barWidth(day.workedMinutes, day.targetMinutes)}%"></div>
 							</div>
-							<span class="bk-hours">{formatHours(day.workedMinutes)}</span>
+							<span class="text-xs text-base-content/70 min-w-[36px] text-right">{formatHours(day.workedMinutes)}</span>
 							{#if day.targetMinutes > 0}
-								<span class="bk-target">/ {formatHours(day.targetMinutes)}</span>
+								<span class="text-xs text-base-content/40">/ {formatHours(day.targetMinutes)}</span>
 							{/if}
 						</div>
 					{/each}
@@ -568,14 +566,14 @@
 	{:else}
 		<!-- YEAR VIEW -->
 		<div class="year-view">
-			<div class="nav-row">
-				<button class="nav-btn" onclick={prevYear}>&lsaquo;</button>
-				<h2 class="nav-title">{currentYear}</h2>
-				<button class="nav-btn" onclick={nextYear}>&rsaquo;</button>
+			<div class="flex items-center justify-center gap-3 mb-5">
+				<button class="btn btn-ghost btn-sm btn-square" onclick={prevYear}>&lsaquo;</button>
+				<h2 class="text-lg font-bold min-w-[180px] text-center m-0">{currentYear}</h2>
+				<button class="btn btn-ghost btn-sm btn-square" onclick={nextYear}>&rsaquo;</button>
 			</div>
 
 			{#if yearLoading}
-				<div class="loading-state"><div class="spinner"></div><span>Loading year data...</span></div>
+				<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>Loading year data...</span></div>
 			{:else}
 				<!-- Year summary -->
 				{@const yearTotal = yearMonths.reduce((s, m) => s + m.workedMinutes, 0)}
@@ -585,62 +583,62 @@
 				{@const yearSick = yearMonths.reduce((s, m) => s + m.sickDays, 0)}
 				{@const yearVacation = yearMonths.reduce((s, m) => s + m.vacationDays, 0)}
 
-				<div class="stats-row">
-					<div class="stat-card">
-						<span class="stat-value">{formatHours(yearTotal)}</span>
-						<span class="stat-label">Total Worked</span>
+				<div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4">
+					<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center">
+						<span class="block text-xl font-bold text-base-content">{formatHours(yearTotal)}</span>
+						<span class="text-xs text-base-content/60">Total Worked</span>
 					</div>
-					<div class="stat-card">
-						<span class="stat-value">{formatHours(yearTarget)}</span>
-						<span class="stat-label">Total Target</span>
+					<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center">
+						<span class="block text-xl font-bold text-base-content">{formatHours(yearTarget)}</span>
+						<span class="text-xs text-base-content/60">Total Target</span>
 					</div>
-					<div class="stat-card">
-						<span class="stat-value" class:positive={yearDelta > 0} class:negative={yearDelta < 0}>{formatDelta(yearDelta)}</span>
-						<span class="stat-label">Year Balance</span>
+					<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center">
+						<span class="block text-xl font-bold {yearDelta > 0 ? 'text-success' : yearDelta < 0 ? 'text-error' : 'text-base-content'}">{formatDelta(yearDelta)}</span>
+						<span class="text-xs text-base-content/60">Year Balance</span>
 					</div>
-					<div class="stat-card cumulative-card">
-						<span class="stat-value" class:positive={getYearCumulative(currentYear) > 0} class:negative={getYearCumulative(currentYear) < 0}>{formatDelta(getYearCumulative(currentYear))}</span>
-						<span class="stat-label">Cumulative</span>
+					<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center border-l-3 border-l-secondary">
+						<span class="block text-xl font-bold {getYearCumulative(currentYear) > 0 ? 'text-success' : getYearCumulative(currentYear) < 0 ? 'text-error' : 'text-base-content'}">{formatDelta(getYearCumulative(currentYear))}</span>
+						<span class="text-xs text-base-content/60">Cumulative</span>
 					</div>
 				</div>
 
-				<div class="summary-badges">
-					{#if yearHolidays > 0}<span class="badge badge-holiday">{yearHolidays} Holidays</span>{/if}
-					{#if yearSick > 0}<span class="badge badge-sick">{yearSick} Sick Days</span>{/if}
-					{#if yearVacation > 0}<span class="badge badge-vacation">{yearVacation} Vacation Days</span>{/if}
+				<div class="flex flex-wrap gap-2 mb-5">
+					{#if yearHolidays > 0}<span class="badge badge-secondary badge-sm">{yearHolidays} Holidays</span>{/if}
+					{#if yearSick > 0}<span class="badge badge-error badge-sm">{yearSick} Sick Days</span>{/if}
+					{#if yearVacation > 0}<span class="badge badge-accent badge-sm">{yearVacation} Vacation Days</span>{/if}
 				</div>
 
 				<!-- Monthly cards -->
-				<div class="year-grid">
+				<div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
 					{#each yearMonths as mo}
 						{@const isCurrent = mo.month === new Date().getMonth() && currentYear === new Date().getFullYear()}
 						{@const moKey = `${currentYear}-${String(mo.month + 1).padStart(2, '0')}`}
 						{@const moCumulative = monthlyCumulativeBalances.get(moKey)}
-						<button class="month-card" class:current={isCurrent} class:has-data={mo.workedMinutes > 0} onclick={() => { currentMonth = mo.month; viewMode = 'month'; loadEntries(); }}>
-							<div class="mc-header">
-								<span class="mc-name">{mo.name}</span>
+						<button class="bg-base-100 border rounded-lg p-3.5 cursor-pointer text-left transition-all w-full hover:border-primary/30 hover:shadow-md {isCurrent ? 'border-primary shadow-[0_0_0_1px] shadow-primary' : 'border-base-300'}" onclick={() => { currentMonth = mo.month; viewMode = 'month'; loadEntries(); }}>
+							<div class="flex justify-between items-center mb-2">
+								<span class="font-semibold text-sm text-base-content">{mo.name}</span>
 								{#if mo.workedMinutes > 0}
-									<span class="mc-delta" class:positive={mo.delta > 0} class:negative={mo.delta < 0}>{formatDelta(mo.delta)}</span>
+									<span class="text-xs font-medium {mo.delta > 0 ? 'text-success' : mo.delta < 0 ? 'text-error' : ''}">{formatDelta(mo.delta)}</span>
 								{/if}
 							</div>
-							<div class="mc-bar-track">
-								<div class="mc-bar-fill" class:over={mo.workedMinutes > mo.targetMinutes && mo.targetMinutes > 0} style="width: {barWidth(mo.workedMinutes, mo.targetMinutes)}%"></div>
+							<div class="h-1.5 bg-base-200 rounded-full overflow-hidden mb-2">
+								<div class="h-full {mo.workedMinutes > mo.targetMinutes && mo.targetMinutes > 0 ? 'bg-success' : 'bg-primary'} rounded-full transition-all duration-300" style="width: {barWidth(mo.workedMinutes, mo.targetMinutes)}%"></div>
 							</div>
-							<div class="mc-stats">
-								<span class="mc-worked">{formatHours(mo.workedMinutes)}</span>
+							<div class="text-sm text-base-content/70 mb-1.5">
+								<span class="font-semibold">{formatHours(mo.workedMinutes)}</span>
 								{#if mo.targetMinutes > 0}
-									<span class="mc-target">/ {formatHours(mo.targetMinutes)}</span>
+									<span class="text-base-content/40">/ {formatHours(mo.targetMinutes)}</span>
 								{/if}
 							</div>
 							{#if moCumulative !== undefined}
-								<div class="mc-cumulative" class:positive={moCumulative > 0} class:negative={moCumulative < 0}>
+								<div class="text-xs font-semibold mb-1 {moCumulative > 0 ? 'text-success' : moCumulative < 0 ? 'text-error' : 'text-base-content/60'}">
 									Σ {formatDelta(moCumulative)}
 								</div>
 							{/if}
-							<div class="mc-badges">
-								{#if mo.holidays > 0}<span class="mc-badge mc-badge-holiday">{mo.holidays}🏖️</span>{/if}
-								{#if mo.sickDays > 0}<span class="mc-badge mc-badge-sick">{mo.sickDays}🤒</span>{/if}
-								{#if mo.vacationDays > 0}<span class="mc-badge mc-badge-vacation">{mo.vacationDays}✈️</span>{/if}
+							<div class="flex gap-1.5 flex-wrap">
+								{#if mo.holidays > 0}<span class="text-xs">{mo.holidays}🏖️</span>{/if}
+								{#if mo.sickDays > 0}<span class="text-xs">{mo.sickDays}🤒</span>{/if}
+								{#if mo.vacationDays > 0}<span class="text-xs">{mo.vacationDays}✈️</span>{/if}
 							</div>
 						</button>
 					{/each}
@@ -649,316 +647,3 @@
 		</div>
 	{/if}
 </div>
-
-<style>
-	.history-page {
-		max-width: 960px;
-		margin: 0 auto;
-		padding: 1.5rem 1rem;
-	}
-
-	.history-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin-bottom: 1.5rem;
-	}
-	.history-header h1 { margin: 0; font-size: 1.5rem; }
-
-	.view-toggle {
-		display: flex;
-		border: 1px solid #e5e7eb;
-		border-radius: 8px;
-		overflow: hidden;
-	}
-	.toggle-btn {
-		padding: 0.4rem 1rem;
-		border: none;
-		background: #fff;
-		cursor: pointer;
-		font-size: 0.875rem;
-		color: #6b7280;
-		transition: all 0.15s;
-	}
-	.toggle-btn:hover { background: #f9fafb; }
-	.toggle-btn.active { background: #3b82f6; color: #fff; }
-
-	.loading-state { display: flex; align-items: center; gap: 0.75rem; justify-content: center; padding: 3rem 1rem; color: #6b7280; }
-	.spinner { width: 24px; height: 24px; border: 3px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.6s linear infinite; }
-	@keyframes spin { to { transform: rotate(360deg); } }
-
-	/* Navigation */
-	.nav-row {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.75rem;
-		margin-bottom: 1.25rem;
-	}
-	.nav-btn {
-		width: 32px;
-		height: 32px;
-		border: 1px solid #e5e7eb;
-		border-radius: 6px;
-		background: #fff;
-		cursor: pointer;
-		font-size: 1rem;
-		color: #374151;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: all 0.15s;
-	}
-	.nav-btn:hover { background: #f3f4f6; }
-	.nav-title { margin: 0; font-size: 1.125rem; min-width: 180px; text-align: center; }
-
-	/* Stats */
-	.stats-row {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-		gap: 0.75rem;
-		margin-bottom: 1rem;
-	}
-	.stat-card {
-		background: #fff;
-		border: 1px solid #e5e7eb;
-		border-radius: 10px;
-		padding: 0.75rem;
-		text-align: center;
-	}
-	.stat-value { display: block; font-size: 1.25rem; font-weight: 700; color: #111827; }
-	.stat-value.positive { color: #16a34a; }
-	.stat-value.negative { color: #dc2626; }
-	.stat-label { font-size: 0.75rem; color: #6b7280; }
-
-	/* Summary badges */
-	.summary-badges {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-		margin-bottom: 1.25rem;
-	}
-	.badge {
-		font-size: 0.75rem;
-		padding: 0.2rem 0.6rem;
-		border-radius: 999px;
-		font-weight: 500;
-	}
-	.badge-work { background: #f3f4f6; color: #374151; }
-	.badge-worked { background: #dbeafe; color: #1e40af; }
-	.badge-holiday { background: #ede9fe; color: #6d28d9; }
-	.badge-sick { background: #fee2e2; color: #b91c1c; }
-	.badge-vacation { background: #d1fae5; color: #065f46; }
-
-	/* Calendar */
-	.calendar {
-		background: #fff;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		overflow: hidden;
-		margin-bottom: 1.25rem;
-	}
-	.calendar-header {
-		display: grid;
-		grid-template-columns: repeat(7, 1fr);
-		background: #f9fafb;
-		border-bottom: 1px solid #e5e7eb;
-	}
-	.calendar-header span {
-		text-align: center;
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: #6b7280;
-		padding: 0.5rem;
-	}
-	.calendar-grid {
-		display: grid;
-		grid-template-columns: repeat(7, 1fr);
-	}
-	.calendar-cell {
-		min-height: 72px;
-		padding: 0.35rem;
-		border-right: 1px solid #f3f4f6;
-		border-bottom: 1px solid #f3f4f6;
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		position: relative;
-		transition: background 0.15s;
-	}
-	.calendar-cell:nth-child(7n) { border-right: none; }
-	.calendar-cell.other-month { opacity: 0.3; }
-	.calendar-cell.weekend { background: #fafafa; }
-	.calendar-cell.today { outline: 2px solid #3b82f6; outline-offset: -2px; border-radius: 4px; }
-	.calendar-cell.day-holiday { background: rgba(139, 92, 246, 0.08); }
-	.calendar-cell.day-sick { background: rgba(239, 68, 68, 0.08); }
-	.calendar-cell.day-vacation { background: rgba(16, 185, 129, 0.08); }
-	.calendar-cell.day-other { background: rgba(156, 163, 175, 0.12); }
-
-	.cell-day {
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: #374151;
-	}
-	.today .cell-day { color: #3b82f6; font-weight: 700; }
-	.cell-hours {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		color: #111827;
-	}
-	.cell-bar {
-		height: 3px;
-		background: #f3f4f6;
-		border-radius: 2px;
-		overflow: hidden;
-		margin-top: auto;
-	}
-	.cell-bar-fill {
-		height: 100%;
-		border-radius: 2px;
-		min-width: 2px;
-	}
-	.cell-type-label {
-		font-size: 0.75rem;
-		margin-top: 2px;
-	}
-	.cell-missed {
-		font-size: 0.75rem;
-		color: #d1d5db;
-		margin-top: 2px;
-	}
-
-	/* Legend */
-	.day-type-legend {
-		display: flex;
-		gap: 1rem;
-		flex-wrap: wrap;
-		font-size: 0.75rem;
-		color: #6b7280;
-		margin-bottom: 1.5rem;
-	}
-	.legend-item {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-	}
-	.legend-dot {
-		width: 10px;
-		height: 10px;
-		border-radius: 3px;
-		flex-shrink: 0;
-	}
-	.legend-worked { background: rgba(59, 130, 246, 0.3); }
-	.legend-holiday { background: rgba(139, 92, 246, 0.4); }
-	.legend-sick { background: rgba(239, 68, 68, 0.4); }
-	.legend-vacation { background: rgba(16, 185, 129, 0.4); }
-	.legend-other { background: rgba(156, 163, 175, 0.4); }
-	.legend-target-met { background: rgba(34, 197, 94, 0.5); }
-	.legend-under { background: rgba(250, 204, 21, 0.3); }
-
-	.day-type-dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		flex-shrink: 0;
-	}
-	.day-type-dot.day-type-holiday { background: #8b5cf6; }
-	.day-type-dot.day-type-sick { background: #ef4444; }
-	.day-type-dot.day-type-vacation { background: #10b981; }
-	.day-type-dot.day-type-other { background: #9ca3af; }
-	.day-type-dot-placeholder { width: 8px; flex-shrink: 0; }
-
-	/* Daily breakdown */
-	.month-breakdown {
-		background: #fff;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		padding: 1rem;
-	}
-	.month-breakdown h3 {
-		margin: 0 0 0.75rem 0;
-		font-size: 0.9375rem;
-	}
-	.breakdown-rows {
-		display: flex;
-		flex-direction: column;
-		gap: 0.375rem;
-	}
-	.breakdown-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.25rem 0.375rem;
-		border-radius: 4px;
-	}
-	.breakdown-row.today { font-weight: 600; }
-	.breakdown-row.day-holiday { background: rgba(139, 92, 246, 0.06); }
-	.breakdown-row.day-sick { background: rgba(239, 68, 68, 0.06); }
-	.breakdown-row.day-vacation { background: rgba(16, 185, 129, 0.06); }
-	.breakdown-row.day-other { background: rgba(156, 163, 175, 0.08); }
-
-	.bk-day { width: 28px; font-size: 0.75rem; color: #6b7280; flex-shrink: 0; }
-	.bk-date { width: 20px; font-size: 0.75rem; color: #9ca3af; flex-shrink: 0; text-align: right; }
-	.bk-bar-track { flex: 1; height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden; }
-	.bk-bar-fill { height: 100%; background: #3b82f6; border-radius: 3px; transition: width 0.3s; }
-	.bk-bar-fill.over { background: #22c55e; }
-	.bk-hours { font-size: 0.75rem; color: #374151; min-width: 36px; text-align: right; }
-	.bk-target { font-size: 0.6875rem; color: #9ca3af; }
-
-	/* Year view */
-	.year-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-		gap: 0.75rem;
-	}
-	.month-card {
-		background: #fff;
-		border: 1px solid #e5e7eb;
-		border-radius: 10px;
-		padding: 0.875rem;
-		cursor: pointer;
-		text-align: left;
-		transition: all 0.15s;
-		width: 100%;
-	}
-	.month-card:hover { border-color: #93c5fd; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1); }
-	.month-card.current { border-color: #3b82f6; box-shadow: 0 0 0 1px #3b82f6; }
-	.month-card.has-data { }
-
-	.mc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-	.mc-name { font-weight: 600; font-size: 0.875rem; color: #111827; }
-	.mc-delta { font-size: 0.75rem; font-weight: 500; }
-	.mc-delta.positive { color: #16a34a; }
-	.mc-delta.negative { color: #dc2626; }
-
-	.mc-bar-track { height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden; margin-bottom: 0.5rem; }
-	.mc-bar-fill { height: 100%; background: #3b82f6; border-radius: 3px; transition: width 0.3s; }
-	.mc-bar-fill.over { background: #22c55e; }
-
-	.mc-stats { font-size: 0.8125rem; color: #374151; margin-bottom: 0.375rem; }
-	.mc-worked { font-weight: 600; }
-	.mc-target { color: #9ca3af; }
-
-	.mc-badges { display: flex; gap: 0.375rem; flex-wrap: wrap; }
-	.mc-badge { font-size: 0.6875rem; }
-
-	.mc-cumulative { font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; color: #6b7280; }
-	.mc-cumulative.positive { color: #16a34a; }
-	.mc-cumulative.negative { color: #dc2626; }
-
-	.cumulative-card { border-left: 3px solid #6366f1; }
-
-	/* Responsive */
-	@media (max-width: 640px) {
-		.stats-row { grid-template-columns: repeat(2, 1fr); }
-		.calendar-cell { min-height: 52px; padding: 0.25rem; }
-		.cell-day { font-size: 0.6875rem; }
-		.cell-hours { font-size: 0.625rem; }
-		.year-grid { grid-template-columns: repeat(2, 1fr); }
-		.nav-title { font-size: 0.9375rem; min-width: 140px; }
-		.history-header { flex-direction: column; gap: 0.75rem; align-items: flex-start; }
-	}
-
-	.positive { color: #16a34a; }
-	.negative { color: #dc2626; }
-</style>

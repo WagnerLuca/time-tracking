@@ -399,124 +399,124 @@
 	<title>{member ? `${member.firstName} ${member.lastName}` : 'Member'} - {org?.name ?? 'Organization'}</title>
 </svelte:head>
 
-<div class="page">
+<div class="max-w-3xl mx-auto py-8 px-6">
 	<!-- Back link -->
-	<a href="/organizations/{orgSlug}" class="back-link">
+	<a href="/organizations/{orgSlug}" class="inline-flex items-center gap-1.5 text-base-content/60 no-underline text-sm mb-6 transition-colors hover:text-primary">
 		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
 		Back to {org?.name ?? 'Organization'}
 	</a>
 
 	{#if loading}
-		<div class="loading-container">
-			<div class="spinner"></div>
-			<p class="muted">Loading member details...</p>
+		<div class="text-center py-12">
+			<span class="loading loading-spinner loading-md"></span>
+			<p class="text-base-content/40 text-sm">Loading member details...</p>
 		</div>
 	{:else if error}
-		<div class="error-msg">{error}</div>
+		<div class="alert alert-error mb-4 text-sm">{error}</div>
 	{:else if member}
 		<!-- ═══ Member Header ═══ -->
-		<div class="member-header">
-			<div class="member-avatar">
+		<div class="flex items-center gap-5 mb-8 pb-6 border-b border-base-300">
+			<div class="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-xl font-bold shrink-0">
 				{getInitials(member.firstName, member.lastName)}
 			</div>
-			<div class="member-info">
-				<h1>{member.firstName} {member.lastName}</h1>
-				<p class="member-email">{member.email}</p>
-				<div class="member-meta">
-					<span class="role-badge role-{member.role?.toLowerCase()}">{member.role}</span>
+			<div class="flex-1">
+				<h1 class="text-2xl font-bold text-base-content m-0">{member.firstName} {member.lastName}</h1>
+				<p class="text-base-content/60 text-sm mt-0.5 mb-2">{member.email}</p>
+				<div class="flex items-center gap-2.5 flex-wrap">
+					<span class="badge badge-sm uppercase tracking-wide {member.role === 'Owner' ? 'badge-warning' : member.role === 'Admin' ? 'badge-info' : 'badge-ghost'}">{member.role}</span>
 					{#if member.joinedAt}
-						<span class="joined">Joined {formatDateFull(member.joinedAt)}</span>
+						<span class="text-base-content/40 text-xs">Joined {formatDateFull(member.joinedAt)}</span>
 					{/if}
 					{#if isSelf}
-						<span class="you-badge">You</span>
+						<span class="badge badge-success badge-xs font-semibold">You</span>
 					{/if}
 				</div>
 			</div>
 
 			{#if canEdit && !isSelf}
-				<div class="member-actions">
-					<select class="role-select" value={member.role === 'Admin' ? 1 : member.role === 'Owner' ? 2 : 0} onchange={(e) => changeMemberRole(parseInt(e.currentTarget.value))}>
+				<div class="flex items-center gap-2 shrink-0">
+					<select class="select select-bordered select-xs" value={member.role === 'Admin' ? 1 : member.role === 'Owner' ? 2 : 0} onchange={(e) => changeMemberRole(parseInt(e.currentTarget.value))}>
 						<option value={0}>Member</option>
 						<option value={1}>Admin</option>
 						{#if myRole === 'Owner'}<option value={2}>Owner</option>{/if}
 					</select>
-					<button class="btn-danger-sm" onclick={removeMember}>Remove</button>
+					<button class="btn btn-outline btn-error btn-xs" onclick={removeMember}>Remove</button>
 				</div>
 			{/if}
 		</div>
 
 		{#if actionError}
-			<div class="error-msg">{actionError}</div>
+			<div class="alert alert-error mb-4 text-sm">{actionError}</div>
 		{/if}
 
 		<!-- ═══ Time Overview ═══ -->
 		{#if canViewTime}
-		<section class="card">
-			<div class="card-header">
-				<h2>
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+		<section class="card bg-base-100 border border-base-300 p-5 mb-5">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-base font-bold text-base-content flex items-center gap-2 m-0">
+					<svg class="text-base-content/60" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
 					Time Overview
 				</h2>
 			</div>
 
-			<div class="week-nav">
-				<button class="week-btn" onclick={() => changeWeek(-1)}>&lsaquo;</button>
-				<span class="week-label">{formatWeekLabel(weekRange)}</span>
-				<button class="week-btn" onclick={() => changeWeek(1)} disabled={weekOffset >= 0}>&rsaquo;</button>
+			<div class="flex items-center justify-center gap-4 mb-4">
+				<button class="btn btn-ghost btn-sm btn-square text-lg" onclick={() => changeWeek(-1)}>&lsaquo;</button>
+				<span class="font-semibold text-[0.9375rem] text-base-content">{formatWeekLabel(weekRange)}</span>
+				<button class="btn btn-ghost btn-sm btn-square text-lg" onclick={() => changeWeek(1)} disabled={weekOffset >= 0}>&rsaquo;</button>
 			</div>
 
 			{#if overviewLoading}
-				<p class="muted">Loading...</p>
+				<p class="text-base-content/40 text-sm">Loading...</p>
 			{:else if overview}
 				{@const targetMinutes = overview.weeklyWorkHours ? overview.weeklyWorkHours * 60 : 0}
 				{@const diff = (overview.netTrackedMinutes ?? 0) - targetMinutes}
-				<div class="stats-grid">
-					<div class="stat-card">
-						<span class="stat-value">{formatHoursDecimal(overview.totalTrackedMinutes)}</span>
-						<span class="stat-label">Total Tracked</span>
+				<div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4">
+					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
+						<span class="block text-xl font-bold text-base-content">{formatHoursDecimal(overview.totalTrackedMinutes)}</span>
+						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Total Tracked</span>
 					</div>
-					<div class="stat-card">
-						<span class="stat-value">{formatHoursDecimal(overview.netTrackedMinutes)}</span>
-						<span class="stat-label">Net (after pauses)</span>
+					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
+						<span class="block text-xl font-bold text-base-content">{formatHoursDecimal(overview.netTrackedMinutes)}</span>
+						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Net (after pauses)</span>
 					</div>
-					<div class="stat-card">
-						<span class="stat-value">{overview.weeklyWorkHours ? overview.weeklyWorkHours + 'h' : '-'}</span>
-						<span class="stat-label">Weekly Target</span>
+					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
+						<span class="block text-xl font-bold text-base-content">{overview.weeklyWorkHours ? overview.weeklyWorkHours + 'h' : '-'}</span>
+						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Weekly Target</span>
 					</div>
-					<div class="stat-card {diff >= 0 ? 'stat-positive' : 'stat-negative'}">
-						<span class="stat-value">{diff >= 0 ? '+' : ''}{formatHoursDecimal(Math.abs(diff))}</span>
-						<span class="stat-label">Overtime</span>
+					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center {diff >= 0 ? 'border-success/30 bg-success/5' : 'border-error/30 bg-error/5'}">
+						<span class="block text-xl font-bold {diff >= 0 ? 'text-success' : 'text-error'}">{diff >= 0 ? '+' : ''}{formatHoursDecimal(Math.abs(diff))}</span>
+						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Overtime</span>
 					</div>
-					<div class="stat-card">
-						<span class="stat-value">{overview.entryCount}</span>
-						<span class="stat-label">Entries</span>
+					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
+						<span class="block text-xl font-bold text-base-content">{overview.entryCount}</span>
+						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Entries</span>
 					</div>
 				</div>
 
-				<button class="toggle-entries" onclick={toggleEntries}>
+				<button class="btn btn-ghost btn-xs text-primary font-medium gap-1" onclick={toggleEntries}>
 					{entriesExpanded ? 'Hide' : 'Show'} time entries
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class:rotated={entriesExpanded}><path d="M6 9l6 6 6-6"/></svg>
+					<svg class="[&.rotated]:rotate-180 transition-transform" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class:rotated={entriesExpanded}><path d="M6 9l6 6 6-6"/></svg>
 				</button>
 
 				{#if entriesExpanded}
 					{#if entriesLoading}
-						<p class="muted">Loading entries...</p>
+						<p class="text-base-content/40 text-sm">Loading entries...</p>
 					{:else if entries.length === 0}
-						<p class="muted">No entries this week.</p>
+						<p class="text-base-content/40 text-sm">No entries this week.</p>
 					{:else}
-						<div class="entries-list">
+						<div class="mt-3 flex flex-col gap-1.5">
 							{#each entries as entry}
-								<div class="entry-row">
-									<span class="entry-date">{formatDateShort(entry.startTime!)}</span>
-									<span class="entry-time">
+								<div class="flex items-center gap-3 text-sm py-1.5 px-2 bg-base-200/30 rounded-md border border-base-200">
+									<span class="text-base-content/60 min-w-[56px] text-xs">{formatDateShort(entry.startTime!)}</span>
+									<span class="text-base-content/70 min-w-[100px]">
 										{formatTime(entry.startTime!)}{entry.endTime ? ` – ${formatTime(entry.endTime)}` : ''}
 									</span>
-									<span class="entry-desc">{entry.description || ''}</span>
-									<span class="entry-dur">
+									<span class="text-base-content/40 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{entry.description || ''}</span>
+									<span class="font-semibold text-base-content/70 min-w-[56px] text-right">
 										{entry.isRunning ? 'Running' : formatDuration(entry.netDurationMinutes ?? entry.durationMinutes ?? 0)}
 									</span>
 									{#if (entry.pauseDurationMinutes ?? 0) > 0}
-										<span class="entry-pause">-{entry.pauseDurationMinutes}m</span>
+										<span class="badge badge-warning badge-xs">-{entry.pauseDurationMinutes}m</span>
 									{/if}
 								</div>
 							{/each}
@@ -524,103 +524,103 @@
 					{/if}
 				{/if}
 			{:else}
-				<p class="muted">No time data available for this week.</p>
+				<p class="text-base-content/40 text-sm">No time data available for this week.</p>
 			{/if}
 		</section>
 
 		<!-- ═══ Cumulative Summary ═══ -->
-		<section class="card cumulative-card">
-			<div class="card-header">
-				<h2>
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+		<section class="card bg-base-100 border border-base-300 p-5 mb-5 bg-gradient-to-br from-base-100 to-base-200/50">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-base font-bold text-base-content flex items-center gap-2 m-0">
+					<svg class="text-base-content/60" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
 					Cumulative Summary
 				</h2>
 			</div>
 
 			{#if allTimeLoading}
-				<p class="muted">Calculating...</p>
+				<p class="text-base-content/40 text-sm">Calculating...</p>
 			{:else if allTimeOverview}
 				{@const initialOTMinutes = (schedule?.initialOvertimeHours ?? 0) * 60}
 				{@const startDate = firstEntryDate ?? (member?.joinedAt ? new Date(member.joinedAt) : new Date())}
 				{@const weeksWorked = Math.max(1, (Date.now() - startDate.getTime()) / (7 * 24 * 60 * 60 * 1000))}
 				{@const expectedMinutes = (allTimeOverview.weeklyWorkHours ?? 0) * 60 * weeksWorked}
 				{@const cumulativeOT = (allTimeOverview.netTrackedMinutes ?? 0) - expectedMinutes + initialOTMinutes}
-				<div class="stats-grid">
-					<div class="stat-card stat-highlight {cumulativeOT >= 0 ? 'stat-positive' : 'stat-negative'}">
-						<span class="stat-value">{cumulativeOT >= 0 ? '+' : ''}{formatHoursDecimal(Math.abs(cumulativeOT))}</span>
-						<span class="stat-label">Cumulative Overtime</span>
+				<div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4">
+					<div class="bg-base-200/50 border rounded-lg p-3 text-center border-2 {cumulativeOT >= 0 ? 'border-success/40 bg-success/5' : 'border-error/40 bg-error/5'}">
+						<span class="block text-xl font-bold {cumulativeOT >= 0 ? 'text-success' : 'text-error'}">{cumulativeOT >= 0 ? '+' : ''}{formatHoursDecimal(Math.abs(cumulativeOT))}</span>
+						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Cumulative Overtime</span>
 					</div>
-					<div class="stat-card">
-						<span class="stat-value">{formatHoursDecimal(allTimeOverview.netTrackedMinutes)}</span>
-						<span class="stat-label">All-Time Net Tracked</span>
+					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
+						<span class="block text-xl font-bold text-base-content">{formatHoursDecimal(allTimeOverview.netTrackedMinutes)}</span>
+						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">All-Time Net Tracked</span>
 					</div>
-					<div class="stat-card">
-						<span class="stat-value">{allTimeOverview.entryCount}</span>
-						<span class="stat-label">Total Entries</span>
+					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
+						<span class="block text-xl font-bold text-base-content">{allTimeOverview.entryCount}</span>
+						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Total Entries</span>
 					</div>
-					<div class="stat-card">
-						<span class="stat-value">{schedule?.initialOvertimeHours ?? 0}h</span>
-						<span class="stat-label">Initial Overtime</span>
+					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
+						<span class="block text-xl font-bold text-base-content">{schedule?.initialOvertimeHours ?? 0}h</span>
+						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Initial Overtime</span>
 					</div>
 				</div>
 			{:else}
-				<p class="muted">No cumulative data available.</p>
+				<p class="text-base-content/40 text-sm">No cumulative data available.</p>
 			{/if}
 		</section>
 		{/if}
 
 		<!-- ═══ Absences ═══ -->
 		{#if isSelf || canEdit}
-		<section class="card">
-			<div class="card-header">
-				<h2>
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+		<section class="card bg-base-100 border border-base-300 p-5 mb-5">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-base font-bold text-base-content flex items-center gap-2 m-0">
+					<svg class="text-base-content/60" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
 					Absences
 				</h2>
 				{#if canEdit}
-					<button class="btn-sm" onclick={() => showAddAbsence = !showAddAbsence}>
+					<button class="btn btn-ghost btn-sm" onclick={() => showAddAbsence = !showAddAbsence}>
 						{showAddAbsence ? 'Cancel' : '+ Add'}
 					</button>
 				{/if}
 			</div>
 
 			{#if showAddAbsence && canEdit}
-				<div class="form-inline">
-					<div class="date-range-inputs">
-						<label class="date-label">From</label>
-						<input type="date" bind:value={absenceFromDate} class="input-sm" />
-						<label class="date-label">To</label>
-						<input type="date" bind:value={absenceToDate} class="input-sm" placeholder="Same day" />
+				<div class="flex items-center gap-2 flex-wrap mb-3">
+					<div class="flex items-center gap-1.5">
+						<label class="text-xs text-base-content/60 font-medium">From</label>
+						<input type="date" bind:value={absenceFromDate} class="input input-bordered input-sm" />
+						<label class="text-xs text-base-content/60 font-medium">To</label>
+						<input type="date" bind:value={absenceToDate} class="input input-bordered input-sm" placeholder="Same day" />
 					</div>
-					<select bind:value={absenceType} class="input-sm">
+					<select bind:value={absenceType} class="select select-bordered select-sm">
 						<option value={0}>Sick Day</option>
 						<option value={1}>Vacation</option>
 						<option value={2}>Other</option>
 					</select>
-					<input type="text" bind:value={absenceNote} placeholder="Note (optional)" class="input-sm input-grow" />
-					<button class="btn-primary-sm" onclick={addAbsence} disabled={absenceSaving || !absenceFromDate}>
+					<input type="text" bind:value={absenceNote} placeholder="Note (optional)" class="input input-bordered input-sm flex-1" />
+					<button class="btn btn-primary btn-sm" onclick={addAbsence} disabled={absenceSaving || !absenceFromDate}>
 						{absenceSaving ? 'Saving...' : 'Add'}
 					</button>
 				</div>
-				<p class="hint">Only workdays (Mon–Fri) will be counted.</p>
-				{#if absenceError}<p class="error-inline">{absenceError}</p>{/if}
+				<p class="text-xs text-base-content/40 -mt-1 mb-2 italic">Only workdays (Mon–Fri) will be counted.</p>
+				{#if absenceError}<p class="text-error text-sm mt-1">{absenceError}</p>{/if}
 			{/if}
 
 			{#if absencesLoading}
-				<p class="muted">Loading absences...</p>
+				<p class="text-base-content/40 text-sm">Loading absences...</p>
 			{:else if absences.length === 0}
-				<p class="muted">No absences recorded.</p>
+				<p class="text-base-content/40 text-sm">No absences recorded.</p>
 			{:else}
-				<div class="absence-list">
+				<div class="flex flex-col gap-1.5">
 					{#each absences as absence}
-						<div class="absence-row">
-							<span class="absence-date">{formatDateFull(absence.date!)}</span>
-							<span class="absence-type {absenceTypeBadge(absence.type)}">{absenceTypeLabel(absence.type)}</span>
+						<div class="flex items-center gap-3 py-2 px-2.5 bg-base-200/30 rounded-md border border-base-200 text-sm">
+							<span class="font-medium text-base-content/70 min-w-[100px]">{formatDateFull(absence.date!)}</span>
+							<span class="badge badge-sm {absenceTypeBadge(absence.type) === 'badge-sick' ? 'badge-error' : absenceTypeBadge(absence.type) === 'badge-vacation' ? 'badge-info' : 'badge-accent'}">{absenceTypeLabel(absence.type)}</span>
 							{#if absence.note}
-								<span class="absence-note">{absence.note}</span>
+								<span class="text-base-content/40 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs">{absence.note}</span>
 							{/if}
 							{#if canEdit}
-								<button class="btn-icon-danger" onclick={() => deleteAbsence(absence.id!)} title="Delete">
+								<button class="btn btn-ghost btn-xs text-base-content/30 hover:text-error" onclick={() => deleteAbsence(absence.id!)} title="Delete">
 									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
 								</button>
 							{/if}
@@ -632,57 +632,57 @@
 		{/if}
 
 		<!-- ═══ Work Schedule ═══ -->
-		<section class="card">
-			<div class="card-header">
-				<h2>
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+		<section class="card bg-base-100 border border-base-300 p-5 mb-5">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-base font-bold text-base-content flex items-center gap-2 m-0">
+					<svg class="text-base-content/60" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
 					Work Schedule
 				</h2>
 				{#if canEdit && !editingSchedule}
-					<button class="btn-sm" onclick={startEditSchedule}>Edit</button>
+					<button class="btn btn-ghost btn-sm" onclick={startEditSchedule}>Edit</button>
 				{/if}
 			</div>
 
 			{#if scheduleLoading}
-				<p class="muted">Loading schedule...</p>
+				<p class="text-base-content/40 text-sm">Loading schedule...</p>
 			{:else if editingSchedule}
-				<div class="schedule-form">
-					<div class="form-row">
-						<label>Weekly Hours</label>
-						<input type="number" bind:value={schedWeeklyHours} min="0" max="80" step="0.5" class="input-sm" />
+				<div class="flex flex-col gap-3">
+					<div class="flex items-center gap-2">
+						<label class="text-sm text-base-content/70 font-medium">Weekly Hours</label>
+						<input type="number" bind:value={schedWeeklyHours} min="0" max="80" step="0.5" class="input input-bordered input-sm" />
 					</div>
-					<div class="form-row">
-						<label>
+					<div class="flex items-center gap-2">
+						<label class="text-sm text-base-content/70 font-medium">
 							<input type="checkbox" bind:checked={schedDistribute} />
 							Distribute evenly (Mon–Fri)
 						</label>
 					</div>
 					{#if !schedDistribute}
-						<div class="day-grid">
-							<div class="day-input"><label>Mon</label><input type="number" bind:value={schedMon} min="0" max="24" step="0.5" class="input-sm" /></div>
-							<div class="day-input"><label>Tue</label><input type="number" bind:value={schedTue} min="0" max="24" step="0.5" class="input-sm" /></div>
-							<div class="day-input"><label>Wed</label><input type="number" bind:value={schedWed} min="0" max="24" step="0.5" class="input-sm" /></div>
-							<div class="day-input"><label>Thu</label><input type="number" bind:value={schedThu} min="0" max="24" step="0.5" class="input-sm" /></div>
-							<div class="day-input"><label>Fri</label><input type="number" bind:value={schedFri} min="0" max="24" step="0.5" class="input-sm" /></div>
+						<div class="grid grid-cols-5 gap-2">
+							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Mon</label><input type="number" bind:value={schedMon} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Tue</label><input type="number" bind:value={schedTue} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Wed</label><input type="number" bind:value={schedWed} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Thu</label><input type="number" bind:value={schedThu} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Fri</label><input type="number" bind:value={schedFri} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
 						</div>
 					{/if}
-					{#if scheduleError}<p class="error-inline">{scheduleError}</p>{/if}
-					<div class="form-actions">
-						<button class="btn-primary-sm" onclick={saveSchedule} disabled={scheduleSaving}>
+					{#if scheduleError}<p class="text-error text-sm mt-1">{scheduleError}</p>{/if}
+					<div class="flex gap-2">
+						<button class="btn btn-primary btn-sm" onclick={saveSchedule} disabled={scheduleSaving}>
 							{scheduleSaving ? 'Saving...' : 'Save'}
 						</button>
-						<button class="btn-sm" onclick={() => editingSchedule = false}>Cancel</button>
+						<button class="btn btn-ghost btn-sm" onclick={() => editingSchedule = false}>Cancel</button>
 					</div>
 				</div>
 			{:else if schedule}
-				<div class="schedule-display">
-					<div class="sched-row">
-						<span class="sched-label">Weekly Hours</span>
-						<span class="sched-value">{schedule.weeklyWorkHours ?? '-'}h</span>
+				<div class="flex flex-col gap-3">
+					<div class="flex items-start gap-4">
+						<span class="text-sm text-base-content/60 min-w-[110px] font-medium">Weekly Hours</span>
+						<span class="text-sm text-base-content font-semibold">{schedule.weeklyWorkHours ?? '-'}h</span>
 					</div>
-					<div class="sched-row">
-						<span class="sched-label">Daily Targets</span>
-						<span class="sched-value days">
+					<div class="flex items-start gap-4">
+						<span class="text-sm text-base-content/60 min-w-[110px] font-medium">Daily Targets</span>
+						<span class="flex gap-3 flex-wrap font-medium text-sm text-base-content/70">
 							<span>Mon {schedule.targetMon ?? 0}h</span>
 							<span>Tue {schedule.targetTue ?? 0}h</span>
 							<span>Wed {schedule.targetWed ?? 0}h</span>
@@ -692,85 +692,85 @@
 					</div>
 				</div>
 			{:else}
-				<p class="muted">No schedule configured.</p>
+				<p class="text-base-content/40 text-sm">No schedule configured.</p>
 			{/if}
 		</section>
 
 		<!-- ═══ Initial Overtime ═══ -->
-		<section class="card">
-			<div class="card-header">
-				<h2>
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+		<section class="card bg-base-100 border border-base-300 p-5 mb-5">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-base font-bold text-base-content flex items-center gap-2 m-0">
+					<svg class="text-base-content/60" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
 					Initial Overtime
 				</h2>
 				{#if canEdit && !editingOvertime}
-					<button class="btn-sm" onclick={() => editingOvertime = true}>Edit</button>
+					<button class="btn btn-ghost btn-sm" onclick={() => editingOvertime = true}>Edit</button>
 				{/if}
 			</div>
 
 			{#if editingOvertime}
-				<div class="form-inline">
-					<input type="number" bind:value={overtimeHours} step="0.5" class="input-sm" style="width: 100px;" />
-					<span class="muted">hours</span>
-					<button class="btn-primary-sm" onclick={saveOvertime} disabled={overtimeSaving}>
+				<div class="flex items-center gap-2 flex-wrap mb-3">
+					<input type="number" bind:value={overtimeHours} step="0.5" class="input input-bordered input-sm" style="width: 100px;" />
+					<span class="text-base-content/40 text-sm">hours</span>
+					<button class="btn btn-primary btn-sm" onclick={saveOvertime} disabled={overtimeSaving}>
 						{overtimeSaving ? 'Saving...' : 'Save'}
 					</button>
-					<button class="btn-sm" onclick={() => editingOvertime = false}>Cancel</button>
+					<button class="btn btn-ghost btn-sm" onclick={() => editingOvertime = false}>Cancel</button>
 				</div>
 			{:else}
-				<p class="overtime-value">{schedule?.initialOvertimeHours ?? 0}h</p>
-				<p class="muted" style="font-size: 0.75rem;">Carry-over overtime from before time tracking started.</p>
+				<p class="text-2xl font-bold text-base-content mb-1">{schedule?.initialOvertimeHours ?? 0}h</p>
+				<p class="text-base-content/40 text-sm" style="font-size: 0.75rem;">Carry-over overtime from before time tracking started.</p>
 			{/if}
 		</section>
 
 		<!-- ═══ Schedule Periods ═══ -->
-		<section class="card">
-			<div class="card-header">
-				<h2>
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/></svg>
+		<section class="card bg-base-100 border border-base-300 p-5 mb-5">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-base font-bold text-base-content flex items-center gap-2 m-0">
+					<svg class="text-base-content/60" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/></svg>
 					Schedule Periods
 				</h2>
 				{#if canEdit}
-					<button class="btn-sm" onclick={() => showAddPeriod = !showAddPeriod}>
+					<button class="btn btn-ghost btn-sm" onclick={() => showAddPeriod = !showAddPeriod}>
 						{showAddPeriod ? 'Cancel' : '+ Add'}
 					</button>
 				{/if}
 			</div>
 
 			{#if showAddPeriod && canEdit}
-				<div class="period-form">
-					<div class="form-row-pair">
-						<div class="form-row">
-							<label>Valid From</label>
-							<input type="date" bind:value={periodFrom} class="input-sm" />
+				<div class="flex flex-col gap-3 mb-4 pb-4 border-b border-base-200">
+					<div class="grid grid-cols-2 gap-3">
+						<div class="flex items-center gap-2">
+							<label class="text-sm text-base-content/70 font-medium">Valid From</label>
+							<input type="date" bind:value={periodFrom} class="input input-bordered input-sm" />
 						</div>
-						<div class="form-row">
-							<label>Valid To (optional)</label>
-							<input type="date" bind:value={periodTo} class="input-sm" />
+						<div class="flex items-center gap-2">
+							<label class="text-sm text-base-content/70 font-medium">Valid To (optional)</label>
+							<input type="date" bind:value={periodTo} class="input input-bordered input-sm" />
 						</div>
 					</div>
-					<div class="form-row">
-						<label>Weekly Hours</label>
-						<input type="number" bind:value={periodWeekly} min="0" max="80" step="0.5" class="input-sm" style="width: 120px;" />
+					<div class="flex items-center gap-2">
+						<label class="text-sm text-base-content/70 font-medium">Weekly Hours</label>
+						<input type="number" bind:value={periodWeekly} min="0" max="80" step="0.5" class="input input-bordered input-sm" style="width: 120px;" />
 					</div>
-					<div class="form-row">
-						<label>
+					<div class="flex items-center gap-2">
+						<label class="text-sm text-base-content/70 font-medium">
 							<input type="checkbox" bind:checked={periodDistribute} />
 							Distribute evenly
 						</label>
 					</div>
 					{#if !periodDistribute}
-						<div class="day-grid">
-							<div class="day-input"><label>Mon</label><input type="number" bind:value={periodMon} min="0" max="24" step="0.5" class="input-sm" /></div>
-							<div class="day-input"><label>Tue</label><input type="number" bind:value={periodTue} min="0" max="24" step="0.5" class="input-sm" /></div>
-							<div class="day-input"><label>Wed</label><input type="number" bind:value={periodWed} min="0" max="24" step="0.5" class="input-sm" /></div>
-							<div class="day-input"><label>Thu</label><input type="number" bind:value={periodThu} min="0" max="24" step="0.5" class="input-sm" /></div>
-							<div class="day-input"><label>Fri</label><input type="number" bind:value={periodFri} min="0" max="24" step="0.5" class="input-sm" /></div>
+						<div class="grid grid-cols-5 gap-2">
+							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Mon</label><input type="number" bind:value={periodMon} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Tue</label><input type="number" bind:value={periodTue} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Wed</label><input type="number" bind:value={periodWed} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Thu</label><input type="number" bind:value={periodThu} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Fri</label><input type="number" bind:value={periodFri} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
 						</div>
 					{/if}
-					{#if periodError}<p class="error-inline">{periodError}</p>{/if}
-					<div class="form-actions">
-						<button class="btn-primary-sm" onclick={addPeriod} disabled={periodSaving || !periodFrom}>
+					{#if periodError}<p class="text-error text-sm mt-1">{periodError}</p>{/if}
+					<div class="flex gap-2">
+						<button class="btn btn-primary btn-sm" onclick={addPeriod} disabled={periodSaving || !periodFrom}>
 							{periodSaving ? 'Saving...' : 'Add Period'}
 						</button>
 					</div>
@@ -778,21 +778,21 @@
 			{/if}
 
 			{#if periodsLoading}
-				<p class="muted">Loading periods...</p>
+				<p class="text-base-content/40 text-sm">Loading periods...</p>
 			{:else if periods.length === 0}
-				<p class="muted">No schedule periods defined.</p>
+				<p class="text-base-content/40 text-sm">No schedule periods defined.</p>
 			{:else}
-				<div class="periods-list">
+				<div class="flex flex-col gap-1.5">
 					{#each periods as period}
-						<div class="period-row">
-							<div class="period-dates">
-								<span class="period-from">{formatDateFull(period.validFrom!)}</span>
-								<span class="period-arrow">→</span>
-								<span class="period-to">{period.validTo ? formatDateFull(period.validTo) : 'Ongoing'}</span>
+						<div class="flex items-center gap-3 py-2 px-2.5 bg-base-200/30 rounded-md border border-base-200 text-sm">
+							<div class="flex items-center gap-1.5 flex-1">
+								<span class="font-medium text-base-content/70">{formatDateFull(period.validFrom!)}</span>
+								<span class="text-base-content/40 text-xs">→</span>
+								<span class="font-medium text-base-content/70">{period.validTo ? formatDateFull(period.validTo) : 'Ongoing'}</span>
 							</div>
-							<span class="period-hours">{period.weeklyWorkHours ?? '-'}h/week</span>
+							<span class="font-semibold text-base-content min-w-[65px] text-right">{period.weeklyWorkHours ?? '-'}h/week</span>
 							{#if canEdit}
-								<button class="btn-icon-danger" onclick={() => deletePeriod(period.id!)} title="Delete">
+								<button class="btn btn-ghost btn-xs text-base-content/30 hover:text-error" onclick={() => deletePeriod(period.id!)} title="Delete">
 									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
 								</button>
 							{/if}
@@ -803,605 +803,3 @@
 		</section>
 	{/if}
 </div>
-
-<style>
-	.page {
-		max-width: 800px;
-		margin: 0 auto;
-		padding: 2rem 1.5rem;
-	}
-
-	/* Back link */
-	.back-link {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.375rem;
-		color: #6b7280;
-		text-decoration: none;
-		font-size: 0.875rem;
-		margin-bottom: 1.5rem;
-		transition: color 0.15s;
-	}
-	.back-link:hover { color: #3b82f6; }
-
-	/* Loading */
-	.loading-container {
-		text-align: center;
-		padding: 3rem 0;
-	}
-
-	.spinner {
-		width: 32px;
-		height: 32px;
-		border: 3px solid #e5e7eb;
-		border-top-color: #3b82f6;
-		border-radius: 50%;
-		animation: spin 0.6s linear infinite;
-		margin: 0 auto 1rem;
-	}
-	@keyframes spin { to { transform: rotate(360deg); } }
-
-	.muted { color: #9ca3af; font-size: 0.875rem; }
-
-	.error-msg {
-		color: #dc2626;
-		background: #fef2f2;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
-		border-left: 3px solid #dc2626;
-		margin-bottom: 1rem;
-		font-size: 0.875rem;
-	}
-
-	.error-inline {
-		color: #dc2626;
-		font-size: 0.8125rem;
-		margin: 0.25rem 0 0;
-	}
-
-	/* ═══ Member Header ═══ */
-	.member-header {
-		display: flex;
-		align-items: center;
-		gap: 1.25rem;
-		margin-bottom: 2rem;
-		padding-bottom: 1.5rem;
-		border-bottom: 1px solid #e5e7eb;
-	}
-
-	.member-avatar {
-		width: 64px;
-		height: 64px;
-		border-radius: 50%;
-		background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-		color: white;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 1.375rem;
-		font-weight: 700;
-		flex-shrink: 0;
-	}
-
-	.member-info { flex: 1; }
-	.member-info h1 {
-		margin: 0;
-		font-size: 1.5rem;
-		color: #1a1a2e;
-		font-weight: 700;
-	}
-
-	.member-email {
-		color: #6b7280;
-		font-size: 0.875rem;
-		margin: 0.125rem 0 0.5rem;
-	}
-
-	.member-meta {
-		display: flex;
-		align-items: center;
-		gap: 0.625rem;
-		flex-wrap: wrap;
-	}
-
-	.role-badge {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		padding: 0.125rem 0.5rem;
-		border-radius: 999px;
-		text-transform: uppercase;
-		letter-spacing: 0.03em;
-	}
-	.role-owner { background: #fef3c7; color: #92400e; }
-	.role-admin { background: #dbeafe; color: #1e40af; }
-	.role-member { background: #f3f4f6; color: #4b5563; }
-
-	.joined {
-		color: #9ca3af;
-		font-size: 0.75rem;
-	}
-
-	.you-badge {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		padding: 0.125rem 0.5rem;
-		border-radius: 999px;
-		background: #dcfce7;
-		color: #16a34a;
-	}
-
-	.member-actions {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-shrink: 0;
-	}
-
-	.role-select {
-		font-size: 0.8125rem;
-		padding: 0.375rem 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		background: white;
-		color: #374151;
-	}
-
-	/* ═══ Cards ═══ */
-	.card {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		padding: 1.25rem 1.5rem;
-		margin-bottom: 1.25rem;
-	}
-
-	.card-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin-bottom: 1rem;
-	}
-
-	.card-header h2 {
-		margin: 0;
-		font-size: 1rem;
-		font-weight: 700;
-		color: #1a1a2e;
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.card-header h2 svg { color: #6b7280; }
-
-	/* ═══ Week Navigation ═══ */
-	.week-nav {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 1rem;
-		margin-bottom: 1rem;
-	}
-
-	.week-btn {
-		background: none;
-		border: 1px solid #e5e7eb;
-		width: 30px;
-		height: 30px;
-		border-radius: 6px;
-		font-size: 1.125rem;
-		cursor: pointer;
-		color: #374151;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-	.week-btn:hover:not(:disabled) { background: #f3f4f6; }
-	.week-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-	.week-label {
-		font-weight: 600;
-		font-size: 0.9375rem;
-		color: #1a1a2e;
-	}
-
-	/* ═══ Stats Grid ═══ */
-	.stats-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-		gap: 0.75rem;
-		margin-bottom: 1rem;
-	}
-
-	.stat-card {
-		background: #f9fafb;
-		border: 1px solid #f3f4f6;
-		border-radius: 8px;
-		padding: 0.75rem;
-		text-align: center;
-	}
-
-	.stat-value {
-		display: block;
-		font-size: 1.25rem;
-		font-weight: 700;
-		color: #1a1a2e;
-	}
-
-	.stat-label {
-		display: block;
-		font-size: 0.6875rem;
-		color: #9ca3af;
-		margin-top: 0.125rem;
-		text-transform: uppercase;
-		letter-spacing: 0.03em;
-	}
-
-	.stat-positive .stat-value { color: #16a34a; }
-	.stat-negative .stat-value { color: #dc2626; }
-
-	.stat-highlight {
-		border: 2px solid;
-	}
-	.stat-highlight.stat-positive { border-color: #bbf7d0; background: #f0fdf4; }
-	.stat-highlight.stat-negative { border-color: #fecaca; background: #fef2f2; }
-
-	.cumulative-card {
-		background: linear-gradient(135deg, #fafbff 0%, #f8fafc 100%);
-	}
-
-	/* ═══ Toggle entries ═══ */
-	.toggle-entries {
-		background: none;
-		border: none;
-		color: #3b82f6;
-		font-size: 0.8125rem;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		padding: 0;
-		font-weight: 500;
-	}
-	.toggle-entries:hover { color: #2563eb; }
-	.toggle-entries svg { transition: transform 0.2s; }
-	.toggle-entries .rotated { transform: rotate(180deg); }
-
-	/* ═══ Entries list ═══ */
-	.entries-list {
-		margin-top: 0.75rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.375rem;
-	}
-
-	.entry-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		font-size: 0.8125rem;
-		padding: 0.375rem 0.5rem;
-		background: #f9fafb;
-		border-radius: 6px;
-		border: 1px solid #f3f4f6;
-	}
-
-	.entry-date {
-		color: #6b7280;
-		min-width: 56px;
-		font-size: 0.75rem;
-	}
-
-	.entry-time {
-		color: #374151;
-		min-width: 100px;
-	}
-
-	.entry-desc {
-		color: #9ca3af;
-		flex: 1;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.entry-dur {
-		font-weight: 600;
-		color: #374151;
-		min-width: 56px;
-		text-align: right;
-	}
-
-	.entry-pause {
-		font-size: 0.6875rem;
-		color: #c2410c;
-		background: #fff7ed;
-		padding: 0 0.375rem;
-		border-radius: 999px;
-	}
-
-	/* ═══ Absences ═══ */
-	.absence-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.375rem;
-	}
-
-	.absence-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.5rem 0.625rem;
-		background: #f9fafb;
-		border-radius: 6px;
-		border: 1px solid #f3f4f6;
-		font-size: 0.8125rem;
-	}
-
-	.absence-date {
-		font-weight: 500;
-		color: #374151;
-		min-width: 100px;
-	}
-
-	.absence-type {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		padding: 0.125rem 0.5rem;
-		border-radius: 999px;
-	}
-
-	.badge-sick { background: #fef2f2; color: #dc2626; }
-	.badge-vacation { background: #eff6ff; color: #2563eb; }
-	.badge-other { background: #f5f3ff; color: #7c3aed; }
-
-	.absence-note {
-		color: #9ca3af;
-		flex: 1;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		font-size: 0.75rem;
-	}
-
-	/* ═══ Schedule display ═══ */
-	.schedule-display {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	.sched-row {
-		display: flex;
-		align-items: flex-start;
-		gap: 1rem;
-	}
-
-	.sched-label {
-		font-size: 0.8125rem;
-		color: #6b7280;
-		min-width: 110px;
-		font-weight: 500;
-	}
-
-	.sched-value {
-		font-size: 0.875rem;
-		color: #1a1a2e;
-		font-weight: 600;
-	}
-
-	.sched-value.days {
-		display: flex;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-		font-weight: 500;
-		font-size: 0.8125rem;
-		color: #374151;
-	}
-
-	/* ═══ Schedule form ═══ */
-	.schedule-form {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	.day-grid {
-		display: grid;
-		grid-template-columns: repeat(5, 1fr);
-		gap: 0.5rem;
-	}
-
-	.day-input {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.day-input label {
-		font-size: 0.6875rem;
-		color: #6b7280;
-		font-weight: 600;
-		text-transform: uppercase;
-	}
-
-	/* ═══ Form shared ═══ */
-	.form-inline {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-		margin-bottom: 0.75rem;
-	}
-
-	.date-range-inputs {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-	}
-
-	.date-label {
-		font-size: 0.75rem;
-		color: #6b7280;
-		font-weight: 500;
-	}
-
-	.hint {
-		font-size: 0.6875rem;
-		color: #9ca3af;
-		margin: -0.25rem 0 0.5rem;
-		font-style: italic;
-	}
-
-	.form-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.form-row label {
-		font-size: 0.8125rem;
-		color: #374151;
-		font-weight: 500;
-	}
-
-	.form-row-pair {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.75rem;
-	}
-
-	.form-actions {
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.input-sm {
-		font-size: 0.8125rem;
-		padding: 0.375rem 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		background: white;
-		color: #374151;
-	}
-	.input-sm:focus {
-		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
-	}
-
-	.input-grow { flex: 1; }
-
-	/* ═══ Buttons ═══ */
-	.btn-sm {
-		font-size: 0.8125rem;
-		padding: 0.375rem 0.75rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		background: white;
-		color: #374151;
-		cursor: pointer;
-		font-weight: 500;
-		transition: all 0.15s;
-	}
-	.btn-sm:hover { background: #f3f4f6; border-color: #9ca3af; }
-
-	.btn-primary-sm {
-		font-size: 0.8125rem;
-		padding: 0.375rem 0.75rem;
-		border: none;
-		border-radius: 6px;
-		background: #3b82f6;
-		color: white;
-		cursor: pointer;
-		font-weight: 500;
-		transition: background 0.15s;
-	}
-	.btn-primary-sm:hover { background: #2563eb; }
-	.btn-primary-sm:disabled { opacity: 0.5; cursor: not-allowed; }
-
-	.btn-danger-sm {
-		font-size: 0.75rem;
-		padding: 0.25rem 0.625rem;
-		border: 1px solid #fca5a5;
-		border-radius: 6px;
-		background: #fef2f2;
-		color: #dc2626;
-		cursor: pointer;
-		font-weight: 600;
-		transition: all 0.15s;
-	}
-	.btn-danger-sm:hover { background: #fee2e2; border-color: #f87171; }
-
-	.btn-icon-danger {
-		background: none;
-		border: none;
-		color: #d1d5db;
-		cursor: pointer;
-		padding: 0.25rem;
-		border-radius: 4px;
-		display: flex;
-		align-items: center;
-		transition: color 0.15s;
-	}
-	.btn-icon-danger:hover { color: #dc2626; }
-
-	/* ═══ Periods ═══ */
-	.period-form {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		margin-bottom: 1rem;
-		padding-bottom: 1rem;
-		border-bottom: 1px solid #f3f4f6;
-	}
-
-	.periods-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.375rem;
-	}
-
-	.period-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.5rem 0.625rem;
-		background: #f9fafb;
-		border-radius: 6px;
-		border: 1px solid #f3f4f6;
-		font-size: 0.8125rem;
-	}
-
-	.period-dates {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		flex: 1;
-	}
-
-	.period-from, .period-to {
-		font-weight: 500;
-		color: #374151;
-	}
-
-	.period-arrow {
-		color: #9ca3af;
-		font-size: 0.75rem;
-	}
-
-	.period-hours {
-		font-weight: 600;
-		color: #1a1a2e;
-		min-width: 65px;
-		text-align: right;
-	}
-
-	/* ═══ Overtime ═══ */
-	.overtime-value {
-		font-size: 1.5rem;
-		font-weight: 700;
-		color: #1a1a2e;
-		margin: 0 0 0.25rem;
-	}
-</style>

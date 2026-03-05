@@ -429,53 +429,53 @@
 	<title>Timer - Time Tracking</title>
 </svelte:head>
 
-<div class="page">
+<div class="max-w-3xl mx-auto p-6">
 	{#if loading}
-		<p class="muted">Loading...</p>
+		<p class="text-base-content/50">Loading...</p>
 	{:else}
 		{#if actionError}
-			<div class="error-banner">{actionError}
-				<button class="dismiss" onclick={() => (actionError = '')}>&times;</button>
+			<div class="alert alert-error mb-4 text-sm">{actionError}
+				<button class="btn btn-ghost btn-sm text-error text-xl" onclick={() => (actionError = '')}>&times;</button>
 			</div>
 		{/if}
 
 		<!-- Timer card -->
-		<div class="timer-card" class:running={!!current}>
-			<div class="timer-display">{elapsed}</div>
+		<div class="card bg-base-100 border-2 {current ? 'border-success shadow-[0_0_0_4px] shadow-success/10' : 'border-base-300'} p-8 mb-8 text-center transition-colors">
+			<div class="text-6xl font-bold tabular-nums {current ? 'text-success' : 'text-base-content'} mb-2 tracking-wider">{elapsed}</div>
 
 			{#if orgContext.selectedOrg}
-				<div class="timer-org-label">Tracking for <strong>{orgContext.selectedOrg.name}</strong></div>
+				<div class="text-sm text-base-content/70 mb-5">Tracking for <strong>{orgContext.selectedOrg.name}</strong></div>
 			{:else}
-				<div class="timer-org-label muted-label">Personal (no organization)</div>
+				<div class="text-sm text-base-content/40 mb-5">Personal (no organization)</div>
 			{/if}
 
-			<div class="timer-actions">
+			<div class="mb-4">
 				{#if current}
-					<button class="btn-stop" onclick={handleStop} disabled={stopping}>
+					<button class="btn btn-error btn-lg min-w-40 text-lg font-bold" onclick={handleStop} disabled={stopping}>
 						{stopping ? 'Stopping...' : 'Stop'}
 					</button>
 				{:else}
-					<button class="btn-start" onclick={handleStart} disabled={starting}>
+					<button class="btn btn-success btn-lg min-w-40 text-lg font-bold" onclick={handleStart} disabled={starting}>
 						{starting ? 'Starting...' : 'Start'}
 					</button>
 				{/if}
 			</div>
 
-			<div class="note-wrapper">
+			<div class="relative w-full max-w-[360px] mx-auto">
 				<input
 					type="text"
 					bind:value={note}
 					placeholder="Optional note..."
-					class="note-input"
+					class="input input-bordered input-sm w-full text-center bg-base-200/50 text-base-content/60"
 					disabled={stopping}
 					onfocus={() => showNoteSuggestions = true}
 					onblur={() => setTimeout(() => showNoteSuggestions = false, 200)}
 				/>
 				{#if showNoteSuggestions && previousDescriptions().length > 0}
-					<div class="note-suggestions">
+					<div class="absolute top-full left-0 right-0 bg-base-100 border border-base-300 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto mt-0.5">
 						{#each previousDescriptions() as desc}
 							<button
-								class="note-suggestion"
+								class="block w-full py-2 px-3 border-none bg-transparent text-left text-sm text-base-content/70 cursor-pointer hover:bg-base-200 border-t border-t-base-200 first:border-t-0"
 								onmousedown={() => { note = desc; showNoteSuggestions = false; }}
 							>{desc}</button>
 						{/each}
@@ -485,51 +485,51 @@
 		</div>
 
 		<!-- Weekly summary -->
-		<section class="week-section">
-			<div class="week-header">
-				<button class="week-nav" onclick={() => changeWeek(-1)}>&lsaquo;</button>
-				<div class="week-title">
-					<span class="week-label">{formatWeekLabel(weekRange)}</span>
-					<span class="week-total">
+		<section class="card bg-base-100 border border-base-300 p-5 mb-8">
+			<div class="flex items-center justify-between mb-4">
+				<button class="btn btn-ghost btn-sm btn-square text-xl" onclick={() => changeWeek(-1)}>&lsaquo;</button>
+				<div class="text-center">
+					<span class="block font-semibold text-base text-base-content">{formatWeekLabel(weekRange)}</span>
+					<span class="block text-sm text-base-content/60 mt-0.5">
 						{formatHoursDecimal(weekTotal)}{#if weekTargetFull > 0} / {formatHoursDecimal(weekTargetFull)}{/if}
 						{#if weekTargetSoFar > 0}
 							{@const weekDelta = weekTotal - weekTargetSoFar}
-							<span class="week-delta" class:positive={weekDelta > 0} class:negative={weekDelta < 0}>
+							<span class="{weekDelta > 0 ? 'text-success' : weekDelta < 0 ? 'text-error' : ''}">
 								({weekDelta > 0 ? '+' : ''}{formatHours(weekDelta)})
 							</span>
 						{/if}
 					</span>
 					{#if weekTargetFull > 0}
 						{@const pctWeek = Math.min((weekTotal / weekTargetFull) * 100, 100)}
-						<div class="week-progress-track">
-							<div class="week-progress-fill" style="width: {pctWeek}%"></div>
+						<div class="h-1 bg-base-200 rounded-full overflow-hidden mt-1.5 w-full max-w-[140px] mx-auto">
+							<div class="h-full bg-primary rounded-full transition-all duration-300" style="width: {pctWeek}%"></div>
 						</div>
 					{/if}
 				</div>
-				<button class="week-nav" onclick={() => changeWeek(1)} disabled={weekOffset >= 0}>&rsaquo;</button>
+				<button class="btn btn-ghost btn-sm btn-square text-xl" onclick={() => changeWeek(1)} disabled={weekOffset >= 0}>&rsaquo;</button>
 			</div>
 
 			<!-- Day bars -->
-			<div class="day-grid">
+			<div class="flex flex-col gap-2">
 				{#each dailyTotals as day}
 					{@const maxMins = Math.max(...dailyTotals.map(d => Math.max(d.minutes, d.targetMinutes)), 480)}
 					{@const pct = maxMins > 0 ? Math.min((day.minutes / maxMins) * 100, 100) : 0}
 					{@const targetPct = maxMins > 0 && day.targetMinutes > 0 ? Math.min((day.targetMinutes / maxMins) * 100, 100) : 0}
 					{@const delta = day.isPastOrToday && day.targetMinutes > 0 ? day.minutes - day.targetMinutes : 0}
 					{@const dayType = getDayType(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}
-					<div class="day-row" class:today={isToday(day.date)} class:future={!day.isPastOrToday} class:day-holiday={dayType === 'holiday'} class:day-sick={dayType === 'sick'} class:day-vacation={dayType === 'vacation'} class:day-other={dayType === 'other-absence'}>
-						<span class="day-name">{day.name}</span>
-						<span class="day-date">{formatDateShort(day.date)}{#if dayType} <span class="day-type-dot day-type-{dayType}" title={getDayTypeLabel(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}></span>{/if}</span>
-						<div class="day-bar-track">
+					<div class="grid grid-cols-[36px_70px_1fr_auto] items-center gap-2 py-1.5 px-2 {isToday(day.date) ? 'font-semibold' : ''} {!day.isPastOrToday ? 'opacity-50' : ''} {dayType === 'holiday' ? 'bg-secondary/10 rounded-md' : dayType === 'sick' ? 'bg-error/10 rounded-md' : dayType === 'vacation' ? 'bg-accent/10 rounded-md' : dayType === 'other-absence' ? 'bg-base-300/30 rounded-md' : ''}">
+						<span class="text-sm text-base-content/70">{day.name}</span>
+						<span class="text-xs text-base-content/40">{formatDateShort(day.date)}{#if dayType} <span class="w-2 h-2 rounded-full shrink-0 inline-block align-middle ml-1 {dayType === 'holiday' ? 'bg-secondary' : dayType === 'sick' ? 'bg-error' : dayType === 'vacation' ? 'bg-accent' : 'bg-base-content/40'}" title={getDayTypeLabel(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}></span>{/if}</span>
+						<div class="h-5 bg-base-200 rounded overflow-hidden relative">
 							{#if targetPct > 0}
-								<div class="day-bar-target" style="left: {targetPct}%"></div>
+								<div class="absolute top-0 bottom-0 w-0.5 bg-base-content/30 z-[1]" style="left: {targetPct}%"></div>
 							{/if}
-							<div class="day-bar-fill" style="width: {pct}%"></div>
+							<div class="h-full {isToday(day.date) ? 'bg-success' : 'bg-primary'} rounded min-w-0 transition-all duration-300" style="width: {pct}%"></div>
 						</div>
-						<span class="day-hours">
-							{formatHoursDecimal(day.minutes)}{#if day.targetMinutes > 0}<span class="day-target-label"> / {formatHoursDecimal(day.targetMinutes)}</span>{/if}
+						<span class="text-right text-sm text-base-content/70 tabular-nums whitespace-nowrap min-w-[110px]">
+							{formatHoursDecimal(day.minutes)}{#if day.targetMinutes > 0}<span class="text-base-content/40 font-normal text-xs"> / {formatHoursDecimal(day.targetMinutes)}</span>{/if}
 							{#if delta !== 0}
-								<span class="day-delta" class:positive={delta > 0} class:negative={delta < 0}>
+								<span class="{delta > 0 ? 'text-success' : delta < 0 ? 'text-error' : ''}">
 									{delta > 0 ? '+' : ''}{formatHours(delta)}
 								</span>
 							{/if}
@@ -540,120 +540,120 @@
 
 			<!-- Day Type Legend -->
 			{#if holidayDates.size > 0 || sickDayDates.size > 0 || vacationDates.size > 0 || otherAbsenceDates.size > 0}
-				<div class="day-type-legend">
-					{#if holidayDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-holiday"></span> Holiday</span>{/if}
-					{#if sickDayDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-sick"></span> Sick Day</span>{/if}
-					{#if vacationDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-vacation"></span> Vacation</span>{/if}
-					{#if otherAbsenceDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-other"></span> Other Absence</span>{/if}
+				<div class="flex gap-4 flex-wrap text-xs text-base-content/60 mt-3">
+					{#if holidayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block bg-secondary"></span> Holiday</span>{/if}
+					{#if sickDayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block bg-error"></span> Sick Day</span>{/if}
+					{#if vacationDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block bg-accent"></span> Vacation</span>{/if}
+					{#if otherAbsenceDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block bg-base-content/40"></span> Other Absence</span>{/if}
 				</div>
 			{/if}
 		</section>
 
 		<!-- Cumulative overtime -->
 		{#if hasOvertimeData && workSchedule}
-			<div class="overtime-card" class:positive={cumulativeOvertime > 0} class:negative={cumulativeOvertime < 0}>
-				<span class="overtime-label">Cumulative Balance</span>
-				<span class="overtime-value">{formatDelta(cumulativeOvertime)}</span>
-				<span class="overtime-hint">Since first tracked entry</span>
+			<div class="card card-side bg-base-100 border-2 p-4 flex-row items-center gap-4 mb-8 {cumulativeOvertime > 0 ? 'border-success/50 bg-success/5' : cumulativeOvertime < 0 ? 'border-error/50 bg-error/5' : 'border-base-300'}">
+				<span class="text-xs text-base-content/40 uppercase font-semibold tracking-wider">Cumulative Balance</span>
+				<span class="text-xl font-bold tabular-nums {cumulativeOvertime > 0 ? 'text-success' : cumulativeOvertime < 0 ? 'text-error' : ''}">{formatDelta(cumulativeOvertime)}</span>
+				<span class="text-xs text-base-content/40 ml-auto">Since first tracked entry</span>
 			</div>
 		{/if}
 
 		<!-- Day entries detail -->
-		<section class="entries-section">
-			<h2>Entries this week</h2>
+		<section>
+			<h2 class="text-lg text-base-content/70 mb-4">Entries this week</h2>
 
 			{#if weekEntries.length === 0}
-				<p class="muted">No entries this week. Start tracking above!</p>
+				<p class="text-base-content/50">No entries this week. Start tracking above!</p>
 			{:else}
-				<div class="entries-list">
+				<div class="card bg-base-100 border border-base-300 overflow-hidden">
 					{#each weekEntries as entry}
 						{#if editingEntryId === entry.id}
 							<!-- Inline edit form -->
-							<div class="entry-edit-row">
+							<div class="p-4 bg-base-200/50 border-b border-base-300 overflow-hidden">
 								{#if editError}
-									<div class="edit-error">{editError}</div>
+									<div class="alert alert-error text-sm mb-3 py-2 px-3">{editError}</div>
 								{/if}
-								<div class="edit-fields">
-									<div class="edit-field">
+								<div class="flex gap-3 flex-wrap mb-3 max-w-full overflow-hidden">
+									<div class="flex flex-col gap-1">
 										<!-- svelte-ignore a11y_label_has_associated_control -->
-										<label>Start</label>
-										<input type="datetime-local" bind:value={editStartTime} disabled={editSaving} />
+										<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Start</label>
+										<input class="input input-bordered input-sm" type="datetime-local" bind:value={editStartTime} disabled={editSaving} />
 									</div>
-									<div class="edit-field">
+									<div class="flex flex-col gap-1">
 										<!-- svelte-ignore a11y_label_has_associated_control -->
-										<label>End</label>
-										<input type="datetime-local" bind:value={editEndTime} disabled={editSaving} />
+										<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">End</label>
+										<input class="input input-bordered input-sm" type="datetime-local" bind:value={editEndTime} disabled={editSaving} />
 									</div>
-									<div class="edit-field edit-field-desc">
+									<div class="flex flex-col gap-1 flex-1 min-w-[150px]">
 										<!-- svelte-ignore a11y_label_has_associated_control -->
-										<label>Note</label>
-										<input type="text" bind:value={editDescription} placeholder="Optional note" disabled={editSaving} />
+										<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Note</label>
+										<input class="input input-bordered input-sm w-full" type="text" bind:value={editDescription} placeholder="Optional note" disabled={editSaving} />
 									</div>
 									{#if orgDetail?.editPauseMode === 'Allowed'}
-										<div class="edit-field edit-field-pause">
+										<div class="flex flex-col gap-1">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>Pause (min)</label>
-											<input type="number" min="0" bind:value={editPause} disabled={editSaving} />
+											<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Pause (min)</label>
+											<input class="input input-bordered input-sm w-20" type="number" min="0" bind:value={editPause} disabled={editSaving} />
 										</div>
 									{/if}
 								</div>
-								<div class="edit-actions">
-									<button class="btn-save-sm" onclick={() => saveEditEntry(entry.id!)} disabled={editSaving}>
+								<div class="flex gap-2">
+									<button class="btn btn-primary btn-sm" onclick={() => saveEditEntry(entry.id!)} disabled={editSaving}>
 										{editSaving ? 'Saving...' : 'Save'}
 									</button>
-									<button class="btn-cancel-sm" onclick={cancelEditEntry}>Cancel</button>
+									<button class="btn btn-ghost btn-sm" onclick={cancelEditEntry}>Cancel</button>
 								</div>
 							</div>
 						{:else}
-							<div class="entry-row" class:is-running={entry.isRunning}>
-								<div class="entry-time">
-									<span class="entry-time-range">
+							<div class="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 py-3 px-4 border-b border-base-200 last:border-b-0 {entry.isRunning ? 'bg-success/5' : ''}">
+								<div class="text-left">
+									<span class="block text-sm text-base-content/70">
 										{formatTime(entry.startTime!)}{entry.endTime ? ` – ${formatTime(entry.endTime!)}` : ''}
 									</span>
-									<span class="entry-date">{formatDateShort(new Date(entry.startTime!))}</span>
+									<span class="text-xs text-base-content/40">{formatDateShort(new Date(entry.startTime!))}</span>
 								</div>
-								<div class="entry-middle">
+								<div class="flex items-center gap-2 flex-wrap">
 									{#if entry.organizationName}
-										<span class="entry-org-tag">{entry.organizationName}</span>
+										<span class="badge badge-info badge-sm">{entry.organizationName}</span>
 									{/if}
 									{#if entry.description}
-										<span class="entry-note">{entry.description}</span>
+										<span class="text-sm text-base-content/60">{entry.description}</span>
 									{/if}
 									{#if entry.isRunning}
-										<span class="running-badge">Running</span>
+										<span class="badge badge-success badge-sm uppercase font-semibold">Running</span>
 									{/if}
 									{#if (entry.pauseDurationMinutes ?? 0) > 0}
 										{#if orgDetail?.editPauseMode === 'Allowed' && !entry.isRunning}
-											<button class="pause-badge pause-badge-edit" title="Click to edit pause" onclick={() => startEditEntry(entry)}>&#8722;{entry.pauseDurationMinutes}m pause &#9998;</button>
+											<button class="badge badge-warning badge-sm badge-outline cursor-pointer hover:bg-warning/20" title="Click to edit pause" onclick={() => startEditEntry(entry)}>&#8722;{entry.pauseDurationMinutes}m pause &#9998;</button>
 										{:else if orgDetail?.editPauseMode === 'RequiresApproval' && !entry.isRunning}
-											<button class="pause-badge pause-badge-request" title="Request pause edit" onclick={() => startRequest(entry.id!, 'pause')}>&#8722;{entry.pauseDurationMinutes}m pause &#128233;</button>
+											<button class="badge badge-warning badge-sm badge-outline border-dashed border-warning cursor-pointer hover:bg-warning/10" title="Request pause edit" onclick={() => startRequest(entry.id!, 'pause')}>&#8722;{entry.pauseDurationMinutes}m pause &#128233;</button>
 										{:else}
-											<span class="pause-badge">&#8722;{entry.pauseDurationMinutes}m pause</span>
+											<span class="badge badge-warning badge-sm badge-outline">&#8722;{entry.pauseDurationMinutes}m pause</span>
 										{/if}
 									{:else if orgDetail?.editPauseMode === 'Allowed' && !entry.isRunning}
-										<button class="pause-badge pause-badge-edit pause-badge-add" title="Click to add pause" onclick={() => startEditEntry(entry)}>+pause &#9998;</button>
+										<button class="badge badge-ghost badge-sm cursor-pointer hover:badge-warning hover:badge-outline" title="Click to add pause" onclick={() => startEditEntry(entry)}>+pause &#9998;</button>
 									{:else if orgDetail?.editPauseMode === 'RequiresApproval' && !entry.isRunning}
-										<button class="pause-badge pause-badge-request pause-badge-add" title="Request to add pause" onclick={() => startRequest(entry.id!, 'pause')}>+pause &#128233;</button>
+										<button class="badge badge-ghost badge-sm cursor-pointer border-dashed border-warning hover:bg-warning/10" title="Request to add pause" onclick={() => startRequest(entry.id!, 'pause')}>+pause &#128233;</button>
 									{/if}
 								</div>
-								<div class="entry-dur">
+								<div class="font-semibold text-sm text-base-content/70 min-w-[56px] text-right tabular-nums">
 									{#if entry.isRunning}
 										{elapsed}
 									{:else if (entry.pauseDurationMinutes ?? 0) > 0}
-										<span class="net-dur">{formatDuration(entry.netDurationMinutes ?? undefined)}</span>
-										<span class="gross-dur">({formatDuration(entry.durationMinutes ?? undefined)})</span>
+										<span class="block">{formatDuration(entry.netDurationMinutes ?? undefined)}</span>
+										<span class="block text-xs text-base-content/40 font-normal">({formatDuration(entry.durationMinutes ?? undefined)})</span>
 									{:else}
 										{formatDuration(entry.durationMinutes ?? undefined)}
 									{/if}
 								</div>
-								<div class="entry-actions">
+								<div class="min-w-[28px] flex gap-0.5">
 									{#if !entry.isRunning}
 										{#if orgDetail?.editPastEntriesMode === 'Allowed'}
-											<button class="btn-icon-edit" title="Edit" onclick={() => startEditEntry(entry)}>&#9998;</button>
+											<button class="btn btn-ghost btn-xs text-primary opacity-40 hover:opacity-100" title="Edit" onclick={() => startEditEntry(entry)}>&#9998;</button>
 										{:else if orgDetail?.editPastEntriesMode === 'RequiresApproval'}
-											<button class="btn-icon-request" title="Request edit" onclick={() => startRequest(entry.id!, 'edit')}>&#128233;</button>
+											<button class="btn btn-ghost btn-xs text-warning opacity-50 hover:opacity-100" title="Request edit" onclick={() => startRequest(entry.id!, 'edit')}>&#128233;</button>
 										{/if}
-										<button class="btn-icon-danger" title="Delete" onclick={() => deleteEntry(entry.id!)}>
+										<button class="btn btn-ghost btn-xs text-error opacity-40 hover:opacity-100" title="Delete" onclick={() => deleteEntry(entry.id!)}>
 											&times;
 										</button>
 									{/if}
@@ -667,869 +667,53 @@
 	{/if}
 
 	{#if requestSuccess}
-		<div class="success-banner">{requestSuccess}</div>
+		<div class="alert alert-success mt-4 text-sm">{requestSuccess}</div>
 	{/if}
 
 	{#if requestingEntryId}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
-		<div class="request-backdrop" onclick={cancelRequest}></div>
-		<div class="request-modal">
-			<h3>{requestType === 'edit' ? 'Request Entry Edit' : 'Request Pause Edit'}</h3>
-			<p class="request-hint">Specify the new values. An admin will review and apply them.</p>
+		<div class="fixed inset-0 bg-black/30 z-[100]" onclick={cancelRequest}></div>
+		<div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-base-100 rounded-xl p-6 w-[90%] max-w-[420px] shadow-2xl z-[101]">
+			<h3 class="text-lg font-bold mb-1">{requestType === 'edit' ? 'Request Entry Edit' : 'Request Pause Edit'}</h3>
+			<p class="text-sm text-base-content/60 mb-4">Specify the new values. An admin will review and apply them.</p>
 
 			{#if requestType === 'edit'}
-				<div class="request-fields">
-					<div class="request-field">
+				<div class="flex flex-col gap-3 mb-3">
+					<div>
 						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label>New Start Time</label>
-						<input type="datetime-local" bind:value={requestNewStart} disabled={requestSending} />
+						<label class="text-xs font-semibold text-base-content/70 mb-1">New Start Time</label>
+						<input class="input input-bordered input-sm w-full" type="datetime-local" bind:value={requestNewStart} disabled={requestSending} />
 					</div>
-					<div class="request-field">
+					<div>
 						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label>New End Time</label>
-						<input type="datetime-local" bind:value={requestNewEnd} disabled={requestSending} />
+						<label class="text-xs font-semibold text-base-content/70 mb-1">New End Time</label>
+						<input class="input input-bordered input-sm w-full" type="datetime-local" bind:value={requestNewEnd} disabled={requestSending} />
 					</div>
 				</div>
 			{:else}
-				<div class="request-fields">
-					<div class="request-field">
+				<div class="flex flex-col gap-3 mb-3">
+					<div>
 						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label>New Pause Duration (minutes)</label>
-						<input type="number" min="0" bind:value={requestNewPause} disabled={requestSending} />
+						<label class="text-xs font-semibold text-base-content/70 mb-1">New Pause Duration (minutes)</label>
+						<input class="input input-bordered input-sm w-full" type="number" min="0" bind:value={requestNewPause} disabled={requestSending} />
 					</div>
 				</div>
 			{/if}
 
 			<textarea
+				class="textarea textarea-bordered w-full text-sm mb-4"
 				bind:value={requestMessage}
 				placeholder="Optional message for the admin..."
 				rows="2"
 				disabled={requestSending}
 			></textarea>
-			<div class="request-modal-actions">
-				<button class="btn-primary" onclick={submitRequest} disabled={requestSending}>
+			<div class="flex gap-2">
+				<button class="btn btn-primary btn-sm" onclick={submitRequest} disabled={requestSending}>
 					{requestSending ? 'Sending...' : 'Submit Request'}
 				</button>
-				<button class="btn-cancel-sm" onclick={cancelRequest}>Cancel</button>
+				<button class="btn btn-ghost btn-sm" onclick={cancelRequest}>Cancel</button>
 			</div>
 		</div>
 	{/if}
 </div>
-
-<style>
-	.muted { color: #9ca3af; }
-
-	.error-banner {
-		background: #fef2f2;
-		color: #dc2626;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
-		margin-bottom: 1rem;
-		font-size: 0.875rem;
-		border-left: 3px solid #dc2626;
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-
-	.dismiss {
-		background: none;
-		border: none;
-		color: #dc2626;
-		font-size: 1.25rem;
-		cursor: pointer;
-	}
-
-	/* Timer card */
-	.timer-card {
-		background: white;
-		border-radius: 16px;
-		padding: 2rem;
-		border: 2px solid #e5e7eb;
-		margin-bottom: 2rem;
-		text-align: center;
-		transition: border-color 0.3s;
-	}
-
-	.timer-card.running {
-		border-color: #22c55e;
-		box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.1);
-	}
-
-	.timer-display {
-		font-size: 3.5rem;
-		font-weight: 700;
-		font-variant-numeric: tabular-nums;
-		color: #1a1a2e;
-		margin-bottom: 0.5rem;
-		letter-spacing: 0.05em;
-	}
-
-	.running .timer-display {
-		color: #16a34a;
-	}
-
-	.timer-org-label {
-		font-size: 0.875rem;
-		color: #374151;
-		margin-bottom: 1.25rem;
-	}
-
-	.muted-label {
-		color: #9ca3af;
-	}
-
-	.timer-actions {
-		margin-bottom: 1rem;
-	}
-
-	.note-input {
-		display: block;
-		width: 100%;
-		max-width: 360px;
-		margin: 0 auto;
-		padding: 0.5rem 0.75rem;
-		border: 1px solid #e5e7eb;
-		border-radius: 8px;
-		font-size: 0.8125rem;
-		color: #6b7280;
-		text-align: center;
-		background: #fafafa;
-	}
-
-	.note-input:focus {
-		outline: none;
-		border-color: #d1d5db;
-		background: white;
-	}
-
-	.note-input::placeholder { color: #d1d5db; }
-
-	.note-wrapper {
-		position: relative;
-		width: 100%;
-		max-width: 360px;
-		margin: 0 auto;
-	}
-
-	.note-wrapper .note-input {
-		max-width: none;
-		margin: 0;
-	}
-
-	.note-suggestions {
-		position: absolute;
-		top: 100%;
-		left: 0;
-		right: 0;
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 8px;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-		z-index: 10;
-		max-height: 160px;
-		overflow-y: auto;
-		margin-top: 2px;
-	}
-
-	.note-suggestion {
-		display: block;
-		width: 100%;
-		padding: 0.5rem 0.75rem;
-		border: none;
-		background: none;
-		text-align: left;
-		font-size: 0.8125rem;
-		color: #374151;
-		cursor: pointer;
-		transition: background 0.1s;
-	}
-
-	.note-suggestion:hover {
-		background: #f3f4f6;
-	}
-
-	.note-suggestion + .note-suggestion {
-		border-top: 1px solid #f3f4f6;
-	}
-
-	.btn-start {
-		padding: 0.875rem 3rem;
-		background: #22c55e;
-		color: white;
-		border: none;
-		border-radius: 12px;
-		font-size: 1.125rem;
-		font-weight: 700;
-		cursor: pointer;
-		transition: background 0.15s;
-		min-width: 160px;
-	}
-
-	.btn-start:hover:not(:disabled) { background: #16a34a; }
-	.btn-start:disabled { opacity: 0.6; cursor: not-allowed; }
-
-	.btn-stop {
-		padding: 0.875rem 3rem;
-		background: #ef4444;
-		color: white;
-		border: none;
-		border-radius: 12px;
-		font-size: 1.125rem;
-		font-weight: 700;
-		cursor: pointer;
-		transition: background 0.15s;
-		min-width: 160px;
-	}
-
-	.btn-stop:hover:not(:disabled) { background: #dc2626; }
-	.btn-stop:disabled { opacity: 0.6; cursor: not-allowed; }
-
-	/* Weekly summary */
-	.week-section {
-		background: white;
-		border-radius: 12px;
-		padding: 1.25rem 1.5rem;
-		border: 1px solid #e5e7eb;
-		margin-bottom: 2rem;
-	}
-
-	.week-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin-bottom: 1rem;
-	}
-
-	.week-nav {
-		background: none;
-		border: 1px solid #e5e7eb;
-		width: 32px;
-		height: 32px;
-		border-radius: 8px;
-		font-size: 1.25rem;
-		cursor: pointer;
-		color: #374151;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: background 0.15s;
-	}
-
-	.week-nav:hover:not(:disabled) { background: #f3f4f6; }
-	.week-nav:disabled { opacity: 0.3; cursor: not-allowed; }
-
-	.week-title {
-		text-align: center;
-	}
-
-	.week-label {
-		display: block;
-		font-weight: 600;
-		font-size: 0.9375rem;
-		color: #1a1a2e;
-	}
-
-	.week-total {
-		display: block;
-		font-size: 0.8125rem;
-		color: #6b7280;
-		margin-top: 0.125rem;
-	}
-
-	.day-grid {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.day-row {
-		display: grid;
-		grid-template-columns: 36px 70px 1fr auto;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.375rem 0.5rem;
-	}
-
-	.day-row.today {
-		font-weight: 600;
-	}
-
-	.day-row.future {
-		opacity: 0.5;
-	}
-
-	.day-row.day-holiday { background: rgba(139, 92, 246, 0.08); border-radius: 6px; }
-	.day-row.day-sick { background: rgba(239, 68, 68, 0.08); border-radius: 6px; }
-	.day-row.day-vacation { background: rgba(16, 185, 129, 0.08); border-radius: 6px; }
-	.day-row.day-other { background: rgba(156, 163, 175, 0.12); border-radius: 6px; }
-
-	.day-type-dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		flex-shrink: 0;
-		display: inline-block;
-		vertical-align: middle;
-		margin-left: 4px;
-	}
-	.day-type-dot.day-type-holiday { background: #8b5cf6; }
-	.day-type-dot.day-type-sick { background: #ef4444; }
-	.day-type-dot.day-type-vacation { background: #10b981; }
-	.day-type-dot.day-type-other { background: #9ca3af; }
-
-	.day-type-legend {
-		display: flex;
-		gap: 1rem;
-		flex-wrap: wrap;
-		font-size: 0.75rem;
-		color: #6b7280;
-		margin-top: 0.75rem;
-	}
-	.legend-item {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-	}
-
-	.day-name {
-		font-size: 0.8125rem;
-		color: #374151;
-	}
-
-	.day-date {
-		font-size: 0.75rem;
-		color: #9ca3af;
-	}
-
-	.day-bar-track {
-		height: 20px;
-		background: #f3f4f6;
-		border-radius: 4px;
-		overflow: hidden;
-		position: relative;
-	}
-
-	.day-bar-fill {
-		height: 100%;
-		background: #3b82f6;
-		border-radius: 4px;
-		min-width: 0;
-		transition: width 0.3s ease;
-	}
-
-	.day-bar-target {
-		position: absolute;
-		top: 0;
-		bottom: 0;
-		width: 2px;
-		background: #9ca3af;
-		z-index: 1;
-		opacity: 0.7;
-	}
-
-	.today .day-bar-fill {
-		background: #22c55e;
-	}
-
-	.day-hours {
-		text-align: right;
-		font-size: 0.8125rem;
-		color: #374151;
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-		min-width: 110px;
-	}
-
-	.day-target-label {
-		color: #9ca3af;
-		font-weight: 400;
-		font-size: 0.6875rem;
-	}
-
-	.day-delta {
-		display: inline-block;
-		font-size: 0.6875rem;
-		font-weight: 500;
-		margin-left: 0.25rem;
-	}
-
-	.day-delta.positive { color: #16a34a; }
-	.day-delta.negative { color: #dc2626; }
-
-	.week-delta {
-		font-size: 0.75rem;
-		font-weight: 500;
-		margin-left: 0.25rem;
-	}
-
-	.week-delta.positive { color: #16a34a; }
-	.week-delta.negative { color: #dc2626; }
-
-	/* Week progress */
-	.week-progress-track {
-		
-
-	/* Cumulative overtime card */
-	.overtime-card {
-		background: white;
-		border: 2px solid #e5e7eb;
-		border-radius: 12px;
-		padding: 1rem 1.5rem;
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin-bottom: 2rem;
-	}
-
-	.overtime-card.positive {
-		border-color: #86efac;
-		background: #f0fdf4;
-	}
-
-	.overtime-card.negative {
-		border-color: #fca5a5;
-		background: #fef2f2;
-	}
-
-	.overtime-label {
-		font-size: 0.75rem;
-		color: #9ca3af;
-		text-transform: uppercase;
-		font-weight: 600;
-		letter-spacing: 0.05em;
-	}
-
-	.overtime-value {
-		font-size: 1.25rem;
-		font-weight: 700;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.overtime-card.positive .overtime-value { color: #16a34a; }
-	.overtime-card.negative .overtime-value { color: #dc2626; }
-
-	.overtime-hint {
-		font-size: 0.6875rem;
-		color: #9ca3af;
-		margin-left: auto;
-	}height: 4px;
-		background: #e5e7eb;
-		border-radius: 2px;
-		overflow: hidden;
-		margin-top: 0.375rem;
-		width: 100%;
-		max-width: 140px;
-		margin-left: auto;
-		margin-right: auto;
-	}
-
-	.week-progress-fill {
-		height: 100%;
-		background: #3b82f6;
-		border-radius: 2px;
-		transition: width 0.3s ease;
-	}
-
-	/* Entries list */
-	.entries-section h2 {
-		margin: 0 0 1rem;
-		font-size: 1.125rem;
-		color: #374151;
-	}
-
-	.entries-list {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		overflow: hidden;
-	}
-
-	.entry-row {
-		display: grid;
-		grid-template-columns: auto 1fr auto auto;
-		align-items: center;
-		gap: 1rem;
-		padding: 0.75rem 1rem;
-		border-bottom: 1px solid #f3f4f6;
-	}
-
-	.entry-row:last-child { border-bottom: none; }
-
-	.entry-row.is-running {
-		background: #f0fdf4;
-	}
-
-	.entry-time {
-		text-align: left;
-	}
-
-	.entry-time-range {
-		display: block;
-		font-size: 0.8125rem;
-		color: #374151;
-	}
-
-	.entry-date {
-		font-size: 0.6875rem;
-		color: #9ca3af;
-	}
-
-	.entry-middle {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-	}
-
-	.entry-org-tag {
-		font-size: 0.6875rem;
-		background: #eff6ff;
-		color: #2563eb;
-		padding: 0.0625rem 0.5rem;
-		border-radius: 999px;
-		font-weight: 500;
-	}
-
-	.entry-note {
-		font-size: 0.8125rem;
-		color: #6b7280;
-	}
-
-	.running-badge {
-		font-size: 0.6875rem;
-		background: #dcfce7;
-		color: #16a34a;
-		padding: 0.125rem 0.5rem;
-		border-radius: 999px;
-		font-weight: 600;
-		text-transform: uppercase;
-	}
-
-	.entry-dur {
-		font-weight: 600;
-		font-size: 0.875rem;
-		color: #374151;
-		min-width: 56px;
-		text-align: right;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.entry-actions {
-		min-width: 28px;
-	}
-
-	.btn-icon-danger {
-		background: none;
-		border: none;
-		color: #dc2626;
-		font-size: 1.125rem;
-		cursor: pointer;
-		padding: 0.125rem 0.375rem;
-		border-radius: 4px;
-		line-height: 1;
-		opacity: 0.4;
-		transition: opacity 0.15s;
-	}
-
-	.btn-icon-danger:hover {
-		opacity: 1;
-		background: #fef2f2;
-	}
-
-	/* Edit entry inline */
-	.entry-edit-row {
-		padding: 1rem;
-		background: #f9fafb;
-		border-bottom: 1px solid #e5e7eb;
-		overflow: hidden;
-	}
-
-	.edit-error {
-		background: #fef2f2;
-		color: #dc2626;
-		padding: 0.5rem 0.75rem;
-		border-radius: 6px;
-		margin-bottom: 0.75rem;
-		font-size: 0.8125rem;
-		border-left: 3px solid #dc2626;
-	}
-
-	.edit-fields {
-		display: flex;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-		margin-bottom: 0.75rem;
-		max-width: 100%;
-		overflow: hidden;
-	}
-
-	.edit-field {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
-	}
-
-	.edit-field label {
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: #6b7280;
-		text-transform: uppercase;
-		letter-spacing: 0.025em;
-	}
-
-	.edit-field input {
-		padding: 0.5rem 0.625rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		font-family: inherit;
-		box-sizing: border-box;
-		max-width: 100%;
-	}
-
-	.edit-field input:focus {
-		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-	}
-
-	.edit-field-desc {
-		flex: 1;
-		min-width: 150px;
-	}
-
-	.edit-field-desc input {
-		width: 100%;
-	}
-
-	.edit-actions {
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.btn-save-sm {
-		background: #3b82f6;
-		color: white;
-		padding: 0.375rem 0.875rem;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		border: none;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.btn-save-sm:hover:not(:disabled) { background: #2563eb; }
-	.btn-save-sm:disabled { opacity: 0.6; cursor: not-allowed; }
-
-	.btn-cancel-sm {
-		background: white;
-		color: #4b5563;
-		padding: 0.375rem 0.875rem;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		border: 1px solid #d1d5db;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.btn-cancel-sm:hover { background: #f9fafb; }
-
-	/* Pause badge */
-	.pause-badge {
-		font-size: 0.6875rem;
-		background: #fff7ed;
-		color: #c2410c;
-		padding: 0.0625rem 0.5rem;
-		border-radius: 999px;
-		font-weight: 500;
-	}
-
-	.pause-badge-edit {
-		border: 1px solid #fed7aa;
-		cursor: pointer;
-		transition: background 0.15s, border-color 0.15s;
-	}
-
-	.pause-badge-edit:hover {
-		background: #fed7aa;
-		border-color: #fb923c;
-	}
-
-	.pause-badge-add {
-		background: #f9fafb;
-		color: #9ca3af;
-		border-color: #e5e7eb;
-		font-size: 0.625rem;
-	}
-
-	.pause-badge-add:hover {
-		background: #fff7ed;
-		color: #c2410c;
-		border-color: #fed7aa;
-	}
-
-	.edit-field-pause input {
-		width: 5rem;
-	}
-
-	.net-dur {
-		display: block;
-	}
-
-	.gross-dur {
-		display: block;
-		font-size: 0.6875rem;
-		color: #9ca3af;
-		font-weight: 400;
-	}
-
-	/* Edit icon */
-	.btn-icon-edit {
-		background: none;
-		border: none;
-		color: #3b82f6;
-		font-size: 0.9375rem;
-		cursor: pointer;
-		padding: 0.125rem 0.375rem;
-		border-radius: 4px;
-		line-height: 1;
-		opacity: 0.4;
-		transition: opacity 0.15s;
-	}
-
-	.btn-icon-edit:hover {
-		opacity: 1;
-		background: #eff6ff;
-	}
-
-	/* Request icon */
-	.btn-icon-request {
-		background: none;
-		border: none;
-		color: #f59e0b;
-		font-size: 0.9375rem;
-		cursor: pointer;
-		padding: 0.125rem 0.375rem;
-		border-radius: 4px;
-		line-height: 1;
-		opacity: 0.5;
-		transition: opacity 0.15s;
-	}
-
-	.btn-icon-request:hover {
-		opacity: 1;
-		background: #fffbeb;
-	}
-
-	.pause-badge-request {
-		cursor: pointer;
-		border: 1px dashed #f59e0b;
-		background: #fffbeb;
-		color: #b45309;
-	}
-
-	.pause-badge-request:hover {
-		background: #fef3c7;
-	}
-
-	/* Success banner */
-	.success-banner {
-		background: #f0fdf4;
-		color: #16a34a;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
-		margin-top: 1rem;
-		font-size: 0.875rem;
-		border-left: 3px solid #16a34a;
-	}
-
-	/* Request modal */
-	.request-backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.3);
-		z-index: 100;
-	}
-
-	.request-modal {
-		position: fixed;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		background: #fff;
-		border-radius: 12px;
-		padding: 1.5rem;
-		width: 90%;
-		max-width: 420px;
-		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-		z-index: 101;
-	}
-
-	.request-modal h3 {
-		margin: 0 0 0.25rem;
-		font-size: 1.125rem;
-	}
-
-	.request-hint {
-		margin: 0 0 1rem;
-		font-size: 0.8125rem;
-		color: #6b7280;
-	}
-
-	.request-modal textarea {
-		width: 100%;
-		border: 1px solid #d1d5db;
-		border-radius: 8px;
-		padding: 0.5rem 0.75rem;
-		font-size: 0.875rem;
-		resize: vertical;
-		margin-bottom: 1rem;
-		font-family: inherit;
-		box-sizing: border-box;
-	}
-
-	.request-modal textarea:focus {
-		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-	}
-
-	.request-modal-actions {
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.request-fields {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		margin-bottom: 0.75rem;
-	}
-
-	.request-field label {
-		display: block;
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: #374151;
-		margin-bottom: 0.25rem;
-	}
-
-	.request-field input {
-		width: 100%;
-		border: 1px solid #d1d5db;
-		border-radius: 8px;
-		padding: 0.5rem 0.75rem;
-		font-size: 0.875rem;
-		box-sizing: border-box;
-	}
-
-	.request-field input:focus {
-		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-	}
-</style>

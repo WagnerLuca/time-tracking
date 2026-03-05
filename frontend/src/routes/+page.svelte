@@ -319,53 +319,53 @@
 	<title>Dashboard - Time Tracking</title>
 </svelte:head>
 
-<div class="dashboard">
+<div>
 	{#if loading}
-		<div class="loading-state">
-			<div class="spinner"></div>
+		<div class="flex flex-col items-center justify-center py-16 px-8 gap-4 text-base-content/60">
+			<span class="loading loading-spinner loading-md"></span>
 			<p>Loading dashboard...</p>
 		</div>
 	{:else}
 	<!-- Header with org context -->
-	<div class="dash-header">
+	<div class="flex items-start justify-between mb-6">
 		<div>
-			<h1>Welcome, {auth.user?.firstName}!</h1>
+			<h1 class="text-2xl font-bold text-base-content">Welcome, {auth.user?.firstName}!</h1>
 			{#if orgContext.selectedOrg}
-				<p class="org-context">{orgContext.selectedOrg.name}</p>
+				<p class="text-sm font-medium text-primary mt-1">{orgContext.selectedOrg.name}</p>
 			{:else}
-				<p class="org-context personal">Personal</p>
+				<p class="text-sm font-medium text-base-content/40 mt-1">Personal</p>
 			{/if}
 		</div>
 		{#if orgContext.selectedOrg}
-			<a href="/organizations/{orgContext.selectedOrgSlug}" class="org-link" title="View organization">
-				<span class="org-link-icon">&#9881;</span> Manage
+			<a href="/organizations/{orgContext.selectedOrgSlug}" class="btn btn-ghost btn-sm text-primary" title="View organization">
+				<span>&#9881;</span> Manage
 			</a>
 		{/if}
 	</div>
 
 	{#if actionError}
-		<div class="error-banner">{actionError}
-			<button class="dismiss" onclick={() => (actionError = '')}>&times;</button>
+		<div class="alert alert-error mb-4">{actionError}
+			<button class="btn btn-ghost btn-sm btn-square" onclick={() => (actionError = '')}>&times;</button>
 		</div>
 	{/if}
 
 	<!-- Timer control -->
-	<div class="timer-card" class:running={!!currentEntry}>
+	<div class="card p-5 mb-6 border-2 {currentEntry ? 'border-success bg-success/5' : 'border-base-300 bg-base-100'}">
 		{#if currentEntry}
-			<div class="timer-row">
-				<div class="timer-info">
-					<span class="timer-pulse"></span>
-					<span class="timer-label">{currentEntry.organizationName || 'Personal'}</span>
+			<div class="flex items-center gap-4">
+				<div class="flex items-center gap-2.5 flex-1">
+					<span class="w-2.5 h-2.5 bg-success rounded-full animate-pulse"></span>
+					<span class="font-semibold text-base-content">{currentEntry.organizationName || 'Personal'}</span>
 				</div>
-				<span class="timer-clock">{elapsed}</span>
-				<button class="btn-stop" onclick={handleStop} disabled={stopping}>
+				<span class="font-bold text-2xl tabular-nums text-success tracking-wide">{elapsed}</span>
+				<button class="btn btn-error btn-lg" onclick={handleStop} disabled={stopping}>
 					{stopping ? 'Stopping...' : 'Stop'}
 				</button>
 			</div>
 		{:else}
-			<div class="timer-row">
-				<span class="timer-label idle">No timer running</span>
-				<button class="btn-start" onclick={handleStart} disabled={starting}>
+			<div class="flex items-center gap-4">
+				<span class="text-base-content/40 font-normal flex-1">No timer running</span>
+				<button class="btn btn-success btn-lg" onclick={handleStart} disabled={starting}>
 					{starting ? 'Starting...' : 'Start'}
 				</button>
 			</div>
@@ -373,71 +373,71 @@
 	</div>
 
 	<!-- Stats cards -->
-	<div class="stats-row">
-		<div class="stat-card">
-			<span class="stat-label">Today</span>
-			<span class="stat-value">{formatHours(todayMinutes + runningMinutes)}</span>
+	<div class="grid grid-cols-3 gap-4 mb-6 max-sm:grid-cols-1">
+		<div class="card bg-base-100 border border-base-300 p-5 text-center">
+			<span class="block text-xs text-base-content/40 uppercase font-semibold tracking-wider mb-1">Today</span>
+			<span class="block text-2xl font-bold text-base-content tabular-nums">{formatHours(todayMinutes + runningMinutes)}</span>
 			{#if todayTarget > 0}
-				<span class="stat-target">/ {formatHours(todayTarget)}</span>
+				<span class="block text-xs text-base-content/40 mt-0.5">/ {formatHours(todayTarget)}</span>
 				{@const d = todayMinutes + runningMinutes - todayTarget}
-				<span class="stat-delta" class:positive={d > 0} class:negative={d < 0}>{formatDelta(d)}</span>
+				<span class="block text-sm font-semibold mt-1 {d > 0 ? 'text-success' : d < 0 ? 'text-error' : ''}">{formatDelta(d)}</span>
 			{/if}
 		</div>
-		<div class="stat-card accent">
-			<span class="stat-label">This Week</span>
-			<span class="stat-value">{formatHours(weekMinutes + runningMinutes)}</span>
+		<div class="card border-primary bg-primary/5 p-5 text-center">
+			<span class="block text-xs text-base-content/40 uppercase font-semibold tracking-wider mb-1">This Week</span>
+			<span class="block text-2xl font-bold text-base-content tabular-nums">{formatHours(weekMinutes + runningMinutes)}</span>
 			{#if weekTarget > 0}
-				<span class="stat-target">/ {formatHours(weekTarget)}</span>
+				<span class="block text-xs text-base-content/40 mt-0.5">/ {formatHours(weekTarget)}</span>
 				{@const d = weekMinutes + runningMinutes - weekTarget}
-				<span class="stat-delta" class:positive={d > 0} class:negative={d < 0}>{formatDelta(d)}</span>
+				<span class="block text-sm font-semibold mt-1 {d > 0 ? 'text-success' : d < 0 ? 'text-error' : ''}">{formatDelta(d)}</span>
 			{/if}
 		</div>
-		<div class="stat-card">
-			<span class="stat-label">{getMonthName()}</span>
-			<span class="stat-value">{formatHours(monthMinutes + runningMinutes)}</span>
+		<div class="card bg-base-100 border border-base-300 p-5 text-center">
+			<span class="block text-xs text-base-content/40 uppercase font-semibold tracking-wider mb-1">{getMonthName()}</span>
+			<span class="block text-2xl font-bold text-base-content tabular-nums">{formatHours(monthMinutes + runningMinutes)}</span>
 			{#if monthTarget > 0}
-				<span class="stat-target">/ {formatHours(monthTarget)}</span>
+				<span class="block text-xs text-base-content/40 mt-0.5">/ {formatHours(monthTarget)}</span>
 				{@const d = monthMinutes + runningMinutes - monthTarget}
-				<span class="stat-delta" class:positive={d > 0} class:negative={d < 0}>{formatDelta(d)}</span>
+				<span class="block text-sm font-semibold mt-1 {d > 0 ? 'text-success' : d < 0 ? 'text-error' : ''}">{formatDelta(d)}</span>
 			{/if}
 		</div>
 	</div>
 
 	<!-- Cumulative overtime -->
 	{#if workSchedule}
-		<div class="overtime-card" class:positive={cumulativeOvertime + runningMinutes > 0} class:negative={cumulativeOvertime + runningMinutes < 0}>
-			<span class="overtime-label">Cumulative Balance</span>
-			<span class="overtime-value">{formatDelta(cumulativeOvertime + runningMinutes)}</span>
-			<span class="overtime-hint">Since first tracked entry{firstEntryDate ? ` (${firstEntryDate.toLocaleDateString()})` : ''}</span>
+		<div class="card p-5 text-center mb-6 border-2 {cumulativeOvertime + runningMinutes > 0 ? 'border-success/50 bg-success/5' : cumulativeOvertime + runningMinutes < 0 ? 'border-error/50 bg-error/5' : 'border-base-300 bg-base-100'}">
+			<span class="block text-xs text-base-content/40 uppercase font-semibold tracking-wider mb-1">Cumulative Balance</span>
+			<span class="block text-3xl font-bold tabular-nums {cumulativeOvertime + runningMinutes > 0 ? 'text-success' : cumulativeOvertime + runningMinutes < 0 ? 'text-error' : ''}">{formatDelta(cumulativeOvertime + runningMinutes)}</span>
+			<span class="block text-xs text-base-content/40 mt-1">Since first tracked entry{firstEntryDate ? ` (${firstEntryDate.toLocaleDateString()})` : ''}</span>
 		</div>
 	{/if}
 
 	<!-- Weekly Breakdown -->
 	{#if weekDays.length > 0}
-		<div class="breakdown-card">
-			<h2 class="breakdown-title">This Week</h2>
-			<div class="breakdown-rows">
+		<div class="card bg-base-100 border border-base-300 p-5 mb-6">
+			<h2 class="text-base font-semibold text-base-content mb-4">This Week</h2>
+			<div class="flex flex-col gap-2">
 				{#each weekDays as day}
 					{@const dayType = getDayType(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}
-					<div class="breakdown-row" class:today={isToday(day.date)} class:future={isFuture(day.date)} class:day-holiday={dayType === 'holiday'} class:day-sick={dayType === 'sick'} class:day-vacation={dayType === 'vacation'} class:day-other={dayType === 'other-absence'}>
-						<span class="breakdown-day">{day.label}</span>
+					<div class="flex items-center gap-2.5 {isToday(day.date) ? 'font-semibold' : ''} {isFuture(day.date) ? 'opacity-40' : ''} {dayType === 'holiday' ? 'bg-secondary/10 rounded px-1 -mx-1' : dayType === 'sick' ? 'bg-error/10 rounded px-1 -mx-1' : dayType === 'vacation' ? 'bg-success/10 rounded px-1 -mx-1' : dayType === 'other-absence' ? 'bg-base-content/10 rounded px-1 -mx-1' : ''}">
+						<span class="w-8 text-sm text-base-content/50 shrink-0">{day.label}</span>
 						{#if dayType}
-							<span class="day-type-dot day-type-{dayType}" title={getDayTypeLabel(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}></span>
+							<span class="w-2 h-2 rounded-full shrink-0 {dayType === 'holiday' ? 'bg-secondary' : dayType === 'sick' ? 'bg-error' : dayType === 'vacation' ? 'bg-success' : 'bg-base-content/40'}" title={getDayTypeLabel(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}></span>
 						{/if}
-						<div class="breakdown-bar-track">
-							<div class="breakdown-bar-fill" class:over={day.worked > day.target && day.target > 0} style="width: {barWidth(isToday(day.date) ? day.worked + runningMinutes : day.worked, day.target)}%"></div>
+						<div class="flex-1 h-2 bg-base-200 rounded-full overflow-hidden">
+							<div class="h-full rounded-full transition-all duration-300 {day.worked > day.target && day.target > 0 ? 'bg-success' : 'bg-primary'}" style="width: {barWidth(isToday(day.date) ? day.worked + runningMinutes : day.worked, day.target)}%"></div>
 						</div>
-						<span class="breakdown-hours">{formatHours(isToday(day.date) ? day.worked + runningMinutes : day.worked)}</span>
+						<span class="text-sm font-semibold text-base-content w-10 text-right tabular-nums">{formatHours(isToday(day.date) ? day.worked + runningMinutes : day.worked)}</span>
 						{#if day.target > 0}
-							<span class="breakdown-target">/ {formatHours(day.target)}</span>
+							<span class="text-xs text-base-content/40 w-10 tabular-nums">/ {formatHours(day.target)}</span>
 						{/if}
 					</div>
 				{/each}
 			</div>
-			<div class="breakdown-footer">
+			<div class="flex justify-between items-center mt-3 pt-3 border-t border-base-200 text-sm text-base-content font-semibold">
 				<span>Total: {formatHours(weekMinutes + runningMinutes)}</span>
 				{#if weekTarget > 0}
-					<span class="breakdown-footer-delta" class:positive={weekMinutes + runningMinutes - weekTarget > 0} class:negative={weekMinutes + runningMinutes - weekTarget < 0}>
+					<span class="{weekMinutes + runningMinutes - weekTarget > 0 ? 'text-success' : weekMinutes + runningMinutes - weekTarget < 0 ? 'text-error' : ''} font-semibold">
 						{formatDelta(weekMinutes + runningMinutes - weekTarget)}
 					</span>
 				{/if}
@@ -447,36 +447,36 @@
 
 	<!-- Day Type Legend -->
 	{#if holidayDates.size > 0 || sickDayDates.size > 0 || vacationDates.size > 0 || otherAbsenceDates.size > 0}
-		<div class="day-type-legend">
-			{#if holidayDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-holiday"></span> Holiday</span>{/if}
-			{#if sickDayDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-sick"></span> Sick Day</span>{/if}
-			{#if vacationDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-vacation"></span> Vacation</span>{/if}
-			{#if otherAbsenceDates.size > 0}<span class="legend-item"><span class="day-type-dot day-type-other"></span> Other Absence</span>{/if}
+		<div class="flex gap-4 flex-wrap text-xs text-base-content/50 mb-4">
+			{#if holidayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-secondary"></span> Holiday</span>{/if}
+			{#if sickDayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-error"></span> Sick Day</span>{/if}
+			{#if vacationDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-success"></span> Vacation</span>{/if}
+			{#if otherAbsenceDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-base-content/40"></span> Other Absence</span>{/if}
 		</div>
 	{/if}
 
 	<!-- Monthly Overview -->
 	{#if monthWeeks.length > 0}
-		<div class="breakdown-card">
-			<h2 class="breakdown-title">{getMonthName()} Overview</h2>
-			<div class="breakdown-rows">
+		<div class="card bg-base-100 border border-base-300 p-5 mb-6">
+			<h2 class="text-base font-semibold text-base-content mb-4">{getMonthName()} Overview</h2>
+			<div class="flex flex-col gap-2">
 				{#each monthWeeks as wk}
-					<div class="breakdown-row">
-						<span class="breakdown-day month-range">{wk.label}</span>
-						<div class="breakdown-bar-track">
-							<div class="breakdown-bar-fill month-bar" class:over={wk.worked > wk.target && wk.target > 0} style="width: {barWidth(wk.worked, wk.target)}%"></div>
+					<div class="flex items-center gap-2.5">
+						<span class="w-12 text-sm text-base-content/50 shrink-0">{wk.label}</span>
+						<div class="flex-1 h-2 bg-base-200 rounded-full overflow-hidden">
+							<div class="h-full rounded-full transition-all duration-300 {wk.worked > wk.target && wk.target > 0 ? 'bg-success' : 'bg-secondary'}" style="width: {barWidth(wk.worked, wk.target)}%"></div>
 						</div>
-						<span class="breakdown-hours">{formatHours(wk.worked)}</span>
+						<span class="text-sm font-semibold text-base-content w-10 text-right tabular-nums">{formatHours(wk.worked)}</span>
 						{#if wk.target > 0}
-							<span class="breakdown-target">/ {formatHours(wk.target)}</span>
+							<span class="text-xs text-base-content/40 w-10 tabular-nums">/ {formatHours(wk.target)}</span>
 						{/if}
 					</div>
 				{/each}
 			</div>
-			<div class="breakdown-footer">
+			<div class="flex justify-between items-center mt-3 pt-3 border-t border-base-200 text-sm text-base-content font-semibold">
 				<span>Total: {formatHours(monthMinutes + runningMinutes)}</span>
 				{#if monthTarget > 0}
-					<span class="breakdown-footer-delta" class:positive={monthMinutes + runningMinutes - monthTarget > 0} class:negative={monthMinutes + runningMinutes - monthTarget < 0}>
+					<span class="{monthMinutes + runningMinutes - monthTarget > 0 ? 'text-success' : monthMinutes + runningMinutes - monthTarget < 0 ? 'text-error' : ''} font-semibold">
 						{formatDelta(monthMinutes + runningMinutes - monthTarget)}
 					</span>
 				{/if}
@@ -485,529 +485,27 @@
 	{/if}
 
 	<!-- Quick links -->
-	<h2 class="section-title">Quick Links</h2>
-	<div class="quick-links">
-		<a href="/time" class="quick-link">
-			<span class="ql-icon">&#9201;</span>
+	<h2 class="text-base font-semibold text-base-content mt-6 mb-3">Quick Links</h2>
+	<div class="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-4">
+		<a href="/time" class="flex items-center gap-3 card bg-base-100 border border-base-300 p-4 no-underline text-base-content font-medium hover:border-primary hover:shadow-md transition-all">
+			<span class="text-lg">&#9201;</span>
 			<span>Weekly View</span>
 		</a>
-		<a href="/history" class="quick-link">
-			<span class="ql-icon">&#128197;</span>
+		<a href="/history" class="flex items-center gap-3 card bg-base-100 border border-base-300 p-4 no-underline text-base-content font-medium hover:border-primary hover:shadow-md transition-all">
+			<span class="text-lg">&#128197;</span>
 			<span>History</span>
 		</a>
 		{#if orgContext.selectedOrg}
-			<a href="/organizations/{orgContext.selectedOrgSlug}" class="quick-link">
-				<span class="ql-icon">&#128101;</span>
+			<a href="/organizations/{orgContext.selectedOrgSlug}" class="flex items-center gap-3 card bg-base-100 border border-base-300 p-4 no-underline text-base-content font-medium hover:border-primary hover:shadow-md transition-all">
+				<span class="text-lg">&#128101;</span>
 				<span>Organization</span>
 			</a>
 		{/if}
-		<a href="/settings" class="quick-link">
-			<span class="ql-icon">&#9881;</span>
+		<a href="/settings" class="flex items-center gap-3 card bg-base-100 border border-base-300 p-4 no-underline text-base-content font-medium hover:border-primary hover:shadow-md transition-all">
+			<span class="text-lg">&#9881;</span>
 			<span>Settings</span>
 		</a>
 	</div>
 	{/if}
 </div>
 
-<style>
-	.dashboard h1 {
-		margin: 0;
-		
-
-	.section-title {
-		font-size: 1rem;
-		color: #374151;
-		margin: 1.5rem 0 0.75rem;
-		font-weight: 600;
-	}font-size: 1.75rem;
-		color: #1a1a2e;
-	}
-
-	.dash-header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		margin-bottom: 1.5rem;
-	}
-
-	.org-context {
-		margin: 0.25rem 0 0;
-		font-size: 0.9375rem;
-		color: #3b82f6;
-		font-weight: 500;
-	}
-
-	.org-context.personal {
-		color: #9ca3af;
-	}
-
-	.org-link {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.375rem;
-		background: #eff6ff;
-		color: #2563eb;
-		border: 1px solid #bfdbfe;
-		border-radius: 8px;
-		padding: 0.5rem 1rem;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		text-decoration: none;
-		transition: all 0.15s;
-	}
-
-	.org-link:hover {
-		background: #dbeafe;
-		border-color: #93c5fd;
-	}
-
-	.org-link-icon {
-		font-size: 0.875rem;
-	}
-
-	.error-banner {
-		background: #fef2f2;
-		color: #dc2626;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
-		margin-bottom: 1rem;
-		font-size: 0.875rem;
-		border-left: 3px solid #dc2626;
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-
-	.dismiss {
-		background: none;
-		border: none;
-		color: #dc2626;
-		font-size: 1.25rem;
-		cursor: pointer;
-	}
-
-	/* Timer card */
-	.timer-card {
-		background: white;
-		border: 2px solid #e5e7eb;
-		border-radius: 14px;
-		padding: 1.25rem 1.5rem;
-		margin-bottom: 1.5rem;
-		transition: border-color 0.3s;
-	}
-
-	.timer-card.running {
-		border-color: #22c55e;
-		background: #f0fdf4;
-	}
-
-	.timer-row {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-	}
-
-	.timer-info {
-		display: flex;
-		align-items: center;
-		gap: 0.625rem;
-		flex: 1;
-	}
-
-	.timer-pulse {
-		width: 10px;
-		height: 10px;
-		background: #22c55e;
-		border-radius: 50%;
-		animation: pulse 1.5s infinite;
-	}
-
-	@keyframes pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.4; }
-	}
-
-	.timer-label {
-		font-weight: 600;
-		color: #1a1a2e;
-		font-size: 1rem;
-	}
-
-	.timer-label.idle {
-		color: #9ca3af;
-		font-weight: 400;
-		flex: 1;
-	}
-
-	.timer-clock {
-		font-weight: 700;
-		font-size: 1.5rem;
-		font-variant-numeric: tabular-nums;
-		color: #16a34a;
-		letter-spacing: 0.03em;
-	}
-
-	.btn-start {
-		padding: 0.625rem 2rem;
-		background: #22c55e;
-		color: white;
-		border: none;
-		border-radius: 10px;
-		font-size: 1rem;
-		font-weight: 700;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.btn-start:hover:not(:disabled) { background: #16a34a; }
-	.btn-start:disabled { opacity: 0.6; cursor: not-allowed; }
-
-	.btn-stop {
-		padding: 0.625rem 2rem;
-		background: #ef4444;
-		color: white;
-		border: none;
-		border-radius: 10px;
-		font-size: 1rem;
-		font-weight: 700;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.btn-stop:hover:not(:disabled) { background: #dc2626; }
-	.btn-stop:disabled { opacity: 0.6; cursor: not-allowed; }
-
-	/* Stats */
-	.stats-row {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 1rem;
-		margin-bottom: 1.5rem;
-	}
-
-	.stat-card {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		padding: 1.25rem;
-		text-align: center;
-	}
-
-	.stat-card.accent {
-		border-color: #3b82f6;
-		background: #eff6ff;
-	}
-
-	.stat-label {
-		display: block;
-		font-size: 0.75rem;
-		color: #9ca3af;
-		text-transform: uppercase;
-		font-weight: 600;
-		letter-spacing: 0.05em;
-		margin-bottom: 0.375rem;
-	}
-
-	.stat-card.accent .stat-label {
-		color: #3b82f6;
-	}
-
-	.stat-value {
-		display: block;
-		font-size: 1.5rem;
-		font-weight: 700;
-		color: #1a1a2e;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.stat-target {
-		display: block;
-		font-size: 0.75rem;
-		color: #9ca3af;
-		margin-top: 0.125rem;
-	}
-
-	.stat-delta {
-		display: block;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		margin-top: 0.25rem;
-	}
-
-	.stat-delta.positive { color: #16a34a; }
-	.stat-delta.negative { color: #dc2626; }
-
-	/* Cumulative overtime card */
-	.overtime-card {
-		background: white;
-		border: 2px solid #e5e7eb;
-		border-radius: 12px;
-		padding: 1.25rem;
-		text-align: center;
-		margin-bottom: 1.5rem;
-	}
-
-	.overtime-card.positive {
-		border-color: #86efac;
-		background: #f0fdf4;
-	}
-
-	.overtime-card.negative {
-		border-color: #fca5a5;
-		background: #fef2f2;
-	}
-
-	.overtime-label {
-		display: block;
-		font-size: 0.75rem;
-		color: #9ca3af;
-		text-transform: uppercase;
-		font-weight: 600;
-		letter-spacing: 0.05em;
-		margin-bottom: 0.375rem;
-	}
-
-	.overtime-value {
-		display: block;
-		font-size: 2rem;
-		font-weight: 700;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.overtime-card.positive .overtime-value { color: #16a34a; }
-	.overtime-card.negative .overtime-value { color: #dc2626; }
-
-	.overtime-hint {
-		display: block;
-		font-size: 0.6875rem;
-		color: #9ca3af;
-		margin-top: 0.25rem;
-	}
-
-	/* Quick links */
-	.quick-links {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-		gap: 1rem;
-	}
-
-	.quick-link {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		padding: 1rem 1.25rem;
-		text-decoration: none;
-		color: #374151;
-		font-weight: 500;
-		font-size: 0.9375rem;
-		transition: border-color 0.15s, box-shadow 0.15s;
-	}
-
-	.quick-link:hover {
-		border-color: #3b82f6;
-		box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
-	}
-
-	.ql-icon {
-		font-size: 1.125rem;
-	}
-
-	/* Breakdown cards */
-	.breakdown-card {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		padding: 1.25rem;
-		margin-bottom: 1.5rem;
-	}
-
-	.breakdown-title {
-		margin: 0 0 1rem;
-		font-size: 1rem;
-		font-weight: 600;
-		color: #1a1a2e;
-	}
-
-	.breakdown-rows {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.breakdown-row {
-		display: flex;
-		align-items: center;
-		gap: 0.625rem;
-	}
-
-	.breakdown-row.today {
-		font-weight: 600;
-	}
-
-	.breakdown-row.future {
-		opacity: 0.4;
-	}
-
-	.breakdown-row.day-holiday { background: rgba(139, 92, 246, 0.08); border-radius: 4px; padding: 2px 4px; margin: -2px -4px; }
-	.breakdown-row.day-sick { background: rgba(239, 68, 68, 0.08); border-radius: 4px; padding: 2px 4px; margin: -2px -4px; }
-	.breakdown-row.day-vacation { background: rgba(16, 185, 129, 0.08); border-radius: 4px; padding: 2px 4px; margin: -2px -4px; }
-	.breakdown-row.day-other { background: rgba(156, 163, 175, 0.12); border-radius: 4px; padding: 2px 4px; margin: -2px -4px; }
-
-	.day-type-dot {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		flex-shrink: 0;
-	}
-	.day-type-dot.day-type-holiday { background: #8b5cf6; }
-	.day-type-dot.day-type-sick { background: #ef4444; }
-	.day-type-dot.day-type-vacation { background: #10b981; }
-	.day-type-dot.day-type-other { background: #9ca3af; }
-
-	.day-type-legend {
-		display: flex;
-		gap: 1rem;
-		flex-wrap: wrap;
-		font-size: 0.75rem;
-		color: #6b7280;
-		margin-bottom: 1rem;
-	}
-	.legend-item {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-	}
-
-	.breakdown-day {
-		width: 32px;
-		font-size: 0.8125rem;
-		color: #6b7280;
-		flex-shrink: 0;
-	}
-
-	.breakdown-day.month-range {
-		width: 50px;
-	}
-
-	.breakdown-bar-track {
-		flex: 1;
-		height: 8px;
-		background: #f3f4f6;
-		border-radius: 4px;
-		overflow: hidden;
-	}
-
-	.breakdown-bar-fill {
-		height: 100%;
-		background: #3b82f6;
-		border-radius: 4px;
-		transition: width 0.3s ease;
-	}
-
-	.breakdown-bar-fill.over {
-		background: #16a34a;
-	}
-
-	.breakdown-bar-fill.month-bar {
-		background: #8b5cf6;
-	}
-
-	.breakdown-bar-fill.month-bar.over {
-		background: #16a34a;
-	}
-
-	.breakdown-hours {
-		font-size: 0.8125rem;
-		font-weight: 600;
-		color: #1a1a2e;
-		width: 40px;
-		text-align: right;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.breakdown-target {
-		font-size: 0.75rem;
-		color: #9ca3af;
-		width: 40px;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.breakdown-footer {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-top: 0.75rem;
-		padding-top: 0.75rem;
-		border-top: 1px solid #f3f4f6;
-		font-size: 0.875rem;
-		color: #374151;
-		font-weight: 600;
-	}
-
-	.breakdown-footer-delta {
-		font-weight: 600;
-	}
-
-	.breakdown-footer-delta.positive { color: #16a34a; }
-
-	/* Loading state */
-	.loading-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: 4rem 2rem;
-		gap: 1rem;
-		color: #6b7280;
-	}
-
-	.spinner {
-		width: 2rem;
-		height: 2rem;
-		border: 3px solid #e5e7eb;
-		border-top-color: #3b82f6;
-		border-radius: 50%;
-		animation: spin 0.8s linear infinite;
-	}
-
-	@keyframes spin {
-		to { transform: rotate(360deg); }
-	}
-
-	/* Responsive */
-	@media (max-width: 640px) {
-		.dashboard {
-			padding: 1rem;
-		}
-
-		.dashboard h1 {
-			font-size: 1.35rem;
-		}
-
-		.stats-row {
-			grid-template-columns: 1fr !important;
-			gap: 0.75rem;
-		}
-
-		.timer-row {
-			flex-wrap: wrap;
-			gap: 0.5rem;
-		}
-
-		.timer-clock {
-			font-size: 1.5rem;
-		}
-
-		.quick-links {
-			grid-template-columns: 1fr !important;
-		}
-
-		.breakdown-row {
-			font-size: 0.8rem;
-		}
-	}
-	.breakdown-footer-delta.negative { color: #dc2626; }
-</style>

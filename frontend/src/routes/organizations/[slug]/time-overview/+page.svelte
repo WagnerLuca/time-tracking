@@ -88,93 +88,93 @@
 </svelte:head>
 
 <div class="page">
-	<a href="/organizations/{orgSlug}" class="back-link">&larr; Back to {orgName || 'Organization'}</a>
+	<a href="/organizations/{orgSlug}" class="text-base-content/60 text-sm inline-block mb-3 no-underline hover:text-primary">&larr; Back to {orgName || 'Organization'}</a>
 
-	<h1>Team Time Overview</h1>
-	{#if orgName}<p class="subtitle">{orgName}</p>{/if}
+	<h1 class="text-xl font-bold mb-1">Team Time Overview</h1>
+	{#if orgName}<p class="text-base-content/60 text-sm mb-6">{orgName}</p>{/if}
 
 	{#if error}
-		<div class="error-msg">{error}</div>
+		<div class="alert alert-error">{error}</div>
 	{:else}
 		<!-- Week nav -->
-		<div class="week-header">
-			<button class="week-nav" onclick={() => changeWeek(-1)}>&lsaquo;</button>
+		<div class="flex items-center justify-center gap-4 mb-6">
+			<button class="btn btn-ghost btn-sm btn-square border border-base-300" onclick={() => changeWeek(-1)}>&lsaquo;</button>
 			<div class="week-title">
-				<span class="week-label">{formatWeekLabel(weekRange)}</span>
+				<span class="font-semibold text-base">{formatWeekLabel(weekRange)}</span>
 			</div>
-			<button class="week-nav" onclick={() => changeWeek(1)} disabled={weekOffset >= 0}>&rsaquo;</button>
+			<button class="btn btn-ghost btn-sm btn-square border border-base-300" onclick={() => changeWeek(1)} disabled={weekOffset >= 0}>&rsaquo;</button>
 		</div>
 
 		{#if loading}
-			<p class="muted">Loading...</p>
+			<p class="text-base-content/50">Loading...</p>
 		{:else if members.length === 0}
-			<p class="muted">No members found.</p>
+			<p class="text-base-content/50">No members found.</p>
 		{:else}
-			<div class="overview-table">
-				<div class="table-header">
-					<span class="col-name">Member</span>
-					<span class="col-role">Role</span>
-					<span class="col-target">Target</span>
-					<span class="col-tracked">Tracked</span>
-					<span class="col-net">Net</span>
-					<span class="col-entries">Entries</span>
-					<span class="col-status">Status</span>
+			<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+				<div class="grid grid-cols-[2fr_0.7fr_0.7fr_0.8fr_0.8fr_0.6fr_0.8fr] gap-2 px-4 py-3 bg-base-200/50 text-[0.6875rem] font-bold text-base-content/60 uppercase tracking-wider border-b border-base-300">
+					<span class="overflow-hidden">Member</span>
+					<span class="text-center">Role</span>
+					<span class="text-center">Target</span>
+					<span class="text-center">Tracked</span>
+					<span class="text-center">Net</span>
+					<span class="text-center">Entries</span>
+					<span class="text-center">Status</span>
 				</div>
 
 				{#each members as member}
 					{@const targetMinutes = member.weeklyWorkHours ? member.weeklyWorkHours * 60 : 0}
 					{@const pct = targetMinutes > 0 ? Math.round(((member.netTrackedMinutes ?? 0) / targetMinutes) * 100) : 0}
-					<button class="table-row" onclick={() => toggleMemberDetail(member.userId!)}>
-						<span class="col-name">
-							<span class="member-name">{member.firstName} {member.lastName}</span>
-							<span class="member-email">{member.email}</span>
+					<button class="grid grid-cols-[2fr_0.7fr_0.7fr_0.8fr_0.8fr_0.6fr_0.8fr] gap-2 px-4 py-3 border-b border-base-200 bg-base-100 w-full text-left cursor-pointer transition-colors text-sm items-center hover:bg-base-200/50" onclick={() => toggleMemberDetail(member.userId!)}>
+						<span class="overflow-hidden">
+							<span class="block font-semibold text-sm">{member.firstName} {member.lastName}</span>
+							<span class="block text-[0.6875rem] text-base-content/50 overflow-hidden text-ellipsis whitespace-nowrap">{member.email}</span>
 						</span>
-						<span class="col-role">
-							<span class="role-badge role-{(member.role?.toLowerCase() ?? 'member')}">{member.role}</span>
+						<span class="text-center">
+							<span class={"badge badge-sm " + ((member.role?.toLowerCase() ?? 'member') === 'owner' ? 'badge-warning' : (member.role?.toLowerCase() ?? 'member') === 'admin' ? 'badge-info' : 'badge-ghost')}>{member.role}</span>
 						</span>
-						<span class="col-target">
+						<span class="text-center">
 							{member.weeklyWorkHours ? `${member.weeklyWorkHours}h` : '-'}
 						</span>
-						<span class="col-tracked">{formatHoursDecimal(member.totalTrackedMinutes ?? 0)}</span>
-						<span class="col-net">{formatHoursDecimal(member.netTrackedMinutes ?? 0)}</span>
-						<span class="col-entries">{member.entryCount}</span>
-						<span class="col-status">
+						<span class="text-center">{formatHoursDecimal(member.totalTrackedMinutes ?? 0)}</span>
+						<span class="text-center">{formatHoursDecimal(member.netTrackedMinutes ?? 0)}</span>
+						<span class="text-center">{member.entryCount}</span>
+						<span class="text-center">
 							{#if targetMinutes > 0}
 								{#if pct >= 100}
-									<span class="status-badge status-complete">&#10003; {pct}%</span>
+									<span class="badge badge-success badge-sm">&#10003; {pct}%</span>
 								{:else if pct >= 75}
-									<span class="status-badge status-good">{pct}%</span>
+									<span class="badge badge-info badge-sm">{pct}%</span>
 								{:else if pct >= 50}
-									<span class="status-badge status-partial">{pct}%</span>
+									<span class="badge badge-warning badge-sm">{pct}%</span>
 								{:else}
-									<span class="status-badge status-low">{pct}%</span>
+									<span class="badge badge-error badge-sm">{pct}%</span>
 								{/if}
 							{:else}
-								<span class="muted">-</span>
+								<span class="text-base-content/50">-</span>
 							{/if}
 						</span>
 					</button>
 
 					{#if expandedUserId === member.userId}
-						<div class="member-detail">
+						<div class="px-5 py-3 bg-base-200/50 border-b border-base-300">
 							{#if entriesLoading}
-								<p class="muted">Loading entries...</p>
+								<p class="text-base-content/50">Loading entries...</p>
 							{:else if memberEntries.length === 0}
-								<p class="muted">No entries this week.</p>
+								<p class="text-base-content/50">No entries this week.</p>
 							{:else}
-								<div class="detail-entries">
+								<div class="flex flex-col gap-1.5">
 									{#each memberEntries as entry}
-										<div class="detail-entry">
-											<span class="de-date">{formatDateShort(entry.startTime!)}</span>
-											<span class="de-time">
+										<div class="flex items-center gap-3 text-sm px-2 py-1.5 bg-base-100 rounded-md border border-base-300">
+											<span class="text-base-content/60 min-w-[56px] text-xs">{formatDateShort(entry.startTime!)}</span>
+											<span class="text-base-content min-w-[100px]">
 												{formatTime(entry.startTime!)}{entry.endTime ? ` – ${formatTime(entry.endTime!)}` : ''}
 											</span>
-											<span class="de-desc">{entry.description || ''}</span>
-											<span class="de-dur">
+											<span class="text-base-content/50 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{entry.description || ''}</span>
+											<span class="font-semibold min-w-[56px] text-right">
 												{entry.isRunning ? 'Running' : formatDuration(entry.netDurationMinutes ?? entry.durationMinutes ?? 0)}
 											</span>
 											{#if (entry.pauseDurationMinutes ?? 0) > 0}
-												<span class="de-pause">-{entry.pauseDurationMinutes}m pause</span>
+												<span class="text-[0.6875rem] text-warning bg-warning/10 px-1.5 rounded-full">-{entry.pauseDurationMinutes}m pause</span>
 											{/if}
 										</div>
 									{/each}
@@ -188,208 +188,3 @@
 	{/if}
 </div>
 
-<style>
-	.back-link {
-		color: #6b7280;
-		text-decoration: none;
-		font-size: 0.875rem;
-		display: inline-block;
-		margin-bottom: 0.75rem;
-	}
-	.back-link:hover { color: #3b82f6; }
-
-	h1 {
-		margin: 0 0 0.25rem;
-		font-size: 1.5rem;
-		color: #1a1a2e;
-	}
-
-	.subtitle {
-		color: #6b7280;
-		font-size: 0.875rem;
-		margin: 0 0 1.5rem;
-	}
-
-	.muted { color: #9ca3af; }
-
-	.error-msg {
-		color: #dc2626;
-		background: #fef2f2;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
-		border-left: 3px solid #dc2626;
-	}
-
-	/* Week nav */
-	.week-header {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 1rem;
-		margin-bottom: 1.5rem;
-	}
-
-	.week-nav {
-		background: none;
-		border: 1px solid #e5e7eb;
-		width: 32px;
-		height: 32px;
-		border-radius: 8px;
-		font-size: 1.25rem;
-		cursor: pointer;
-		color: #374151;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-	.week-nav:hover:not(:disabled) { background: #f3f4f6; }
-	.week-nav:disabled { opacity: 0.3; cursor: not-allowed; }
-
-	.week-label {
-		font-weight: 600;
-		font-size: 1rem;
-		color: #1a1a2e;
-	}
-
-	/* Overview table */
-	.overview-table {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		overflow: hidden;
-	}
-
-	.table-header {
-		display: grid;
-		grid-template-columns: 2fr 0.7fr 0.7fr 0.8fr 0.8fr 0.6fr 0.8fr;
-		gap: 0.5rem;
-		padding: 0.75rem 1rem;
-		background: #f9fafb;
-		font-size: 0.6875rem;
-		font-weight: 700;
-		color: #6b7280;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		border-bottom: 1px solid #e5e7eb;
-	}
-
-	.table-row {
-		display: grid;
-		grid-template-columns: 2fr 0.7fr 0.7fr 0.8fr 0.8fr 0.6fr 0.8fr;
-		gap: 0.5rem;
-		padding: 0.75rem 1rem;
-		border: none;
-		border-bottom: 1px solid #f3f4f6;
-		background: white;
-		width: 100%;
-		text-align: left;
-		cursor: pointer;
-		transition: background 0.1s;
-		font-size: 0.875rem;
-		align-items: center;
-	}
-
-	.table-row:hover { background: #f9fafb; }
-	.table-row:last-child { border-bottom: none; }
-
-	.col-name { overflow: hidden; }
-	.col-role, .col-target, .col-tracked, .col-net, .col-entries, .col-status {
-		text-align: center;
-	}
-
-	.member-name {
-		display: block;
-		font-weight: 600;
-		color: #1a1a2e;
-		font-size: 0.875rem;
-	}
-
-	.member-email {
-		display: block;
-		font-size: 0.6875rem;
-		color: #9ca3af;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.role-badge {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		padding: 0.125rem 0.5rem;
-		border-radius: 999px;
-		text-transform: uppercase;
-	}
-	.role-owner { background: #fef3c7; color: #92400e; }
-	.role-admin { background: #dbeafe; color: #1e40af; }
-	.role-member { background: #f3f4f6; color: #4b5563; }
-
-	.status-badge {
-		font-size: 0.75rem;
-		font-weight: 600;
-		padding: 0.125rem 0.5rem;
-		border-radius: 999px;
-	}
-	.status-complete { background: #dcfce7; color: #16a34a; }
-	.status-good { background: #dbeafe; color: #2563eb; }
-	.status-partial { background: #fef3c7; color: #d97706; }
-	.status-low { background: #fef2f2; color: #dc2626; }
-
-	/* Member detail */
-	.member-detail {
-		padding: 0.75rem 1.25rem 1rem;
-		background: #f9fafb;
-		border-bottom: 1px solid #e5e7eb;
-	}
-
-	.detail-entries {
-		display: flex;
-		flex-direction: column;
-		gap: 0.375rem;
-	}
-
-	.detail-entry {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		font-size: 0.8125rem;
-		padding: 0.375rem 0.5rem;
-		background: white;
-		border-radius: 6px;
-		border: 1px solid #e5e7eb;
-	}
-
-	.de-date {
-		color: #6b7280;
-		min-width: 56px;
-		font-size: 0.75rem;
-	}
-
-	.de-time {
-		color: #374151;
-		min-width: 100px;
-	}
-
-	.de-desc {
-		color: #9ca3af;
-		flex: 1;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.de-dur {
-		font-weight: 600;
-		color: #374151;
-		min-width: 56px;
-		text-align: right;
-	}
-
-	.de-pause {
-		font-size: 0.6875rem;
-		color: #c2410c;
-		background: #fff7ed;
-		padding: 0 0.375rem;
-		border-radius: 999px;
-	}
-</style>

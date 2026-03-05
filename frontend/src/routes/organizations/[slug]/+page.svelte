@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -325,7 +325,7 @@
 
 
 
-	// ── Admin: Member Schedule ──
+	// â”€â”€ Admin: Member Schedule â”€â”€
 	async function openMemberSchedule(memberId: number) {
 		if (editingMemberSchedule === memberId) {
 			editingMemberSchedule = null;
@@ -846,12 +846,12 @@
 	}
 
 	function formatOvertimeHours(minutes: number): string {
-		if (minutes === 0) return '±0h';
+		if (minutes === 0) return 'Â±0h';
 		const sign = minutes > 0 ? '+' : '';
 		return sign + (minutes / 60).toFixed(1) + 'h';
 	}
 
-	// ── Holidays ──
+	// â”€â”€ Holidays â”€â”€
 	async function loadHolidays() {
 		if (holidaysLoaded) return;
 		holidaysLoading = true;
@@ -935,7 +935,7 @@
 		} catch { return dateStr; }
 	}
 
-	// ── Absences ──
+	// â”€â”€ Absences â”€â”€
 	async function loadAbsences() {
 		if (absencesLoaded) return;
 		absencesLoading = true;
@@ -1039,7 +1039,7 @@
 		return absences.filter(a => a.userId === adminAbsenceFilter);
 	}
 
-	// ── Schedule Periods ──
+	// â”€â”€ Schedule Periods â”€â”€
 	async function loadSchedulePeriods() {
 		if (schedulePeriodsLoaded) return;
 		schedulePeriodsLoading = true;
@@ -1213,45 +1213,45 @@
 	<title>{org ? org.name : 'Organization'} - Time Tracking</title>
 </svelte:head>
 
-<div class="page">
-	<a href="/organizations" class="back-link">&larr; Back to Organizations</a>
+<div class="max-w-4xl mx-auto p-6">
+	<a href="/organizations" class="text-base-content/60 no-underline text-sm inline-block mb-3 hover:text-primary">&larr; Back to Organizations</a>
 
 	{#if loading}
-		<div class="loading-state"><div class="spinner"></div><span>Loading...</span></div>
+		<div class="flex items-center gap-3 justify-center py-12 text-base-content/40"><span class="loading loading-spinner loading-sm"></span><span>Loading...</span></div>
 	{:else if error}
-		<div class="error-msg">{error}</div>
+		<div class="alert alert-error">{error}</div>
 	{:else if org}
 		{#if actionError}
-			<div class="error-banner">{actionError}</div>
+			<div class="alert alert-error mb-4 text-sm">{actionError}</div>
 		{/if}
 
 		{#if editing}
 			<!-- Edit form -->
-			<div class="card">
-				<h2>Edit Organization</h2>
+			<div class="card bg-base-100 border border-base-300 p-8 max-w-xl">
+				<h2 class="text-xl font-bold text-base-content mb-5">Edit Organization</h2>
 				{#if editError}
-					<div class="error-banner">{editError}</div>
+					<div class="alert alert-error mb-4 text-sm">{editError}</div>
 				{/if}
 				<form onsubmit={saveEdit}>
-					<div class="field">
-						<label for="editName">Name</label>
-						<input id="editName" type="text" bind:value={editName} required disabled={editSaving} />
+					<div class="form-control mb-5">
+						<label for="editName" class="label text-sm font-medium text-base-content/70">Name</label>
+						<input id="editName" type="text" class="input input-bordered w-full" bind:value={editName} required disabled={editSaving} />
 					</div>
-					<div class="field">
-						<label for="editSlug">Slug</label>
-						<input id="editSlug" type="text" bind:value={editSlug} required disabled={editSaving} />
+					<div class="form-control mb-5">
+						<label for="editSlug" class="label text-sm font-medium text-base-content/70">Slug</label>
+						<input id="editSlug" type="text" class="input input-bordered w-full" bind:value={editSlug} required disabled={editSaving} />
 					</div>
-					<div class="field">
-						<label for="editDesc">Description</label>
-						<textarea id="editDesc" bind:value={editDescription} rows="3" disabled={editSaving}></textarea>
+					<div class="form-control mb-5">
+						<label for="editDesc" class="label text-sm font-medium text-base-content/70">Description</label>
+						<textarea id="editDesc" class="textarea textarea-bordered w-full" bind:value={editDescription} rows="3" disabled={editSaving}></textarea>
 					</div>
-					<div class="field">
-						<label for="editWeb">Website</label>
-						<input id="editWeb" type="url" bind:value={editWebsite} disabled={editSaving} />
+					<div class="form-control mb-5">
+						<label for="editWeb" class="label text-sm font-medium text-base-content/70">Website</label>
+						<input id="editWeb" type="url" class="input input-bordered w-full" bind:value={editWebsite} disabled={editSaving} />
 					</div>
-					<div class="form-actions">
-						<button type="button" class="btn-secondary" onclick={cancelEdit}>Cancel</button>
-						<button type="submit" class="btn-primary" disabled={editSaving}>
+					<div class="flex gap-3 justify-end mt-6">
+						<button type="button" class="btn btn-outline btn-sm" onclick={cancelEdit}>Cancel</button>
+						<button type="submit" class="btn btn-primary" disabled={editSaving}>
 							{editSaving ? 'Saving...' : 'Save Changes'}
 						</button>
 					</div>
@@ -1259,133 +1259,133 @@
 			</div>
 		{:else}
 			<!-- Organization header -->
-			<div class="org-header">
+			<div class="flex items-start justify-between mb-2">
 				<div>
-					<h1>{org.name}</h1>
-					<span class="slug">/{org.slug}</span>
+					<h1 class="text-2xl font-bold text-base-content">{org.name}</h1>
+					<span class="text-base-content/40 text-sm">/{org.slug}</span>
 				</div>
 				{#if canEdit}
-					<div class="header-actions">
+					<div class="flex gap-2">
 						{#if org.memberTimeEntryVisibility}
-							<a href="/organizations/{orgSlug}/time-overview" class="btn-secondary">Time Overview</a>
+							<a href="/organizations/{orgSlug}/time-overview" class="btn btn-outline btn-sm">Time Overview</a>
 						{/if}
-						<button class="btn-secondary" onclick={startEdit}>Edit</button>
+						<button class="btn btn-outline btn-sm" onclick={startEdit}>Edit</button>
 						{#if isOwner}
-							<button class="btn-danger" onclick={deleteOrg}>Delete</button>
+							<button class="btn btn-outline btn-error btn-sm" onclick={deleteOrg}>Delete</button>
 						{/if}
 					</div>
 				{/if}
 			</div>
 
 			{#if !canEdit && org.memberTimeEntryVisibility}
-				<div class="visibility-warning">
+				<div class="alert alert-warning mb-4 text-sm">
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
 					Your administrator can view your tracked working hours.
 				</div>
 			{/if}
 
 			{#if showSettingsChangedBanner}
-				<div class="settings-changed-banner">
+				<div class="alert alert-info mb-4 text-sm">
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-					Organization rules have been updated. Check the <button class="link-btn" onclick={() => { activeTab = 'settings'; dismissSettingsNotifications(); }}>Rules</button> tab for details.
-					<button class="dismiss-btn" onclick={() => dismissSettingsNotifications()}>&times;</button>
+					Organization rules have been updated. Check the <button class="link link-primary font-semibold" onclick={() => { activeTab = 'settings'; dismissSettingsNotifications(); }}>Rules</button> tab for details.
+					<button class="btn btn-ghost btn-xs ml-auto text-lg" onclick={() => dismissSettingsNotifications()}>&times;</button>
 				</div>
 			{/if}
 
 			{#if org.description}
-				<p class="description">{org.description}</p>
+				<p class="text-base-content/70 my-3">{org.description}</p>
 			{/if}
 
 			{#if org.website}
-				<a href={org.website} target="_blank" class="website-link">{org.website}</a>
+				<a href={org.website} target="_blank" class="link link-primary text-sm inline-block mb-6">{org.website}</a>
 			{/if}
 
 			<!-- Tab navigation -->
-			<div class="tab-bar">
-				<button class="tab-btn" class:active={activeTab === 'my-schedule'} onclick={() => (activeTab = 'my-schedule')}>
-					<svg class="tab-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
+			<div class="tabs tabs-bordered mt-5">
+				<button class="tab {activeTab === 'my-schedule' ? 'tab-active' : ''}" onclick={() => (activeTab = 'my-schedule')}>
+					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
 					My Schedule
 				</button>
-				<button class="tab-btn" class:active={activeTab === 'team'} onclick={() => (activeTab = 'team')}>
-					<svg class="tab-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
+				<button class="tab {activeTab === 'team' ? 'tab-active' : ''}" onclick={() => (activeTab = 'team')}>
+					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
 					Team
 				</button>
-				<button class="tab-btn" class:active={activeTab === 'settings'} onclick={() => (activeTab = 'settings')}>
-					<svg class="tab-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+				<button class="tab {activeTab === 'settings' ? 'tab-active' : ''}" onclick={() => (activeTab = 'settings')}>
+					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
 					{canEdit ? 'Settings' : 'Rules'}
 				</button>
 			</div>
 
 			<!-- ==================== MY SCHEDULE TAB ==================== -->
 			{#if activeTab === 'my-schedule'}
-				<div class="tab-content">
-					<p class="tab-description">Your personal work schedule, overtime balance, absences and time period configurations.</p>
+				<div class="pt-2">
+					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Your personal work schedule, overtime balance, absences and time period configurations.</p>
 					<!-- My Work Schedule -->
 					{#if myRole && workSchedule}
-						<section class="schedule-overview-section">
-							<div class="section-header-row">
-								<h2>My Work Schedule</h2>
+						<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
+							<div class="flex items-center justify-between mb-4">
+								<h2 class="text-xl font-bold text-base-content">My Work Schedule</h2>
 								{#if !editingMySchedule && workSchedule.workScheduleChangeMode !== 'Disabled'}
-									<button class="btn-schedule-sm" onclick={startEditMySchedule}>Edit</button>
+									<button class="btn btn-outline btn-info btn-xs" onclick={startEditMySchedule}>Edit</button>
 								{/if}
 							</div>
 
 							{#if editingMySchedule}
-								<div class="my-schedule-form">
+								<div class="flex flex-col gap-3 py-2">
 									{#if myScheduleError}
-										<div class="inline-error">{myScheduleError}</div>
+										<div class="alert alert-error text-sm py-1.5 px-2.5">{myScheduleError}</div>
 									{/if}
-									<div class="schedule-form-row">
-										<label>Weekly Hours</label>
-										<input type="number" class="input-xs" bind:value={myWeeklyHours} min="0" max="168" step="0.5" />
+									<div class="flex items-center gap-3">
+										<label class="text-sm text-base-content/70 font-medium min-w-[100px]">Weekly Hours</label>
+										<input type="number" class="input input-bordered input-xs w-20" bind:value={myWeeklyHours} min="0" max="168" step="0.5" />
 									</div>
-									<div class="schedule-form-row">
-										<label class="checkbox-label-sm">
-											<input type="checkbox" bind:checked={myDistributeEvenly} />
-											Distribute evenly (Mon–Fri)
+									<div class="flex items-center gap-3">
+										<label class="label cursor-pointer flex items-center gap-1.5 text-sm text-base-content/70">
+											<input type="checkbox" class="checkbox checkbox-sm checkbox-primary" bind:checked={myDistributeEvenly} />
+											Distribute evenly (Monâ€“Fri)
 										</label>
 									</div>
 									{#if !myDistributeEvenly}
-										<div class="schedule-day-targets">
-											<div class="day-target-sm"><span>Mon</span><input type="number" bind:value={myTargetMon} min="0" max="24" step="0.5" /></div>
-											<div class="day-target-sm"><span>Tue</span><input type="number" bind:value={myTargetTue} min="0" max="24" step="0.5" /></div>
-											<div class="day-target-sm"><span>Wed</span><input type="number" bind:value={myTargetWed} min="0" max="24" step="0.5" /></div>
-											<div class="day-target-sm"><span>Thu</span><input type="number" bind:value={myTargetThu} min="0" max="24" step="0.5" /></div>
-											<div class="day-target-sm"><span>Fri</span><input type="number" bind:value={myTargetFri} min="0" max="24" step="0.5" /></div>
+										<div class="flex gap-2 flex-wrap">
+											<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Mon</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={myTargetMon} min="0" max="24" step="0.5" /></div>
+											<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Tue</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={myTargetTue} min="0" max="24" step="0.5" /></div>
+											<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Wed</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={myTargetWed} min="0" max="24" step="0.5" /></div>
+											<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Thu</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={myTargetThu} min="0" max="24" step="0.5" /></div>
+											<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Fri</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={myTargetFri} min="0" max="24" step="0.5" /></div>
 										</div>
 									{/if}
-									<div class="schedule-form-actions">
-										<button class="btn-primary-sm" onclick={saveMySchedule} disabled={myScheduleSaving}>
+									<div class="flex gap-2 mt-1">
+										<button class="btn btn-primary btn-sm" onclick={saveMySchedule} disabled={myScheduleSaving}>
 											{myScheduleSaving ? 'Saving...' : 'Save'}
 										</button>
-										<button class="btn-secondary-sm" onclick={() => (editingMySchedule = false)}>Cancel</button>
+										<button class="btn btn-ghost btn-sm" onclick={() => (editingMySchedule = false)}>Cancel</button>
 									</div>
 								</div>
 							{:else}
-								<div class="schedule-overview-grid">
-									<div class="schedule-stat">
-										<span class="schedule-stat-label">Weekly Hours</span>
-										<span class="schedule-stat-value">{workSchedule.weeklyWorkHours ?? '—'}h</span>
+								<div class="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] gap-2">
+									<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+										<span class="text-xs text-base-content/60 font-medium">Weekly Hours</span>
+										<span class="text-lg font-bold text-base-content">{workSchedule.weeklyWorkHours ?? 'â€”'}h</span>
 									</div>
-									<div class="schedule-stat">
-										<span class="schedule-stat-label">Mon</span>
-										<span class="schedule-stat-value">{workSchedule.targetMon ?? 0}h</span>
+									<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+										<span class="text-xs text-base-content/60 font-medium">Mon</span>
+										<span class="text-lg font-bold text-base-content">{workSchedule.targetMon ?? 0}h</span>
 									</div>
-									<div class="schedule-stat">
-										<span class="schedule-stat-label">Tue</span>
-										<span class="schedule-stat-value">{workSchedule.targetTue ?? 0}h</span>
+									<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+										<span class="text-xs text-base-content/60 font-medium">Tue</span>
+										<span class="text-lg font-bold text-base-content">{workSchedule.targetTue ?? 0}h</span>
 									</div>
-									<div class="schedule-stat">
-										<span class="schedule-stat-label">Wed</span>
-										<span class="schedule-stat-value">{workSchedule.targetWed ?? 0}h</span>
+									<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+										<span class="text-xs text-base-content/60 font-medium">Wed</span>
+										<span class="text-lg font-bold text-base-content">{workSchedule.targetWed ?? 0}h</span>
 									</div>
-									<div class="schedule-stat">
-										<span class="schedule-stat-label">Thu</span>
-										<span class="schedule-stat-value">{workSchedule.targetThu ?? 0}h</span>
+									<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+										<span class="text-xs text-base-content/60 font-medium">Thu</span>
+										<span class="text-lg font-bold text-base-content">{workSchedule.targetThu ?? 0}h</span>
 									</div>
-									<div class="schedule-stat">
-										<span class="schedule-stat-label">Fri</span>
-										<span class="schedule-stat-value">{workSchedule.targetFri ?? 0}h</span>
+									<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+										<span class="text-xs text-base-content/60 font-medium">Fri</span>
+										<span class="text-lg font-bold text-base-content">{workSchedule.targetFri ?? 0}h</span>
 									</div>
 								</div>
 							{/if}
@@ -1393,43 +1393,43 @@
 
 						<!-- Initial Overtime Balance -->
 						{#if workSchedule.initialOvertimeMode !== 'Disabled'}
-							<section class="schedule-overview-section overtime-section">
-								<div class="section-header-row">
-									<h2>Initial Overtime Balance</h2>
+							<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300 mt-4">
+								<div class="flex items-center justify-between mb-4">
+									<h2 class="text-xl font-bold text-base-content">Initial Overtime Balance</h2>
 									{#if !editingMyOvertime && workSchedule.initialOvertimeMode === 'Allowed'}
-										<button class="btn-schedule-sm" onclick={startEditMyOvertime}>Edit</button>
+										<button class="btn btn-outline btn-info btn-xs" onclick={startEditMyOvertime}>Edit</button>
 									{/if}
 								</div>
 
 								{#if editingMyOvertime}
-									<div class="my-schedule-form">
+									<div class="flex flex-col gap-3 py-2">
 										{#if myOvertimeError}
-											<div class="inline-error">{myOvertimeError}</div>
+											<div class="alert alert-error text-sm py-1.5 px-2.5">{myOvertimeError}</div>
 										{/if}
-										<div class="schedule-form-row">
-											<label>Hours</label>
-											<input type="number" class="input-xs" bind:value={myOvertimeHours} step="0.5" />
+										<div class="flex items-center gap-3">
+											<label class="text-sm text-base-content/70 font-medium min-w-[100px]">Hours</label>
+											<input type="number" class="input input-bordered input-xs w-20" bind:value={myOvertimeHours} step="0.5" />
 										</div>
-										<div class="schedule-form-actions">
-											<button class="btn-primary-sm" onclick={saveMyOvertime} disabled={myOvertimeSaving}>
+										<div class="flex gap-2 mt-1">
+											<button class="btn btn-primary btn-sm" onclick={saveMyOvertime} disabled={myOvertimeSaving}>
 												{myOvertimeSaving ? 'Saving...' : 'Save'}
 											</button>
-											<button class="btn-secondary-sm" onclick={() => (editingMyOvertime = false)}>Cancel</button>
+											<button class="btn btn-ghost btn-sm" onclick={() => (editingMyOvertime = false)}>Cancel</button>
 										</div>
 									</div>
 								{:else}
-									<div class="schedule-overview-grid">
-										<div class="schedule-stat overtime-stat">
-											<span class="schedule-stat-label">Hours</span>
-											<span class="schedule-stat-value">{workSchedule.initialOvertimeHours ?? 0}h</span>
+									<div class="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] gap-2">
+										<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+											<span class="text-xs text-base-content/60 font-medium">Hours</span>
+											<span class="text-lg font-bold text-primary">{workSchedule.initialOvertimeHours ?? 0}h</span>
 										</div>
-										<div class="schedule-stat">
-											<span class="schedule-stat-label">Mode</span>
-											<span class="schedule-stat-value schedule-stat-value-sm">{ruleModeLabel(workSchedule.initialOvertimeMode)}</span>
+										<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+											<span class="text-xs text-base-content/60 font-medium">Mode</span>
+											<span class="text-lg font-bold text-base-content !text-sm break-words">{ruleModeLabel(workSchedule.initialOvertimeMode)}</span>
 										</div>
 									</div>
 									{#if workSchedule.initialOvertimeMode === 'RequiresApproval'}
-										<p class="schedule-hint">Requires admin approval to change</p>
+										<p class="text-sm text-base-content/40 mt-3">Requires admin approval to change</p>
 									{/if}
 								{/if}
 							</section>
@@ -1438,54 +1438,54 @@
 
 					<!-- My Absences -->
 					{#if myRole}
-						<section class="schedule-overview-section">
-							<div class="section-header-row">
-								<h2>My Absences</h2>
+						<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
+							<div class="flex items-center justify-between mb-4">
+								<h2 class="text-xl font-bold text-base-content">My Absences</h2>
 								{#if absencesLoaded}
-									<button class="btn-primary-sm" onclick={() => (showAddAbsence = !showAddAbsence)}>
+									<button class="btn btn-primary btn-sm" onclick={() => (showAddAbsence = !showAddAbsence)}>
 										{showAddAbsence ? 'Cancel' : '+ Add Absence'}
 									</button>
 								{/if}
 							</div>
 
 							{#if absencesLoading}
-								<p class="muted">Loading absences...</p>
+								<p class="text-base-content/40">Loading absences...</p>
 							{:else if absencesLoaded}
 								{#if absenceError}
-									<div class="inline-error">{absenceError}</div>
+									<div class="alert alert-error text-sm py-1.5 px-2.5">{absenceError}</div>
 								{/if}
 
 								{#if showAddAbsence}
-									<form onsubmit={addAbsence} class="period-form">
-										<div class="period-form-row">
+									<form onsubmit={addAbsence} class="flex flex-col gap-2.5 p-3 bg-base-200/30 rounded-lg mb-3 border border-base-300">
+										<div class="flex items-center gap-2">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>From</label>
-											<input type="date" bind:value={newAbsenceDate} required disabled={addingAbsence} />
+											<label class="min-w-[80px] text-sm font-medium text-base-content/70">From</label>
+											<input type="date" class="input input-bordered input-sm flex-1" bind:value={newAbsenceDate} required disabled={addingAbsence} />
 										</div>
-										<div class="period-form-row">
+										<div class="flex items-center gap-2">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>To (optional)</label>
-											<input type="date" bind:value={newAbsenceToDate} min={newAbsenceDate} disabled={addingAbsence} />
+											<label class="min-w-[80px] text-sm font-medium text-base-content/70">To (optional)</label>
+											<input type="date" class="input input-bordered input-sm flex-1" bind:value={newAbsenceToDate} min={newAbsenceDate} disabled={addingAbsence} />
 										</div>
 										{#if newAbsenceDate && newAbsenceToDate && newAbsenceDate !== newAbsenceToDate}
-											<p class="range-hint">Absences will be created for workdays (Mon–Fri) only.</p>
+											<p class="text-xs text-base-content/60 my-1 italic">Absences will be created for workdays (Monâ€“Fri) only.</p>
 										{/if}
-										<div class="period-form-row">
+										<div class="flex items-center gap-2">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>Type</label>
-											<select bind:value={newAbsenceType} disabled={addingAbsence}>
+											<label class="min-w-[80px] text-sm font-medium text-base-content/70">Type</label>
+											<select class="select select-bordered select-sm flex-1" bind:value={newAbsenceType} disabled={addingAbsence}>
 												<option value={0}>Sick Day</option>
 												<option value={1}>Vacation</option>
 												<option value={2}>Other</option>
 											</select>
 										</div>
-										<div class="period-form-row">
+										<div class="flex items-center gap-2">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>Note</label>
-											<input type="text" bind:value={newAbsenceNote} placeholder="Optional note" disabled={addingAbsence} />
+											<label class="min-w-[80px] text-sm font-medium text-base-content/70">Note</label>
+											<input type="text" class="input input-bordered input-sm flex-1" bind:value={newAbsenceNote} placeholder="Optional note" disabled={addingAbsence} />
 										</div>
-										<div class="schedule-form-actions">
-											<button type="submit" class="btn-primary-sm" disabled={addingAbsence}>
+										<div class="flex gap-2 mt-1">
+											<button type="submit" class="btn btn-primary btn-sm" disabled={addingAbsence}>
 												{addingAbsence ? 'Adding...' : 'Add'}
 											</button>
 										</div>
@@ -1494,17 +1494,17 @@
 
 								{@const myAbsences = (absences ?? []).filter(a => a.userId === auth.user?.id)}
 								{#if myAbsences.length === 0}
-									<p class="muted">No absences recorded.</p>
+									<p class="text-base-content/40">No absences recorded.</p>
 								{:else}
-									<div class="absences-list">
+									<div class="flex flex-col gap-1.5">
 										{#each myAbsences as a}
-											<div class="absence-row">
-												<span class="absence-date">{formatDateDisplay(a.date)}</span>
-												<span class="absence-badge {absenceTypeBadge(a.type)}">{absenceTypeLabel(a.type)}</span>
+											<div class="flex items-center gap-3 py-2 px-3 bg-base-200/30 rounded-md text-sm">
+												<span class="font-medium text-base-content/70 min-w-[90px]">{formatDateDisplay(a.date)}</span>
+												<span class="badge badge-sm {absenceTypeBadge(a.type) === 'badge-sick' ? 'badge-error' : absenceTypeBadge(a.type) === 'badge-vacation' ? 'badge-info' : 'badge-ghost'}">{absenceTypeLabel(a.type)}</span>
 												{#if a.note}
-													<span class="absence-note">{a.note}</span>
+													<span class="text-base-content/40 text-sm italic flex-1">{a.note}</span>
 												{/if}
-												<button class="btn-icon-danger" title="Delete" onclick={() => deleteAbsence(a.id!)}>&times;</button>
+												<button class="btn btn-ghost btn-xs text-error" title="Delete" onclick={() => deleteAbsence(a.id!)}>&times;</button>
 											</div>
 										{/each}
 									</div>
@@ -1515,61 +1515,61 @@
 
 					<!-- My Schedule Periods -->
 					{#if myRole && workSchedule && workSchedule.workScheduleChangeMode !== 'Disabled'}
-						<section class="schedule-overview-section">
-							<div class="section-header-row">
-								<h2>Schedule Periods</h2>
+						<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
+							<div class="flex items-center justify-between mb-4">
+								<h2 class="text-xl font-bold text-base-content">Schedule Periods</h2>
 								{#if schedulePeriodsLoaded && workSchedule.workScheduleChangeMode === 'Allowed'}
-									<button class="btn-primary-sm" onclick={() => (showAddPeriod = !showAddPeriod)}>
+									<button class="btn btn-primary btn-sm" onclick={() => (showAddPeriod = !showAddPeriod)}>
 										{showAddPeriod ? 'Cancel' : '+ Add Period'}
 									</button>
 								{/if}
 							</div>
 
 							{#if workSchedule.workScheduleChangeMode === 'RequiresApproval'}
-								<p class="schedule-hint">Schedule period changes require admin approval</p>
+								<p class="text-sm text-base-content/40 mt-3">Schedule period changes require admin approval</p>
 							{/if}
 
 							{#if schedulePeriodsLoading}
-								<p class="muted">Loading schedule periods...</p>
+								<p class="text-base-content/40">Loading schedule periods...</p>
 							{:else if schedulePeriodsLoaded}
 								{#if periodError}
-									<div class="inline-error">{periodError}</div>
+									<div class="alert alert-error text-sm py-1.5 px-2.5">{periodError}</div>
 								{/if}
 
 								{#if showAddPeriod && workSchedule.workScheduleChangeMode === 'Allowed'}
-									<form onsubmit={addSchedulePeriod} class="period-form">
-										<div class="period-form-row">
+									<form onsubmit={addSchedulePeriod} class="flex flex-col gap-2.5 p-3 bg-base-200/30 rounded-lg mb-3 border border-base-300">
+										<div class="flex items-center gap-2">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>From</label>
-											<input type="date" bind:value={newPeriodFrom} required disabled={addingPeriod} />
+											<label class="min-w-[80px] text-sm font-medium text-base-content/70">From</label>
+											<input type="date" class="input input-bordered input-sm flex-1" bind:value={newPeriodFrom} required disabled={addingPeriod} />
 										</div>
-										<div class="period-form-row">
+										<div class="flex items-center gap-2">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>To (optional)</label>
-											<input type="date" bind:value={newPeriodTo} disabled={addingPeriod} />
+											<label class="min-w-[80px] text-sm font-medium text-base-content/70">To (optional)</label>
+											<input type="date" class="input input-bordered input-sm flex-1" bind:value={newPeriodTo} disabled={addingPeriod} />
 										</div>
-										<div class="period-form-row">
+										<div class="flex items-center gap-2">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>Weekly Hours</label>
-											<input type="number" bind:value={newPeriodWeeklyHours} step="0.5" min="0" max="168" disabled={addingPeriod} />
+											<label class="min-w-[80px] text-sm font-medium text-base-content/70">Weekly Hours</label>
+											<input type="number" class="input input-bordered input-sm flex-1" bind:value={newPeriodWeeklyHours} step="0.5" min="0" max="168" disabled={addingPeriod} />
 										</div>
-										<div class="schedule-form-row">
-											<label class="checkbox-label-sm">
-												<input type="checkbox" bind:checked={newPeriodDistributeEvenly} disabled={addingPeriod} />
-												Distribute evenly (Mon–Fri)
+										<div class="flex items-center gap-3">
+											<label class="label cursor-pointer flex items-center gap-1.5 text-sm text-base-content/70">
+												<input type="checkbox" class="checkbox checkbox-sm checkbox-primary" bind:checked={newPeriodDistributeEvenly} disabled={addingPeriod} />
+												Distribute evenly (Monâ€“Fri)
 											</label>
 										</div>
 										{#if !newPeriodDistributeEvenly}
-											<div class="schedule-day-targets">
-												<div class="day-target-sm"><span>Mon</span><input type="number" bind:value={newPeriodMon} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
-												<div class="day-target-sm"><span>Tue</span><input type="number" bind:value={newPeriodTue} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
-												<div class="day-target-sm"><span>Wed</span><input type="number" bind:value={newPeriodWed} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
-												<div class="day-target-sm"><span>Thu</span><input type="number" bind:value={newPeriodThu} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
-												<div class="day-target-sm"><span>Fri</span><input type="number" bind:value={newPeriodFri} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+											<div class="flex gap-2 flex-wrap">
+												<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Mon</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={newPeriodMon} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+												<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Tue</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={newPeriodTue} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+												<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Wed</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={newPeriodWed} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+												<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Thu</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={newPeriodThu} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
+												<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Fri</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={newPeriodFri} step="0.5" min="0" max="24" disabled={addingPeriod} /></div>
 											</div>
 										{/if}
-										<div class="schedule-form-actions">
-											<button type="submit" class="btn-primary-sm" disabled={addingPeriod}>
+										<div class="flex gap-2 mt-1">
+											<button type="submit" class="btn btn-primary btn-sm" disabled={addingPeriod}>
 												{addingPeriod ? 'Adding...' : 'Add'}
 											</button>
 										</div>
@@ -1577,24 +1577,24 @@
 								{/if}
 
 								{#if schedulePeriods.length === 0}
-									<p class="muted">No schedule periods configured. The base work schedule is used.</p>
+									<p class="text-base-content/40">No schedule periods configured. The base work schedule is used.</p>
 								{:else}
-									<div class="periods-list">
+									<div class="flex flex-col gap-1.5">
 										{#each schedulePeriods as p}
 											{@const today = new Date().toISOString().slice(0, 10)}
 											{@const isActive = p.validFrom && p.validFrom <= today && (!p.validTo || p.validTo >= today)}
-											<div class="period-row" class:period-active={isActive}>
-												<div class="period-dates">
+											<div class="flex items-center gap-3 py-2 px-3 rounded-md text-sm {isActive ? 'bg-success/5 border border-success' : 'bg-base-200/30'}">
+												<div class="flex items-center gap-1.5 font-medium text-base-content/70">
 													<span>{formatDateDisplay(p.validFrom)}</span>
-													<span class="period-arrow">&rarr;</span>
+													<span class="text-base-content/40">&rarr;</span>
 													<span>{p.validTo ? formatDateDisplay(p.validTo) : 'ongoing'}</span>
 												</div>
 												{#if isActive}
-													<span class="active-badge">Active</span>
+													<span class="badge badge-success badge-xs font-semibold">Active</span>
 												{/if}
-												<span class="period-hours">{p.weeklyWorkHours ?? '—'}h/week</span>
+												<span class="text-primary font-semibold ml-auto">{p.weeklyWorkHours ?? 'â€”'}h/week</span>
 												{#if workSchedule.workScheduleChangeMode === 'Allowed'}
-													<button class="btn-icon-danger" title="Delete" onclick={() => deleteSchedulePeriod(p.id!)}>&times;</button>
+													<button class="btn btn-ghost btn-xs text-error" title="Delete" onclick={() => deleteSchedulePeriod(p.id!)}>&times;</button>
 												{/if}
 											</div>
 										{/each}
@@ -1607,85 +1607,85 @@
 
 			<!-- ==================== TEAM TAB ==================== -->
 			{:else if activeTab === 'team'}
-				<div class="tab-content">
-					<p class="tab-description">Your team at a glance. {#if canEdit}Click a member for details, schedule editing, and absence history.{:else}Click a member to see their profile.{/if}</p>
+				<div class="pt-2">
+					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Your team at a glance. {#if canEdit}Click a member for details, schedule editing, and absence history.{:else}Click a member to see their profile.{/if}</p>
 
 					<!-- Members -->
-					<section class="members-section">
-						<div class="section-header">
-							<h2>Members ({(org.members ?? []).length})</h2>
+					<section class="mt-8">
+						<div class="flex items-center justify-between mb-4">
+							<h2 class="text-xl text-base-content/70">Members ({(org.members ?? []).length})</h2>
 							{#if canEdit}
-								<button class="btn-primary-sm" onclick={() => { showAddMember = !showAddMember; if (showAddMember) loadUsersForDropdown(); }}>
+								<button class="btn btn-primary btn-sm" onclick={() => { showAddMember = !showAddMember; if (showAddMember) loadUsersForDropdown(); }}>
 									{showAddMember ? 'Cancel' : '+ Add Member'}
 								</button>
 							{/if}
 						</div>
 
 						{#if showAddMember && canEdit}
-							<div class="add-member-form">
+							<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
 								{#if addMemberError}
-									<div class="error-banner">{addMemberError}</div>
+									<div class="alert alert-error mb-4 text-sm">{addMemberError}</div>
 								{/if}
-								<form onsubmit={addMember} class="inline-form">
-									<select bind:value={selectedUserId} disabled={addingMember} class="user-select">
+								<form onsubmit={addMember} class="flex gap-2 items-center flex-wrap">
+									<select bind:value={selectedUserId} disabled={addingMember} class="select select-bordered select-sm flex-1 min-w-[200px]">
 										<option value={null}>Select a user...</option>
 										{#each getAvailableUsers() as user}
 											<option value={user.id}>{user.firstName} {user.lastName} ({user.email})</option>
 										{/each}
 									</select>
-									<select bind:value={newMemberRole} disabled={addingMember}>
+									<select bind:value={newMemberRole} disabled={addingMember} class="select select-bordered select-sm">
 										<option value={0}>Member</option>
 										<option value={1}>Admin</option>
 										{#if isOwner}<option value={2}>Owner</option>{/if}
 									</select>
-									<button type="submit" class="btn-primary-sm" disabled={addingMember}>
+									<button type="submit" class="btn btn-primary btn-sm" disabled={addingMember}>
 										{addingMember ? 'Adding...' : 'Add'}
 									</button>
 								</form>
 							</div>
 						{/if}
 
-						<div class="team-cards">
+						<div class="flex flex-col gap-2">
 							{#each (org.members ?? []) as member}
 								{@const overview = getMemberOverview(member.id!)}
 								<a
-									class="team-card"
+									class="group flex items-center gap-4 p-3.5 bg-base-100 border border-base-300 rounded-xl cursor-pointer transition-all hover:border-primary/30 hover:shadow-md hover:-translate-y-px no-underline text-base-content"
 									href="/organizations/{orgSlug}/members/{member.id}"
 									title="View {member.firstName}'s details"
 								>
-									<div class="team-card-avatar">
+									<div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-sm font-semibold shrink-0">
 										{(member.firstName?.[0] ?? '').toUpperCase()}{(member.lastName?.[0] ?? '').toUpperCase()}
 									</div>
-									<div class="team-card-body">
-										<div class="team-card-name">
+									<div class="flex-1 min-w-0">
+										<div class="font-semibold text-base-content text-[0.9375rem] flex items-center gap-1.5">
 											{member.firstName} {member.lastName}
 											{#if member.id === auth.user?.id}
-												<span class="you-badge">You</span>
+												<span class="badge badge-info badge-xs font-semibold">You</span>
 											{/if}
 										</div>
-										<div class="team-card-email">{member.email}</div>
+										<div class="text-sm text-base-content/40 mt-0.5">{member.email}</div>
 										{#if canEdit && org.memberTimeEntryVisibility && overview}
-											<div class="team-card-stats">
-												<span class="stat" title="Tracked this week">
-													<svg viewBox="0 0 16 16" fill="currentColor" class="stat-icon"><path d="M8 3.5a.5.5 0 00-1 0V8a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 7.71V3.5z"/><path d="M8 16A8 8 0 108 0a8 8 0 000 16zm7-8A7 7 0 111 8a7 7 0 0114 0z"/></svg>
+											<div class="flex gap-3 mt-1.5 flex-wrap">
+												<span class="flex items-center gap-1 text-xs text-base-content/50" title="Tracked this week">
+													<svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5 opacity-60"><path d="M8 3.5a.5.5 0 00-1 0V8a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 7.71V3.5z"/><path d="M8 16A8 8 0 108 0a8 8 0 000 16zm7-8A7 7 0 111 8a7 7 0 0114 0z"/></svg>
 													{formatMinutesToHours(overview.netTrackedMinutes)}
 												</span>
-												<span class="stat" title="Entries this week">
-													<svg viewBox="0 0 16 16" fill="currentColor" class="stat-icon"><path d="M5 3.5h6A1.5 1.5 0 0112.5 5v6a1.5 1.5 0 01-1.5 1.5H5A1.5 1.5 0 013.5 11V5A1.5 1.5 0 015 3.5z"/></svg>
+												<span class="flex items-center gap-1 text-xs text-base-content/50" title="Entries this week">
+													<svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5 opacity-60"><path d="M5 3.5h6A1.5 1.5 0 0112.5 5v6a1.5 1.5 0 01-1.5 1.5H5A1.5 1.5 0 013.5 11V5A1.5 1.5 0 015 3.5z"/></svg>
 													{overview.entryCount ?? 0} entries
 												</span>
 												{#if overview.weeklyWorkHours}
-													<span class="stat" title="Weekly target">
-														<svg viewBox="0 0 16 16" fill="currentColor" class="stat-icon"><path d="M8 15A7 7 0 118 1a7 7 0 010 14zm0 1A8 8 0 108 0a8 8 0 000 16z"/><path d="M10.97 4.97a.235.235 0 00-.02.022L7.477 9.417 5.384 7.323a.75.75 0 00-1.06 1.06L6.97 11.03a.75.75 0 001.079-.02l3.992-4.99a.75.75 0 00-1.071-1.05z"/></svg>
+													<span class="flex items-center gap-1 text-xs text-base-content/50" title="Weekly target">
+														<svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5 opacity-60"><path d="M8 15A7 7 0 118 1a7 7 0 010 14zm0 1A8 8 0 108 0a8 8 0 000 16z"/><path d="M10.97 4.97a.235.235 0 00-.02.022L7.477 9.417 5.384 7.323a.75.75 0 00-1.06 1.06L6.97 11.03a.75.75 0 001.079-.02l3.992-4.99a.75.75 0 00-1.071-1.05z"/></svg>
 														{overview.weeklyWorkHours}h/w
 													</span>
 												{/if}
 											</div>
 										{/if}
 									</div>
-									<div class="team-card-right">
-										<span class="role-badge role-{(member.role?.toLowerCase() ?? 'member')}">{member.role}</span>
-										<svg class="team-card-arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
+									<div class="flex items-center gap-2 shrink-0">
+										<span class="badge badge-sm uppercase tracking-wide {(member.role?.toLowerCase() ?? 'member') === 'owner' ? 'badge-warning' : (member.role?.toLowerCase() ?? 'member') === 'admin' ? 'badge-info' : 'badge-ghost'}">{member.role}</span>
+										<svg class="w-5 h-5 text-base-content/20 group-hover:text-primary transition-colors" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
 									</div>
 								</a>
 							{/each}
@@ -1694,57 +1694,57 @@
 
 					<!-- Holidays -->
 					{#if myRole}
-						<section class="schedule-overview-section">
-							<div class="section-header-row">
-								<h2>Holidays</h2>
+						<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
+							<div class="flex items-center justify-between mb-4">
+								<h2 class="text-xl font-bold text-base-content">Holidays</h2>
 								{#if holidaysLoaded && canEdit}
-									<button class="btn-primary-sm" onclick={() => (showAddHoliday = !showAddHoliday)}>
+									<button class="btn btn-primary btn-sm" onclick={() => (showAddHoliday = !showAddHoliday)}>
 										{showAddHoliday ? 'Cancel' : '+ Add Holiday'}
 									</button>
 								{/if}
 							</div>
 
 							{#if holidaysLoading}
-								<p class="muted">Loading holidays...</p>
+								<p class="text-base-content/40">Loading holidays...</p>
 							{:else if holidaysLoaded}
 								{#if holidayError}
-									<div class="inline-error">{holidayError}</div>
+									<div class="alert alert-error text-sm py-1.5 px-2.5">{holidayError}</div>
 								{/if}
 
 								{#if canEdit}
-									<div class="import-holidays-row">
-										<select bind:value={importPreset} class="input-xs" disabled={importingHolidays}>
+									<div class="flex items-center gap-2 mb-3 flex-wrap">
+										<select bind:value={importPreset} class="input input-bordered input-xs w-20" disabled={importingHolidays}>
 											<option value="de">Germany</option>
 											<option value="at">Austria</option>
 											<option value="ch">Switzerland</option>
 										</select>
-										<input type="number" bind:value={importYear} class="input-xs" min="2020" max="2099" style="width:80px" disabled={importingHolidays} />
-										<button class="btn-secondary-sm" onclick={importHolidays} disabled={importingHolidays}>
+										<input type="number" bind:value={importYear} class="input input-bordered input-xs w-20" min="2020" max="2099" style="width:80px" disabled={importingHolidays} />
+										<button class="btn btn-ghost btn-sm" onclick={importHolidays} disabled={importingHolidays}>
 											{importingHolidays ? 'Importing...' : 'Import Holidays'}
 										</button>
 									</div>
 								{/if}
 
 								{#if showAddHoliday && canEdit}
-									<form onsubmit={addHoliday} class="period-form">
-										<div class="period-form-row">
+									<form onsubmit={addHoliday} class="flex flex-col gap-2.5 p-3 bg-base-200/30 rounded-lg mb-3 border border-base-300">
+										<div class="flex items-center gap-2">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>Date</label>
-											<input type="date" bind:value={newHolidayDate} required disabled={addingHoliday} />
+											<label class="min-w-[80px] text-sm font-medium text-base-content/70">Date</label>
+											<input type="date" class="input input-bordered input-sm flex-1" bind:value={newHolidayDate} required disabled={addingHoliday} />
 										</div>
-										<div class="period-form-row">
+										<div class="flex items-center gap-2">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label>Name</label>
-											<input type="text" bind:value={newHolidayName} placeholder="e.g. Christmas" required disabled={addingHoliday} />
+											<label class="min-w-[80px] text-sm font-medium text-base-content/70">Name</label>
+											<input type="text" class="input input-bordered input-sm flex-1" bind:value={newHolidayName} placeholder="e.g. Christmas" required disabled={addingHoliday} />
 										</div>
-										<div class="period-form-row">
-											<label class="checkbox-label">
-												<input type="checkbox" bind:checked={newHolidayRecurring} disabled={addingHoliday} />
+										<div class="flex items-center gap-2">
+											<label class="label cursor-pointer flex items-center gap-1.5 text-sm text-base-content/70">
+												<input type="checkbox" class="checkbox checkbox-sm" bind:checked={newHolidayRecurring} disabled={addingHoliday} />
 												Yearly recurring
 											</label>
 										</div>
-										<div class="schedule-form-actions">
-											<button type="submit" class="btn-primary-sm" disabled={addingHoliday}>
+										<div class="flex gap-2 mt-1">
+											<button type="submit" class="btn btn-primary btn-sm" disabled={addingHoliday}>
 												{addingHoliday ? 'Adding...' : 'Add'}
 											</button>
 										</div>
@@ -1752,32 +1752,32 @@
 								{/if}
 
 								{#if holidays.length === 0}
-									<p class="muted">No holidays configured.</p>
+									<p class="text-base-content/40">No holidays configured.</p>
 								{:else}
-									<div class="holidays-list">
+									<div class="flex flex-col gap-1.5">
 										{#each holidays as h}
-											<div class="holiday-row">
+											<div class="flex items-center gap-3 py-2 px-3 bg-base-200/30 rounded-md text-sm">
 												{#if editingHolidayId === h.id && canEdit}
-													<input type="date" bind:value={editHolidayDate} class="input-xs" disabled={editHolidaySaving} />
-													<input type="text" bind:value={editHolidayName} class="input-xs" disabled={editHolidaySaving} />
-													<label class="checkbox-label compact">
-														<input type="checkbox" bind:checked={editHolidayRecurring} disabled={editHolidaySaving} />
+													<input type="date" bind:value={editHolidayDate} class="input input-bordered input-xs w-20" disabled={editHolidaySaving} />
+													<input type="text" bind:value={editHolidayName} class="input input-bordered input-xs w-20" disabled={editHolidaySaving} />
+													<label class="label cursor-pointer flex items-center gap-1.5 text-[0.8rem] whitespace-nowrap text-sm text-base-content/70">
+														<input type="checkbox" class="checkbox checkbox-sm" bind:checked={editHolidayRecurring} disabled={editHolidaySaving} />
 														Yearly
 													</label>
-													<div class="rule-actions">
-														<button class="btn-primary-sm" onclick={() => saveEditHoliday(h.id!)} disabled={editHolidaySaving}>Save</button>
-														<button class="btn-secondary-sm" onclick={() => (editingHolidayId = null)}>Cancel</button>
+													<div class="flex items-center gap-1.5">
+														<button class="btn btn-primary btn-sm" onclick={() => saveEditHoliday(h.id!)} disabled={editHolidaySaving}>Save</button>
+														<button class="btn btn-ghost btn-sm" onclick={() => (editingHolidayId = null)}>Cancel</button>
 													</div>
 												{:else}
-													<span class="holiday-date">{formatDateDisplay(h.date)}</span>
-													<span class="holiday-name">{h.name}</span>
+													<span class="font-medium text-base-content/70 min-w-[90px]">{formatDateDisplay(h.date)}</span>
+													<span class="flex-1 text-base-content/60">{h.name}</span>
 													{#if h.isRecurring}
-														<span class="recurring-badge" title="Repeats every year">&#x1f501; Yearly</span>
+														<span class="badge badge-info badge-xs" title="Repeats every year">&#x1f501; Yearly</span>
 													{/if}
 													{#if canEdit}
-														<div class="rule-actions">
-															<button class="btn-secondary-sm" onclick={() => startEditHoliday(h)}>Edit</button>
-															<button class="btn-icon-danger" title="Delete" onclick={() => deleteHoliday(h.id!)}>&times;</button>
+														<div class="flex items-center gap-1.5">
+															<button class="btn btn-ghost btn-sm" onclick={() => startEditHoliday(h)}>Edit</button>
+															<button class="btn btn-ghost btn-xs text-error" title="Delete" onclick={() => deleteHoliday(h.id!)}>&times;</button>
 														</div>
 													{/if}
 												{/if}
@@ -1792,40 +1792,39 @@
 
 			<!-- ==================== SETTINGS TAB (Admin) ==================== -->
 			{:else if activeTab === 'settings' && canEdit}
-				<div class="tab-content">
-					<p class="tab-description">Organization-wide rules, permissions, and approval workflows.</p>
+				<div class="pt-2">
+					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Organization-wide rules, permissions, and approval workflows.</p>
 
 					<!-- Organization Settings -->
-					<section class="settings-section">
-						<h2>Organization Settings</h2>
+					<section class="mt-10">
+						<h2 class="text-xl text-base-content/70 mb-4">Organization Settings</h2>
 						{#if settingsError}
-							<div class="error-banner">{settingsError}</div>
+							<div class="alert alert-error mb-4 text-sm">{settingsError}</div>
 						{/if}
 
-						<div class="settings-grid">
-							<div class="setting-row">
+						<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+							<div class="flex items-center justify-between p-4 border-b border-base-200">
 								<div class="setting-info">
-									<div class="setting-label">Auto-Pause Tracking</div>
-									<div class="setting-desc">Automatically deduct break time from tracked hours based on configurable rules.</div>
+									<div class="font-semibold text-base-content mb-0.5">Auto-Pause Tracking</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Automatically deduct break time from tracked hours based on configurable rules.</div>
 								</div>
 								<button
-									class="toggle-switch"
-									class:active={org.autoPauseEnabled}
+									class="relative w-12 h-[26px] {org.autoPauseEnabled ? 'bg-primary' : 'bg-base-300'} rounded-full border-none cursor-pointer transition-colors shrink-0 p-0"
 									onclick={toggleAutoPause}
 									disabled={settingsSaving}
 									aria-label="Toggle auto-pause"
 								>
-									<span class="toggle-knob"></span>
+									<span class="absolute top-[3px] {org.autoPauseEnabled ? 'translate-x-[22px]' : 'translate-x-0'} left-[3px] w-5 h-5 bg-base-100 rounded-full transition-transform shadow-sm"></span>
 								</button>
 							</div>
 
-							<div class="setting-row">
+							<div class="flex items-center justify-between p-4 border-b border-base-200">
 								<div class="setting-info">
-									<div class="setting-label">Edit Past Entries</div>
-									<div class="setting-desc">Control whether members can edit start/end times of completed time entries.</div>
+									<div class="font-semibold text-base-content mb-0.5">Edit Past Entries</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can edit start/end times of completed time entries.</div>
 								</div>
 								<button
-									class="rule-mode-btn {ruleModeColor(org.editPastEntriesMode)}"
+									class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeColor(org.editPastEntriesMode) === 'mode-allowed' ? 'btn-success' : ruleModeColor(org.editPastEntriesMode) === 'mode-approval' ? 'btn-warning' : 'btn-neutral'}"
 									onclick={cycleEditPastEntriesMode}
 									disabled={settingsSaving}
 								>
@@ -1833,13 +1832,13 @@
 								</button>
 							</div>
 
-							<div class="setting-row">
+							<div class="flex items-center justify-between p-4 border-b border-base-200">
 								<div class="setting-info">
-									<div class="setting-label">Edit Pause Duration</div>
-									<div class="setting-desc">Control whether members can override auto-deducted break time.</div>
+									<div class="font-semibold text-base-content mb-0.5">Edit Pause Duration</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can override auto-deducted break time.</div>
 								</div>
 								<button
-									class="rule-mode-btn {ruleModeColor(org.editPauseMode)}"
+									class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeColor(org.editPauseMode) === 'mode-allowed' ? 'btn-success' : ruleModeColor(org.editPauseMode) === 'mode-approval' ? 'btn-warning' : 'btn-neutral'}"
 									onclick={cycleEditPauseMode}
 									disabled={settingsSaving}
 								>
@@ -1847,13 +1846,13 @@
 								</button>
 							</div>
 
-							<div class="setting-row">
+							<div class="flex items-center justify-between p-4 border-b border-base-200">
 								<div class="setting-info">
-									<div class="setting-label">Initial Overtime</div>
-									<div class="setting-desc">Control whether members can set their own initial overtime balance.</div>
+									<div class="font-semibold text-base-content mb-0.5">Initial Overtime</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can set their own initial overtime balance.</div>
 								</div>
 								<button
-									class="rule-mode-btn {ruleModeColor(org.initialOvertimeMode)}"
+									class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeColor(org.initialOvertimeMode) === 'mode-allowed' ? 'btn-success' : ruleModeColor(org.initialOvertimeMode) === 'mode-approval' ? 'btn-warning' : 'btn-neutral'}"
 									onclick={cycleInitialOvertimeMode}
 									disabled={settingsSaving}
 								>
@@ -1861,13 +1860,13 @@
 								</button>
 							</div>
 
-							<div class="setting-row">
+							<div class="flex items-center justify-between p-4 border-b border-base-200">
 								<div class="setting-info">
-									<div class="setting-label">Join Policy</div>
-									<div class="setting-desc">Control how new members can join the organization.</div>
+									<div class="font-semibold text-base-content mb-0.5">Join Policy</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Control how new members can join the organization.</div>
 								</div>
 								<button
-									class="rule-mode-btn {ruleModeColor(org.joinPolicy)}"
+									class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeColor(org.joinPolicy) === 'mode-allowed' ? 'btn-success' : ruleModeColor(org.joinPolicy) === 'mode-approval' ? 'btn-warning' : 'btn-neutral'}"
 									onclick={cycleJoinPolicy}
 									disabled={settingsSaving}
 								>
@@ -1875,13 +1874,13 @@
 								</button>
 							</div>
 
-							<div class="setting-row">
+							<div class="flex items-center justify-between p-4 border-b border-base-200">
 								<div class="setting-info">
-									<div class="setting-label">Schedule Periods</div>
-									<div class="setting-desc">Control whether members can create/modify their own schedule periods.</div>
+									<div class="font-semibold text-base-content mb-0.5">Schedule Periods</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can create/modify their own schedule periods.</div>
 								</div>
 								<button
-									class="rule-mode-btn {ruleModeColor(org.workScheduleChangeMode)}"
+									class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeColor(org.workScheduleChangeMode) === 'mode-allowed' ? 'btn-success' : ruleModeColor(org.workScheduleChangeMode) === 'mode-approval' ? 'btn-warning' : 'btn-neutral'}"
 									onclick={cycleWorkScheduleChangeMode}
 									disabled={settingsSaving}
 								>
@@ -1889,52 +1888,51 @@
 								</button>
 							</div>
 
-							<div class="setting-row">
+							<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
 								<div class="setting-info">
-									<div class="setting-label">Member Time Visibility</div>
-									<div class="setting-desc">When enabled, admins can view members' tracked working hours. Members will see a notification about this.</div>
+									<div class="font-semibold text-base-content mb-0.5">Member Time Visibility</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">When enabled, admins can view members' tracked working hours. Members will see a notification about this.</div>
 								</div>
 								<button
-									class="toggle-switch"
-									class:active={org.memberTimeEntryVisibility}
+									class="relative w-12 h-[26px] {org.memberTimeEntryVisibility ? 'bg-primary' : 'bg-base-300'} rounded-full border-none cursor-pointer transition-colors shrink-0 p-0"
 									onclick={toggleMemberTimeEntryVisibility}
 									disabled={settingsSaving}
 									aria-label="Toggle member time entry visibility"
 								>
-									<span class="toggle-knob"></span>
+									<span class="absolute top-[3px] {org.memberTimeEntryVisibility ? 'translate-x-[22px]' : 'translate-x-0'} left-[3px] w-5 h-5 bg-base-100 rounded-full transition-transform shadow-sm"></span>
 								</button>
 							</div>
 						</div>
 
 						<!-- Pause Rules -->
 						{#if org.autoPauseEnabled}
-							<div class="pause-rules-section">
-								<div class="section-header">
-									<h3>Pause Rules</h3>
-									<button class="btn-primary-sm" onclick={() => (showAddRule = !showAddRule)}>
+							<div class="mt-6">
+								<div class="flex items-center justify-between mb-4">
+									<h3 class="text-base font-bold text-base-content/70">Pause Rules</h3>
+									<button class="btn btn-primary btn-sm" onclick={() => (showAddRule = !showAddRule)}>
 										{showAddRule ? 'Cancel' : '+ Add Rule'}
 									</button>
 								</div>
 
 								{#if showAddRule}
-									<div class="add-rule-form">
+									<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
 										{#if addRuleError}
-											<div class="error-banner">{addRuleError}</div>
+											<div class="alert alert-error mb-4 text-sm">{addRuleError}</div>
 										{/if}
-										<form onsubmit={addPauseRule} class="inline-form">
-											<div class="rule-field">
+										<form onsubmit={addPauseRule} class="flex gap-2 items-center flex-wrap">
+											<div class="flex items-center gap-1.5">
 												<!-- svelte-ignore a11y_label_has_associated_control -->
-												<label>When tracked &ge;</label>
-												<input type="number" step="0.5" min="0.5" bind:value={newRuleMinHours} required disabled={addingRule} />
-												<span>hours</span>
+												<label class="text-sm text-base-content/70 font-medium whitespace-nowrap">When tracked &ge;</label>
+												<input type="number" class="input input-bordered input-xs w-[70px] text-center" step="0.5" min="0.5" bind:value={newRuleMinHours} required disabled={addingRule} />
+												<span class="text-sm text-base-content/60 whitespace-nowrap">hours</span>
 											</div>
-											<div class="rule-field">
+											<div class="flex items-center gap-1.5">
 												<!-- svelte-ignore a11y_label_has_associated_control -->
-												<label>deduct</label>
-												<input type="number" min="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
-												<span>min pause</span>
+												<label class="text-sm text-base-content/70 font-medium whitespace-nowrap">deduct</label>
+												<input type="number" class="input input-bordered input-xs w-[70px] text-center" min="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
+												<span class="text-sm text-base-content/60 whitespace-nowrap">min pause</span>
 											</div>
-											<button type="submit" class="btn-primary-sm" disabled={addingRule}>
+											<button type="submit" class="btn btn-primary btn-sm" disabled={addingRule}>
 												{addingRule ? 'Adding...' : 'Add Rule'}
 											</button>
 										</form>
@@ -1942,40 +1940,40 @@
 								{/if}
 
 								{#if getPauseRules().length === 0}
-									<p class="muted">No pause rules configured. Add rules to automatically deduct break time.</p>
+									<p class="text-base-content/40">No pause rules configured. Add rules to automatically deduct break time.</p>
 								{:else}
-									<div class="rules-list">
+									<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
 										{#each getPauseRules() as rule}
-											<div class="rule-row">
+											<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0 flex-wrap gap-2">
 												{#if editingRuleId === rule.id}
 													{#if editRuleError}
-														<div class="error-banner" style="width:100%">{editRuleError}</div>
+														<div class="alert alert-error mb-4 text-sm" style="width:100%">{editRuleError}</div>
 													{/if}
-													<div class="rule-edit-form">
-														<div class="rule-field">
+													<div class="flex items-center gap-3 flex-wrap w-full">
+														<div class="flex items-center gap-1.5">
 															<!-- svelte-ignore a11y_label_has_associated_control -->
-															<label>&ge;</label>
-															<input type="number" step="0.5" min="0.5" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
-															<span>h</span>
+															<label class="text-sm text-base-content/70 font-medium whitespace-nowrap">&ge;</label>
+															<input type="number" class="input input-bordered input-xs w-[70px] text-center" step="0.5" min="0.5" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
+															<span class="text-sm text-base-content/60 whitespace-nowrap">h</span>
 														</div>
-														<div class="rule-field">
+														<div class="flex items-center gap-1.5">
 															<!-- svelte-ignore a11y_label_has_associated_control -->
-															<label>&rarr;</label>
-															<input type="number" min="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
-															<span>min</span>
+															<label class="text-sm text-base-content/70 font-medium whitespace-nowrap">&rarr;</label>
+															<input type="number" class="input input-bordered input-xs w-[70px] text-center" min="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
+															<span class="text-sm text-base-content/60 whitespace-nowrap">min</span>
 														</div>
-														<div class="rule-actions">
-															<button class="btn-primary-sm" onclick={() => saveEditRule(rule.id!)} disabled={editingRuleSaving}>Save</button>
-															<button class="btn-secondary-sm" onclick={cancelEditRule}>Cancel</button>
+														<div class="flex items-center gap-1.5">
+															<button class="btn btn-primary btn-sm" onclick={() => saveEditRule(rule.id!)} disabled={editingRuleSaving}>Save</button>
+															<button class="btn btn-ghost btn-sm" onclick={cancelEditRule}>Cancel</button>
 														</div>
 													</div>
 												{:else}
-													<div class="rule-text">
+													<div class="text-[0.9375rem] text-base-content/70">
 														<strong>&ge; {rule.minHours}h</strong> tracked &rarr; <strong>{rule.pauseMinutes} min</strong> pause deducted
 													</div>
-													<div class="rule-actions">
-														<button class="btn-secondary-sm" onclick={() => startEditRule(rule)}>Edit</button>
-														<button class="btn-icon-danger" title="Delete rule" onclick={() => deleteRule(rule.id!)}>&times;</button>
+													<div class="flex items-center gap-1.5">
+														<button class="btn btn-ghost btn-sm" onclick={() => startEditRule(rule)}>Edit</button>
+														<button class="btn btn-ghost btn-xs text-error" title="Delete rule" onclick={() => deleteRule(rule.id!)}>&times;</button>
 													</div>
 												{/if}
 											</div>
@@ -1987,43 +1985,43 @@
 					</section>
 
 					<!-- Request History -->
-					<section class="request-history-section">
-						<div class="section-header-row">
-							<h2>Request History</h2>
+					<section class="mt-8">
+						<div class="flex items-center justify-between mb-4">
+							<h2 class="text-xl font-bold text-base-content">Request History</h2>
 						</div>
 
 						{#if requestHistoryLoading}
-							<p class="muted">Loading requests...</p>
+							<p class="text-base-content/40">Loading requests...</p>
 						{:else if requestHistoryLoaded}
-							<div class="request-filters">
-								<button class="filter-btn" class:active={requestHistoryFilter === 'all'} onclick={() => (requestHistoryFilter = 'all')}>All ({requestHistory.length})</button>
-								<button class="filter-btn" class:active={requestHistoryFilter === 'Pending'} onclick={() => (requestHistoryFilter = 'Pending')}>Pending ({requestHistory.filter(r => r.status === 'Pending').length})</button>
-								<button class="filter-btn" class:active={requestHistoryFilter === 'Accepted'} onclick={() => (requestHistoryFilter = 'Accepted')}>Accepted ({requestHistory.filter(r => r.status === 'Accepted').length})</button>
-								<button class="filter-btn" class:active={requestHistoryFilter === 'Declined'} onclick={() => (requestHistoryFilter = 'Declined')}>Declined ({requestHistory.filter(r => r.status === 'Declined').length})</button>
+							<div class="flex gap-1.5 mb-4 flex-wrap">
+								<button class="btn btn-sm rounded-full {requestHistoryFilter === 'all' ? 'btn-neutral' : 'btn-outline'}" onclick={() => (requestHistoryFilter = 'all')}>All ({requestHistory.length})</button>
+								<button class="btn btn-sm rounded-full {requestHistoryFilter === 'Pending' ? 'btn-neutral' : 'btn-outline'}" onclick={() => (requestHistoryFilter = 'Pending')}>Pending ({requestHistory.filter(r => r.status === 'Pending').length})</button>
+								<button class="btn btn-sm rounded-full {requestHistoryFilter === 'Accepted' ? 'btn-neutral' : 'btn-outline'}" onclick={() => (requestHistoryFilter = 'Accepted')}>Accepted ({requestHistory.filter(r => r.status === 'Accepted').length})</button>
+								<button class="btn btn-sm rounded-full {requestHistoryFilter === 'Declined' ? 'btn-neutral' : 'btn-outline'}" onclick={() => (requestHistoryFilter = 'Declined')}>Declined ({requestHistory.filter(r => r.status === 'Declined').length})</button>
 							</div>
 
 							{#if filteredRequests().length === 0}
-								<p class="muted">No requests found.</p>
+								<p class="text-base-content/40">No requests found.</p>
 							{:else}
-								<div class="request-list">
+								<div class="flex flex-col gap-3">
 									{#each filteredRequests() as req}
-										<div class="request-item">
-											<div class="request-item-header">
-												<span class="request-type-tag">{formatRequestType(req.type)}</span>
-												<span class="request-status {statusBadgeClass(req.status)}">{req.status}</span>
+										<div class="bg-base-200/30 border border-base-300 rounded-lg p-4">
+											<div class="flex items-center gap-2 mb-2">
+												<span class="badge badge-primary badge-sm">{formatRequestType(req.type)}</span>
+												<span class="badge badge-sm {statusBadgeClass(req.status) === 'status-pending' ? 'badge-warning' : statusBadgeClass(req.status) === 'status-accepted' ? 'badge-success' : 'badge-error'}">{req.status}</span>
 											</div>
-											<div class="request-item-body">
-												<div class="request-user">
+											<div class="text-sm">
+												<div class="mb-1">
 													<strong>{req.userFirstName} {req.userLastName}</strong>
-													<span class="request-email">{req.userEmail}</span>
+													<span class="text-base-content/40 text-sm ml-1.5">{req.userEmail}</span>
 												</div>
 												{#if req.requestData}
-													<div class="request-data">{parseRequestData(req.type, req.requestData).join(', ')}</div>
+													<div class="text-primary text-sm my-1 py-1 px-2 bg-primary/10 rounded-md inline-block">{parseRequestData(req.type, req.requestData).join(', ')}</div>
 												{/if}
 												{#if req.message}
-													<div class="request-message">"{req.message}"</div>
+													<div class="text-base-content/60 italic text-sm my-1">"{req.message}"</div>
 												{/if}
-												<div class="request-meta">
+												<div class="text-base-content/40 text-xs mt-1.5">
 													<span>Created {formatTimeAgo(req.createdAt)}</span>
 													{#if req.respondedAt}
 														<span>&middot; {req.status === 'Accepted' ? 'Accepted' : 'Declined'} by {req.respondedByName ?? 'Unknown'} {formatTimeAgo(req.respondedAt)}</span>
@@ -2034,8 +2032,8 @@
 												</div>
 											</div>
 											{#if req.status === 'Pending'}
-												<div class="request-item-actions">
-													<button class="btn-accept-sm" onclick={async () => {
+												<div class="flex gap-1.5 mt-3 pt-3 border-t border-base-300">
+													<button class="btn btn-success btn-sm" onclick={async () => {
 														try {
 															await requestsApi.apiOrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: true });
 															requestHistoryLoaded = false;
@@ -2044,7 +2042,7 @@
 															actionError = extractErrorMessage(e, 'Failed to accept');
 														}
 													}}>Accept</button>
-													<button class="btn-decline-sm" onclick={async () => {
+													<button class="btn btn-outline btn-error btn-sm" onclick={async () => {
 														try {
 															await requestsApi.apiOrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: false });
 															requestHistoryLoaded = false;
@@ -2065,79 +2063,79 @@
 
 			<!-- ==================== RULES TAB (Member read-only) ==================== -->
 			{:else if activeTab === 'settings'}
-				<div class="tab-content">
-					<p class="tab-description">Current organization rules and policies. Only admins can change these settings.</p>
+				<div class="pt-2">
+					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Current organization rules and policies. Only admins can change these settings.</p>
 
-					<section class="settings-section">
-						<h2>Organization Rules</h2>
+					<section class="mt-10">
+						<h2 class="text-xl text-base-content/70 mb-4">Organization Rules</h2>
 
-						<div class="settings-grid">
-							<div class="setting-row">
+						<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+							<div class="flex items-center justify-between p-4 border-b border-base-200">
 								<div class="setting-info">
-									<div class="setting-label">Auto-Pause Tracking</div>
-									<div class="setting-desc">Automatically deduct break time from tracked hours based on configurable rules.</div>
+									<div class="font-semibold text-base-content mb-0.5">Auto-Pause Tracking</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Automatically deduct break time from tracked hours based on configurable rules.</div>
 								</div>
-								<span class="rule-status" class:active={org.autoPauseEnabled}>{org.autoPauseEnabled ? 'On' : 'Off'}</span>
+								<span class="badge {org.autoPauseEnabled ? 'badge-success' : 'badge-ghost'}">{org.autoPauseEnabled ? 'On' : 'Off'}</span>
 							</div>
 
-							<div class="setting-row">
+							<div class="flex items-center justify-between p-4 border-b border-base-200">
 								<div class="setting-info">
-									<div class="setting-label">Edit Past Entries</div>
-									<div class="setting-desc">Control whether members can edit start/end times of completed time entries.</div>
+									<div class="font-semibold text-base-content mb-0.5">Edit Past Entries</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can edit start/end times of completed time entries.</div>
 								</div>
-								<span class="rule-status-badge {ruleModeColor(org.editPastEntriesMode)}">{ruleModeLabel(org.editPastEntriesMode)}</span>
+								<span class="badge {ruleModeColor(org.editPastEntriesMode) === 'mode-allowed' ? 'badge-success' : ruleModeColor(org.editPastEntriesMode) === 'mode-approval' ? 'badge-warning' : 'badge-neutral'}">{ruleModeLabel(org.editPastEntriesMode)}</span>
 							</div>
 
-							<div class="setting-row">
+							<div class="flex items-center justify-between p-4 border-b border-base-200">
 								<div class="setting-info">
-									<div class="setting-label">Edit Pause Duration</div>
-									<div class="setting-desc">Control whether members can override auto-deducted break time.</div>
+									<div class="font-semibold text-base-content mb-0.5">Edit Pause Duration</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can override auto-deducted break time.</div>
 								</div>
-								<span class="rule-status-badge {ruleModeColor(org.editPauseMode)}">{ruleModeLabel(org.editPauseMode)}</span>
+								<span class="badge {ruleModeColor(org.editPauseMode) === 'mode-allowed' ? 'badge-success' : ruleModeColor(org.editPauseMode) === 'mode-approval' ? 'badge-warning' : 'badge-neutral'}">{ruleModeLabel(org.editPauseMode)}</span>
 							</div>
 
-							<div class="setting-row">
+							<div class="flex items-center justify-between p-4 border-b border-base-200">
 								<div class="setting-info">
-									<div class="setting-label">Initial Overtime</div>
-									<div class="setting-desc">Control whether members can set their own initial overtime balance.</div>
+									<div class="font-semibold text-base-content mb-0.5">Initial Overtime</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can set their own initial overtime balance.</div>
 								</div>
-								<span class="rule-status-badge {ruleModeColor(org.initialOvertimeMode)}">{ruleModeLabel(org.initialOvertimeMode)}</span>
+								<span class="badge {ruleModeColor(org.initialOvertimeMode) === 'mode-allowed' ? 'badge-success' : ruleModeColor(org.initialOvertimeMode) === 'mode-approval' ? 'badge-warning' : 'badge-neutral'}">{ruleModeLabel(org.initialOvertimeMode)}</span>
 							</div>
 
-							<div class="setting-row">
+							<div class="flex items-center justify-between p-4 border-b border-base-200">
 								<div class="setting-info">
-									<div class="setting-label">Join Policy</div>
-									<div class="setting-desc">Control how new members can join the organization.</div>
+									<div class="font-semibold text-base-content mb-0.5">Join Policy</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Control how new members can join the organization.</div>
 								</div>
-								<span class="rule-status-badge {ruleModeColor(org.joinPolicy)}">{joinPolicyLabel(org.joinPolicy)}</span>
+								<span class="badge {ruleModeColor(org.joinPolicy) === 'mode-allowed' ? 'badge-success' : ruleModeColor(org.joinPolicy) === 'mode-approval' ? 'badge-warning' : 'badge-neutral'}">{joinPolicyLabel(org.joinPolicy)}</span>
 							</div>
 
-							<div class="setting-row">
+							<div class="flex items-center justify-between p-4 border-b border-base-200">
 								<div class="setting-info">
-									<div class="setting-label">Schedule Periods</div>
-									<div class="setting-desc">Control whether members can create/modify their own schedule periods.</div>
+									<div class="font-semibold text-base-content mb-0.5">Schedule Periods</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can create/modify their own schedule periods.</div>
 								</div>
-								<span class="rule-status-badge {ruleModeColor(org.workScheduleChangeMode)}">{ruleModeLabel(org.workScheduleChangeMode)}</span>
+								<span class="badge {ruleModeColor(org.workScheduleChangeMode) === 'mode-allowed' ? 'badge-success' : ruleModeColor(org.workScheduleChangeMode) === 'mode-approval' ? 'badge-warning' : 'badge-neutral'}">{ruleModeLabel(org.workScheduleChangeMode)}</span>
 							</div>
 
-							<div class="setting-row">
+							<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
 								<div class="setting-info">
-									<div class="setting-label">Member Time Visibility</div>
-									<div class="setting-desc">Whether admins can view members' tracked working hours.</div>
+									<div class="font-semibold text-base-content mb-0.5">Member Time Visibility</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Whether admins can view members' tracked working hours.</div>
 								</div>
-								<span class="rule-status" class:active={org.memberTimeEntryVisibility}>{org.memberTimeEntryVisibility ? 'On' : 'Off'}</span>
+								<span class="badge {org.memberTimeEntryVisibility ? 'badge-success' : 'badge-ghost'}">{org.memberTimeEntryVisibility ? 'On' : 'Off'}</span>
 							</div>
 						</div>
 
 						{#if org.autoPauseEnabled}
-							<div class="pause-rules-readonly">
-								<h3>Pause Rules</h3>
+							<div class="mt-6 pt-4 border-t border-base-300">
+								<h3 class="text-base font-bold text-base-content mb-3">Pause Rules</h3>
 								{#if (org.pauseRules ?? []).length === 0}
-									<p class="muted">No pause rules configured.</p>
+									<p class="text-base-content/40">No pause rules configured.</p>
 								{:else}
-									<div class="rules-list">
+									<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
 										{#each (org.pauseRules ?? []) as rule}
-											<div class="rule-item-readonly">
+											<div class="p-2 bg-base-200/50 border border-base-300 rounded-lg text-sm text-base-content/70 mb-2">
 												<strong>&ge; {rule.minHours}h</strong> tracked &rarr; <strong>{rule.pauseMinutes} min</strong> pause deducted
 											</div>
 										{/each}
@@ -2152,1618 +2150,3 @@
 	{/if}
 </div>
 
-<style>
-	.visibility-warning {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1rem;
-		background: #fffbeb;
-		border: 1px solid #f59e0b;
-		border-radius: 8px;
-		color: #92400e;
-		font-size: 0.875rem;
-		margin-bottom: 1rem;
-	}
-	.visibility-warning svg {
-		flex-shrink: 0;
-		color: #f59e0b;
-	}
-
-	.settings-changed-banner {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1rem;
-		background: #eff6ff;
-		border: 1px solid #3b82f6;
-		border-radius: 8px;
-		color: #1e40af;
-		font-size: 0.875rem;
-		margin-bottom: 1rem;
-	}
-	.settings-changed-banner svg {
-		flex-shrink: 0;
-		color: #3b82f6;
-	}
-	.settings-changed-banner .link-btn {
-		background: none;
-		border: none;
-		color: #2563eb;
-		font-weight: 600;
-		text-decoration: underline;
-		cursor: pointer;
-		padding: 0;
-		font-size: inherit;
-	}
-	.settings-changed-banner .dismiss-btn {
-		margin-left: auto;
-		background: none;
-		border: none;
-		color: #6b7280;
-		cursor: pointer;
-		font-size: 1.25rem;
-		padding: 0 0.25rem;
-		line-height: 1;
-	}
-	.settings-changed-banner .dismiss-btn:hover { color: #1e40af; }
-
-	.rule-status {
-		font-size: 0.8125rem;
-		font-weight: 600;
-		padding: 0.25rem 0.75rem;
-		border-radius: 999px;
-		background: #f3f4f6;
-		color: #6b7280;
-	}
-	.rule-status.active {
-		background: #dcfce7;
-		color: #16a34a;
-	}
-
-	.rule-status-badge {
-		font-size: 0.75rem;
-		font-weight: 600;
-		padding: 0.25rem 0.75rem;
-		border-radius: 999px;
-	}
-
-	.pause-rules-readonly {
-		margin-top: 1.5rem;
-		padding-top: 1rem;
-		border-top: 1px solid #e5e7eb;
-	}
-	.pause-rules-readonly h3 {
-		font-size: 1rem;
-		margin: 0 0 0.75rem;
-		color: #1a1a2e;
-	}
-	.rule-item-readonly {
-		padding: 0.5rem 0.75rem;
-		background: #f9fafb;
-		border: 1px solid #e5e7eb;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		color: #374151;
-		margin-bottom: 0.5rem;
-	}
-
-	.back-link {
-		color: #6b7280;
-		text-decoration: none;
-		font-size: 0.875rem;
-		display: inline-block;
-		margin-bottom: 0.75rem;
-	}
-
-	.back-link:hover {
-		color: #3b82f6;
-	}
-
-	.muted {
-		color: #9ca3af;
-	}
-
-	.error-msg {
-		color: #dc2626;
-		background: #fef2f2;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
-		border-left: 3px solid #dc2626;
-	}
-
-	.error-banner {
-		background: #fef2f2;
-		color: #dc2626;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
-		margin-bottom: 1rem;
-		font-size: 0.875rem;
-		border-left: 3px solid #dc2626;
-	}
-
-	/* ====== Tab Navigation ====== */
-	.tab-bar {
-		display: flex;
-		gap: 0;
-		background: transparent;
-		border-bottom: 2px solid #e2e8f0;
-		margin: 1.25rem 0 0;
-		padding: 0;
-	}
-
-	.tab-btn {
-		position: relative;
-		flex: 1;
-		padding: 0.875rem 1.25rem;
-		border: none;
-		border-radius: 0;
-		background: transparent;
-		color: #64748b;
-		font-size: 0.9rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: color 0.2s ease, background 0.15s ease;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-		white-space: nowrap;
-		letter-spacing: 0.01em;
-	}
-
-	.tab-btn::after {
-		content: '';
-		position: absolute;
-		bottom: -2px;
-		left: 0;
-		right: 0;
-		height: 3px;
-		background: transparent;
-		border-radius: 3px 3px 0 0;
-		transition: background 0.2s ease;
-	}
-
-	.tab-btn:hover {
-		color: #1e293b;
-		background: #f8fafc;
-	}
-
-	.tab-btn.active {
-		color: #2563eb;
-		font-weight: 600;
-	}
-
-	.tab-btn.active::after {
-		background: #2563eb;
-	}
-
-	.tab-icon {
-		width: 1.125rem;
-		height: 1.125rem;
-		flex-shrink: 0;
-	}
-
-	.tab-content {
-		animation: fadeTab 0.25s ease;
-		padding-top: 0.5rem;
-	}
-
-	.tab-description {
-		color: #64748b;
-		font-size: 0.875rem;
-		margin: 0.5rem 0 1.25rem;
-		line-height: 1.5;
-	}
-
-	@keyframes fadeTab {
-		from { opacity: 0; transform: translateY(6px); }
-		to   { opacity: 1; transform: translateY(0); }
-	}
-
-	.loading-state {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		justify-content: center;
-		padding: 3rem 0;
-		color: #94a3b8;
-	}
-
-	.spinner {
-		width: 1.25rem;
-		height: 1.25rem;
-		border: 2px solid #e2e8f0;
-		border-top-color: #2563eb;
-		border-radius: 50%;
-		animation: spin 0.6s linear infinite;
-	}
-
-	@keyframes spin {
-		to { transform: rotate(360deg); }
-	}
-
-	/* Organization header */
-	.org-header {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		margin-bottom: 0.5rem;
-	}
-
-	.org-header h1 {
-		margin: 0;
-		font-size: 1.75rem;
-		color: #1a1a2e;
-	}
-
-	.slug {
-		color: #9ca3af;
-		font-size: 0.875rem;
-	}
-
-	.header-actions {
-		display: flex;
-		gap: 0.5rem;
-	}
-
-	.description {
-		color: #4b5563;
-		margin: 0.75rem 0;
-	}
-
-	.website-link {
-		color: #3b82f6;
-		font-size: 0.875rem;
-		display: inline-block;
-		margin-bottom: 1.5rem;
-	}
-
-	/* Members */
-	.members-section {
-		margin-top: 2rem;
-	}
-
-	/* Schedule overview */
-	.schedule-overview-section {
-		margin-top: 2rem;
-		background: #f8fafc;
-		border-radius: 10px;
-		padding: 1.25rem;
-		border: 1px solid #e5e7eb;
-	}
-
-	.schedule-overview-section h2 {
-		margin: 0 0 0.75rem 0;
-		font-size: 1.125rem;
-	}
-
-	.schedule-overview-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-		gap: 0.5rem;
-	}
-
-	.schedule-stat {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		background: white;
-		padding: 0.5rem;
-		border-radius: 8px;
-		border: 1px solid #e5e7eb;
-	}
-
-	.schedule-stat-label {
-		font-size: 0.75rem;
-		color: #6b7280;
-		font-weight: 500;
-	}
-
-	.schedule-stat-value {
-		font-size: 1.1rem;
-		font-weight: 700;
-		color: #1a1a2e;
-	}
-
-	.schedule-stat-value-sm {
-		font-size: 0.85rem;
-		word-break: break-word;
-	}
-
-	.overtime-stat .schedule-stat-value {
-		color: #3b82f6;
-	}
-
-	.schedule-hint {
-		margin: 0.75rem 0 0;
-		font-size: 0.8rem;
-		color: #9ca3af;
-	}
-
-	.schedule-hint a {
-		color: #3b82f6;
-		text-decoration: none;
-	}
-
-	.schedule-hint a:hover {
-		text-decoration: underline;
-	}
-
-	.section-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin-bottom: 1rem;
-	}
-
-	.section-header h2 {
-		margin: 0;
-		font-size: 1.25rem;
-		color: #374151;
-	}
-
-	.add-member-form {
-		background: #f9fafb;
-		padding: 1rem;
-		border-radius: 8px;
-		margin-bottom: 1rem;
-		border: 1px solid #e5e7eb;
-	}
-
-	.inline-form {
-		display: flex;
-		gap: 0.5rem;
-		align-items: center;
-		flex-wrap: wrap;
-	}
-
-	.inline-form input {
-		flex: 1;
-		min-width: 200px;
-		padding: 0.5rem 0.75rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 0.875rem;
-	}
-
-	.inline-form select {
-		padding: 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 0.875rem;
-	}
-
-	.user-select {
-		flex: 1;
-		min-width: 200px;
-	}
-
-	.members-list {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		overflow: hidden;
-	}
-
-	/* Team card grid */
-	.team-cards {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.team-card {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		padding: 0.875rem 1rem;
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		cursor: pointer;
-		transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
-		text-decoration: none;
-		color: inherit;
-	}
-
-	.team-card:hover {
-		border-color: #93c5fd;
-		box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
-		transform: translateY(-1px);
-	}
-
-	.team-card-avatar {
-		width: 2.5rem;
-		height: 2.5rem;
-		border-radius: 50%;
-		background: linear-gradient(135deg, #3b82f6, #6366f1);
-		color: white;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		flex-shrink: 0;
-		letter-spacing: 0.03em;
-	}
-
-	.team-card-body {
-		flex: 1;
-		min-width: 0;
-	}
-
-	.team-card-name {
-		font-weight: 600;
-		color: #1e293b;
-		font-size: 0.9375rem;
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-	}
-
-	.team-card-email {
-		font-size: 0.8125rem;
-		color: #94a3b8;
-		margin-top: 0.125rem;
-	}
-
-	.team-card-stats {
-		display: flex;
-		gap: 0.75rem;
-		margin-top: 0.375rem;
-		flex-wrap: wrap;
-	}
-
-	.team-card-stats .stat {
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		font-size: 0.75rem;
-		color: #64748b;
-	}
-
-	.stat-icon {
-		width: 0.875rem;
-		height: 0.875rem;
-		opacity: 0.6;
-	}
-
-	.team-card-right {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-shrink: 0;
-	}
-
-	.team-card-arrow {
-		width: 1.25rem;
-		height: 1.25rem;
-		color: #cbd5e1;
-		transition: color 0.15s;
-	}
-
-	.team-card:hover .team-card-arrow {
-		color: #3b82f6;
-	}
-
-	.member-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.75rem 1rem;
-		border-bottom: 1px solid #f3f4f6;
-	}
-
-	.member-row:last-child {
-		border-bottom: none;
-	}
-
-	.member-name {
-		font-weight: 500;
-		color: #1a1a2e;
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.member-email {
-		font-size: 0.8125rem;
-		color: #9ca3af;
-	}
-
-	.member-overtime {
-		margin-top: 0.25rem;
-	}
-
-	.overtime-badge {
-		font-size: 0.6875rem;
-		background: #f3f4f6;
-		color: #6b7280;
-		border: 1px solid #e5e7eb;
-		padding: 0.125rem 0.5rem;
-		border-radius: 999px;
-		cursor: pointer;
-		transition: background 0.15s, border-color 0.15s;
-	}
-
-	.overtime-badge:hover {
-		background: #eff6ff;
-		border-color: #93c5fd;
-		color: #3b82f6;
-	}
-
-	.overtime-edit-inline {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		flex-wrap: wrap;
-	}
-
-	.overtime-edit-inline label {
-		font-size: 0.6875rem;
-		color: #6b7280;
-		white-space: nowrap;
-	}
-
-	.overtime-input {
-		width: 70px;
-		padding: 0.25rem 0.375rem;
-		border: 1px solid #d1d5db;
-		border-radius: 4px;
-		font-size: 0.75rem;
-		text-align: center;
-	}
-
-	.overtime-input:focus {
-		outline: none;
-		border-color: #3b82f6;
-	}
-
-	.btn-save-xs, .btn-cancel-xs {
-		padding: 0.125rem 0.375rem;
-		border-radius: 4px;
-		font-size: 0.75rem;
-		cursor: pointer;
-		border: 1px solid #d1d5db;
-		line-height: 1;
-	}
-
-	.btn-save-xs {
-		background: #22c55e;
-		color: white;
-		border-color: #22c55e;
-	}
-
-	.btn-cancel-xs {
-		background: white;
-		color: #6b7280;
-	}
-
-	.overtime-error {
-		font-size: 0.6875rem;
-		color: #dc2626;
-	}
-
-	.member-actions {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.member-actions select {
-		padding: 0.375rem 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-	}
-
-	.you-badge {
-		font-size: 0.6875rem;
-		background: #dbeafe;
-		color: #1e40af;
-		padding: 0.0625rem 0.375rem;
-		border-radius: 999px;
-		font-weight: 600;
-	}
-
-	.role-badge {
-		font-size: 0.75rem;
-		font-weight: 600;
-		padding: 0.125rem 0.5rem;
-		border-radius: 999px;
-		text-transform: uppercase;
-		letter-spacing: 0.025em;
-	}
-
-	.role-owner {
-		background: #fef3c7;
-		color: #92400e;
-	}
-
-	.role-admin {
-		background: #dbeafe;
-		color: #1e40af;
-	}
-
-	.role-member {
-		background: #f3f4f6;
-		color: #4b5563;
-	}
-
-	.btn-icon-danger {
-		background: none;
-		border: none;
-		color: #dc2626;
-		font-size: 1.25rem;
-		cursor: pointer;
-		padding: 0.25rem 0.5rem;
-		border-radius: 4px;
-		line-height: 1;
-	}
-
-	.btn-icon-danger:hover {
-		background: #fef2f2;
-	}
-
-	/* Buttons */
-	.btn-primary {
-		background: #3b82f6;
-		color: white;
-		padding: 0.5rem 1rem;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		font-weight: 600;
-		border: none;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.btn-primary:hover:not(:disabled) {
-		background: #2563eb;
-	}
-
-	.btn-primary:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	.btn-primary-sm {
-		background: #3b82f6;
-		color: white;
-		padding: 0.375rem 0.75rem;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		font-weight: 600;
-		border: none;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.btn-primary-sm:hover:not(:disabled) {
-		background: #2563eb;
-	}
-
-	.btn-primary-sm:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	.btn-secondary {
-		background: white;
-		color: #4b5563;
-		padding: 0.5rem 1rem;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		font-weight: 500;
-		border: 1px solid #d1d5db;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.btn-secondary:hover {
-		background: #f9fafb;
-	}
-
-	.btn-danger {
-		background: white;
-		color: #dc2626;
-		padding: 0.5rem 1rem;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		font-weight: 500;
-		border: 1px solid #fecaca;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.btn-danger:hover {
-		background: #fef2f2;
-	}
-
-	/* Card / form */
-	.card {
-		background: white;
-		border-radius: 12px;
-		padding: 2rem;
-		border: 1px solid #e5e7eb;
-		max-width: 560px;
-	}
-
-	.card h2 {
-		margin: 0 0 1.25rem;
-		color: #1a1a2e;
-	}
-
-	.field {
-		margin-bottom: 1.25rem;
-	}
-
-	.field label {
-		display: block;
-		font-weight: 500;
-		margin-bottom: 0.375rem;
-		color: #374151;
-		font-size: 0.875rem;
-	}
-
-	.field input,
-	.field textarea {
-		width: 100%;
-		padding: 0.625rem 0.75rem;
-		border: 1px solid #d1d5db;
-		border-radius: 8px;
-		font-size: 0.9375rem;
-		box-sizing: border-box;
-		font-family: inherit;
-	}
-
-	.field input:focus,
-	.field textarea:focus {
-		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-	}
-
-	.form-actions {
-		display: flex;
-		gap: 0.75rem;
-		justify-content: flex-end;
-		margin-top: 1.5rem;
-	}
-
-	/* Settings section */
-	.settings-section {
-		margin-top: 2.5rem;
-	}
-
-	.settings-section h2 {
-		font-size: 1.25rem;
-		color: #374151;
-		margin: 0 0 1rem;
-	}
-
-	.settings-grid {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		overflow: hidden;
-	}
-
-	.setting-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 1rem 1.25rem;
-		border-bottom: 1px solid #f3f4f6;
-	}
-
-	.setting-row:last-child {
-		border-bottom: none;
-	}
-
-	.setting-label {
-		font-weight: 600;
-		color: #1a1a2e;
-		margin-bottom: 0.125rem;
-	}
-
-	.setting-desc {
-		font-size: 0.8125rem;
-		color: #6b7280;
-		max-width: 400px;
-	}
-
-	/* Toggle switch */
-	.toggle-switch {
-		position: relative;
-		width: 48px;
-		height: 26px;
-		background: #d1d5db;
-		border: none;
-		border-radius: 999px;
-		cursor: pointer;
-		transition: background 0.2s;
-		flex-shrink: 0;
-		padding: 0;
-	}
-
-	.toggle-switch.active {
-		background: #3b82f6;
-	}
-
-	.toggle-switch:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.toggle-knob {
-		position: absolute;
-		top: 3px;
-		left: 3px;
-		width: 20px;
-		height: 20px;
-		background: white;
-		border-radius: 50%;
-		transition: transform 0.2s;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-	}
-
-	.toggle-switch.active .toggle-knob {
-		transform: translateX(22px);
-	}
-
-	/* Rule mode buttons */
-	.rule-mode-btn {
-		padding: 0.35rem 0.85rem;
-		border: none;
-		border-radius: 6px;
-		font-size: 0.8rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: background 0.2s, color 0.2s;
-		white-space: nowrap;
-		min-width: 130px;
-		text-align: center;
-	}
-
-	.rule-mode-btn:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.rule-mode-btn.mode-allowed {
-		background: #22c55e;
-		color: white;
-	}
-
-	.rule-mode-btn.mode-approval {
-		background: #f59e0b;
-		color: white;
-	}
-
-	.rule-mode-btn.mode-disabled {
-		background: #6b7280;
-		color: white;
-	}
-
-	/* Pause rules */
-	.pause-rules-section {
-		margin-top: 1.5rem;
-	}
-
-	.pause-rules-section h3 {
-		margin: 0;
-		font-size: 1.05rem;
-		color: #374151;
-	}
-
-	.add-rule-form {
-		background: #f9fafb;
-		padding: 1rem;
-		border-radius: 8px;
-		margin-bottom: 1rem;
-		border: 1px solid #e5e7eb;
-	}
-
-	.rule-field {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-	}
-
-	.rule-field label {
-		font-size: 0.875rem;
-		color: #4b5563;
-		font-weight: 500;
-		white-space: nowrap;
-	}
-
-	.rule-field input {
-		width: 70px;
-		padding: 0.375rem 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 0.875rem;
-		text-align: center;
-	}
-
-	.rule-field span {
-		font-size: 0.8125rem;
-		color: #6b7280;
-		white-space: nowrap;
-	}
-
-	.rules-list {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		overflow: hidden;
-	}
-
-	.rule-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 0.75rem 1rem;
-		border-bottom: 1px solid #f3f4f6;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-	}
-
-	.rule-row:last-child {
-		border-bottom: none;
-	}
-
-	.rule-text {
-		font-size: 0.9375rem;
-		color: #374151;
-	}
-
-	.rule-edit-form {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		flex-wrap: wrap;
-		width: 100%;
-	}
-
-	.rule-actions {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-	}
-
-	.btn-secondary-sm {
-		background: white;
-		color: #4b5563;
-		padding: 0.375rem 0.75rem;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		border: 1px solid #d1d5db;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.btn-secondary-sm:hover {
-		background: #f9fafb;
-	}
-
-	/* Request History */
-	.request-history-section {
-		margin-top: 2rem;
-	}
-
-	.section-header-row {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin-bottom: 1rem;
-	}
-
-	.section-header-row h2 {
-		margin: 0;
-		font-size: 1.25rem;
-		color: #1a1a2e;
-	}
-
-	.request-filters {
-		display: flex;
-		gap: 0.375rem;
-		margin-bottom: 1rem;
-		flex-wrap: wrap;
-	}
-
-	.filter-btn {
-		padding: 0.375rem 0.75rem;
-		border-radius: 20px;
-		border: 1px solid #d1d5db;
-		background: white;
-		color: #6b7280;
-		font-size: 0.8125rem;
-		cursor: pointer;
-		transition: all 0.15s;
-	}
-
-	.filter-btn.active {
-		background: #1a1a2e;
-		color: white;
-		border-color: #1a1a2e;
-	}
-
-	.filter-btn:hover:not(.active) {
-		background: #f3f4f6;
-	}
-
-	.request-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	.request-item {
-		background: #f9fafb;
-		border: 1px solid #e5e7eb;
-		border-radius: 10px;
-		padding: 1rem;
-	}
-
-	.request-item-header {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 0.5rem;
-	}
-
-	.request-type-tag {
-		background: #e0e7ff;
-		color: #3730a3;
-		padding: 0.125rem 0.5rem;
-		border-radius: 10px;
-		font-size: 0.75rem;
-		font-weight: 600;
-	}
-
-	.request-status {
-		font-size: 0.75rem;
-		font-weight: 600;
-		padding: 0.125rem 0.5rem;
-		border-radius: 10px;
-	}
-
-	.status-pending {
-		background: #fef3c7;
-		color: #b45309;
-	}
-
-	.status-accepted {
-		background: #d1fae5;
-		color: #065f46;
-	}
-
-	.status-declined {
-		background: #fee2e2;
-		color: #991b1b;
-	}
-
-	.request-item-body {
-		font-size: 0.875rem;
-	}
-
-	.request-user {
-		margin-bottom: 0.25rem;
-	}
-
-	.request-email {
-		color: #9ca3af;
-		font-size: 0.8125rem;
-		margin-left: 0.375rem;
-	}
-
-	.request-data {
-		color: #3b82f6;
-		font-size: 0.8125rem;
-		margin: 0.25rem 0;
-		padding: 0.25rem 0.5rem;
-		background: #eff6ff;
-		border-radius: 6px;
-		display: inline-block;
-	}
-
-	.request-message {
-		color: #6b7280;
-		font-style: italic;
-		font-size: 0.8125rem;
-		margin: 0.25rem 0;
-	}
-
-	.request-meta {
-		color: #9ca3af;
-		font-size: 0.75rem;
-		margin-top: 0.375rem;
-	}
-
-	.request-item-actions {
-		display: flex;
-		gap: 0.375rem;
-		margin-top: 0.75rem;
-		padding-top: 0.75rem;
-		border-top: 1px solid #e5e7eb;
-	}
-
-	.btn-accept-sm {
-		background: #10b981;
-		color: white;
-		border: none;
-		padding: 0.375rem 0.75rem;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		cursor: pointer;
-	}
-
-	.btn-accept-sm:hover {
-		background: #059669;
-	}
-
-	.btn-decline-sm {
-		background: white;
-		color: #dc2626;
-		border: 1px solid #fca5a5;
-		padding: 0.375rem 0.75rem;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		cursor: pointer;
-	}
-
-	.btn-decline-sm:hover {
-		background: #fef2f2;
-	}
-
-	/* Member Schedule Panel */
-	.member-wrapper {
-		border: 1px solid #e5e7eb;
-		border-radius: 10px;
-		overflow: hidden;
-		transition: box-shadow 0.15s;
-	}
-
-	.member-wrapper:hover {
-		box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-	}
-
-	.btn-schedule-sm {
-		background: #eff6ff;
-		color: #2563eb;
-		border: 1px solid #bfdbfe;
-		padding: 0.25rem 0.625rem;
-		border-radius: 6px;
-		font-size: 0.75rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.15s;
-	}
-
-	.btn-schedule-sm:hover {
-		background: #dbeafe;
-		border-color: #93c5fd;
-	}
-
-	.member-schedule-panel {
-		background: #f8fafc;
-		border-top: 1px solid #e5e7eb;
-		padding: 1rem 1.25rem;
-	}
-
-	.member-schedule-form {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	.schedule-form-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
-
-	.schedule-form-row label {
-		font-size: 0.8125rem;
-		color: #374151;
-		font-weight: 500;
-		min-width: 100px;
-	}
-
-	.input-xs {
-		padding: 0.3rem 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		width: 80px;
-	}
-
-	.input-xs:focus {
-		outline: none;
-		border-color: #6366f1;
-		box-shadow: 0 0 0 2px rgba(99,102,241,0.15);
-	}
-
-	.checkbox-label-sm {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		font-size: 0.8125rem;
-		color: #374151;
-		cursor: pointer;
-	}
-
-	.checkbox-label-sm input[type="checkbox"] {
-		accent-color: #6366f1;
-	}
-
-	.schedule-day-targets {
-		display: flex;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-	}
-
-	.day-target-sm {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.25rem;
-	}
-
-	.day-target-sm span {
-		font-size: 0.75rem;
-		color: #6b7280;
-		font-weight: 500;
-	}
-
-	.day-target-sm input {
-		width: 56px;
-		padding: 0.25rem 0.375rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		text-align: center;
-	}
-
-	.day-target-sm input:focus {
-		outline: none;
-		border-color: #6366f1;
-		box-shadow: 0 0 0 2px rgba(99,102,241,0.15);
-	}
-
-	.schedule-form-actions {
-		display: flex;
-		gap: 0.5rem;
-		margin-top: 0.25rem;
-	}
-
-	.overtime-section {
-		margin-top: 1rem;
-	}
-
-	.overtime-stat .schedule-stat-value {
-		color: #2563eb;
-		font-weight: 700;
-	}
-
-	.my-schedule-form {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		padding: 0.5rem 0;
-	}
-
-	.inline-error {
-		background: #fef2f2;
-		color: #dc2626;
-		font-size: 0.8125rem;
-		padding: 0.375rem 0.625rem;
-		border-radius: 6px;
-		border-left: 3px solid #dc2626;
-	}
-
-	.range-hint {
-		font-size: 0.75rem;
-		color: #6b7280;
-		margin: 0.25rem 0;
-		font-style: italic;
-	}
-
-	/* Holidays */
-	.holidays-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.375rem;
-	}
-
-	.holiday-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.5rem 0.75rem;
-		background: #f8fafc;
-		border-radius: 6px;
-		font-size: 0.875rem;
-	}
-
-	.holiday-date {
-		font-weight: 500;
-		color: #374151;
-		min-width: 90px;
-	}
-
-	.holiday-name {
-		flex: 1;
-		color: #6b7280;
-	}
-
-	.recurring-badge {
-		font-size: 0.7rem;
-		background: #dbeafe;
-		color: #1d4ed8;
-		padding: 0.125rem 0.5rem;
-		border-radius: 999px;
-		white-space: nowrap;
-	}
-
-	.import-holidays-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 0.75rem;
-		flex-wrap: wrap;
-	}
-
-	.checkbox-label {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		font-size: 0.85rem;
-		color: #374151;
-		cursor: pointer;
-	}
-
-	.checkbox-label.compact {
-		font-size: 0.8rem;
-		white-space: nowrap;
-	}
-
-	.checkbox-label input[type="checkbox"] {
-		margin: 0;
-	}
-
-	/* Absences */
-	.absences-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.375rem;
-	}
-
-	.absence-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.5rem 0.75rem;
-		background: #f8fafc;
-		border-radius: 6px;
-		font-size: 0.875rem;
-	}
-
-	.absence-date {
-		font-weight: 500;
-		color: #374151;
-		min-width: 90px;
-	}
-
-	.absence-badge {
-		padding: 0.125rem 0.5rem;
-		border-radius: 9999px;
-		font-size: 0.75rem;
-		font-weight: 500;
-	}
-
-	.absence-sick {
-		background: #fef2f2;
-		color: #dc2626;
-	}
-
-	.absence-vacation {
-		background: #eff6ff;
-		color: #2563eb;
-	}
-
-	.absence-other {
-		background: #f3f4f6;
-		color: #6b7280;
-	}
-
-	.absence-user {
-		color: #6b7280;
-		font-size: 0.8125rem;
-	}
-
-	.absence-note {
-		color: #9ca3af;
-		font-size: 0.8125rem;
-		font-style: italic;
-		flex: 1;
-	}
-
-	.absence-toolbar {
-		margin-bottom: 0.75rem;
-	}
-
-	.absence-admin-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin-bottom: 0.5rem;
-	}
-
-	.filter-select {
-		padding: 0.25rem 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-		background: white;
-	}
-
-	/* Schedule Periods */
-	.periods-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.375rem;
-	}
-
-	.period-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.5rem 0.75rem;
-		background: #f8fafc;
-		border-radius: 6px;
-		font-size: 0.875rem;
-	}
-
-	.period-row.period-active {
-		background: #ecfdf5;
-		border: 1px solid #10b981;
-	}
-
-	.active-badge {
-		font-size: 0.7rem;
-		background: #10b981;
-		color: #fff;
-		padding: 0.125rem 0.5rem;
-		border-radius: 999px;
-		font-weight: 600;
-		white-space: nowrap;
-	}
-
-	.period-dates {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		font-weight: 500;
-		color: #374151;
-	}
-
-	.period-arrow {
-		color: #9ca3af;
-	}
-
-	.period-hours {
-		color: #3b82f6;
-		font-weight: 600;
-		margin-left: auto;
-	}
-
-	.period-form {
-		display: flex;
-		flex-direction: column;
-		gap: 0.625rem;
-		padding: 0.75rem;
-		background: #f9fafb;
-		border-radius: 8px;
-		margin-bottom: 0.75rem;
-		border: 1px solid #e5e7eb;
-	}
-
-	.period-form.compact {
-		padding: 0.5rem;
-		gap: 0.5rem;
-	}
-
-	.period-form-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.period-form-row label {
-		min-width: 80px;
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: #374151;
-	}
-
-	.period-form-row input,
-	.period-form-row select {
-		flex: 1;
-		padding: 0.375rem 0.5rem;
-		border: 1px solid #d1d5db;
-		border-radius: 6px;
-		font-size: 0.8125rem;
-	}
-
-	.member-periods-section {
-		margin-top: 0.75rem;
-		padding-top: 0.75rem;
-		border-top: 1px solid #e5e7eb;
-	}
-
-	.member-periods-section h4 {
-		margin: 0;
-		font-size: 0.875rem;
-		color: #374151;
-	}
-
-	/* Responsive */
-	@media (max-width: 640px) {
-		.page {
-			padding: 1rem;
-		}
-
-		.org-header {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 0.75rem;
-		}
-
-		.org-header .org-actions {
-			width: 100%;
-			flex-wrap: wrap;
-		}
-
-		.holiday-row,
-		.absence-row,
-		.period-row {
-			flex-wrap: wrap;
-		}
-
-		.import-holidays-row {
-			flex-direction: column;
-			align-items: stretch;
-		}
-
-		.settings-grid {
-			grid-template-columns: 1fr !important;
-		}
-
-		.schedule-overview-grid {
-			grid-template-columns: repeat(3, 1fr) !important;
-		}
-
-		.schedule-day-targets {
-			flex-wrap: wrap;
-		}
-
-		.member-row {
-			flex-wrap: wrap;
-		}
-
-		.request-item {
-			flex-direction: column;
-		}
-
-		.request-filters {
-			flex-wrap: wrap;
-		}
-	}
-</style>

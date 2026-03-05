@@ -182,501 +182,219 @@
 	<title>Settings - Time Tracking</title>
 </svelte:head>
 
-<div class="page">
-	<h1>Settings</h1>
+<div class="max-w-2xl mx-auto">
+	<h1 class="text-2xl font-bold mb-6">Settings</h1>
 
 	<!-- Profile section -->
-	<section class="card">
-		<h2>Profile</h2>
-		<div class="profile-info">
-			<div class="info-row">
-				<span class="info-label">Name</span>
-				<span class="info-value">{auth.user?.firstName} {auth.user?.lastName}</span>
-			</div>
-			<div class="info-row">
-				<span class="info-label">Email</span>
-				<span class="info-value">{auth.user?.email}</span>
+	<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
+		<div class="card-body">
+			<h2 class="card-title text-base">Profile</h2>
+			<div class="flex flex-col gap-2">
+				<div class="flex gap-4 items-baseline">
+					<span class="text-xs text-base-content/50 min-w-[60px]">Name</span>
+					<span class="text-sm text-base-content font-medium">{auth.user?.firstName} {auth.user?.lastName}</span>
+				</div>
+				<div class="flex gap-4 items-baseline">
+					<span class="text-xs text-base-content/50 min-w-[60px]">Email</span>
+					<span class="text-sm text-base-content font-medium">{auth.user?.email}</span>
+				</div>
 			</div>
 		</div>
 	</section>
 
 	<!-- Organization section -->
-	<section class="card">
-		<h2>Active Organization</h2>
-		<p class="card-desc">Select which organization to track time for. This applies globally to new time entries.</p>
+	<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
+		<div class="card-body">
+			<h2 class="card-title text-base">Active Organization</h2>
+			<p class="text-sm text-base-content/60 mb-4">Select which organization to track time for. This applies globally to new time entries.</p>
 
-		<div class="org-options">
-			<button
-				class="org-option"
-				class:selected={orgContext.selectedOrgId === null}
-				onclick={() => handleOrgSelect(null)}
-			>
-				<span class="org-option-radio" class:checked={orgContext.selectedOrgId === null}></span>
-				<span class="org-option-label">Personal (no organization)</span>
-			</button>
-
-			{#each orgContext.organizations as org}
+			<div class="flex flex-col gap-2">
 				<button
-					class="org-option"
-					class:selected={orgContext.selectedOrgId === org.organizationId}
-					onclick={() => handleOrgSelect(org.organizationId ?? null)}
+					class={"flex items-center gap-3 border rounded-xl px-4 py-3 cursor-pointer text-left w-full transition-colors hover:border-base-content/20 hover:bg-base-200 " + (orgContext.selectedOrgId === null ? "border-primary bg-primary/5" : "bg-base-200/50 border-base-300")}
+					onclick={() => handleOrgSelect(null)}
 				>
-					<span class="org-option-radio" class:checked={orgContext.selectedOrgId === org.organizationId}></span>
-					<div class="org-option-info">
-						<span class="org-option-label">{org.name}</span>
-						<span class="org-option-role">{org.role}</span>
-					</div>
+					<input type="radio" class="radio radio-primary radio-sm" checked={orgContext.selectedOrgId === null} tabindex="-1" />
+					<span class="text-sm font-medium">Personal (no organization)</span>
 				</button>
-			{/each}
 
-			{#if orgContext.organizations.length === 0 && !orgContext.loading}
-				<p class="muted">No organizations yet. <a href="/organizations/new">Create one</a>.</p>
-			{/if}
-		</div>
+				{#each orgContext.organizations as org}
+					<button
+						class={"flex items-center gap-3 border rounded-xl px-4 py-3 cursor-pointer text-left w-full transition-colors hover:border-base-content/20 hover:bg-base-200 " + (orgContext.selectedOrgId === org.organizationId ? "border-primary bg-primary/5" : "bg-base-200/50 border-base-300")}
+						onclick={() => handleOrgSelect(org.organizationId ?? null)}
+					>
+						<input type="radio" class="radio radio-primary radio-sm" checked={orgContext.selectedOrgId === org.organizationId} tabindex="-1" />
+						<div class="flex gap-2 items-center">
+							<span class="text-sm font-medium">{org.name}</span>
+							<span class="text-[0.6875rem] text-base-content/60 uppercase font-semibold tracking-wide">{org.role}</span>
+						</div>
+					</button>
+				{/each}
 
-		<div class="org-manage-links">
-			<a href="/organizations" class="org-manage-link">Browse Organizations</a>
-			<a href="/organizations/new" class="org-manage-link">+ Create New</a>
+				{#if orgContext.organizations.length === 0 && !orgContext.loading}
+					<p class="text-sm text-base-content/50">No organizations yet. <a href="/organizations/new" class="link link-primary">Create one</a>.</p>
+				{/if}
+			</div>
+
+			<div class="flex gap-4 mt-4 pt-4 border-t border-base-200">
+				<a href="/organizations" class="text-sm link link-primary font-medium no-underline hover:underline">Browse Organizations</a>
+				<a href="/organizations/new" class="text-sm link link-primary font-medium no-underline hover:underline">+ Create New</a>
+			</div>
 		</div>
 	</section>
 
 	<!-- Work Schedule (when org is selected) -->
 	{#if orgContext.selectedOrgId}
-		<section class="card">
-			<h2>Work Schedule</h2>
-			<p class="card-desc">Set your weekly work hours target for <strong>{orgContext.selectedOrg?.name}</strong>. This helps track your progress.</p>
+		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
+			<div class="card-body">
+				<h2 class="card-title text-base">Work Schedule</h2>
+				<p class="text-sm text-base-content/60 mb-4">Set your weekly work hours target for <strong>{orgContext.selectedOrg?.name}</strong>. This helps track your progress.</p>
 
-			{#if scheduleError}
-				<div class="error-msg">{scheduleError}</div>
-			{/if}
-			{#if scheduleSuccess}
-				<div class="success-msg">{scheduleSuccess}</div>
-			{/if}
-
-			{#if scheduleLoading}
-				<p class="muted">Loading schedule...</p>
-			{:else}
-				<div class="form-group">
-					<label for="weeklyHours">Weekly Work Hours</label>
-					<input
-						id="weeklyHours"
-						type="number"
-						step="0.5"
-						min="0"
-						max="80"
-						bind:value={weeklyHours}
-						placeholder="e.g. 40"
-						class="input input-sm"
-					/>
-				</div>
-
-				<div class="form-group">
-					<label class="checkbox-label">
-						<input type="checkbox" bind:checked={distributeEvenly} />
-						Distribute equally (Mon–Fri)
-					</label>
-				</div>
-
-				{#if !distributeEvenly}
-					<div class="day-targets">
-						<div class="day-target">
-							<label for="tMon">Mon</label>
-							<input id="tMon" type="number" step="0.5" min="0" max="24" bind:value={targetMon} class="input input-xs" />
-						</div>
-						<div class="day-target">
-							<label for="tTue">Tue</label>
-							<input id="tTue" type="number" step="0.5" min="0" max="24" bind:value={targetTue} class="input input-xs" />
-						</div>
-						<div class="day-target">
-							<label for="tWed">Wed</label>
-							<input id="tWed" type="number" step="0.5" min="0" max="24" bind:value={targetWed} class="input input-xs" />
-						</div>
-						<div class="day-target">
-							<label for="tThu">Thu</label>
-							<input id="tThu" type="number" step="0.5" min="0" max="24" bind:value={targetThu} class="input input-xs" />
-						</div>
-						<div class="day-target">
-							<label for="tFri">Fri</label>
-							<input id="tFri" type="number" step="0.5" min="0" max="24" bind:value={targetFri} class="input input-xs" />
-						</div>
-					</div>
+				{#if scheduleError}
+					<div class="alert alert-error text-sm mb-4">{scheduleError}</div>
+				{/if}
+				{#if scheduleSuccess}
+					<div class="alert alert-success text-sm mb-4">{scheduleSuccess}</div>
 				{/if}
 
-				<button class="btn-primary" onclick={saveWorkSchedule} disabled={scheduleSaving || weeklyHours == null}>
-					{scheduleSaving ? 'Saving...' : 'Save Schedule'}
-				</button>
-			{/if}
+				{#if scheduleLoading}
+					<p class="text-sm text-base-content/50">Loading schedule...</p>
+				{:else}
+					<div class="mb-4">
+						<label for="weeklyHours" class="block text-sm font-medium text-base-content/80 mb-1.5">Weekly Work Hours</label>
+						<input
+							id="weeklyHours"
+							type="number"
+							step="0.5"
+							min="0"
+							max="80"
+							bind:value={weeklyHours}
+							placeholder="e.g. 40"
+							class="input input-bordered input-sm max-w-[120px]"
+						/>
+					</div>
+
+					<div class="mb-4">
+						<label class="flex items-center gap-2 text-sm text-base-content/80 cursor-pointer">
+							<input type="checkbox" class="checkbox checkbox-primary checkbox-sm" bind:checked={distributeEvenly} />
+							Distribute equally (Mon–Fri)
+						</label>
+					</div>
+
+					{#if !distributeEvenly}
+						<div class="flex gap-3 mb-5 flex-wrap">
+							<div class="flex flex-col items-center gap-1">
+								<label for="tMon" class="text-xs font-semibold text-base-content/60 uppercase">Mon</label>
+								<input id="tMon" type="number" step="0.5" min="0" max="24" bind:value={targetMon} class="input input-bordered input-xs max-w-[70px] text-center" />
+							</div>
+							<div class="flex flex-col items-center gap-1">
+								<label for="tTue" class="text-xs font-semibold text-base-content/60 uppercase">Tue</label>
+								<input id="tTue" type="number" step="0.5" min="0" max="24" bind:value={targetTue} class="input input-bordered input-xs max-w-[70px] text-center" />
+							</div>
+							<div class="flex flex-col items-center gap-1">
+								<label for="tWed" class="text-xs font-semibold text-base-content/60 uppercase">Wed</label>
+								<input id="tWed" type="number" step="0.5" min="0" max="24" bind:value={targetWed} class="input input-bordered input-xs max-w-[70px] text-center" />
+							</div>
+							<div class="flex flex-col items-center gap-1">
+								<label for="tThu" class="text-xs font-semibold text-base-content/60 uppercase">Thu</label>
+								<input id="tThu" type="number" step="0.5" min="0" max="24" bind:value={targetThu} class="input input-bordered input-xs max-w-[70px] text-center" />
+							</div>
+							<div class="flex flex-col items-center gap-1">
+								<label for="tFri" class="text-xs font-semibold text-base-content/60 uppercase">Fri</label>
+								<input id="tFri" type="number" step="0.5" min="0" max="24" bind:value={targetFri} class="input input-bordered input-xs max-w-[70px] text-center" />
+							</div>
+						</div>
+					{/if}
+
+					<button class="btn btn-primary btn-sm" onclick={saveWorkSchedule} disabled={scheduleSaving || weeklyHours == null}>
+						{scheduleSaving ? 'Saving...' : 'Save Schedule'}
+					</button>
+				{/if}
+			</div>
 		</section>
 
 		<!-- Initial Overtime Balance (separate card) -->
 		{#if initialOvertimeMode !== 'Disabled'}
-			<section class="card">
-				<h2>Initial Overtime Balance</h2>
-				<p class="card-desc">
-					Set your starting overtime balance for <strong>{orgContext.selectedOrg?.name}</strong>.
-					{#if initialOvertimeMode === 'RequiresApproval'}
-						<em>This requires admin approval.</em>
-					{/if}
-				</p>
-
-				{#if overtimeError}
-					<div class="error-msg">{overtimeError}</div>
-				{/if}
-				{#if overtimeSuccess}
-					<div class="success-msg">{overtimeSuccess}</div>
-				{/if}
-
-				<div class="form-group">
-					<label for="initialOvertime">Overtime (hours)</label>
-					<input
-						id="initialOvertime"
-						type="number"
-						step="0.5"
-						bind:value={initialOvertimeHours}
-						placeholder="e.g. 2.5 or -1"
-						class="input input-sm"
-						disabled={initialOvertimeMode === 'RequiresApproval'}
-					/>
-					<span class="form-hint">
-						{#if initialOvertimeHours > 0}
-							+{initialOvertimeHours.toFixed(1)}h carried over
-						{:else if initialOvertimeHours < 0}
-							{initialOvertimeHours.toFixed(1)}h deficit
-						{:else}
-							Starting from zero
+			<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
+				<div class="card-body">
+					<h2 class="card-title text-base">Initial Overtime Balance</h2>
+					<p class="text-sm text-base-content/60 mb-4">
+						Set your starting overtime balance for <strong>{orgContext.selectedOrg?.name}</strong>.
+						{#if initialOvertimeMode === 'RequiresApproval'}
+							<em>This requires admin approval.</em>
 						{/if}
-					</span>
-				</div>
+					</p>
 
-				{#if initialOvertimeMode === 'Allowed'}
-					<button class="btn-primary" onclick={saveInitialOvertime} disabled={overtimeSaving}>
-						{overtimeSaving ? 'Saving...' : 'Save Overtime'}
-					</button>
-				{:else}
-					<p class="muted" style="font-size: 0.8125rem;">Submit a request through the Timer page to change this value.</p>
-				{/if}
+					{#if overtimeError}
+						<div class="alert alert-error text-sm mb-4">{overtimeError}</div>
+					{/if}
+					{#if overtimeSuccess}
+						<div class="alert alert-success text-sm mb-4">{overtimeSuccess}</div>
+					{/if}
+
+					<div class="mb-4">
+						<label for="initialOvertime" class="block text-sm font-medium text-base-content/80 mb-1.5">Overtime (hours)</label>
+						<input
+							id="initialOvertime"
+							type="number"
+							step="0.5"
+							bind:value={initialOvertimeHours}
+							placeholder="e.g. 2.5 or -1"
+							class="input input-bordered input-sm max-w-[120px]"
+							disabled={initialOvertimeMode === 'RequiresApproval'}
+						/>
+						<span class="block text-xs text-base-content/50 mt-1">
+							{#if initialOvertimeHours > 0}
+								+{initialOvertimeHours.toFixed(1)}h carried over
+							{:else if initialOvertimeHours < 0}
+								{initialOvertimeHours.toFixed(1)}h deficit
+							{:else}
+								Starting from zero
+							{/if}
+						</span>
+					</div>
+
+					{#if initialOvertimeMode === 'Allowed'}
+						<button class="btn btn-primary btn-sm" onclick={saveInitialOvertime} disabled={overtimeSaving}>
+							{overtimeSaving ? 'Saving...' : 'Save Overtime'}
+						</button>
+					{:else}
+						<p class="text-sm text-base-content/50" style="font-size: 0.8125rem;">Submit a request through the Timer page to change this value.</p>
+					{/if}
+				</div>
 			</section>
 		{/if}
 	{/if}
 
 	<!-- Change password -->
-	<section class="card">
-		<h2>Change Password</h2>
+	<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
+		<div class="card-body">
+			<h2 class="card-title text-base">Change Password</h2>
 
-		{#if changePasswordError}
-			<div class="error-msg">{changePasswordError}</div>
-		{/if}
-		{#if changePasswordSuccess}
-			<div class="success-msg">{changePasswordSuccess}</div>
-		{/if}
+			{#if changePasswordError}
+				<div class="alert alert-error text-sm mb-4">{changePasswordError}</div>
+			{/if}
+			{#if changePasswordSuccess}
+				<div class="alert alert-success text-sm mb-4">{changePasswordSuccess}</div>
+			{/if}
 
-		<div class="form-group">
-			<label for="currentPw">Current Password</label>
-			<input id="currentPw" type="password" bind:value={currentPassword} class="input" />
+			<div class="mb-4">
+				<label for="currentPw" class="block text-sm font-medium text-base-content/80 mb-1.5">Current Password</label>
+				<input id="currentPw" type="password" bind:value={currentPassword} class="input input-bordered w-full max-w-xs" />
+			</div>
+			<div class="mb-4">
+				<label for="newPw" class="block text-sm font-medium text-base-content/80 mb-1.5">New Password</label>
+				<input id="newPw" type="password" bind:value={newPassword} class="input input-bordered w-full max-w-xs" />
+			</div>
+			<button class="btn btn-primary btn-sm" onclick={handleChangePassword} disabled={saving}>
+				{saving ? 'Saving...' : 'Change Password'}
+			</button>
 		</div>
-		<div class="form-group">
-			<label for="newPw">New Password</label>
-			<input id="newPw" type="password" bind:value={newPassword} class="input" />
-		</div>
-		<button class="btn-primary" onclick={handleChangePassword} disabled={saving}>
-			{saving ? 'Saving...' : 'Change Password'}
-		</button>
 	</section>
 
 	<!-- Sign out -->
-	<section class="card danger-zone">
-		<button class="btn-danger" onclick={handleLogout}>Sign Out</button>
+	<section class="card bg-base-100 border border-error/30 shadow-sm mb-5">
+		<div class="card-body">
+			<button class="btn btn-error btn-sm" onclick={handleLogout}>Sign Out</button>
+		</div>
 	</section>
 </div>
-
-<style>
-	h1 {
-		margin: 0 0 1.5rem;
-		font-size: 1.75rem;
-		color: #1a1a2e;
-	}
-
-	.card {
-		background: white;
-		border: 1px solid #e5e7eb;
-		border-radius: 12px;
-		padding: 1.5rem;
-		margin-bottom: 1.25rem;
-	}
-
-	.card h2 {
-		margin: 0 0 0.75rem;
-		font-size: 1.0625rem;
-		color: #1a1a2e;
-	}
-
-	.card-desc {
-		color: #6b7280;
-		font-size: 0.875rem;
-		margin: 0 0 1rem;
-	}
-
-	.profile-info {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.info-row {
-		display: flex;
-		gap: 1rem;
-		align-items: baseline;
-	}
-
-	.info-label {
-		font-size: 0.8125rem;
-		color: #9ca3af;
-		min-width: 60px;
-	}
-
-	.info-value {
-		font-size: 0.9375rem;
-		color: #1a1a2e;
-		font-weight: 500;
-	}
-
-	/* Org selection */
-	.org-options {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.org-option {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		background: #fafafa;
-		border: 1px solid #e5e7eb;
-		border-radius: 10px;
-		padding: 0.75rem 1rem;
-		cursor: pointer;
-		transition: border-color 0.15s, background 0.15s;
-		text-align: left;
-		width: 100%;
-	}
-
-	.org-option:hover {
-		border-color: #d1d5db;
-		background: #f3f4f6;
-	}
-
-	.org-option.selected {
-		border-color: #3b82f6;
-		background: #eff6ff;
-	}
-
-	.org-option-radio {
-		width: 18px;
-		height: 18px;
-		border-radius: 50%;
-		border: 2px solid #d1d5db;
-		flex-shrink: 0;
-		position: relative;
-		transition: border-color 0.15s;
-	}
-
-	.org-option-radio.checked {
-		border-color: #3b82f6;
-	}
-
-	.org-option-radio.checked::after {
-		content: '';
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
-		background: #3b82f6;
-	}
-
-	.org-option-info {
-		display: flex;
-		gap: 0.5rem;
-		align-items: center;
-	}
-
-	.org-option-label {
-		font-size: 0.9375rem;
-		font-weight: 500;
-		color: #1a1a2e;
-	}
-
-	.org-option-role {
-		font-size: 0.6875rem;
-		color: #6b7280;
-		text-transform: uppercase;
-		font-weight: 600;
-		letter-spacing: 0.03em;
-	}
-
-	.muted {
-		color: #9ca3af;
-		font-size: 0.875rem;
-	}
-
-	.muted a {
-		color: #3b82f6;
-	}
-
-	/* Forms */
-	.form-group {
-		margin-bottom: 1rem;
-	}
-
-	.form-group label {
-		display: block;
-		font-size: 0.8125rem;
-		color: #374151;
-		font-weight: 500;
-		margin-bottom: 0.375rem;
-	}
-
-	.input {
-		width: 100%;
-		max-width: 320px;
-		padding: 0.625rem 0.75rem;
-		border: 1px solid #d1d5db;
-		border-radius: 8px;
-		font-size: 0.9375rem;
-	}
-
-	.input:focus {
-		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
-	}
-
-	.error-msg {
-		color: #dc2626;
-		background: #fef2f2;
-		padding: 0.625rem 0.75rem;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		margin-bottom: 1rem;
-		border-left: 3px solid #dc2626;
-	}
-
-	.success-msg {
-		color: #16a34a;
-		background: #f0fdf4;
-		padding: 0.625rem 0.75rem;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		margin-bottom: 1rem;
-		border-left: 3px solid #16a34a;
-	}
-
-	.btn-primary {
-		padding: 0.625rem 1.25rem;
-		background: #3b82f6;
-		color: white;
-		border: none;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.btn-primary:hover:not(:disabled) { background: #2563eb; }
-	.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-
-	.danger-zone {
-		border-color: #fecaca;
-	}
-
-	.btn-danger {
-		padding: 0.625rem 1.25rem;
-		background: #ef4444;
-		color: white;
-		border: none;
-		border-radius: 8px;
-		font-size: 0.875rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.btn-danger:hover { background: #dc2626; }
-
-	/* Work schedule */
-	.input-sm {
-		max-width: 120px;
-	}
-
-	.input-xs {
-		max-width: 70px;
-		text-align: center;
-		padding: 0.5rem;
-	}
-
-	.checkbox-label {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.875rem;
-		color: #374151;
-		cursor: pointer;
-	}
-
-	.checkbox-label input[type="checkbox"] {
-		width: 16px;
-		height: 16px;
-		accent-color: #3b82f6;
-	}
-
-	.day-targets {
-		display: flex;
-		gap: 0.75rem;
-		margin-bottom: 1.25rem;
-		flex-wrap: wrap;
-	}
-
-	.day-target {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.25rem;
-	}
-
-	.day-target label {
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: #6b7280;
-		text-transform: uppercase;
-	}
-
-	.form-hint {
-		display: block;
-		font-size: 0.75rem;
-		color: #9ca3af;
-		margin-top: 0.25rem;
-	}
-
-	.org-manage-links {
-		display: flex;
-		gap: 1rem;
-		margin-top: 1rem;
-		padding-top: 1rem;
-		border-top: 1px solid #f3f4f6;
-	}
-
-	.org-manage-link {
-		font-size: 0.8125rem;
-		color: #3b82f6;
-		text-decoration: none;
-		font-weight: 500;
-	}
-
-	.org-manage-link:hover {
-		text-decoration: underline;
-	}
-</style>

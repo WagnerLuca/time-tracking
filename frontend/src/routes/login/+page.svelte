@@ -38,155 +38,52 @@
 	<title>Login - Time Tracking</title>
 </svelte:head>
 
-<div class="auth-page">
-	<div class="auth-card">
-		<h1>Sign In</h1>
-		<p class="subtitle">Welcome back to Time Tracking</p>
+<div class="min-h-screen flex items-center justify-center bg-base-200 p-4">
+	<div class="card bg-base-100 shadow-lg w-full max-w-[420px]">
+		<div class="card-body p-10">
+			<h1 class="text-2xl font-bold mb-1">Sign In</h1>
+			<p class="text-base-content/60 mb-6">Welcome back to Time Tracking</p>
 
-		{#if error}
-			<div class="error-banner">{error}</div>
-		{/if}
+			{#if error}
+				<div class="alert alert-error text-sm mb-4">{error}</div>
+			{/if}
 
-		<form onsubmit={handleLogin}>
-			<div class="field">
-				<label for="email">Email</label>
-				<input
-					id="email"
-					type="email"
-					bind:value={email}
-					placeholder="you@example.com"
-					required
-					disabled={submitting}
-				/>
-			</div>
+			<form onsubmit={handleLogin}>
+				<div class="mb-5">
+					<label for="email" class="block font-medium mb-1.5 text-base-content/80 text-sm">Email</label>
+					<input
+						id="email"
+						type="email"
+						class="input input-bordered w-full"
+						bind:value={email}
+						placeholder="you@example.com"
+						required
+						disabled={submitting}
+					/>
+				</div>
 
-			<div class="field">
-				<label for="password">Password</label>
-				<input
-					id="password"
-					type="password"
-					bind:value={password}
-					placeholder="••••••••"
-					required
-					disabled={submitting}
-				/>
-			</div>
+				<div class="mb-5">
+					<label for="password" class="block font-medium mb-1.5 text-base-content/80 text-sm">Password</label>
+					<input
+						id="password"
+						type="password"
+						class="input input-bordered w-full"
+						bind:value={password}
+						placeholder="••••••••"
+						required
+						disabled={submitting}
+					/>
+				</div>
 
-			<button type="submit" class="btn-primary" disabled={submitting}>
-				{submitting ? 'Signing in...' : 'Sign In'}
-			</button>
-		</form>
+				<button type="submit" class="btn btn-primary w-full" disabled={submitting}>
+					{submitting ? 'Signing in...' : 'Sign In'}
+				</button>
+			</form>
 
-		<p class="switch-auth">
-			Don't have an account? <a href="/register">Create one</a>
-		</p>
+			<p class="text-center mt-6 text-sm text-base-content/60">
+				Don't have an account? <a href="/register" class="link link-primary">Create one</a>
+			</p>
+		</div>
 	</div>
 </div>
 
-<style>
-	.auth-page {
-		min-height: 100vh;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: #f0f2f5;
-		padding: 1rem;
-	}
-
-	.auth-card {
-		background: white;
-		border-radius: 12px;
-		padding: 2.5rem;
-		width: 100%;
-		max-width: 420px;
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-	}
-
-	h1 {
-		margin: 0 0 0.25rem;
-		color: #1a1a2e;
-		font-size: 1.75rem;
-	}
-
-	.subtitle {
-		color: #6b7280;
-		margin: 0 0 1.5rem;
-	}
-
-	.error-banner {
-		background: #fef2f2;
-		color: #dc2626;
-		padding: 0.75rem 1rem;
-		border-radius: 8px;
-		margin-bottom: 1rem;
-		font-size: 0.875rem;
-		border-left: 3px solid #dc2626;
-	}
-
-	.field {
-		margin-bottom: 1.25rem;
-	}
-
-	label {
-		display: block;
-		font-weight: 500;
-		margin-bottom: 0.375rem;
-		color: #374151;
-		font-size: 0.875rem;
-	}
-
-	input {
-		width: 100%;
-		padding: 0.625rem 0.75rem;
-		border: 1px solid #d1d5db;
-		border-radius: 8px;
-		font-size: 0.9375rem;
-		transition: border-color 0.15s;
-		box-sizing: border-box;
-	}
-
-	input:focus {
-		outline: none;
-		border-color: #3b82f6;
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-	}
-
-	.btn-primary {
-		width: 100%;
-		padding: 0.75rem;
-		background: #3b82f6;
-		color: white;
-		border: none;
-		border-radius: 8px;
-		font-size: 1rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: background 0.15s;
-	}
-
-	.btn-primary:hover:not(:disabled) {
-		background: #2563eb;
-	}
-
-	.btn-primary:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	.switch-auth {
-		text-align: center;
-		margin-top: 1.5rem;
-		color: #6b7280;
-		font-size: 0.875rem;
-	}
-
-	.switch-auth a {
-		color: #3b82f6;
-		text-decoration: none;
-		font-weight: 500;
-	}
-
-	.switch-auth a:hover {
-		text-decoration: underline;
-	}
-</style>
