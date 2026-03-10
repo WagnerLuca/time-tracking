@@ -104,8 +104,35 @@ public class AuthController : ControllerBase
     /// </summary>
     [HttpPost("logout")]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Logout([FromBody] RefreshTokenRequest request)
     {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Problem(
+                type: "https://httpstatuses.io/401",
+                title: "Unauthorized",
+                statusCode: StatusCodes.Status401Unauthorized,
+                detail: "Invalid user token.");
+        }
+
+        // Prevent authenticated users from revoking tokens that belong to another account.
+        var tokenOwnerId = await _context.RefreshTokens
+            .AsNoTracking()
+            .Where(rt => rt.Token == request.RefreshToken && !rt.IsRevoked)
+            .Select(rt => (int?)rt.UserId)
+            .FirstOrDefaultAsync();
+
+        if (tokenOwnerId.HasValue && tokenOwnerId.Value != userId)
+        {
+            return Problem(
+                type: "https://httpstatuses.io/403",
+                title: "Forbidden",
+                statusCode: StatusCodes.Status403Forbidden,
+                detail: "You can only revoke your own refresh tokens.");
+        }
+
         var (success, message) = await _authService.RevokeRefreshTokenAsync(request.RefreshToken);
 
         return Ok(new AuthResponse { Success = success, Message = message });

@@ -175,7 +175,26 @@ public class TimeTrackingService : ITimeTrackingService
         if (request.EndTime.HasValue)    entry.EndTime = request.EndTime.Value;
         if (request.Description != null) entry.Description = request.Description;
         if (request.OrganizationId.HasValue)
-            entry.OrganizationId = request.OrganizationId.Value == 0 ? null : request.OrganizationId.Value;
+        {
+            int? newOrganizationId = request.OrganizationId.Value == 0 ? null : request.OrganizationId.Value;
+
+            if (newOrganizationId.HasValue)
+            {
+                var orgExists = await _context.Organizations
+                    .AsNoTracking()
+                    .AnyAsync(o => o.Id == newOrganizationId.Value);
+                if (!orgExists)
+                    return ServiceResult.BadRequest<TimeEntryResponse>("Organization not found.");
+
+                var isMember = await _context.UserOrganizations
+                    .AsNoTracking()
+                    .AnyAsync(uo => uo.OrganizationId == newOrganizationId.Value && uo.UserId == userId);
+                if (!isMember)
+                    return ServiceResult.Forbidden<TimeEntryResponse>("You are not a member of this organization.");
+            }
+
+            entry.OrganizationId = newOrganizationId;
+        }
 
         if (entry.EndTime.HasValue && entry.EndTime.Value <= entry.StartTime)
             return ServiceResult.BadRequest<TimeEntryResponse>("End time must be after start time.");

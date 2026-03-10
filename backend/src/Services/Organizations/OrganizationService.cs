@@ -559,6 +559,12 @@ public class OrganizationService : IOrganizationService
         if (callerRole == null || callerRole < OrganizationRole.Admin || !org.MemberTimeEntryVisibility)
             return ServiceResult.Forbidden<PaginatedResponse<object>>();
 
+        var memberExists = await _context.UserOrganizations
+            .AsNoTracking()
+            .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
+        if (!memberExists)
+            return ServiceResult.NotFound<PaginatedResponse<object>>("Member not found in this organization.");
+
         (limit, offset) = PaginationDefaults.Normalize(limit, offset);
 
         var now = DateTime.UtcNow;
