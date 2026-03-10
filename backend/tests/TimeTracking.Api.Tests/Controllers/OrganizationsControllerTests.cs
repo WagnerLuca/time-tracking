@@ -385,6 +385,22 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         page.Should().NotBeNull();
     }
 
+    [Fact]
+    public async Task GetMemberEntries_ForUserNotInOrganization_Returns404()
+    {
+        var ownerClient = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(ownerClient, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        var outsiderClient = _factory.CreateClient();
+        var outsider = await TestHelpers.RegisterAsync(
+            outsiderClient, "outsider-member-entries@test.com", "Password123!", "Out", "Sider");
+
+        var response = await ownerClient.GetAsync(
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}/member-entries/{outsider.User.Id}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     // ── Initial overtime ─────────────────────────────────────────────────
 
     [Fact]

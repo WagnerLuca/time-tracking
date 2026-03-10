@@ -221,6 +221,33 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         response.StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task Update_ChangeOrganization_ToOrgWhereUserIsNotMember_ReturnsForbidden()
+    {
+        // Fresh non-member user
+        var (nonMemberClient, _) = await TestHelpers.CreateAuthenticatedUserAsync(
+            _factory, "update-nonmember@test.com", "Update", "NonMember");
+
+        // Create an entry to update
+        await nonMemberClient.PostAsJsonAsync("/api/v1/TimeTracking/start", new { description = "Personal entry" });
+        var stopResponse = await nonMemberClient.PostAsJsonAsync("/api/v1/TimeTracking/stop", (object?)null);
+        stopResponse.EnsureSuccessStatusCode();
+        var stopped = await stopResponse.Content.ReadFromJsonAsync<TimeEntryResponseDto>(TestHelpers.JsonOptions);
+
+        // Read target org id (seed org) as non-member
+        var orgResponse = await nonMemberClient.GetAsync($"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}");
+        orgResponse.EnsureSuccessStatusCode();
+        var org = await orgResponse.Content.ReadFromJsonAsync<OrganizationDetailResponseDto>(TestHelpers.JsonOptions);
+
+        // Try to move the entry into an org the caller is not part of
+        var updateResponse = await nonMemberClient.PutAsJsonAsync($"/api/v1/TimeTracking/{stopped!.Id}", new
+        {
+            organizationId = org!.Id
+        });
+
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     // ── Delete ───────────────────────────────────────────────────────────
 
     [Fact]

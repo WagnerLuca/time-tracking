@@ -263,6 +263,35 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
         refreshResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task Logout_WithAnotherUsersRefreshToken_ReturnsForbidden_AndDoesNotRevokeVictimToken()
+    {
+        // Victim gets a refresh token
+        var victimClient = _factory.CreateClient();
+        var victimLogin = await TestHelpers.LoginAsync(
+            victimClient, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        // Attacker is authenticated as a different user
+        var attackerClient = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(attackerClient, TestHelpers.SeedAdminEmail, TestHelpers.SeedPassword);
+
+        var logoutResponse = await attackerClient.PostAsJsonAsync("/api/v1/Auth/logout", new
+        {
+            refreshToken = victimLogin.RefreshToken
+        });
+
+        logoutResponse.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // Victim token must still be usable
+        var refreshClient = _factory.CreateClient();
+        var refreshResponse = await refreshClient.PostAsJsonAsync("/api/v1/Auth/refresh", new
+        {
+            refreshToken = victimLogin.RefreshToken
+        });
+
+        refreshResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
     // ── Delete account ───────────────────────────────────────────────────
 
     [Fact]
