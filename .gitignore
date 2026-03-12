@@ -2,3 +2,4 @@ docs/
 eval_docs/
 .vs/
 artifacts/
+.env

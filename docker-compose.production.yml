@@ -1,64 +1,48 @@
 services:
   db:
-    image: postgres:18
+    image: postgres:${POSTGRES_VERSION}
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pass}
-      POSTGRES_DB: ${POSTGRES_DB:-mydb}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - db_data:/var/lib/postgresql
     ports:
-      - "5432:5432"
+      - ${POSTGRES_PORT}:5432
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
+  seq:
+    image: datalust/seq:${SEQ_VERSION}
+    environment:
+      ACCEPT_EULA: ${SEQ_ACCEPT_EULA}
+      SEQ_FIRSTRUN_NOAUTHENTICATION: ${SEQ_NO_AUTH}
+    ports:
+      - ${SEQ_PORT}:80
+    volumes:
+      - seq_data:/data
   backend:
-    image: ${BACKEND_IMAGE:-ghcr.io/wagnerluca/time-tracking-backend:latest}
+    image: ${BACKEND_IMAGE}
     environment:
-      UseInMemoryDatabase: ${USE_INMEMORY_DB:-true}
-      DATABASE_URL: postgres://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-pass}@db:5432/${POSTGRES_DB:-mydb}
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ASPNETCORE_URLS: http://+:7000
-      JwtSettings__Secret: ${JWT_SECRET:-CHANGE_THIS_TO_A_SECURE_SECRET_KEY_AT_LEAST_32_CHARACTERS_LONG_FOR_PRODUCTION}
+      UseInMemoryDatabase: ${USE_INMEMORY_DB}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      ASPNETCORE_URLS: http://+:${BACKEND_PORT}
+      Serilog__WriteTo__1__Args__serverUrl: http://seq:80
+      JwtSettings__Secret: ${JWT_SECRET}
+      JwtSettings__AccessTokenExpiryMinutes: ${ACCESS_TOKEN_EXPIRY_MINUTES}
+      Cors__AllowedOrigins_0: ${ALLOWED_ORIGINS}
     ports:
-      - "7000:7000"
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7000/health"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
+      - ${BACKEND_PORT}:${BACKEND_PORT}
+      
   frontend:
-    image: ${FRONTEND_IMAGE:-ghcr.io/wagnerluca/time-tracking-frontend:latest}
+    image: ${FRONTEND_IMAGE}
     environment:
-      PORT: 3000
-      HOST: 0.0.0.0
-      NODE_ENV: production
-      API_BASE_URL: ${API_BASE_URL:-http://backend:7000}
+      PORT: ${FRONTEND_PORT}
+      HOST: ${FRONTEND_HOST}
+      NODE_ENV: ${NODE_ENV}
+      API_BASE_URL: ${API_BASE_URL}
     ports:
-      - "3000:3000"
-    depends_on:
-      backend:
-        condition: service_healthy
+      - ${FRONTEND_PORT}:${FRONTEND_PORT}
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1))"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
 volumes:
-  db_data:
-    driver: local
-
-networks:
-  default:
-    name: timetracking-network
+  db_data: null
+  seq_data: null
