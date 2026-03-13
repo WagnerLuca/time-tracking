@@ -162,6 +162,9 @@ public class TimeTrackingDbContext : DbContext
 
             entity.HasIndex(e => new { e.OrganizationId, e.MinHours }).IsUnique();
 
+            // Keep dependent rows hidden when the parent organization is soft-deleted.
+            entity.HasQueryFilter(e => e.Organization.IsActive);
+
             entity.HasOne(e => e.Organization)
                 .WithMany(o => o.PauseRules)
                 .HasForeignKey(e => e.OrganizationId)
@@ -184,6 +187,9 @@ public class TimeTrackingDbContext : DbContext
 
             // Index: user+org+type+status for fast lookups
             entity.HasIndex(e => new { e.UserId, e.OrganizationId, e.Type, e.Status });
+
+            // Keep dependent rows hidden when the parent organization is soft-deleted.
+            entity.HasQueryFilter(e => e.Organization.IsActive);
 
             entity.HasOne(e => e.User)
                 .WithMany()
@@ -215,6 +221,9 @@ public class TimeTrackingDbContext : DbContext
 
             entity.HasIndex(e => new { e.OrganizationId, e.Date }).IsUnique();
 
+            // Keep dependent rows hidden when the parent organization is soft-deleted.
+            entity.HasQueryFilter(e => e.Organization.IsActive);
+
             entity.HasOne(e => e.Organization)
                 .WithMany(o => o.Holidays)
                 .HasForeignKey(e => e.OrganizationId)
@@ -235,6 +244,9 @@ public class TimeTrackingDbContext : DbContext
                 entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasIndex(e => new { e.UserId, e.OrganizationId, e.Date }).IsUnique();
+
+            // Keep dependent rows hidden when the parent organization is soft-deleted.
+            entity.HasQueryFilter(e => e.Organization.IsActive);
 
             entity.HasOne(e => e.User)
                 .WithMany()
@@ -259,6 +271,9 @@ public class TimeTrackingDbContext : DbContext
                 entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasIndex(e => new { e.UserId, e.OrganizationId, e.ValidFrom }).IsUnique();
+
+            // Keep dependent rows hidden when the parent organization is soft-deleted.
+            entity.HasQueryFilter(e => e.Organization.IsActive);
 
             entity.HasOne(e => e.User)
                 .WithMany()
