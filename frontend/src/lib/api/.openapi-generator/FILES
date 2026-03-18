@@ -6,6 +6,7 @@ common.ts
 configuration.ts
 docs/AbsenceDayApi.md
 docs/AbsenceDayResponse.md
+docs/AbsenceDayResponsePaginatedResponse.md
 docs/AbsenceType.md
 docs/AddMemberRequest.md
 docs/AdminCreateAbsenceDayRequest.md
@@ -26,13 +27,16 @@ docs/LoginResponse.md
 docs/MemberTimeOverviewResponse.md
 docs/NotificationsApi.md
 docs/OrgRequestResponse.md
+docs/OrgRequestResponsePaginatedResponse.md
 docs/OrganizationDetailResponse.md
 docs/OrganizationMemberResponse.md
 docs/OrganizationResponse.md
+docs/OrganizationResponsePaginatedResponse.md
 docs/OrganizationRole.md
 docs/OrganizationsApi.md
 docs/PauseRuleResponse.md
 docs/PauseRulesApi.md
+docs/ProblemDetails.md
 docs/RefreshTokenRequest.md
 docs/RefreshTokenResponse.md
 docs/RegisterRequest.md
@@ -45,6 +49,7 @@ docs/SetInitialOvertimeRequest.md
 docs/StartTimeEntryRequest.md
 docs/StopTimeEntryRequest.md
 docs/TimeEntryResponse.md
+docs/TimeEntryResponsePaginatedResponse.md
 docs/TimeTrackingApi.md
 docs/TimeTrackingApiApi.md
 docs/UpdateHolidayRequest.md
@@ -52,6 +57,7 @@ docs/UpdateMemberRoleRequest.md
 docs/UpdateOrganizationRequest.md
 docs/UpdateOrganizationSettingsRequest.md
 docs/UpdatePauseRuleRequest.md
+docs/UpdateProfileRequest.md
 docs/UpdateTimeEntryRequest.md
 docs/UpdateWorkScheduleRequest.md
 docs/UserInfo.md
