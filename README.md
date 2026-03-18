@@ -145,6 +145,8 @@ Copy `.env.production` to `.env.production.local` and configure:
 - `POSTGRES_DB`: Database name
 - `DATABASE_URL`: Complete database connection string
 - `ASPNETCORE_ENVIRONMENT`: Set to "Production"
+- `ALLOWED_ORIGINS`: Frontend origin allowed by backend CORS (example: `https://app.example.com`)
+- `PUBLIC_API_BASE_URL`: Public backend URL used by the frontend in the browser (example: `https://api.example.com`)
 
 ## 🔄 CI/CD Pipeline
 
