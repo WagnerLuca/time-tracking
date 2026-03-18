@@ -29,7 +29,7 @@ services:
       Serilog__WriteTo__1__Args__serverUrl: http://seq:80
       JwtSettings__Secret: ${JWT_SECRET}
       JwtSettings__AccessTokenExpiryMinutes: ${ACCESS_TOKEN_EXPIRY_MINUTES}
-      Cors__AllowedOrigins_0: ${ALLOWED_ORIGINS}
+      Cors__AllowedOrigins__0: ${ALLOWED_ORIGINS}
     ports:
       - ${BACKEND_PORT}:${BACKEND_PORT}
       
@@ -39,7 +39,7 @@ services:
       PORT: ${FRONTEND_PORT}
       HOST: ${FRONTEND_HOST}
       NODE_ENV: ${NODE_ENV}
-      API_BASE_URL: ${API_BASE_URL}
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
     ports:
       - ${FRONTEND_PORT}:${FRONTEND_PORT}
     restart: unless-stopped

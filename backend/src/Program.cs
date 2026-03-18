@@ -68,7 +68,7 @@ builder.Services.AddSwaggerGen(c =>
         Description = "Please enter JWT with Bearer into field",
         Name = "Authorization",
         Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
+        Scheme = JwtBearerDefaults.AuthenticationScheme,
         BearerFormat = "JWT"
     });
 
@@ -202,13 +202,12 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowOrigins", policy =>
     {
-        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
-        if (allowedOrigins != null && allowedOrigins.Length > 0)
+        string[]? configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+        if (configuredOrigins != null && configuredOrigins.Length > 0)
         {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials();
+            policy.WithOrigins(configuredOrigins)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
         }
         else
         {
@@ -246,7 +245,7 @@ builder.Services.AddRateLimiter(options =>
     // General policy for data-access endpoints (prevent rapid enumeration)
     options.AddFixedWindowLimiter("General", opt =>
     {
-        opt.PermitLimit = 120;
+        opt.PermitLimit = 300;
         opt.Window = TimeSpan.FromMinutes(1);
         opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
         opt.QueueLimit = 0;
