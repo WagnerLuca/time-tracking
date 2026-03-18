@@ -4,7 +4,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { timeTrackingApi, workScheduleApi, holidayApi, absenceDayApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, WorkScheduleResponse } from '$lib/api';
-	import { formatHours, formatDelta, barWidth } from '$lib/utils/formatters';
+	import { formatHours, formatDelta, formatDuration, formatTime, formatDateFull, barWidth } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, getHeatColor } from '$lib/utils/scheduleHelpers';
 
@@ -36,6 +36,7 @@
 	let allTimeEntries = $state<TimeEntryResponse[]>([]);
 	let cumulativeBalance = $state(0); // overall cumulative balance in minutes
 	let monthlyCumulativeBalances = $state<Map<string, number>>(new Map()); // "YYYY-MM" -> cumulative balance
+	let selectedDayKey = $state<string | null>(null);
 
 	// Computed
 	const monthName = $derived(new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long' }));
@@ -52,6 +53,20 @@
 		const key = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
 		return monthlyCumulativeBalances.get(key) ?? 0;
 	});
+
+	const selectedDay = $derived(
+		selectedDayKey
+			? (calendarDays.find((day) => day.key === selectedDayKey && day.isCurrentMonth) ?? null)
+			: null
+	);
+
+	const selectedDayEntries = $derived(
+		selectedDay
+			? entries
+				.filter((entry) => entry.startTime && dateKey(new Date(entry.startTime)) === selectedDay.key)
+				.sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime())
+			: []
+	);
 
 	let prevOrgSlug: string | null | undefined = undefined;
 
@@ -88,9 +103,13 @@
 			const from = new Date(currentYear, currentMonth, 1);
 			const to = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
 			const orgId = orgContext.selectedOrgId ?? undefined;
-			const { data } = await timeTrackingApi.apiTimeTrackingGet(orgId, from.toISOString(), to.toISOString(), 5000);
-			entries = data;
-		} catch { entries = []; }
+			const { data } = await timeTrackingApi.apiV1TimeTrackingGet(orgId, from.toISOString(), to.toISOString(), 5000);
+			entries = data.items ?? [];
+		} catch {
+			entries = [];
+		} finally {
+			ensureSelectedDayForCurrentMonth();
+		}
 	}
 
 	async function loadYearEntries() {
@@ -99,8 +118,8 @@
 			const from = new Date(currentYear, 0, 1);
 			const to = new Date(currentYear, 11, 31, 23, 59, 59, 999);
 			const orgId = orgContext.selectedOrgId ?? undefined;
-			const { data } = await timeTrackingApi.apiTimeTrackingGet(orgId, from.toISOString(), to.toISOString(), 50000);
-			yearEntries = data;
+			const { data } = await timeTrackingApi.apiV1TimeTrackingGet(orgId, from.toISOString(), to.toISOString(), 50000);
+			yearEntries = data.items ?? [];
 		} catch { yearEntries = []; }
 		yearLoading = false;
 	}
@@ -108,7 +127,7 @@
 	async function loadWorkSchedule() {
 		if (!orgContext.selectedOrgSlug) { workSchedule = null; return; }
 		try {
-			const { data } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgContext.selectedOrgSlug);
+			const { data } = await workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(orgContext.selectedOrgSlug);
 			workSchedule = data;
 		} catch { workSchedule = null; }
 	}
@@ -116,7 +135,7 @@
 	async function loadSchedulePeriods() {
 		if (!orgContext.selectedOrgSlug) { schedulePeriods = []; return; }
 		try {
-			const { data } = await workScheduleApi.apiOrganizationsSlugWorkSchedulesGet(orgContext.selectedOrgSlug);
+			const { data } = await workScheduleApi.apiV1OrganizationsSlugWorkSchedulesGet(orgContext.selectedOrgSlug);
 			schedulePeriods = data;
 		} catch { schedulePeriods = []; }
 	}
@@ -128,8 +147,8 @@
 		}
 		try {
 			const [holRes, absRes] = await Promise.all([
-				holidayApi.apiOrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
-				absenceDayApi.apiOrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug, auth.user?.id)
+				holidayApi.apiV1OrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
+				absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug, auth.user?.id)
 			]);
 			const off = new Set<string>();
 			const hDates = new Map<string, string>();
@@ -139,7 +158,8 @@
 			for (const h of holRes.data) {
 				if (h.date) { off.add(h.date); hDates.set(h.date, h.name ?? 'Holiday'); }
 			}
-			for (const a of absRes.data) {
+			const absences = absRes.data.items ?? [];
+			for (const a of absences) {
 				if (a.date) {
 					off.add(a.date);
 					if (a.type === 'SickDay') sDates.add(a.date);
@@ -165,7 +185,8 @@
 		}
 		try {
 			const orgId = orgContext.selectedOrgId;
-			const { data: allEntries } = await timeTrackingApi.apiTimeTrackingGet(orgId, undefined, undefined, 50000);
+			const { data: allEntriesPage } = await timeTrackingApi.apiV1TimeTrackingGet(orgId, undefined, undefined, 50000);
+			const allEntries = allEntriesPage.items ?? [];
 			allTimeEntries = allEntries.filter(e => !e.isRunning && e.endTime);
 
 			if (allTimeEntries.length === 0) {
@@ -262,6 +283,32 @@
 		if (mode === 'year' && yearEntries.length === 0) loadYearEntries();
 	}
 
+	function ensureSelectedDayForCurrentMonth() {
+		const monthPrefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-`;
+		if (selectedDayKey?.startsWith(monthPrefix)) {
+			return;
+		}
+
+		const today = new Date();
+		if (today.getFullYear() === currentYear && today.getMonth() === currentMonth) {
+			selectedDayKey = dateKey(today);
+			return;
+		}
+
+		selectedDayKey = `${monthPrefix}01`;
+	}
+
+	function selectDay(day: CalendarDay) {
+		if (!day.isCurrentMonth) return;
+		selectedDayKey = day.key;
+	}
+
+	function isPastOrToday(date: Date): boolean {
+		const endOfToday = new Date();
+		endOfToday.setHours(23, 59, 59, 999);
+		return date <= endOfToday;
+	}
+
 	// Helpers
 
 	function getYearCumulative(year: number): number {
@@ -282,6 +329,7 @@
 		isToday: boolean;
 		isWeekend: boolean;
 		workedMinutes: number;
+		creditedMinutes: number;
 		targetMinutes: number;
 		entryCount: number;
 		dayType: string | null;
@@ -327,7 +375,6 @@
 			const entryData = entryMap.get(key) ?? { minutes: 0, count: 0 };
 			const targetMinutes = isCurrentMonth ? getDayTarget(new Date(cursor), workSchedule, holidayDates, schedulePeriods) : 0;
 			const absCredit = isCurrentMonth ? getAbsenceCredit(new Date(cursor), workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods) : 0;
-			const effectiveWorked = entryData.minutes + absCredit;
 
 			days.push({
 				date: new Date(cursor),
@@ -336,12 +383,13 @@
 				isCurrentMonth,
 				isToday,
 				isWeekend,
-				workedMinutes: effectiveWorked,
+				workedMinutes: entryData.minutes,
+				creditedMinutes: absCredit,
 				targetMinutes,
 				entryCount: entryData.count,
 				dayType: getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates),
 				dayTypeLabel: getDayTypeLabel(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates),
-				delta: effectiveWorked - targetMinutes
+				delta: entryData.minutes + absCredit - targetMinutes
 			});
 
 			cursor.setDate(cursor.getDate() + 1);
@@ -352,21 +400,23 @@
 	function computeMonthStats(days: CalendarDay[]) {
 		const currentDays = days.filter(d => d.isCurrentMonth);
 		const totalWorked = currentDays.reduce((s, d) => s + d.workedMinutes, 0);
+		const totalCredits = currentDays.reduce((s, d) => s + d.creditedMinutes, 0);
 		const totalTarget = currentDays.reduce((s, d) => s + d.targetMinutes, 0);
-		const totalDelta = totalWorked - totalTarget;
+		const totalDelta = totalWorked + totalCredits - totalTarget;
 		const workDays = currentDays.filter(d => d.targetMinutes > 0).length;
 		const workedDays = currentDays.filter(d => d.workedMinutes > 0).length;
 		const holidays = currentDays.filter(d => d.dayType === 'holiday').length;
 		const sickDays = currentDays.filter(d => d.dayType === 'sick').length;
 		const vacationDays = currentDays.filter(d => d.dayType === 'vacation').length;
 		const avgPerDay = workedDays > 0 ? totalWorked / workedDays : 0;
-		return { totalWorked, totalTarget, totalDelta, workDays, workedDays, holidays, sickDays, vacationDays, avgPerDay };
+		return { totalWorked, totalCredits, totalTarget, totalDelta, workDays, workedDays, holidays, sickDays, vacationDays, avgPerDay };
 	}
 
 	interface YearMonth {
 		month: number;
 		name: string;
 		workedMinutes: number;
+		creditedMinutes: number;
 		targetMinutes: number;
 		delta: number;
 		workDays: number;
@@ -415,7 +465,8 @@
 			months.push({
 				month: m,
 				name: monthName,
-				workedMinutes: workedMinutes + absenceCredits,
+				workedMinutes,
+				creditedMinutes: absenceCredits,
 				targetMinutes,
 				delta: workedMinutes + absenceCredits - targetMinutes,
 				workDays,
@@ -460,6 +511,10 @@
 					<span class="text-xs text-base-content/60">Worked</span>
 				</div>
 				<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center">
+					<span class="block text-xl font-bold text-base-content">{formatHours(monthStats.totalCredits)}</span>
+					<span class="text-xs text-base-content/60">Credits</span>
+				</div>
+				<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center">
 					<span class="block text-xl font-bold text-base-content">{formatHours(monthStats.totalTarget)}</span>
 					<span class="text-xs text-base-content/60">Target</span>
 				</div>
@@ -501,9 +556,12 @@
 				</div>
 				<div class="grid grid-cols-7">
 					{#each calendarDays as day}
-						<div
-							class="min-h-[72px] p-1.5 border-r border-b border-base-200 [&:nth-child(7n)]:border-r-0 flex flex-col gap-0.5 relative transition-colors {!day.isCurrentMonth ? 'opacity-30' : ''} {day.isWeekend ? 'bg-base-200/30' : ''} {day.isToday ? 'outline-2 outline-primary -outline-offset-2 rounded' : ''} {day.dayType === 'holiday' ? 'bg-secondary/10' : day.dayType === 'sick' ? 'bg-error/10' : day.dayType === 'vacation' ? 'bg-accent/10' : day.dayType === 'other-absence' ? 'bg-base-content/10' : ''}"
+						<button
+							type="button"
+							class="min-h-[72px] p-1.5 border-r border-b border-base-200 [&:nth-child(7n)]:border-r-0 flex flex-col gap-0.5 relative transition-colors text-left {!day.isCurrentMonth ? 'opacity-30' : ''} {day.isWeekend ? 'bg-base-200/30' : ''} {day.isToday ? 'outline-2 outline-primary -outline-offset-2 rounded' : ''} {day.key === selectedDayKey ? 'ring-2 ring-primary/40 bg-primary/10' : ''} {day.dayType === 'holiday' ? 'bg-secondary/10' : day.dayType === 'sick' ? 'bg-error/10' : day.dayType === 'vacation' ? 'bg-accent/10' : day.dayType === 'other-absence' ? 'bg-base-content/10' : ''}"
 							title={day.dayTypeLabel || (day.workedMinutes > 0 ? `${formatHours(day.workedMinutes)} worked` : '')}
+							onclick={() => selectDay(day)}
+							disabled={!day.isCurrentMonth}
 						>
 							<span class="text-xs font-medium {day.isToday ? 'text-primary font-bold' : 'text-base-content/70'}">{day.dayOfMonth}</span>
 							{#if day.isCurrentMonth}
@@ -520,7 +578,7 @@
 									<span class="text-xs text-base-content/20 mt-0.5">—</span>
 								{/if}
 							{/if}
-						</div>
+						</button>
 					{/each}
 				</div>
 			</div>
@@ -542,7 +600,11 @@
 				<div class="flex flex-col gap-1.5">
 					{#each calendarDays.filter(d => d.isCurrentMonth && (d.workedMinutes > 0 || d.targetMinutes > 0 || d.dayType)) as day}
 						{@const dayName = day.date.toLocaleDateString('en-US', { weekday: 'short' })}
-						<div class="flex items-center gap-2 py-1 px-1.5 rounded {day.isToday ? 'font-semibold' : ''} {day.dayType === 'holiday' ? 'bg-secondary/5' : day.dayType === 'sick' ? 'bg-error/5' : day.dayType === 'vacation' ? 'bg-accent/5' : day.dayType === 'other-absence' ? 'bg-base-content/5' : ''}">
+						<button
+							type="button"
+							class="flex items-center gap-2 py-1 px-1.5 rounded text-left transition-colors {day.isToday ? 'font-semibold' : ''} {day.key === selectedDayKey ? 'ring-2 ring-primary/30 bg-primary/10' : ''} {day.dayType === 'holiday' ? 'bg-secondary/5' : day.dayType === 'sick' ? 'bg-error/5' : day.dayType === 'vacation' ? 'bg-accent/5' : day.dayType === 'other-absence' ? 'bg-base-content/5' : ''}"
+							onclick={() => selectDay(day)}
+						>
 							<span class="w-7 text-xs text-base-content/60 shrink-0">{dayName}</span>
 							<span class="w-5 text-xs text-base-content/40 shrink-0 text-right">{day.dayOfMonth}</span>
 							{#if day.dayType}
@@ -557,10 +619,63 @@
 							{#if day.targetMinutes > 0}
 								<span class="text-xs text-base-content/40">/ {formatHours(day.targetMinutes)}</span>
 							{/if}
-						</div>
+						</button>
 					{/each}
 				</div>
 			</div>
+
+			{#if selectedDay}
+				{@const dayDetails = selectedDay}
+				{@const dayEntries = selectedDayEntries}
+				{@const showUnderTarget = isPastOrToday(dayDetails.date) && dayDetails.targetMinutes > 0 && dayDetails.delta < 0}
+				<div class="card bg-base-100 border border-base-300 p-4 mt-4">
+					<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+						<h3 class="text-[0.9375rem] font-bold m-0">Day Details</h3>
+						<span class="text-sm text-base-content/70">{formatDateFull(dayDetails.date)}</span>
+					</div>
+
+					<div class="flex flex-wrap gap-2 mb-4">
+						<span class="badge badge-outline">Worked {formatHours(dayDetails.workedMinutes)}</span>
+						{#if dayDetails.creditedMinutes > 0}
+							<span class="badge badge-secondary badge-outline">Credits {formatHours(dayDetails.creditedMinutes)}</span>
+						{/if}
+						<span class="badge badge-outline">Target {formatHours(dayDetails.targetMinutes)}</span>
+						<span class={"badge " + (dayDetails.delta > 0 ? 'badge-success' : dayDetails.delta < 0 ? 'badge-error' : 'badge-ghost')}>
+							{formatDelta(dayDetails.delta)}
+						</span>
+						{#if showUnderTarget}
+							<span class="badge badge-warning">Under target</span>
+						{/if}
+						{#if dayDetails.dayType}
+							<span class={"badge " + (dayDetails.dayType === 'holiday' ? 'badge-secondary' : dayDetails.dayType === 'sick' ? 'badge-error' : dayDetails.dayType === 'vacation' ? 'badge-accent' : 'badge-ghost')}>
+								{dayDetails.dayTypeLabel}
+							</span>
+						{/if}
+					</div>
+
+					{#if dayEntries.length > 0}
+						<ul class="flex flex-col gap-2">
+							{#each dayEntries as entry}
+								<li class="flex items-start justify-between gap-3 rounded-lg border border-base-300 bg-base-200/40 px-3 py-2">
+									<div>
+										<div class="text-sm font-medium text-base-content">
+											{formatTime(entry.startTime!)}{entry.endTime ? ` - ${formatTime(entry.endTime)}` : ' - Running'}
+										</div>
+										{#if entry.description}
+											<div class="text-xs text-base-content/60">{entry.description}</div>
+										{/if}
+									</div>
+									<span class="badge badge-outline badge-sm">
+										{formatDuration(entry.netDurationMinutes ?? entry.durationMinutes ?? undefined)}
+									</span>
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="text-sm text-base-content/60 m-0">No tracked entries for this day.</p>
+					{/if}
+				</div>
+			{/if}
 		</div>
 
 	{:else}
@@ -577,8 +692,9 @@
 			{:else}
 				<!-- Year summary -->
 				{@const yearTotal = yearMonths.reduce((s, m) => s + m.workedMinutes, 0)}
+				{@const yearCredits = yearMonths.reduce((s, m) => s + m.creditedMinutes, 0)}
 				{@const yearTarget = yearMonths.reduce((s, m) => s + m.targetMinutes, 0)}
-				{@const yearDelta = yearTotal - yearTarget}
+				{@const yearDelta = yearTotal + yearCredits - yearTarget}
 				{@const yearHolidays = yearMonths.reduce((s, m) => s + m.holidays, 0)}
 				{@const yearSick = yearMonths.reduce((s, m) => s + m.sickDays, 0)}
 				{@const yearVacation = yearMonths.reduce((s, m) => s + m.vacationDays, 0)}
@@ -587,6 +703,10 @@
 					<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center">
 						<span class="block text-xl font-bold text-base-content">{formatHours(yearTotal)}</span>
 						<span class="text-xs text-base-content/60">Total Worked</span>
+					</div>
+					<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center">
+						<span class="block text-xl font-bold text-base-content">{formatHours(yearCredits)}</span>
+						<span class="text-xs text-base-content/60">Credits</span>
 					</div>
 					<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center">
 						<span class="block text-xl font-bold text-base-content">{formatHours(yearTarget)}</span>
@@ -617,7 +737,7 @@
 						<button class="bg-base-100 border rounded-lg p-3.5 cursor-pointer text-left transition-all w-full hover:border-primary/30 hover:shadow-md {isCurrent ? 'border-primary shadow-[0_0_0_1px] shadow-primary' : 'border-base-300'}" onclick={() => { currentMonth = mo.month; viewMode = 'month'; loadEntries(); }}>
 							<div class="flex justify-between items-center mb-2">
 								<span class="font-semibold text-sm text-base-content">{mo.name}</span>
-								{#if mo.workedMinutes > 0}
+								{#if mo.workedMinutes > 0 || mo.creditedMinutes > 0}
 									<span class="text-xs font-medium {mo.delta > 0 ? 'text-success' : mo.delta < 0 ? 'text-error' : ''}">{formatDelta(mo.delta)}</span>
 								{/if}
 							</div>
@@ -630,6 +750,9 @@
 									<span class="text-base-content/40">/ {formatHours(mo.targetMinutes)}</span>
 								{/if}
 							</div>
+							{#if mo.creditedMinutes > 0}
+								<div class="text-xs text-base-content/60 mb-1">+{formatHours(mo.creditedMinutes)} credits</div>
+							{/if}
 							{#if moCumulative !== undefined}
 								<div class="text-xs font-semibold mb-1 {moCumulative > 0 ? 'text-success' : moCumulative < 0 ? 'text-error' : 'text-base-content/60'}">
 									Σ {formatDelta(moCumulative)}

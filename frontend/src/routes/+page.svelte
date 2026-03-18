@@ -69,7 +69,7 @@
 
 	async function loadCurrentTimer() {
 		try {
-			const { data } = await timeTrackingApi.apiTimeTrackingCurrentGet();
+			const { data } = await timeTrackingApi.apiV1TimeTrackingCurrentGet();
 			currentEntry = data;
 			if (currentEntry) {
 				timerInterval = setInterval(updateElapsed, 1000);
@@ -86,7 +86,7 @@
 			return;
 		}
 		try {
-			const { data } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgContext.selectedOrgSlug!);
+			const { data } = await workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(orgContext.selectedOrgSlug!);
 			workSchedule = data;
 		} catch {
 			workSchedule = null;
@@ -99,8 +99,8 @@
 			if (orgContext.selectedOrgSlug) {
 				try {
 					const [holRes, absRes] = await Promise.all([
-						holidayApi.apiOrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
-						absenceDayApi.apiOrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug, auth.user?.id)
+						holidayApi.apiV1OrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
+						absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug, auth.user?.id)
 					]);
 					const offDates = new Set<string>();
 					const holidays = new Map<string, string>();
@@ -113,7 +113,8 @@
 							holidays.set(h.date, h.name ?? 'Holiday');
 						}
 					}
-					for (const a of absRes.data) {
+					const absences = absRes.data.items ?? [];
+					for (const a of absences) {
 						if (a.date) {
 							offDates.add(a.date);
 							if (a.type === 'SickDay') sick.add(a.date);
@@ -164,15 +165,15 @@
 
 			const orgId = orgContext.selectedOrgId ?? undefined;
 			const [todayRes, weekRes, monthRes, allRes] = await Promise.all([
-				timeTrackingApi.apiTimeTrackingGet(orgId, todayStart.toISOString(), todayEnd.toISOString(), WEEKLY_ENTRY_LIMIT),
-				timeTrackingApi.apiTimeTrackingGet(orgId, weekStart.toISOString(), weekEnd.toISOString(), WEEKLY_ENTRY_LIMIT),
-				timeTrackingApi.apiTimeTrackingGet(orgId, monthStart.toISOString(), monthEnd.toISOString(), MONTHLY_ENTRY_LIMIT),
-				timeTrackingApi.apiTimeTrackingGet(orgId, undefined, undefined, MAX_ENTRIES_FOR_OVERTIME)
+				timeTrackingApi.apiV1TimeTrackingGet(orgId, todayStart.toISOString(), todayEnd.toISOString(), WEEKLY_ENTRY_LIMIT),
+				timeTrackingApi.apiV1TimeTrackingGet(orgId, weekStart.toISOString(), weekEnd.toISOString(), WEEKLY_ENTRY_LIMIT),
+				timeTrackingApi.apiV1TimeTrackingGet(orgId, monthStart.toISOString(), monthEnd.toISOString(), MONTHLY_ENTRY_LIMIT),
+				timeTrackingApi.apiV1TimeTrackingGet(orgId, undefined, undefined, MAX_ENTRIES_FOR_OVERTIME)
 			]);
-			const todayEntries = todayRes.data;
-			const weekEntries = weekRes.data;
-			const monthEntries = monthRes.data;
-			const allEntries = allRes.data;
+			const todayEntries = todayRes.data.items ?? [];
+			const weekEntries = weekRes.data.items ?? [];
+			const monthEntries = monthRes.data.items ?? [];
+			const allEntries = allRes.data.items ?? [];
 
 			// Find first entry date (for target calculations)
 			const sorted = [...allEntries].filter(e => !e.isRunning && e.endTime)
@@ -285,7 +286,7 @@
 			const payload: StartTimeEntryRequest = {
 				organizationSlug: orgContext.selectedOrgSlug ?? undefined
 			};
-			const { data } = await timeTrackingApi.apiTimeTrackingStartPost(payload);
+			const { data } = await timeTrackingApi.apiV1TimeTrackingStartPost(payload);
 			currentEntry = data;
 			timerInterval = setInterval(updateElapsed, 1000);
 			updateElapsed();
@@ -300,7 +301,7 @@
 		actionError = '';
 		stopping = true;
 		try {
-			await timeTrackingApi.apiTimeTrackingStopPost({});
+			await timeTrackingApi.apiV1TimeTrackingStopPost({});
 			if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
 			currentEntry = null;
 			elapsed = '00:00:00';
@@ -414,8 +415,11 @@
 
 	<!-- Weekly Breakdown -->
 	{#if weekDays.length > 0}
-		<div class="card bg-base-100 border border-base-300 p-5 mb-6">
-			<h2 class="text-base font-semibold text-base-content mb-4">This Week</h2>
+		<a href="/time" class="card bg-base-100 border border-base-300 p-5 mb-6 no-underline text-base-content hover:border-primary/40 hover:shadow-md transition-all">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-base font-semibold text-base-content m-0">This Week</h2>
+				<span class="text-xs text-primary font-semibold uppercase tracking-wide">Open Timer</span>
+			</div>
 			<div class="flex flex-col gap-2">
 				{#each weekDays as day}
 					{@const dayType = getDayType(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}
@@ -442,7 +446,7 @@
 					</span>
 				{/if}
 			</div>
-		</div>
+		</a>
 	{/if}
 
 	<!-- Day Type Legend -->
@@ -457,8 +461,11 @@
 
 	<!-- Monthly Overview -->
 	{#if monthWeeks.length > 0}
-		<div class="card bg-base-100 border border-base-300 p-5 mb-6">
-			<h2 class="text-base font-semibold text-base-content mb-4">{getMonthName()} Overview</h2>
+		<a href="/history" class="card bg-base-100 border border-base-300 p-5 mb-6 no-underline text-base-content hover:border-primary/40 hover:shadow-md transition-all">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-base font-semibold text-base-content m-0">{getMonthName()} Overview</h2>
+				<span class="text-xs text-primary font-semibold uppercase tracking-wide">Open History</span>
+			</div>
 			<div class="flex flex-col gap-2">
 				{#each monthWeeks as wk}
 					<div class="flex items-center gap-2.5">
@@ -481,7 +488,7 @@
 					</span>
 				{/if}
 			</div>
-		</div>
+		</a>
 	{/if}
 
 	<!-- Quick links -->

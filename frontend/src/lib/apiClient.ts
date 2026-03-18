@@ -1,8 +1,14 @@
 import axios from 'axios';
+import { env } from '$env/dynamic/public';
 import { Configuration, AbsenceDayApi, AuthApi, HolidayApi, NotificationsApi, OrganizationsApi, PauseRulesApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
 
 // Detect base URL: browser uses current hostname, SSR uses Docker service name
 const getApiBaseUrl = (): string => {
+    const configuredUrl = env.PUBLIC_API_BASE_URL?.trim();
+    if (configuredUrl) {
+        return configuredUrl;
+    }
+
     if (typeof window !== 'undefined') {
         // Browser: same host, backend on port 7000
         return `${window.location.protocol}//${window.location.hostname}:7000`;
@@ -17,9 +23,27 @@ const axiosInstance = axios.create({
     headers: { 'Content-Type': 'application/json' },
 });
 
+const ensureVersionedApiPath = (url?: string): string | undefined => {
+    if (!url) {
+        return url;
+    }
+
+    if (url.startsWith('/api/v')) {
+        return url;
+    }
+
+    if (url.startsWith('/api/')) {
+        return `/api/v1/${url.substring('/api/'.length)}`;
+    }
+
+    return url;
+};
+
 // Request interceptor: inject Bearer token
 axiosInstance.interceptors.request.use(
     (config) => {
+        config.url = ensureVersionedApiPath(config.url);
+
         const token = localStorage.getItem('authToken');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;

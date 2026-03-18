@@ -217,5 +217,5 @@ export function barWidth(worked: number, target: number): number {
  * Get the name of the current month.
  */
 export function getMonthName(): string {
-	return new Date().toLocaleDateString([], { month: 'long' });
+	return new Date().toLocaleDateString('en-US', { month: 'long' });
 }

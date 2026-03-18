@@ -48,7 +48,7 @@
 				description: description.trim() || undefined,
 				website: website.trim() || undefined
 			};
-			const { data: created } = await organizationsApi.apiOrganizationsPost(payload);
+			const { data: created } = await organizationsApi.apiV1OrganizationsPost(payload);
 			// Refresh org context so the new org appears immediately in the UI
 			if (auth.user?.id) {
 				await orgContext.loadOrganizations(auth.user.id);

@@ -51,7 +51,7 @@
 
 	async function loadNotifications() {
 		try {
-			const { data } = await requestsApi.apiOrganizationsNotificationsGet();
+			const { data } = await requestsApi.apiV1OrganizationsNotificationsGet();
 			pendingCount = data.pendingRequests ?? 0;
 			pendingRequests = data.requests ?? [];
 		} catch {
@@ -60,7 +60,7 @@
 		}
 		// Also load user notifications (responses to my requests)
 		try {
-			const { data } = await requestsApi.apiOrganizationsUserNotificationsGet();
+			const { data } = await requestsApi.apiV1OrganizationsUserNotificationsGet();
 			userNotifCount = data.count ?? 0;
 			userNotifRequests = data.requests ?? [];
 		} catch {
@@ -80,7 +80,7 @@
 	async function respondToRequest(request: OrgRequestResponse, accept: boolean) {
 		if (!request.organizationSlug || !request.id) return;
 		try {
-			await requestsApi.apiOrganizationsSlugRequestsIdPut(request.organizationSlug, request.id, { accept });
+			await requestsApi.apiV1OrganizationsSlugRequestsIdPut(request.organizationSlug, request.id, { accept });
 			await loadNotifications();
 			if (accept && request.type === 'JoinOrganization') {
 				// Reload orgs if needed
@@ -93,7 +93,7 @@
 
 	async function dismissUserNotif(requestId: number) {
 		try {
-			await requestsApi.apiOrganizationsUserNotificationsMarkSeenPost([requestId]);
+			await requestsApi.apiV1OrganizationsUserNotificationsMarkSeenPost([requestId]);
 			userNotifRequests = userNotifRequests.filter(r => r.id !== requestId);
 			userNotifCount = userNotifRequests.length;
 		} catch {
@@ -103,7 +103,7 @@
 
 	async function dismissAllUserNotifs() {
 		try {
-			await requestsApi.apiOrganizationsUserNotificationsMarkSeenPost(userNotifRequests.map(r => r.id!));
+			await requestsApi.apiV1OrganizationsUserNotificationsMarkSeenPost(userNotifRequests.map(r => r.id!));
 			userNotifRequests = [];
 			userNotifCount = 0;
 		} catch {
@@ -122,6 +122,19 @@
 		detailReq = null;
 	}
 
+	function handleOverlayKeydown(event: KeyboardEvent, close: () => void) {
+		if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			close();
+		}
+	}
+
+	function navLinkClass(path: string) {
+		const current = $page.url.pathname;
+		const active = current === path || current.startsWith(`${path}/`);
+		return `rounded-lg px-3 py-1.5 text-sm font-medium no-underline transition-colors ${active ? 'bg-base-200 text-base-content' : 'text-base-content/70 hover:bg-base-200/60 hover:text-base-content'}`;
+	}
+
 	async function handleLogout() {
 		await auth.logout();
 		goto('/login');
@@ -137,19 +150,24 @@
 		<p>Loading...</p>
 	</div>
 {:else if auth.isAuthenticated}
-	<nav class="navbar bg-base-100 shadow-sm border-b border-base-300 sticky top-0 z-50 px-4">
-		<div class="flex items-center gap-6">
-			<a href="/" class="text-lg font-bold text-primary no-underline">Time Tracking</a>
-			{#if orgContext.selectedOrg}
-				<span class="text-xs font-medium text-base-content/50 bg-base-200 px-2.5 py-1 rounded-md truncate max-w-40">{orgContext.selectedOrg.name}</span>
-			{/if}
-			<a href="/time" class="text-sm font-medium text-base-content/70 no-underline hover:text-base-content border-b-2 border-transparent hover:border-primary transition-colors">Timer</a>
-			<a href="/history" class="text-sm font-medium text-base-content/70 no-underline hover:text-base-content border-b-2 border-transparent hover:border-primary transition-colors">History</a>
-			{#if orgContext.selectedOrg}
-				<a href="/organizations/{orgContext.selectedOrgSlug}" class="text-sm font-medium text-base-content/70 no-underline hover:text-base-content border-b-2 border-transparent hover:border-primary transition-colors">Organization</a>
-			{/if}
-		</div>
-		<div class="flex items-center gap-4">
+	<nav class="sticky top-0 z-50 border-b border-base-300 bg-base-100/95 shadow-sm backdrop-blur">
+		<div class="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
+			<div class="flex min-w-0 items-center gap-3 pr-2">
+				<a href="/" class="text-lg font-bold text-primary no-underline">Time Tracking</a>
+				{#if orgContext.selectedOrg}
+					<span class="max-w-44 truncate rounded-md bg-base-200 px-2.5 py-1 text-xs font-medium text-base-content/60">{orgContext.selectedOrg.name}</span>
+				{/if}
+			</div>
+
+			<div class="flex flex-1 flex-wrap items-center gap-1 md:gap-2">
+				<a href="/time" class={navLinkClass('/time')}>Timer</a>
+				<a href="/history" class={navLinkClass('/history')}>History</a>
+				{#if orgContext.selectedOrg}
+					<a href="/organizations/{orgContext.selectedOrgSlug}" class={navLinkClass(`/organizations/${orgContext.selectedOrgSlug}`)}>Organization</a>
+				{/if}
+			</div>
+
+			<div class="ml-auto flex items-center gap-2 sm:gap-3">
 			<!-- Notification bell -->
 			<div class="relative">
 				<button class="btn btn-ghost btn-sm btn-square" onclick={toggleNotifPanel} title="Notifications">
@@ -164,7 +182,7 @@
 
 				{#if showNotifPanel}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="fixed inset-0 z-[199]" onclick={closeNotifPanel}></div>
+					<div class="fixed inset-0 z-[199]" onclick={closeNotifPanel} onkeydown={(e) => handleOverlayKeydown(e, closeNotifPanel)} tabindex="-1" role="button" aria-label="Close notifications"></div>
 					<div class="absolute top-full mt-2 right-0 w-80 max-h-[420px] bg-base-100 border border-base-300 rounded-xl shadow-xl z-[200] overflow-hidden flex flex-col">
 						<div class="flex items-center justify-between px-4 py-3 border-b border-base-200">
 							<span class="font-semibold text-sm">Notifications</span>
@@ -183,7 +201,7 @@
 										<button class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors border-l-4 {req.status === 'Accepted' ? 'border-l-success' : req.status === 'Declined' ? 'border-l-error' : 'border-l-transparent'}" onclick={() => openNotifDetail(req)}>
 											<div class="flex flex-col gap-0.5 flex-1 min-w-0">
 												<span class="{req.status === 'Accepted' ? 'badge badge-success badge-xs' : 'badge badge-error badge-xs'}">
-													{req.status === 'Accepted' ? 'âœ“ Accepted' : '✗ Declined'}
+													{req.status === 'Accepted' ? 'Accepted' : 'Declined'}
 												</span>
 												<span class="font-semibold text-xs text-primary">{formatRequestType(req.type)}</span>
 												<span class="text-xs text-base-content/50">{req.organizationName}</span>
@@ -231,29 +249,17 @@
 				{/if}
 			</div>
 
-			<a href="/settings" class="text-sm font-medium text-base-content no-underline px-2 py-1 rounded-md hover:bg-base-200 transition-colors" title="Settings">{auth.user?.firstName} {auth.user?.lastName}</a>
-
-			<!-- Theme switcher -->
-			<div class="relative">
-				<select
-					class="select select-bordered select-xs text-xs"
-					value={theme.current}
-					onchange={(e) => theme.set((e.currentTarget as HTMLSelectElement).value as typeof theme.current)}
-				>
-					{#each theme.themes as t}
-						<option value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
-					{/each}
-				</select>
-			</div>
+			<a href="/settings" class="rounded-md px-2 py-1 text-sm font-medium text-base-content no-underline transition-colors hover:bg-base-200" title="Settings">{auth.user?.firstName} {auth.user?.lastName}</a>
 
 			<button class="btn btn-ghost btn-sm" onclick={handleLogout}>Sign Out</button>
+		</div>
 		</div>
 	</nav>
 
 	<!-- Notification detail popup -->
 	{#if detailReq}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="fixed inset-0 bg-black/35 z-[299]" onclick={closeNotifDetail}></div>
+		<div class="fixed inset-0 bg-black/35 z-[299]" onclick={closeNotifDetail} onkeydown={(e) => handleOverlayKeydown(e, closeNotifDetail)} tabindex="-1" role="button" aria-label="Close notification details"></div>
 		<div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] max-w-[92vw] max-h-[80vh] bg-base-100 rounded-2xl shadow-2xl z-[300] flex flex-col overflow-hidden">
 			<div class="flex items-center justify-between px-5 py-4 border-b border-base-200">
 				<h3 class="text-base font-bold">{formatRequestTypeFull(detailReq.type)}</h3>
@@ -265,7 +271,7 @@
 						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Status</span>
 						<span class="text-sm font-medium text-right">
 							<span class="{detailReq.status === 'Accepted' ? 'badge badge-success badge-xs' : detailReq.status === 'Declined' ? 'badge badge-error badge-xs' : 'badge badge-warning badge-xs'}">
-								{detailReq.status === 'Accepted' ? 'âœ“ Accepted' : detailReq.status === 'Declined' ? '✗ Declined' : 'â³ Pending'}
+								{detailReq.status === 'Accepted' ? 'Accepted' : detailReq.status === 'Declined' ? 'Declined' : 'Pending'}
 							</span>
 						</span>
 					</div>

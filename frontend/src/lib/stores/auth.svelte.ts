@@ -46,12 +46,12 @@ function createAuthStore() {
 	}
 
 	async function login(request: LoginRequest): Promise<void> {
-		const { data } = await authApi.apiAuthLoginPost(request);
+		const { data } = await authApi.apiV1AuthLoginPost(request);
 		setAuth(data);
 	}
 
 	async function register(request: RegisterRequest): Promise<void> {
-		const { data } = await authApi.apiAuthRegisterPost(request);
+		const { data } = await authApi.apiV1AuthRegisterPost(request);
 		setAuth(data);
 	}
 
@@ -59,7 +59,7 @@ function createAuthStore() {
 		try {
 			const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 			if (refreshToken) {
-				await authApi.apiAuthLogoutPost({ refreshToken });
+				await authApi.apiV1AuthLogoutPost({ refreshToken });
 			}
 		} catch {
 			// Ignore logout errors
@@ -70,7 +70,7 @@ function createAuthStore() {
 
 	async function fetchCurrentUser(): Promise<void> {
 		try {
-			const { data: userInfo } = await authApi.apiAuthMeGet();
+			const { data: userInfo } = await authApi.apiV1AuthMeGet();
 			user = userInfo;
 			localStorage.setItem(USER_KEY, JSON.stringify(userInfo));
 		} catch {

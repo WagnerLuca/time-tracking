@@ -1,4 +1,4 @@
-﻿<script lang="ts">
+<script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -68,33 +68,6 @@
 	// Work schedule (for member view)
 	let workSchedule = $state<WorkScheduleResponse | null>(null);
 
-	// Admin: member schedule editing
-	let editingMemberSchedule = $state<number | null>(null);
-	let memberSchedule = $state<WorkScheduleResponse | null>(null);
-	let memberScheduleLoading = $state(false);
-	let memberScheduleSaving = $state(false);
-	let memberScheduleError = $state('');
-	let memberWeeklyHours = $state<number | null>(null);
-	let memberDistributeEvenly = $state(true);
-	let memberTargetMon = $state(0);
-	let memberTargetTue = $state(0);
-	let memberTargetWed = $state(0);
-	let memberTargetThu = $state(0);
-	let memberTargetFri = $state(0);
-	let memberOvertimeHours = $state(0);
-
-	// Self schedule editing (inline on org page)
-	let editingMySchedule = $state(false);
-	let myWeeklyHours = $state<number | null>(null);
-	let myDistributeEvenly = $state(true);
-	let myTargetMon = $state(0);
-	let myTargetTue = $state(0);
-	let myTargetWed = $state(0);
-	let myTargetThu = $state(0);
-	let myTargetFri = $state(0);
-	let myScheduleSaving = $state(false);
-	let myScheduleError = $state('');
-
 	// Initial overtime editing (inline)
 	let editingMyOvertime = $state(false);
 	let myOvertimeHours = $state(0);
@@ -163,22 +136,6 @@
 	let newPeriodFri = $state(0);
 	let addingPeriod = $state(false);
 	let periodError = $state('');
-	// Admin schedule periods for member
-	let adminPeriodsForMember = $state<number | null>(null);
-	let adminPeriods = $state<WorkScheduleResponse[]>([]);
-	let adminPeriodsLoading = $state(false);
-	let showAdminAddPeriod = $state(false);
-	let adminNewPeriodFrom = $state('');
-	let adminNewPeriodTo = $state('');
-	let adminNewPeriodWeeklyHours = $state<number | null>(null);
-	let adminNewPeriodDistributeEvenly = $state(true);
-	let adminNewPeriodMon = $state(0);
-	let adminNewPeriodTue = $state(0);
-	let adminNewPeriodWed = $state(0);
-	let adminNewPeriodThu = $state(0);
-	let adminNewPeriodFri = $state(0);
-	let addingAdminPeriod = $state(false);
-	let adminPeriodError = $state('');
 
 	// Settings change notification
 	let showSettingsChangedBanner = $state(false);
@@ -195,12 +152,12 @@
 		loading = true;
 		error = '';
 		try {
-			const { data } = await organizationsApi.apiOrganizationsSlugGet(orgSlug);
+			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			org = data;
 
 			// Check for unread settings-change notifications from backend
 			try {
-				const resp = await notificationsApi.apiNotificationsGet(true) as any;
+				const resp = await notificationsApi.apiV1NotificationsGet(true) as any;
 				const notifications = resp.data as any[];
 				const orgId = org!.id;
 				const settingsNotifs = notifications.filter(
@@ -216,7 +173,7 @@
 
 			// Load work schedule for the current user
 			try {
-				const { data: ws } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgSlug);
+				const { data: ws } = await workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(orgSlug);
 				workSchedule = ws;
 			} catch {
 				workSchedule = null;
@@ -236,7 +193,7 @@
 		// Mark all settings-change notifications as read on the backend
 		for (const nid of settingsNotificationIds) {
 			try {
-				await notificationsApi.apiNotificationsIdReadPut(nid);
+				await notificationsApi.apiV1NotificationsIdReadPut(nid);
 			} catch {
 				// Ignore errors
 			}
@@ -266,7 +223,7 @@
 			const weekEnd = new Date(weekStart);
 			weekEnd.setDate(weekStart.getDate() + 6);
 			weekEnd.setHours(23, 59, 59, 999);
-			const { data } = await organizationsApi.apiOrganizationsSlugTimeOverviewGet(orgSlug, weekStart.toISOString(), weekEnd.toISOString());
+			const { data } = await organizationsApi.apiV1OrganizationsSlugTimeOverviewGet(orgSlug, weekStart.toISOString(), weekEnd.toISOString());
 			teamOverview = data;
 			teamOverviewLoaded = true;
 		} catch {
@@ -291,10 +248,10 @@
 	/** Reload org data without toggling loading state (avoids scroll-to-top) */
 	async function reloadOrg() {
 		try {
-			const { data } = await organizationsApi.apiOrganizationsSlugGet(orgSlug);
+			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			org = data;
 			try {
-				const { data: ws } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgSlug);
+				const { data: ws } = await workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(orgSlug);
 				workSchedule = ws;
 			} catch {
 				workSchedule = null;
@@ -308,8 +265,8 @@
 		if (requestHistoryLoaded) return;
 		requestHistoryLoading = true;
 		try {
-			const { data } = await requestsApi.apiOrganizationsSlugRequestsGet(orgSlug);
-			requestHistory = data as OrgRequestResponse[];
+			const { data } = await requestsApi.apiV1OrganizationsSlugRequestsGet(orgSlug);
+			requestHistory = data.items ?? [];
 			requestHistoryLoaded = true;
 		} catch {
 			requestHistory = [];
@@ -323,143 +280,8 @@
 		return requestHistory.filter(r => r.status === requestHistoryFilter);
 	}
 
-
-
-	// â”€â”€ Admin: Member Schedule â”€â”€
-	async function openMemberSchedule(memberId: number) {
-		if (editingMemberSchedule === memberId) {
-			editingMemberSchedule = null;
-			return;
-		}
-		editingMemberSchedule = memberId;
-		memberScheduleLoading = true;
-		memberScheduleError = '';
-		try {
-			const { data } = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkScheduleGet(orgSlug, memberId);
-			memberSchedule = data;
-			memberWeeklyHours = data.weeklyWorkHours ?? null;
-			memberTargetMon = data.targetMon ?? 0;
-			memberTargetTue = data.targetTue ?? 0;
-			memberTargetWed = data.targetWed ?? 0;
-			memberTargetThu = data.targetThu ?? 0;
-			memberTargetFri = data.targetFri ?? 0;
-			memberOvertimeHours = data.initialOvertimeHours ?? 0;
-			const allEqual = memberTargetMon === memberTargetTue && memberTargetTue === memberTargetWed && memberTargetWed === memberTargetThu && memberTargetThu === memberTargetFri;
-			memberDistributeEvenly = allEqual;
-		} catch {
-			memberSchedule = null;
-		} finally {
-			memberScheduleLoading = false;
-		}
-	}
-
-	async function saveMemberSchedule() {
-		if (!editingMemberSchedule) return;
-		memberScheduleSaving = true;
-		memberScheduleError = '';
-		try {
-			const scheduleId = memberSchedule?.id;
-			let data: WorkScheduleResponse;
-			if (scheduleId && scheduleId > 0) {
-				// Update existing schedule
-				const payload = {
-					weeklyWorkHours: memberWeeklyHours ?? undefined,
-					distributeEvenly: memberDistributeEvenly,
-					targetMon: memberDistributeEvenly ? undefined : memberTargetMon,
-					targetTue: memberDistributeEvenly ? undefined : memberTargetTue,
-					targetWed: memberDistributeEvenly ? undefined : memberTargetWed,
-					targetThu: memberDistributeEvenly ? undefined : memberTargetThu,
-					targetFri: memberDistributeEvenly ? undefined : memberTargetFri,
-				};
-				const resp = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesIdPut(orgSlug, editingMemberSchedule, scheduleId, payload);
-				data = resp.data;
-			} else {
-				// Create new schedule
-				const today = new Date();
-				const validFrom = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-				const payload = {
-					validFrom,
-					weeklyWorkHours: memberWeeklyHours ?? undefined,
-					distributeEvenly: memberDistributeEvenly,
-					targetMon: memberDistributeEvenly ? undefined : memberTargetMon,
-					targetTue: memberDistributeEvenly ? undefined : memberTargetTue,
-					targetWed: memberDistributeEvenly ? undefined : memberTargetWed,
-					targetThu: memberDistributeEvenly ? undefined : memberTargetThu,
-					targetFri: memberDistributeEvenly ? undefined : memberTargetFri,
-				};
-				const resp = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesPost(orgSlug, editingMemberSchedule, payload);
-				data = resp.data;
-			}
-			memberSchedule = data;
-			memberWeeklyHours = data.weeklyWorkHours ?? null;
-			memberTargetMon = data.targetMon ?? 0;
-			memberTargetTue = data.targetTue ?? 0;
-			memberTargetWed = data.targetWed ?? 0;
-			memberTargetThu = data.targetThu ?? 0;
-			memberTargetFri = data.targetFri ?? 0;
-			memberOvertimeHours = data.initialOvertimeHours ?? 0;
-			actionError = '';
-		} catch (err) {
-			memberScheduleError = extractErrorMessage(err, 'Failed to save schedule.');
-		} finally {
-			memberScheduleSaving = false;
-		}
-	}
-
-	function startEditMySchedule() {
-		if (!workSchedule) return;
-		myWeeklyHours = workSchedule.weeklyWorkHours ?? null;
-		myTargetMon = workSchedule.targetMon ?? 0;
-		myTargetTue = workSchedule.targetTue ?? 0;
-		myTargetWed = workSchedule.targetWed ?? 0;
-		myTargetThu = workSchedule.targetThu ?? 0;
-		myTargetFri = workSchedule.targetFri ?? 0;
-		myDistributeEvenly = myTargetMon === myTargetTue && myTargetTue === myTargetWed && myTargetWed === myTargetThu && myTargetThu === myTargetFri;
-		myScheduleError = '';
-		editingMySchedule = true;
-	}
-
-	async function saveMySchedule() {
-		myScheduleSaving = true;
-		myScheduleError = '';
-		try {
-			const scheduleId = workSchedule?.id;
-			let data: WorkScheduleResponse;
-			if (scheduleId && scheduleId > 0) {
-				const payload = {
-					weeklyWorkHours: myWeeklyHours ?? undefined,
-					distributeEvenly: myDistributeEvenly,
-					targetMon: myDistributeEvenly ? undefined : myTargetMon,
-					targetTue: myDistributeEvenly ? undefined : myTargetTue,
-					targetWed: myDistributeEvenly ? undefined : myTargetWed,
-					targetThu: myDistributeEvenly ? undefined : myTargetThu,
-					targetFri: myDistributeEvenly ? undefined : myTargetFri,
-				};
-				const resp = await workScheduleApi.apiOrganizationsSlugWorkSchedulesIdPut(orgSlug, scheduleId, payload);
-				data = resp.data;
-			} else {
-				const today = new Date();
-				const validFrom = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-				const payload = {
-					validFrom,
-					weeklyWorkHours: myWeeklyHours ?? undefined,
-					distributeEvenly: myDistributeEvenly,
-					targetMon: myDistributeEvenly ? undefined : myTargetMon,
-					targetTue: myDistributeEvenly ? undefined : myTargetTue,
-					targetWed: myDistributeEvenly ? undefined : myTargetWed,
-					targetThu: myDistributeEvenly ? undefined : myTargetThu,
-					targetFri: myDistributeEvenly ? undefined : myTargetFri,
-				};
-				const resp = await workScheduleApi.apiOrganizationsSlugWorkSchedulesPost(orgSlug, payload);
-				data = resp.data;
-			}
-			workSchedule = data;
-			editingMySchedule = false;
-		} catch (err) {
-			myScheduleError = extractErrorMessage(err, 'Failed to save schedule.');
-		} finally {
-			myScheduleSaving = false;
-		}
+	function normalizeDateOnly(value: string): string {
+		return value?.split('T')[0] ?? '';
 	}
 
 	function startEditMyOvertime() {
@@ -473,9 +295,9 @@
 		myOvertimeSaving = true;
 		myOvertimeError = '';
 		try {
-			await workScheduleApi.apiOrganizationsSlugInitialOvertimePut(orgSlug, { initialOvertimeHours: myOvertimeHours });
+			await workScheduleApi.apiV1OrganizationsSlugInitialOvertimePut(orgSlug, { initialOvertimeHours: myOvertimeHours });
 			// Reload work schedule
-			const { data: ws } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgSlug);
+			const { data: ws } = await workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(orgSlug);
 			workSchedule = ws;
 			editingMyOvertime = false;
 		} catch (err) {
@@ -488,7 +310,7 @@
 	async function loadUsersForDropdown() {
 		if (usersLoaded) return;
 		try {
-			const { data: orgData } = await organizationsApi.apiOrganizationsSlugGet(orgSlug);
+			const { data: orgData } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			const users = orgData?.members ?? [];
 			allUsers = users.map((u: any) => ({
 				id: u.id,
@@ -532,7 +354,7 @@
 				slug: editSlug.trim(),
 				website: editWebsite.trim() || undefined
 			};
-			await organizationsApi.apiOrganizationsSlugPut(orgSlug, payload);
+			await organizationsApi.apiV1OrganizationsSlugPut(orgSlug, payload);
 			await reloadOrg();
 			editing = false;
 		} catch (err) {
@@ -546,7 +368,7 @@
 		if (!confirm('Are you sure you want to delete this organization? This cannot be undone.'))
 			return;
 		try {
-			await organizationsApi.apiOrganizationsSlugDelete(orgSlug);
+			await organizationsApi.apiV1OrganizationsSlugDelete(orgSlug);
 			goto('/organizations');
 		} catch (err) {
 			actionError = extractErrorMessage(err, 'Failed to delete organization.');
@@ -568,7 +390,7 @@
 				userId: selectedUserId,
 				role: newMemberRole as any
 			};
-			await organizationsApi.apiOrganizationsSlugMembersPost(orgSlug, payload);
+			await organizationsApi.apiV1OrganizationsSlugMembersPost(orgSlug, payload);
 			await reloadOrg();
 			showAddMember = false;
 			selectedUserId = null;
@@ -583,7 +405,7 @@
 	async function updateMemberRole(userId: number, newRole: number) {
 		actionError = '';
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersMemberIdPut(orgSlug, userId, { role: newRole as any });
+			await organizationsApi.apiV1OrganizationsSlugMembersMemberIdPut(orgSlug, userId, { role: newRole as any });
 			await reloadOrg();
 		} catch (err) {
 			actionError = extractErrorMessage(err, 'Failed to update member role.');
@@ -594,7 +416,7 @@
 		if (!confirm(`Remove ${memberName} from this organization?`)) return;
 		actionError = '';
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersMemberIdDelete(orgSlug, userId);
+			await organizationsApi.apiV1OrganizationsSlugMembersMemberIdDelete(orgSlug, userId);
 			await reloadOrg();
 		} catch (err) {
 			actionError = extractErrorMessage(err, 'Failed to remove member.');
@@ -622,7 +444,7 @@
 			const payload: UpdateOrganizationSettingsRequest = {
 				autoPauseEnabled: !org.autoPauseEnabled
 			};
-			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
 		} catch (err) {
 			settingsError = extractErrorMessage(err, 'Failed to update setting.');
@@ -642,7 +464,7 @@
 			const payload: UpdateOrganizationSettingsRequest = {
 				editPastEntriesMode: next
 			};
-			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
 		} catch (err) {
 			settingsError = extractErrorMessage(err, 'Failed to update setting.');
@@ -662,7 +484,7 @@
 			const payload: UpdateOrganizationSettingsRequest = {
 				editPauseMode: next
 			};
-			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
 		} catch (err) {
 			settingsError = extractErrorMessage(err, 'Failed to update setting.');
@@ -682,7 +504,7 @@
 			const payload: UpdateOrganizationSettingsRequest = {
 				initialOvertimeMode: next
 			};
-			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
 		} catch (err) {
 			settingsError = extractErrorMessage(err, 'Failed to update setting.');
@@ -702,7 +524,7 @@
 			const payload: UpdateOrganizationSettingsRequest = {
 				joinPolicy: next
 			};
-			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
 		} catch (err) {
 			settingsError = extractErrorMessage(err, 'Failed to update setting.');
@@ -768,7 +590,7 @@
 				minHours: newRuleMinHours,
 				pauseMinutes: newRulePauseMinutes
 			};
-			await pauseRulesApi.apiOrganizationsSlugPauseRulesPost(orgSlug, payload);
+			await pauseRulesApi.apiV1OrganizationsSlugPauseRulesPost(orgSlug, payload);
 			await reloadOrg();
 			showAddRule = false;
 			newRuleMinHours = 6;
@@ -795,7 +617,7 @@
 		editRuleError = '';
 		editingRuleSaving = true;
 		try {
-			await pauseRulesApi.apiOrganizationsSlugPauseRulesRuleIdPut(orgSlug, ruleId, {
+			await pauseRulesApi.apiV1OrganizationsSlugPauseRulesRuleIdPut(orgSlug, ruleId, {
 				minHours: editRuleMinHours,
 				pauseMinutes: editRulePauseMinutes
 			});
@@ -811,7 +633,7 @@
 	async function deleteRule(ruleId: number) {
 		if (!confirm('Delete this pause rule?')) return;
 		try {
-			await pauseRulesApi.apiOrganizationsSlugPauseRulesRuleIdDelete(orgSlug, ruleId);
+			await pauseRulesApi.apiV1OrganizationsSlugPauseRulesRuleIdDelete(orgSlug, ruleId);
 			await reloadOrg();
 		} catch (err) {
 			settingsError = extractErrorMessage(err, 'Failed to delete rule.');
@@ -833,7 +655,7 @@
 		editOvertimeSaving = true;
 		editOvertimeError = '';
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersMemberIdInitialOvertimePut(
+			await organizationsApi.apiV1OrganizationsSlugMembersMemberIdInitialOvertimePut(
 				orgSlug, userId, { initialOvertimeHours: editOvertimeMinutes }
 			);
 			editingOvertimeMemberId = null;
@@ -857,7 +679,7 @@
 		holidaysLoading = true;
 		holidayError = '';
 		try {
-			const { data } = await holidayApi.apiOrganizationsSlugHolidaysGet(orgSlug);
+			const { data } = await holidayApi.apiV1OrganizationsSlugHolidaysGet(orgSlug);
 			holidays = (data as HolidayResponse[]).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
 			holidaysLoaded = true;
 		} catch {
@@ -872,7 +694,7 @@
 		addingHoliday = true;
 		holidayError = '';
 		try {
-			await holidayApi.apiOrganizationsSlugHolidaysPost(orgSlug, {
+			await holidayApi.apiV1OrganizationsSlugHolidaysPost(orgSlug, {
 				date: newHolidayDate,
 				name: newHolidayName,
 				isRecurring: newHolidayRecurring
@@ -901,7 +723,7 @@
 		editHolidaySaving = true;
 		holidayError = '';
 		try {
-			await holidayApi.apiOrganizationsSlugHolidaysIdPut(orgSlug, id, {
+			await holidayApi.apiV1OrganizationsSlugHolidaysIdPut(orgSlug, id, {
 				date: editHolidayDate,
 				name: editHolidayName,
 				isRecurring: editHolidayRecurring
@@ -919,7 +741,7 @@
 	async function deleteHoliday(id: number) {
 		if (!confirm('Delete this holiday?')) return;
 		try {
-			await holidayApi.apiOrganizationsSlugHolidaysIdDelete(orgSlug, id);
+			await holidayApi.apiV1OrganizationsSlugHolidaysIdDelete(orgSlug, id);
 			holidaysLoaded = false;
 			await loadHolidays();
 		} catch (err) {
@@ -941,8 +763,8 @@
 		absencesLoading = true;
 		absenceError = '';
 		try {
-			const { data } = await absenceDayApi.apiOrganizationsSlugAbsencesGet(orgSlug);
-			absences = (data as AbsenceDayResponse[]).sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+			const { data } = await absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug);
+			absences = [...(data.items ?? [])].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
 			absencesLoaded = true;
 		} catch {
 			absences = [];
@@ -976,7 +798,7 @@
 				return;
 			}
 			for (const dateStr of workdays) {
-				await absenceDayApi.apiOrganizationsSlugAbsencesPost(orgSlug, {
+				await absenceDayApi.apiV1OrganizationsSlugAbsencesPost(orgSlug, {
 					date: dateStr,
 					type: newAbsenceType as AbsenceType,
 					note: newAbsenceNote || undefined
@@ -999,7 +821,7 @@
 	async function deleteAbsence(id: number) {
 		if (!confirm('Delete this absence?')) return;
 		try {
-			await absenceDayApi.apiOrganizationsSlugAbsencesIdDelete(orgSlug, id);
+			await absenceDayApi.apiV1OrganizationsSlugAbsencesIdDelete(orgSlug, id);
 			absencesLoaded = false;
 			await loadAbsences();
 		} catch (err) {
@@ -1014,7 +836,7 @@
 		addingAdminAbsence = true;
 		adminAbsenceError = '';
 		try {
-			await absenceDayApi.apiOrganizationsSlugAbsencesAdminPost(orgSlug, {
+			await absenceDayApi.apiV1OrganizationsSlugAbsencesAdminPost(orgSlug, {
 				userId: adminAbsenceUserId,
 				date: adminAbsenceDate,
 				type: adminAbsenceType as AbsenceType,
@@ -1045,7 +867,7 @@
 		schedulePeriodsLoading = true;
 		periodError = '';
 		try {
-			const { data } = await workScheduleApi.apiOrganizationsSlugWorkSchedulesGet(orgSlug);
+			const { data } = await workScheduleApi.apiV1OrganizationsSlugWorkSchedulesGet(orgSlug);
 			schedulePeriods = (data as WorkScheduleResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
 			schedulePeriodsLoaded = true;
 		} catch {
@@ -1057,26 +879,48 @@
 
 	async function addSchedulePeriod(e: Event) {
 		e.preventDefault();
+		if (!newPeriodFrom) {
+			periodError = 'A start date is required.';
+			return;
+		}
+
+		const validFrom = normalizeDateOnly(newPeriodFrom);
+		const validTo = normalizeDateOnly(newPeriodTo);
+		if (validTo && validTo < validFrom) {
+			periodError = 'Valid to must be on or after valid from.';
+			return;
+		}
+
 		addingPeriod = true;
 		periodError = '';
 		try {
-			await workScheduleApi.apiOrganizationsSlugWorkSchedulesPost(orgSlug, {
-				validFrom: newPeriodFrom,
-				validTo: newPeriodTo || undefined,
-				weeklyWorkHours: newPeriodWeeklyHours,
+			const payload = {
+				validFrom,
+				validTo: validTo || undefined,
+				weeklyWorkHours: newPeriodWeeklyHours ?? undefined,
 				distributeEvenly: newPeriodDistributeEvenly,
 				targetMon: newPeriodDistributeEvenly ? undefined : newPeriodMon,
 				targetTue: newPeriodDistributeEvenly ? undefined : newPeriodTue,
 				targetWed: newPeriodDistributeEvenly ? undefined : newPeriodWed,
 				targetThu: newPeriodDistributeEvenly ? undefined : newPeriodThu,
 				targetFri: newPeriodDistributeEvenly ? undefined : newPeriodFri
-			});
+			};
+
+			const existingPeriod = schedulePeriods.find((p) => p.validFrom === validFrom);
+			if (existingPeriod?.id) {
+				await workScheduleApi.apiV1OrganizationsSlugWorkSchedulesIdPut(orgSlug, existingPeriod.id, payload);
+			} else {
+				await workScheduleApi.apiV1OrganizationsSlugWorkSchedulesPost(orgSlug, payload);
+			}
+
 			schedulePeriodsLoaded = false;
 			await loadSchedulePeriods();
 			showAddPeriod = false;
 			newPeriodFrom = '';
 			newPeriodTo = '';
 			newPeriodWeeklyHours = null;
+			newPeriodDistributeEvenly = true;
+			newPeriodMon = newPeriodTue = newPeriodWed = newPeriodThu = newPeriodFri = 0;
 		} catch (err) {
 			periodError = extractErrorMessage(err, 'Failed to add schedule period.');
 		} finally {
@@ -1087,72 +931,11 @@
 	async function deleteSchedulePeriod(id: number) {
 		if (!confirm('Delete this schedule period?')) return;
 		try {
-			await workScheduleApi.apiOrganizationsSlugWorkSchedulesIdDelete(orgSlug, id);
+			await workScheduleApi.apiV1OrganizationsSlugWorkSchedulesIdDelete(orgSlug, id);
 			schedulePeriodsLoaded = false;
 			await loadSchedulePeriods();
 		} catch (err) {
 			periodError = extractErrorMessage(err, 'Failed to delete period.');
-		}
-	}
-
-	// Admin: member schedule periods
-	async function openMemberPeriods(memberId: number) {
-		if (adminPeriodsForMember === memberId) {
-			adminPeriodsForMember = null;
-			return;
-		}
-		adminPeriodsForMember = memberId;
-		adminPeriodsLoading = true;
-		adminPeriodError = '';
-		try {
-			const { data } = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesGet(orgSlug, memberId);
-			adminPeriods = (data as WorkScheduleResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
-		} catch {
-			adminPeriods = [];
-		} finally {
-			adminPeriodsLoading = false;
-		}
-	}
-
-	async function addAdminSchedulePeriod(e: Event) {
-		e.preventDefault();
-		if (!adminPeriodsForMember) return;
-		addingAdminPeriod = true;
-		adminPeriodError = '';
-		try {
-			await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesPost(orgSlug, adminPeriodsForMember, {
-				validFrom: adminNewPeriodFrom,
-				validTo: adminNewPeriodTo || undefined,
-				weeklyWorkHours: adminNewPeriodWeeklyHours,
-				distributeEvenly: adminNewPeriodDistributeEvenly,
-				targetMon: adminNewPeriodDistributeEvenly ? undefined : adminNewPeriodMon,
-				targetTue: adminNewPeriodDistributeEvenly ? undefined : adminNewPeriodTue,
-				targetWed: adminNewPeriodDistributeEvenly ? undefined : adminNewPeriodWed,
-				targetThu: adminNewPeriodDistributeEvenly ? undefined : adminNewPeriodThu,
-				targetFri: adminNewPeriodDistributeEvenly ? undefined : adminNewPeriodFri
-			});
-			// reload
-			const { data } = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesGet(orgSlug, adminPeriodsForMember);
-			adminPeriods = (data as WorkScheduleResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
-			showAdminAddPeriod = false;
-			adminNewPeriodFrom = '';
-			adminNewPeriodTo = '';
-			adminNewPeriodWeeklyHours = null;
-		} catch (err) {
-			adminPeriodError = extractErrorMessage(err, 'Failed to add schedule period.');
-		} finally {
-			addingAdminPeriod = false;
-		}
-	}
-
-	async function deleteAdminSchedulePeriod(memberId: number, periodId: number) {
-		if (!confirm('Delete this schedule period?')) return;
-		try {
-			await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesIdDelete(orgSlug, memberId, periodId);
-			const { data } = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesGet(orgSlug, memberId);
-			adminPeriods = (data as WorkScheduleResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
-		} catch (err) {
-			adminPeriodError = extractErrorMessage(err, 'Failed to delete period.');
 		}
 	}
 
@@ -1168,7 +951,7 @@
 			const payload: UpdateOrganizationSettingsRequest = {
 				workScheduleChangeMode: next
 			};
-			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
 		} catch (err) {
 			settingsError = extractErrorMessage(err, 'Failed to update setting.');
@@ -1185,7 +968,7 @@
 			const payload: UpdateOrganizationSettingsRequest = {
 				memberTimeEntryVisibility: !org.memberTimeEntryVisibility
 			};
-			await organizationsApi.apiOrganizationsSlugSettingsPut(orgSlug, payload);
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
 			await reloadOrg();
 		} catch (err) {
 			settingsError = extractErrorMessage(err, 'Failed to update setting.');
@@ -1198,7 +981,7 @@
 		importingHolidays = true;
 		holidayError = '';
 		try {
-			await holidayApi.apiOrganizationsSlugHolidaysImportPresetPost(orgSlug, importPreset, importYear);
+			await holidayApi.apiV1OrganizationsSlugHolidaysImportPresetPost(orgSlug, importPreset, importYear);
 			holidaysLoaded = false;
 			await loadHolidays();
 		} catch (err) {
@@ -1320,75 +1103,40 @@
 			{#if activeTab === 'my-schedule'}
 				<div class="pt-2">
 					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Your personal work schedule, overtime balance, absences and time period configurations.</p>
-					<!-- My Work Schedule -->
+					<!-- Active Work Schedule (read-only, managed via periods) -->
 					{#if myRole && workSchedule}
 						<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
 							<div class="flex items-center justify-between mb-4">
-								<h2 class="text-xl font-bold text-base-content">My Work Schedule</h2>
-								{#if !editingMySchedule && workSchedule.workScheduleChangeMode !== 'Disabled'}
-									<button class="btn btn-outline btn-info btn-xs" onclick={startEditMySchedule}>Edit</button>
-								{/if}
+								<h2 class="text-xl font-bold text-base-content">Active Schedule</h2>
 							</div>
 
-							{#if editingMySchedule}
-								<div class="flex flex-col gap-3 py-2">
-									{#if myScheduleError}
-										<div class="alert alert-error text-sm py-1.5 px-2.5">{myScheduleError}</div>
-									{/if}
-									<div class="flex items-center gap-3">
-										<label class="text-sm text-base-content/70 font-medium min-w-[100px]">Weekly Hours</label>
-										<input type="number" class="input input-bordered input-xs w-20" bind:value={myWeeklyHours} min="0" max="168" step="0.5" />
-									</div>
-									<div class="flex items-center gap-3">
-										<label class="label cursor-pointer flex items-center gap-1.5 text-sm text-base-content/70">
-											<input type="checkbox" class="checkbox checkbox-sm checkbox-primary" bind:checked={myDistributeEvenly} />
-											Distribute evenly (Monâ€“Fri)
-										</label>
-									</div>
-									{#if !myDistributeEvenly}
-										<div class="flex gap-2 flex-wrap">
-											<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Mon</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={myTargetMon} min="0" max="24" step="0.5" /></div>
-											<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Tue</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={myTargetTue} min="0" max="24" step="0.5" /></div>
-											<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Wed</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={myTargetWed} min="0" max="24" step="0.5" /></div>
-											<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Thu</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={myTargetThu} min="0" max="24" step="0.5" /></div>
-											<div class="flex flex-col items-center gap-1"><span class="text-xs text-base-content/60 font-medium">Fri</span><input type="number" class="input input-bordered input-xs w-14 text-center" bind:value={myTargetFri} min="0" max="24" step="0.5" /></div>
-										</div>
-									{/if}
-									<div class="flex gap-2 mt-1">
-										<button class="btn btn-primary btn-sm" onclick={saveMySchedule} disabled={myScheduleSaving}>
-											{myScheduleSaving ? 'Saving...' : 'Save'}
-										</button>
-										<button class="btn btn-ghost btn-sm" onclick={() => (editingMySchedule = false)}>Cancel</button>
-									</div>
+							<div class="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] gap-2">
+								<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+									<span class="text-xs text-base-content/60 font-medium">Weekly Hours</span>
+									<span class="text-lg font-bold text-base-content">{workSchedule.weeklyWorkHours ?? 'â€”'}h</span>
 								</div>
-							{:else}
-								<div class="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] gap-2">
-									<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
-										<span class="text-xs text-base-content/60 font-medium">Weekly Hours</span>
-										<span class="text-lg font-bold text-base-content">{workSchedule.weeklyWorkHours ?? 'â€”'}h</span>
-									</div>
-									<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
-										<span class="text-xs text-base-content/60 font-medium">Mon</span>
-										<span class="text-lg font-bold text-base-content">{workSchedule.targetMon ?? 0}h</span>
-									</div>
-									<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
-										<span class="text-xs text-base-content/60 font-medium">Tue</span>
-										<span class="text-lg font-bold text-base-content">{workSchedule.targetTue ?? 0}h</span>
-									</div>
-									<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
-										<span class="text-xs text-base-content/60 font-medium">Wed</span>
-										<span class="text-lg font-bold text-base-content">{workSchedule.targetWed ?? 0}h</span>
-									</div>
-									<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
-										<span class="text-xs text-base-content/60 font-medium">Thu</span>
-										<span class="text-lg font-bold text-base-content">{workSchedule.targetThu ?? 0}h</span>
-									</div>
-									<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
-										<span class="text-xs text-base-content/60 font-medium">Fri</span>
-										<span class="text-lg font-bold text-base-content">{workSchedule.targetFri ?? 0}h</span>
-									</div>
+								<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+									<span class="text-xs text-base-content/60 font-medium">Mon</span>
+									<span class="text-lg font-bold text-base-content">{workSchedule.targetMon ?? 0}h</span>
 								</div>
-							{/if}
+								<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+									<span class="text-xs text-base-content/60 font-medium">Tue</span>
+									<span class="text-lg font-bold text-base-content">{workSchedule.targetTue ?? 0}h</span>
+								</div>
+								<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+									<span class="text-xs text-base-content/60 font-medium">Wed</span>
+									<span class="text-lg font-bold text-base-content">{workSchedule.targetWed ?? 0}h</span>
+								</div>
+								<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+									<span class="text-xs text-base-content/60 font-medium">Thu</span>
+									<span class="text-lg font-bold text-base-content">{workSchedule.targetThu ?? 0}h</span>
+								</div>
+								<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+									<span class="text-xs text-base-content/60 font-medium">Fri</span>
+									<span class="text-lg font-bold text-base-content">{workSchedule.targetFri ?? 0}h</span>
+								</div>
+							</div>
+							<p class="text-xs text-base-content/50 mt-3">Schedule values are managed through the Schedule Periods section below.</p>
 						</section>
 
 						<!-- Initial Overtime Balance -->
@@ -1514,7 +1262,7 @@
 					{/if}
 
 					<!-- My Schedule Periods -->
-					{#if myRole && workSchedule && workSchedule.workScheduleChangeMode !== 'Disabled'}
+					{#if myRole && workSchedule}
 						<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
 							<div class="flex items-center justify-between mb-4">
 								<h2 class="text-xl font-bold text-base-content">Schedule Periods</h2>
@@ -1527,6 +1275,8 @@
 
 							{#if workSchedule.workScheduleChangeMode === 'RequiresApproval'}
 								<p class="text-sm text-base-content/40 mt-3">Schedule period changes require admin approval</p>
+							{:else if workSchedule.workScheduleChangeMode === 'Disabled'}
+								<p class="text-sm text-base-content/40 mt-3">Schedule period changes are disabled for this organization.</p>
 							{/if}
 
 							{#if schedulePeriodsLoading}
@@ -1546,7 +1296,7 @@
 										<div class="flex items-center gap-2">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label class="min-w-[80px] text-sm font-medium text-base-content/70">To (optional)</label>
-											<input type="date" class="input input-bordered input-sm flex-1" bind:value={newPeriodTo} disabled={addingPeriod} />
+											<input type="date" class="input input-bordered input-sm flex-1" bind:value={newPeriodTo} min={newPeriodFrom || undefined} disabled={addingPeriod} />
 										</div>
 										<div class="flex items-center gap-2">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
@@ -2035,7 +1785,7 @@
 												<div class="flex gap-1.5 mt-3 pt-3 border-t border-base-300">
 													<button class="btn btn-success btn-sm" onclick={async () => {
 														try {
-															await requestsApi.apiOrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: true });
+															await requestsApi.apiV1OrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: true });
 															requestHistoryLoaded = false;
 															await loadRequestHistory();
 														} catch (e) {
@@ -2044,7 +1794,7 @@
 													}}>Accept</button>
 													<button class="btn btn-outline btn-error btn-sm" onclick={async () => {
 														try {
-															await requestsApi.apiOrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: false });
+															await requestsApi.apiV1OrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: false });
 															requestHistoryLoaded = false;
 															await loadRequestHistory();
 														} catch (e) {

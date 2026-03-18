@@ -53,16 +53,6 @@
 	// Work schedule
 	let schedule = $state<WorkScheduleResponse | null>(null);
 	let scheduleLoading = $state(false);
-	let editingSchedule = $state(false);
-	let schedWeeklyHours = $state<number | null>(null);
-	let schedDistribute = $state(true);
-	let schedMon = $state(0);
-	let schedTue = $state(0);
-	let schedWed = $state(0);
-	let schedThu = $state(0);
-	let schedFri = $state(0);
-	let scheduleSaving = $state(false);
-	let scheduleError = $state('');
 
 	// Schedule periods
 	let periods = $state<WorkScheduleResponse[]>([]);
@@ -105,7 +95,7 @@
 		loading = true;
 		error = '';
 		try {
-			const { data } = await organizationsApi.apiOrganizationsSlugGet(orgSlug);
+			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			org = data;
 			member = data.members?.find(m => m.id === memberId) ?? null;
 			if (!member) { error = 'Member not found.'; loading = false; return; }
@@ -130,7 +120,7 @@
 		try {
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
-			const { data } = await organizationsApi.apiOrganizationsSlugTimeOverviewGet(orgSlug, from, to);
+			const { data } = await organizationsApi.apiV1OrganizationsSlugTimeOverviewGet(orgSlug, from, to);
 			overview = data.find(m => m.userId === memberId) ?? null;
 		} catch { overview = null; }
 		overviewLoading = false;
@@ -147,7 +137,7 @@
 		allTimeLoading = true;
 		try {
 			// Use a very early start date and far future end date to capture all entries
-			const { data } = await organizationsApi.apiOrganizationsSlugTimeOverviewGet(
+			const { data } = await organizationsApi.apiV1OrganizationsSlugTimeOverviewGet(
 				orgSlug,
 				'2000-01-01T00:00:00.000Z',
 				'2099-12-31T23:59:59.999Z'
@@ -157,13 +147,14 @@
 
 		// Find the date of the first time entry to compute weeks accurately
 		try {
-			const { data: allEntries } = await organizationsApi.apiOrganizationsSlugMemberEntriesMemberIdGet(
+			const { data: allEntries } = await organizationsApi.apiV1OrganizationsSlugMemberEntriesMemberIdGet(
 				orgSlug, memberId,
 				'2000-01-01T00:00:00.000Z',
 				'2099-12-31T23:59:59.999Z'
 			);
-			if (allEntries.length > 0) {
-				const sorted = allEntries
+			const allEntriesItems = allEntries.items ?? [];
+			if (allEntriesItems.length > 0) {
+				const sorted = allEntriesItems
 					.filter((e: any) => e.startTime)
 					.map((e: any) => new Date(e.startTime).getTime())
 					.sort((a: number, b: number) => a - b);
@@ -183,8 +174,8 @@
 		try {
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
-			const { data } = await organizationsApi.apiOrganizationsSlugMemberEntriesMemberIdGet(orgSlug, memberId, from, to);
-			entries = data;
+			const { data } = await organizationsApi.apiV1OrganizationsSlugMemberEntriesMemberIdGet(orgSlug, memberId, from, to);
+			entries = data.items ?? [];
 		} catch { entries = []; }
 		entriesLoading = false;
 	}
@@ -193,8 +184,8 @@
 	async function loadAbsences() {
 		absencesLoading = true;
 		try {
-			const { data } = await absenceDayApi.apiOrganizationsSlugAbsencesGet(orgSlug, memberId);
-			absences = data;
+			const { data } = await absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, memberId);
+			absences = data.items ?? [];
 		} catch { absences = []; }
 		absencesLoading = false;
 	}
@@ -224,7 +215,7 @@
 			// Create one absence per workday
 			for (const wd of workdays) {
 				const dateStr = `${wd.getFullYear()}-${String(wd.getMonth() + 1).padStart(2, '0')}-${String(wd.getDate()).padStart(2, '0')}`;
-				await absenceDayApi.apiOrganizationsSlugAbsencesAdminPost(orgSlug, {
+				await absenceDayApi.apiV1OrganizationsSlugAbsencesAdminPost(orgSlug, {
 					userId: memberId,
 					date: dateStr,
 					type: absenceType as AbsenceType,
@@ -245,7 +236,7 @@
 
 	async function deleteAbsence(id: number) {
 		try {
-			await absenceDayApi.apiOrganizationsSlugAbsencesIdDelete(orgSlug, id);
+			await absenceDayApi.apiV1OrganizationsSlugAbsencesIdDelete(orgSlug, id);
 			loadAbsences();
 		} catch (e) {
 			actionError = extractErrorMessage(e, 'Failed to delete absence.');
@@ -256,94 +247,75 @@
 	async function loadSchedule() {
 		scheduleLoading = true;
 		try {
-			const { data } = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkScheduleGet(orgSlug, memberId);
+			const { data } = await workScheduleApi.apiV1OrganizationsSlugMembersMemberIdWorkScheduleGet(orgSlug, memberId);
 			schedule = data;
 			overtimeHours = data.initialOvertimeHours ?? 0;
 		} catch { schedule = null; }
 		scheduleLoading = false;
 	}
 
-	function startEditSchedule() {
-		if (!schedule) return;
-		schedWeeklyHours = schedule.weeklyWorkHours ?? null;
-		schedDistribute = true;
-		schedMon = schedule.targetMon ?? 0;
-		schedTue = schedule.targetTue ?? 0;
-		schedWed = schedule.targetWed ?? 0;
-		schedThu = schedule.targetThu ?? 0;
-		schedFri = schedule.targetFri ?? 0;
-		editingSchedule = true;
-	}
-
-	async function saveSchedule() {
-		scheduleSaving = true;
-		scheduleError = '';
-		try {
-			const scheduleId = schedule?.id;
-			if (scheduleId && scheduleId > 0) {
-				await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesIdPut(orgSlug, memberId, scheduleId, {
-					weeklyWorkHours: schedWeeklyHours,
-					distributeEvenly: schedDistribute,
-					targetMon: schedDistribute ? null : schedMon,
-					targetTue: schedDistribute ? null : schedTue,
-					targetWed: schedDistribute ? null : schedWed,
-					targetThu: schedDistribute ? null : schedThu,
-					targetFri: schedDistribute ? null : schedFri
-				});
-			} else {
-				const today = new Date();
-				const validFrom = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-				await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesPost(orgSlug, memberId, {
-					validFrom,
-					weeklyWorkHours: schedWeeklyHours,
-					distributeEvenly: schedDistribute,
-					targetMon: schedDistribute ? null : schedMon,
-					targetTue: schedDistribute ? null : schedTue,
-					targetWed: schedDistribute ? null : schedWed,
-					targetThu: schedDistribute ? null : schedThu,
-					targetFri: schedDistribute ? null : schedFri
-				});
-			}
-			editingSchedule = false;
-			loadSchedule();
-		} catch (e) {
-			scheduleError = extractErrorMessage(e, 'Failed to update schedule.');
-		}
-		scheduleSaving = false;
-	}
-
 	// ── Schedule Periods ──
+	function normalizeDateOnly(value: string): string {
+		return value?.split('T')[0] ?? '';
+	}
+
 	async function loadPeriods() {
 		periodsLoading = true;
 		try {
-			const { data } = await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesGet(orgSlug, memberId);
-			periods = data;
+			const { data } = await workScheduleApi.apiV1OrganizationsSlugMembersMemberIdWorkSchedulesGet(orgSlug, memberId);
+			periods = (data as WorkScheduleResponse[]).sort((a, b) => (b.validFrom ?? '').localeCompare(a.validFrom ?? ''));
 		} catch { periods = []; }
 		periodsLoading = false;
 	}
 
 	async function addPeriod() {
-		if (!periodFrom) return;
+		if (!periodFrom) {
+			periodError = 'A start date is required.';
+			return;
+		}
+
+		const validFrom = normalizeDateOnly(periodFrom);
+		const validTo = normalizeDateOnly(periodTo);
+		if (validTo && validTo < validFrom) {
+			periodError = 'Valid to must be on or after valid from.';
+			return;
+		}
+
 		periodSaving = true;
 		periodError = '';
 		try {
-			await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesPost(orgSlug, memberId, {
-				validFrom: new Date(periodFrom).toISOString(),
-				validTo: periodTo ? new Date(periodTo).toISOString() : undefined,
-				weeklyWorkHours: periodWeekly,
+			const payload = {
+				validFrom,
+				validTo: validTo || undefined,
+				weeklyWorkHours: periodWeekly ?? undefined,
 				distributeEvenly: periodDistribute,
-				targetMon: periodDistribute ? null : periodMon,
-				targetTue: periodDistribute ? null : periodTue,
-				targetWed: periodDistribute ? null : periodWed,
-				targetThu: periodDistribute ? null : periodThu,
-				targetFri: periodDistribute ? null : periodFri
-			});
+				targetMon: periodDistribute ? undefined : periodMon,
+				targetTue: periodDistribute ? undefined : periodTue,
+				targetWed: periodDistribute ? undefined : periodWed,
+				targetThu: periodDistribute ? undefined : periodThu,
+				targetFri: periodDistribute ? undefined : periodFri
+			};
+
+			const existingPeriod = periods.find((p) => p.validFrom === validFrom);
+			if (existingPeriod?.id) {
+				await workScheduleApi.apiV1OrganizationsSlugMembersMemberIdWorkSchedulesIdPut(
+					orgSlug,
+					memberId,
+					existingPeriod.id,
+					payload
+				);
+			} else {
+				await workScheduleApi.apiV1OrganizationsSlugMembersMemberIdWorkSchedulesPost(orgSlug, memberId, payload);
+			}
+
 			showAddPeriod = false;
 			periodFrom = '';
 			periodTo = '';
 			periodWeekly = null;
 			periodDistribute = true;
-			loadPeriods();
+			periodMon = periodTue = periodWed = periodThu = periodFri = 0;
+			await loadPeriods();
+			await loadSchedule();
 		} catch (e) {
 			periodError = extractErrorMessage(e, 'Failed to add period.');
 		}
@@ -352,8 +324,9 @@
 
 	async function deletePeriod(periodId: number) {
 		try {
-			await workScheduleApi.apiOrganizationsSlugMembersMemberIdWorkSchedulesIdDelete(orgSlug, memberId, periodId);
-			loadPeriods();
+			await workScheduleApi.apiV1OrganizationsSlugMembersMemberIdWorkSchedulesIdDelete(orgSlug, memberId, periodId);
+			await loadPeriods();
+			await loadSchedule();
 		} catch (e) {
 			actionError = extractErrorMessage(e, 'Failed to delete period.');
 		}
@@ -363,7 +336,7 @@
 	async function saveOvertime() {
 		overtimeSaving = true;
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersMemberIdInitialOvertimePut(orgSlug, memberId, { initialOvertimeHours: overtimeHours });
+			await organizationsApi.apiV1OrganizationsSlugMembersMemberIdInitialOvertimePut(orgSlug, memberId, { initialOvertimeHours: overtimeHours });
 			editingOvertime = false;
 			loadSchedule();
 		} catch (e) {
@@ -375,7 +348,7 @@
 	// ── Member Management ──
 	async function changeMemberRole(newRole: number) {
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersMemberIdPut(orgSlug, memberId, { role: newRole as any });
+			await organizationsApi.apiV1OrganizationsSlugMembersMemberIdPut(orgSlug, memberId, { role: newRole as any });
 			loadAll();
 		} catch (e) {
 			actionError = extractErrorMessage(e, 'Failed to change role.');
@@ -385,7 +358,7 @@
 	async function removeMember() {
 		if (!confirm(`Remove ${member?.firstName} ${member?.lastName} from this organization?`)) return;
 		try {
-			await organizationsApi.apiOrganizationsSlugMembersMemberIdDelete(orgSlug, memberId);
+			await organizationsApi.apiV1OrganizationsSlugMembersMemberIdDelete(orgSlug, memberId);
 			goto(`/organizations/${orgSlug}`);
 		} catch (e) {
 			actionError = extractErrorMessage(e, 'Failed to remove member.');
@@ -636,44 +609,12 @@
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-base font-bold text-base-content flex items-center gap-2 m-0">
 					<svg class="text-base-content/60" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-					Work Schedule
+					Active Schedule
 				</h2>
-				{#if canEdit && !editingSchedule}
-					<button class="btn btn-ghost btn-sm" onclick={startEditSchedule}>Edit</button>
-				{/if}
 			</div>
 
 			{#if scheduleLoading}
 				<p class="text-base-content/40 text-sm">Loading schedule...</p>
-			{:else if editingSchedule}
-				<div class="flex flex-col gap-3">
-					<div class="flex items-center gap-2">
-						<label class="text-sm text-base-content/70 font-medium">Weekly Hours</label>
-						<input type="number" bind:value={schedWeeklyHours} min="0" max="80" step="0.5" class="input input-bordered input-sm" />
-					</div>
-					<div class="flex items-center gap-2">
-						<label class="text-sm text-base-content/70 font-medium">
-							<input type="checkbox" bind:checked={schedDistribute} />
-							Distribute evenly (Mon–Fri)
-						</label>
-					</div>
-					{#if !schedDistribute}
-						<div class="grid grid-cols-5 gap-2">
-							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Mon</label><input type="number" bind:value={schedMon} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
-							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Tue</label><input type="number" bind:value={schedTue} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
-							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Wed</label><input type="number" bind:value={schedWed} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
-							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Thu</label><input type="number" bind:value={schedThu} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
-							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Fri</label><input type="number" bind:value={schedFri} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
-						</div>
-					{/if}
-					{#if scheduleError}<p class="text-error text-sm mt-1">{scheduleError}</p>{/if}
-					<div class="flex gap-2">
-						<button class="btn btn-primary btn-sm" onclick={saveSchedule} disabled={scheduleSaving}>
-							{scheduleSaving ? 'Saving...' : 'Save'}
-						</button>
-						<button class="btn btn-ghost btn-sm" onclick={() => editingSchedule = false}>Cancel</button>
-					</div>
-				</div>
 			{:else if schedule}
 				<div class="flex flex-col gap-3">
 					<div class="flex items-start gap-4">
@@ -690,6 +631,7 @@
 							<span>Fri {schedule.targetFri ?? 0}h</span>
 						</span>
 					</div>
+					<p class="text-xs text-base-content/50">Schedule values are managed through schedule periods below.</p>
 				</div>
 			{:else}
 				<p class="text-base-content/40 text-sm">No schedule configured.</p>
@@ -746,7 +688,7 @@
 						</div>
 						<div class="flex items-center gap-2">
 							<label class="text-sm text-base-content/70 font-medium">Valid To (optional)</label>
-							<input type="date" bind:value={periodTo} class="input input-bordered input-sm" />
+							<input type="date" min={periodFrom || undefined} bind:value={periodTo} class="input input-bordered input-sm" />
 						</div>
 					</div>
 					<div class="flex items-center gap-2">

@@ -30,7 +30,7 @@
 
 	async function loadOrg() {
 		try {
-			const { data: org } = await organizationsApi.apiOrganizationsSlugGet(orgSlug);
+			const { data: org } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			orgName = org.name ?? '';
 		} catch {}
 	}
@@ -41,7 +41,7 @@
 		try {
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
-			const { data } = await organizationsApi.apiOrganizationsSlugTimeOverviewGet(orgSlug, from, to);
+			const { data } = await organizationsApi.apiV1OrganizationsSlugTimeOverviewGet(orgSlug, from, to);
 			members = data;
 		} catch (err) {
 			if (getErrorStatus(err) === 403) {
@@ -72,8 +72,8 @@
 		try {
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
-			const { data } = await organizationsApi.apiOrganizationsSlugMemberEntriesMemberIdGet(orgSlug, userId, from, to);
-			memberEntries = data;
+			const { data } = await organizationsApi.apiV1OrganizationsSlugMemberEntriesMemberIdGet(orgSlug, userId, from, to);
+			memberEntries = data.items ?? [];
 		} catch {
 			memberEntries = [];
 		} finally {

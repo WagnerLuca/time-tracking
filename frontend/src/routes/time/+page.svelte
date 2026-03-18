@@ -6,7 +6,7 @@
 	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/api';
 	import { RequestType } from '$lib/api';
 	import { formatHoursDecimal, formatDelta, formatDuration, formatTime, formatDateShort, formatWeekLabel, formatHours } from '$lib/utils/formatters';
-	import { dateKey, isToday, getWeekRange, toLocalDateTimeInput, sumMinutes } from '$lib/utils/dateHelpers';
+	import { dateKey, isToday, getWeekRange, toLocalDateTimeInput } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel } from '$lib/utils/scheduleHelpers';
 	import { DAY_NAMES, MAX_ENTRIES_FOR_OVERTIME } from '$lib/utils/constants';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
@@ -24,6 +24,8 @@
 	// Cumulative overtime
 	let cumulativeOvertime = $state(0);
 	let hasOvertimeData = $state(false);
+	let cumulativeOvertimeWeekEnd = $state(0);
+	let hasWeekEndOvertimeData = $state(false);
 	// Days off (holidays + absences)
 	let daysOffSet = $state<Set<string>>(new Set());
 	// Day-type tracking for color-coded display
@@ -104,6 +106,36 @@
 		return totals;
 	}
 
+	function computeCumulativeUntilDate(entries: TimeEntryResponse[], firstTrackedDate: Date, untilDate: Date): number {
+		if (!workSchedule) return 0;
+
+		const rangeEnd = new Date(untilDate);
+		rangeEnd.setHours(23, 59, 59, 999);
+
+		let workedMinutes = 0;
+		for (const entry of entries) {
+			if (!entry.startTime) continue;
+			const entryStart = new Date(entry.startTime);
+			if (entryStart > rangeEnd) break;
+			workedMinutes += entry.netDurationMinutes ?? entry.durationMinutes ?? 0;
+		}
+
+		let targetMinutes = 0;
+		let absenceCredits = 0;
+		const cursor = new Date(firstTrackedDate);
+		while (cursor <= rangeEnd) {
+			targetMinutes += getDayTarget(cursor, workSchedule, holidayDates);
+			absenceCredits += getAbsenceCredit(cursor, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates);
+			cursor.setDate(cursor.getDate() + 1);
+		}
+
+		const initialOvertime = (workSchedule.initialOvertimeMode !== 'Disabled' && workSchedule.initialOvertimeHours)
+			? workSchedule.initialOvertimeHours * 60
+			: 0;
+
+		return workedMinutes + absenceCredits - targetMinutes + initialOvertime;
+	}
+
 	function startTimer() {
 		if (timerInterval) clearInterval(timerInterval);
 		timerInterval = setInterval(updateElapsed, 1000);
@@ -130,7 +162,7 @@
 
 	async function loadCurrent() {
 		try {
-			const { data } = await timeTrackingApi.apiTimeTrackingCurrentGet();
+			const { data } = await timeTrackingApi.apiV1TimeTrackingCurrentGet();
 			current = data;
 			if (current) {
 				note = current.description ?? '';
@@ -146,8 +178,8 @@
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
 			const orgId = orgContext.selectedOrgId ?? undefined;
-			const { data } = await timeTrackingApi.apiTimeTrackingGet(orgId, from, to, 200);
-			weekEntries = data;
+			const { data } = await timeTrackingApi.apiV1TimeTrackingGet(orgId, from, to, 200);
+			weekEntries = data.items ?? [];
 		} catch {
 			weekEntries = [];
 		}
@@ -160,13 +192,13 @@
 			return;
 		}
 		try {
-			const { data: ws } = await workScheduleApi.apiOrganizationsSlugWorkScheduleGet(orgContext.selectedOrgSlug!);
+			const { data: ws } = await workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(orgContext.selectedOrgSlug!);
 			workSchedule = ws;
 		} catch {
 			workSchedule = null;
 		}
 		try {
-			const { data: od } = await organizationsApi.apiOrganizationsSlugGet(orgContext.selectedOrgSlug!);
+			const { data: od } = await organizationsApi.apiV1OrganizationsSlugGet(orgContext.selectedOrgSlug!);
 			orgDetail = od;
 		} catch {
 			orgDetail = null;
@@ -178,8 +210,8 @@
 		if (orgContext.selectedOrgSlug) {
 			try {
 				const [holRes, absRes] = await Promise.all([
-					holidayApi.apiOrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
-					absenceDayApi.apiOrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug, auth.user?.id)
+					holidayApi.apiV1OrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
+					absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug, auth.user?.id)
 				]);
 				const offDates = new Set<string>();
 				const hDates = new Map<string, string>();
@@ -192,7 +224,8 @@
 						hDates.set(h.date, h.name ?? 'Holiday');
 					}
 				}
-				for (const a of absRes.data) {
+				const absences = absRes.data.items ?? [];
+				for (const a of absences) {
 					if (a.date) {
 						offDates.add(a.date);
 						if (a.type === 'SickDay') sDates.add(a.date);
@@ -223,42 +256,39 @@
 		if (!workSchedule) {
 			cumulativeOvertime = 0;
 			hasOvertimeData = false;
+			cumulativeOvertimeWeekEnd = 0;
+			hasWeekEndOvertimeData = false;
 			return;
 		}
 		try {
 			const orgId = orgContext.selectedOrgId ?? undefined;
-			const { data: allEntries } = await timeTrackingApi.apiTimeTrackingGet(orgId, undefined, undefined, MAX_ENTRIES_FOR_OVERTIME);
+			const { data: allEntriesPage } = await timeTrackingApi.apiV1TimeTrackingGet(orgId, undefined, undefined, MAX_ENTRIES_FOR_OVERTIME);
+			const allEntries = allEntriesPage.items ?? [];
 			const sorted = [...allEntries]
 				.filter(e => !e.isRunning && e.endTime)
 				.sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime());
+			const initialOvertime = (workSchedule.initialOvertimeMode !== 'Disabled' && workSchedule.initialOvertimeHours)
+				? workSchedule.initialOvertimeHours * 60
+				: 0;
 
 			if (sorted.length > 0) {
 				const firstDate = new Date(sorted[0].startTime!);
 				firstDate.setHours(0, 0, 0, 0);
-				const today = new Date();
-				today.setHours(23, 59, 59, 999);
-
-				const totalWorked = sumMinutes(sorted);
-				let totalTargetMins = 0;
-				let totalAbsenceCredits = 0;
-				const cursor = new Date(firstDate);
-				while (cursor <= today) {
-					totalTargetMins += getDayTarget(cursor, workSchedule, holidayDates);
-					totalAbsenceCredits += getAbsenceCredit(cursor, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates);
-					cursor.setDate(cursor.getDate() + 1);
-				}
-
-				const initialOvertimeHours = (workSchedule?.initialOvertimeMode !== 'Disabled' && workSchedule?.initialOvertimeHours) ? workSchedule.initialOvertimeHours * 60 : 0;
-				const initialOvertime = initialOvertimeHours;
-				cumulativeOvertime = totalWorked + totalAbsenceCredits - totalTargetMins + initialOvertime;
+				cumulativeOvertime = computeCumulativeUntilDate(sorted, firstDate, new Date());
+				cumulativeOvertimeWeekEnd = computeCumulativeUntilDate(sorted, firstDate, weekRange.end);
 				hasOvertimeData = true;
+				hasWeekEndOvertimeData = true;
 			} else {
-				cumulativeOvertime = 0;
-				hasOvertimeData = false;
+				cumulativeOvertime = initialOvertime;
+				cumulativeOvertimeWeekEnd = initialOvertime;
+				hasOvertimeData = initialOvertime !== 0;
+				hasWeekEndOvertimeData = true;
 			}
 		} catch {
 			cumulativeOvertime = 0;
 			hasOvertimeData = false;
+			cumulativeOvertimeWeekEnd = 0;
+			hasWeekEndOvertimeData = false;
 		}
 	}
 
@@ -270,7 +300,7 @@
 				description: note.trim() || undefined,
 				organizationSlug: orgContext.selectedOrgSlug ?? undefined
 			};
-			const { data } = await timeTrackingApi.apiTimeTrackingStartPost(payload);
+			const { data } = await timeTrackingApi.apiV1TimeTrackingStartPost(payload);
 			current = data;
 			startTimer();
 			await loadWeek();
@@ -286,7 +316,7 @@
 		stopping = true;
 		try {
 			const payload = { description: note.trim() || undefined };
-			await timeTrackingApi.apiTimeTrackingStopPost(payload);
+			await timeTrackingApi.apiV1TimeTrackingStopPost(payload);
 			current = null;
 			stopTimer();
 			note = '';
@@ -302,7 +332,7 @@
 	async function deleteEntry(id: number) {
 		if (!confirm('Delete this time entry?')) return;
 		try {
-			await timeTrackingApi.apiTimeTrackingIdDelete(id);
+			await timeTrackingApi.apiV1TimeTrackingIdDelete(id);
 			weekEntries = weekEntries.filter((e) => e.id !== id);
 		} catch (err) {
 			actionError = extractErrorMessage(err, 'Failed to delete entry.');
@@ -312,6 +342,7 @@
 	function changeWeek(dir: number) {
 		weekOffset += dir;
 		loadWeek();
+		loadCumulativeOvertime();
 	}
 
 	// Edit entry
@@ -348,7 +379,7 @@
 			if (orgDetail?.editPauseMode === 'Allowed') {
 				payload.pauseDurationMinutes = Math.max(0, Number(editPause) || 0);
 			}
-			await timeTrackingApi.apiTimeTrackingIdPut(entryId, payload);
+			await timeTrackingApi.apiV1TimeTrackingIdPut(entryId, payload);
 			await loadWeek();
 			editingEntryId = null;
 		} catch (err) {
@@ -406,7 +437,7 @@
 			} else {
 				requestData = String(Math.max(0, requestNewPause));
 			}
-			await requestsApi.apiOrganizationsSlugRequestsPost(orgContext.selectedOrgSlug, {
+			await requestsApi.apiV1OrganizationsSlugRequestsPost(orgContext.selectedOrgSlug, {
 				type: rType,
 				relatedEntityId: requestingEntryId,
 				requestData,
@@ -550,11 +581,26 @@
 		</section>
 
 		<!-- Cumulative overtime -->
-		{#if hasOvertimeData && workSchedule}
-			<div class="card card-side bg-base-100 border-2 p-4 flex-row items-center gap-4 mb-8 {cumulativeOvertime > 0 ? 'border-success/50 bg-success/5' : cumulativeOvertime < 0 ? 'border-error/50 bg-error/5' : 'border-base-300'}">
-				<span class="text-xs text-base-content/40 uppercase font-semibold tracking-wider">Cumulative Balance</span>
-				<span class="text-xl font-bold tabular-nums {cumulativeOvertime > 0 ? 'text-success' : cumulativeOvertime < 0 ? 'text-error' : ''}">{formatDelta(cumulativeOvertime)}</span>
-				<span class="text-xs text-base-content/40 ml-auto">Since first tracked entry</span>
+		{#if (hasOvertimeData || hasWeekEndOvertimeData) && workSchedule}
+			<div class="card bg-base-100 border-2 p-4 mb-8 {cumulativeOvertime > 0 ? 'border-success/50 bg-success/5' : cumulativeOvertime < 0 ? 'border-error/50 bg-error/5' : 'border-base-300'}">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="flex flex-col gap-1">
+						<span class="text-xs text-base-content/40 uppercase font-semibold tracking-wider">Cumulative Balance</span>
+						<span class="text-xl font-bold tabular-nums {cumulativeOvertime > 0 ? 'text-success' : cumulativeOvertime < 0 ? 'text-error' : ''}">
+							{formatDelta(cumulativeOvertime)}
+						</span>
+						<span class="text-xs text-base-content/40">As of today</span>
+					</div>
+					{#if hasWeekEndOvertimeData}
+						<div class="flex flex-col gap-1 md:border-l md:border-base-300 md:pl-4">
+							<span class="text-xs text-base-content/40 uppercase font-semibold tracking-wider">End of Selected Week</span>
+							<span class="text-xl font-bold tabular-nums {cumulativeOvertimeWeekEnd > 0 ? 'text-success' : cumulativeOvertimeWeekEnd < 0 ? 'text-error' : ''}">
+								{formatDelta(cumulativeOvertimeWeekEnd)}
+							</span>
+							<span class="text-xs text-base-content/40">{formatWeekLabel(weekRange)}</span>
+						</div>
+					{/if}
+				</div>
 			</div>
 		{/if}
 

@@ -25,7 +25,7 @@ function createOrgContext() {
 	async function loadOrganizations(userId: number) {
 		loading = true;
 		try {
-			const { data } = await organizationsApi.apiOrganizationsUserUserIdGet(userId);
+			const { data } = await organizationsApi.apiV1OrganizationsMineGet();
 			organizations = data;
 			// Validate that saved org still exists
 			if (selectedOrgId && !organizations.some((o) => o.organizationId === selectedOrgId)) {

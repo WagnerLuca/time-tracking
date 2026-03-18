@@ -19,18 +19,18 @@
 	onMount(async () => {
 		try {
 			const [orgRes, myOrgsRes] = await Promise.all([
-				organizationsApi.apiOrganizationsGet(),
-				auth.user?.id
-					? organizationsApi.apiOrganizationsUserUserIdGet(auth.user.id)
-					: Promise.resolve({ data: [] })
+				organizationsApi.apiV1OrganizationsGet(),
+				auth.user
+					? organizationsApi.apiV1OrganizationsMineGet()
+					: Promise.resolve({ data: [] as any[] })
 			]);
-			organizations = orgRes.data;
+			organizations = orgRes.data.items ?? [];
 			myOrgIds = new Set((myOrgsRes.data ?? []).map((o: any) => o.organizationId));
 
 			// Load pending join requests
 			try {
-				const { data: myRequests } = await requestsApi.apiOrganizationsMyRequestsGet(0 as RequestType);
-				for (const r of myRequests ?? []) {
+				const { data: myRequestsPage } = await requestsApi.apiV1OrganizationsMyRequestsGet(0 as RequestType);
+				for (const r of myRequestsPage.items ?? []) {
 					if (r.status === 'Pending' && r.organizationSlug) {
 						pendingJoinSlugs.add(r.organizationSlug);
 					}
@@ -49,7 +49,7 @@
 		if (!org.slug) return;
 		joiningSlugs = new Set([...joiningSlugs, org.slug]);
 		try {
-			const res = await requestsApi.apiOrganizationsSlugRequestsPost(org.slug, {
+			const res = await requestsApi.apiV1OrganizationsSlugRequestsPost(org.slug, {
 				type: 0 as RequestType, // JoinOrganization
 				message: ''
 			});
