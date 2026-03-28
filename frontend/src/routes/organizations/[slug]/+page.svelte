@@ -141,7 +141,7 @@
 	let showSettingsChangedBanner = $state(false);
 	let settingsNotificationIds: number[] = $state([]);
 
-	let orgSlug: string;
+	let orgSlug = $state('');
 
 	onMount(() => {
 		orgSlug = $page.params.slug ?? '';
@@ -1155,8 +1155,8 @@
 											<div class="alert alert-error text-sm py-1.5 px-2.5">{myOvertimeError}</div>
 										{/if}
 										<div class="flex items-center gap-3">
-											<label class="text-sm text-base-content/70 font-medium min-w-[100px]">Hours</label>
-											<input type="number" class="input input-bordered input-xs w-20" bind:value={myOvertimeHours} step="0.5" />
+											<label for="my-overtime-hours" class="text-sm text-base-content/70 font-medium min-w-[100px]">Hours</label>
+											<input id="my-overtime-hours" type="number" class="input input-bordered input-xs w-20" bind:value={myOvertimeHours} step="0.5" />
 										</div>
 										<div class="flex gap-2 mt-1">
 											<button class="btn btn-primary btn-sm" onclick={saveMyOvertime} disabled={myOvertimeSaving}>

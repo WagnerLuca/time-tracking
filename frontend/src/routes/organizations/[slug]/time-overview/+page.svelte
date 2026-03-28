@@ -7,7 +7,7 @@
 	import { getWeekRange } from '$lib/utils/dateHelpers';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 
-	let orgSlug: string;
+	let orgSlug = $state('');
 	let orgName = $state('');
 	let members = $state<MemberTimeOverviewResponse[]>([]);
 	let loading = $state(true);

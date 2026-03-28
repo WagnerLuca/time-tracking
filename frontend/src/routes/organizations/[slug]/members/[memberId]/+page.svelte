@@ -17,8 +17,8 @@
 		AbsenceType
 	} from '$lib/api';
 
-	let orgSlug = '';
-	let memberId = 0;
+	let orgSlug = $state('');
+	let memberId = $state(0);
 	let org = $state<OrganizationDetailResponse | null>(null);
 	let member = $state<OrganizationMemberResponse | null>(null);
 	let loading = $state(true);
@@ -560,10 +560,10 @@
 			{#if showAddAbsence && canEdit}
 				<div class="flex items-center gap-2 flex-wrap mb-3">
 					<div class="flex items-center gap-1.5">
-						<label class="text-xs text-base-content/60 font-medium">From</label>
-						<input type="date" bind:value={absenceFromDate} class="input input-bordered input-sm" />
-						<label class="text-xs text-base-content/60 font-medium">To</label>
-						<input type="date" bind:value={absenceToDate} class="input input-bordered input-sm" placeholder="Same day" />
+						<label for="absence-from" class="text-xs text-base-content/60 font-medium">From</label>
+						<input id="absence-from" type="date" bind:value={absenceFromDate} class="input input-bordered input-sm" />
+						<label for="absence-to" class="text-xs text-base-content/60 font-medium">To</label>
+						<input id="absence-to" type="date" bind:value={absenceToDate} class="input input-bordered input-sm" placeholder="Same day" />
 					</div>
 					<select bind:value={absenceType} class="select select-bordered select-sm">
 						<option value={0}>Sick Day</option>
@@ -593,7 +593,7 @@
 								<span class="text-base-content/40 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs">{absence.note}</span>
 							{/if}
 							{#if canEdit}
-								<button class="btn btn-ghost btn-xs text-base-content/30 hover:text-error" onclick={() => deleteAbsence(absence.id!)} title="Delete">
+								<button class="btn btn-ghost btn-xs text-base-content/30 hover:text-error" onclick={() => deleteAbsence(absence.id!)} title="Delete" aria-label="Delete absence">
 									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
 								</button>
 							{/if}
@@ -683,17 +683,17 @@
 				<div class="flex flex-col gap-3 mb-4 pb-4 border-b border-base-200">
 					<div class="grid grid-cols-2 gap-3">
 						<div class="flex items-center gap-2">
-							<label class="text-sm text-base-content/70 font-medium">Valid From</label>
-							<input type="date" bind:value={periodFrom} class="input input-bordered input-sm" />
+							<label for="member-period-from" class="text-sm text-base-content/70 font-medium">Valid From</label>
+							<input id="member-period-from" type="date" bind:value={periodFrom} class="input input-bordered input-sm" />
 						</div>
 						<div class="flex items-center gap-2">
-							<label class="text-sm text-base-content/70 font-medium">Valid To (optional)</label>
-							<input type="date" min={periodFrom || undefined} bind:value={periodTo} class="input input-bordered input-sm" />
+							<label for="member-period-to" class="text-sm text-base-content/70 font-medium">Valid To (optional)</label>
+							<input id="member-period-to" type="date" min={periodFrom || undefined} bind:value={periodTo} class="input input-bordered input-sm" />
 						</div>
 					</div>
 					<div class="flex items-center gap-2">
-						<label class="text-sm text-base-content/70 font-medium">Weekly Hours</label>
-						<input type="number" bind:value={periodWeekly} min="0" max="80" step="0.5" class="input input-bordered input-sm" style="width: 120px;" />
+						<label for="member-period-weekly" class="text-sm text-base-content/70 font-medium">Weekly Hours</label>
+						<input id="member-period-weekly" type="number" bind:value={periodWeekly} min="0" max="80" step="0.5" class="input input-bordered input-sm" style="width: 120px;" />
 					</div>
 					<div class="flex items-center gap-2">
 						<label class="text-sm text-base-content/70 font-medium">
@@ -703,11 +703,11 @@
 					</div>
 					{#if !periodDistribute}
 						<div class="grid grid-cols-5 gap-2">
-							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Mon</label><input type="number" bind:value={periodMon} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
-							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Tue</label><input type="number" bind:value={periodTue} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
-							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Wed</label><input type="number" bind:value={periodWed} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
-							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Thu</label><input type="number" bind:value={periodThu} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
-							<div class="flex flex-col gap-1"><label class="text-xs text-base-content/60 font-semibold uppercase">Fri</label><input type="number" bind:value={periodFri} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label for="member-period-mon" class="text-xs text-base-content/60 font-semibold uppercase">Mon</label><input id="member-period-mon" type="number" bind:value={periodMon} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label for="member-period-tue" class="text-xs text-base-content/60 font-semibold uppercase">Tue</label><input id="member-period-tue" type="number" bind:value={periodTue} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label for="member-period-wed" class="text-xs text-base-content/60 font-semibold uppercase">Wed</label><input id="member-period-wed" type="number" bind:value={periodWed} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label for="member-period-thu" class="text-xs text-base-content/60 font-semibold uppercase">Thu</label><input id="member-period-thu" type="number" bind:value={periodThu} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
+							<div class="flex flex-col gap-1"><label for="member-period-fri" class="text-xs text-base-content/60 font-semibold uppercase">Fri</label><input id="member-period-fri" type="number" bind:value={periodFri} min="0" max="24" step="0.5" class="input input-bordered input-sm" /></div>
 						</div>
 					{/if}
 					{#if periodError}<p class="text-error text-sm mt-1">{periodError}</p>{/if}
@@ -734,7 +734,7 @@
 							</div>
 							<span class="font-semibold text-base-content min-w-[65px] text-right">{period.weeklyWorkHours ?? '-'}h/week</span>
 							{#if canEdit}
-								<button class="btn btn-ghost btn-xs text-base-content/30 hover:text-error" onclick={() => deletePeriod(period.id!)} title="Delete">
+								<button class="btn btn-ghost btn-xs text-base-content/30 hover:text-error" onclick={() => deletePeriod(period.id!)} title="Delete" aria-label="Delete period">
 									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
 								</button>
 							{/if}
