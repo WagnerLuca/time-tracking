@@ -171,6 +171,7 @@
 			<div class="flex flex-1 flex-wrap items-center gap-1 md:gap-2">
 				<a href="/time" class={navLinkClass('/time')}>Timer</a>
 				<a href="/history" class={navLinkClass('/history')}>History</a>
+				<a href="/export" class={navLinkClass('/export')}>Export</a>
 				{#if orgContext.selectedOrg}
 					<a href="/organizations/{orgContext.selectedOrgSlug}" class={navLinkClass(`/organizations/${orgContext.selectedOrgSlug}`)}>Organization</a>
 				{/if}

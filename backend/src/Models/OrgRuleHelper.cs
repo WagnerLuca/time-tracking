@@ -18,6 +18,7 @@ public static class OrgRuleHelper
         RequestType.SetInitialOvertime => org.InitialOvertimeMode,
         RequestType.WorkScheduleChange => org.WorkScheduleChangeMode,
         RequestType.JoinOrganization   => org.JoinPolicy,
+        RequestType.CsvImport          => org.CsvImportMode,
         _ => RuleMode.Allowed
     };
 

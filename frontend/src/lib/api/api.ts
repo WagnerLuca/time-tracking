@@ -194,6 +194,31 @@ export interface CreateWorkScheduleRequest {
     'targetFri'?: number | null;
 }
 /**
+ * Request payload for exporting time entries or daily reports.
+ */
+export interface ExportRequest {
+    /**
+     * Export type: \"entries\" for individual time entries, \"daily\" for daily summary.
+     */
+    'type': string;
+    /**
+     * Organization slug to filter by. Null for all organizations.
+     */
+    'organizationSlug'?: string | null;
+    /**
+     * Start of date range (inclusive).
+     */
+    'from'?: string | null;
+    /**
+     * End of date range (inclusive).
+     */
+    'to'?: string | null;
+    /**
+     * Columns to include in the export. If empty/null, all columns are included.
+     */
+    'columns'?: Array<string> | null;
+}
+/**
  * Organization holiday entry.
  */
 export interface HolidayResponse {
@@ -202,6 +227,46 @@ export interface HolidayResponse {
     'date'?: string;
     'name': string | null;
     'isRecurring'?: boolean;
+}
+/**
+ * Request payload to confirm and execute a CSV import.
+ */
+export interface ImportEntryRequest {
+    'date': string;
+    'startTime': string;
+    'endTime': string;
+    'pauseMinutes'?: number;
+    'description'?: string | null;
+}
+/**
+ * Preview of parsed CSV rows before confirming import.
+ */
+export interface ImportPreviewResponse {
+    'rows': Array<ImportPreviewRow> | null;
+    'totalRows'?: number;
+    'duplicateCount'?: number;
+    'warnings'?: Array<string> | null;
+}
+/**
+ * A single row from the parsed CSV preview.
+ */
+export interface ImportPreviewRow {
+    'rowNumber'?: number;
+    'date'?: string | null;
+    'startTime'?: string | null;
+    'endTime'?: string | null;
+    'pauseMinutes'?: number;
+    'description'?: string | null;
+    'isDuplicate'?: boolean;
+    'warning'?: string | null;
+}
+/**
+ * Result of a confirmed CSV import.
+ */
+export interface ImportResultResponse {
+    'importedCount'?: number;
+    'skippedCount'?: number;
+    'errors'?: Array<string> | null;
 }
 /**
  * Request payload for logging in with email and password.
@@ -312,6 +377,7 @@ export interface OrganizationDetailResponse {
     'workScheduleChangeMode': string | null;
     'memberTimeEntryVisibility'?: boolean;
     'require2fa'?: boolean;
+    'csvImportMode': string | null;
     'settingsUpdatedAt'?: string | null;
     'createdAt'?: string;
     'members': Array<OrganizationMemberResponse> | null;
@@ -457,7 +523,8 @@ export const RequestType = {
     NUMBER_1: 1,
     NUMBER_2: 2,
     NUMBER_3: 3,
-    NUMBER_4: 4
+    NUMBER_4: 4,
+    NUMBER_5: 5
 } as const;
 
 export type RequestType = typeof RequestType[keyof typeof RequestType];
@@ -657,6 +724,7 @@ export interface UpdateOrganizationSettingsRequest {
     'workScheduleChangeMode'?: RuleMode;
     'memberTimeEntryVisibility'?: boolean | null;
     'require2fa'?: boolean | null;
+    'csvImportMode'?: RuleMode;
 }
 
 
@@ -2032,6 +2100,276 @@ export class AuthApi extends BaseAPI {
      */
     public apiV1AuthRegisterPost(registerRequest?: RegisterRequest, options?: RawAxiosRequestConfig) {
         return AuthApiFp(this.configuration).apiV1AuthRegisterPost(registerRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * ExportImportApi - axios parameter creator
+ */
+export const ExportImportApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary Export time entries or daily report as CSV file.
+         * @param {ExportRequest} [exportRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1ExportImportExportPost: async (exportRequest?: ExportRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/ExportImport/export`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(exportRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Confirm and execute a CSV import, creating time entries.
+         * @param {string} [orgSlug] 
+         * @param {Array<ImportEntryRequest>} [importEntryRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1ExportImportImportConfirmPost: async (orgSlug?: string, importEntryRequest?: Array<ImportEntryRequest>, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/ExportImport/import/confirm`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (orgSlug !== undefined) {
+                localVarQueryParameter['orgSlug'] = orgSlug;
+            }
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(importEntryRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Preview a CSV file for import (parse and check for duplicates).
+         * @param {string} [orgSlug] 
+         * @param {File} [file] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1ExportImportImportPreviewPost: async (orgSlug?: string, file?: File, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/ExportImport/import/preview`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+            const localVarFormParams = new ((configuration && configuration.formDataCtor) || FormData)();
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (orgSlug !== undefined) {
+                localVarQueryParameter['orgSlug'] = orgSlug;
+            }
+
+
+            if (file !== undefined) { 
+                localVarFormParams.append('file', file as any);
+            }
+    
+    
+            localVarHeaderParameter['Content-Type'] = 'multipart/form-data';
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = localVarFormParams;
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * ExportImportApi - functional programming interface
+ */
+export const ExportImportApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = ExportImportApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Export time entries or daily report as CSV file.
+         * @param {ExportRequest} [exportRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1ExportImportExportPost(exportRequest?: ExportRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1ExportImportExportPost(exportRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ExportImportApi.apiV1ExportImportExportPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Confirm and execute a CSV import, creating time entries.
+         * @param {string} [orgSlug] 
+         * @param {Array<ImportEntryRequest>} [importEntryRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1ExportImportImportConfirmPost(orgSlug?: string, importEntryRequest?: Array<ImportEntryRequest>, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ImportResultResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1ExportImportImportConfirmPost(orgSlug, importEntryRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ExportImportApi.apiV1ExportImportImportConfirmPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Preview a CSV file for import (parse and check for duplicates).
+         * @param {string} [orgSlug] 
+         * @param {File} [file] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1ExportImportImportPreviewPost(orgSlug?: string, file?: File, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ImportPreviewResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1ExportImportImportPreviewPost(orgSlug, file, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ExportImportApi.apiV1ExportImportImportPreviewPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * ExportImportApi - factory interface
+ */
+export const ExportImportApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = ExportImportApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Export time entries or daily report as CSV file.
+         * @param {ExportRequest} [exportRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1ExportImportExportPost(exportRequest?: ExportRequest, options?: RawAxiosRequestConfig): AxiosPromise<File> {
+            return localVarFp.apiV1ExportImportExportPost(exportRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Confirm and execute a CSV import, creating time entries.
+         * @param {string} [orgSlug] 
+         * @param {Array<ImportEntryRequest>} [importEntryRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1ExportImportImportConfirmPost(orgSlug?: string, importEntryRequest?: Array<ImportEntryRequest>, options?: RawAxiosRequestConfig): AxiosPromise<ImportResultResponse> {
+            return localVarFp.apiV1ExportImportImportConfirmPost(orgSlug, importEntryRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Preview a CSV file for import (parse and check for duplicates).
+         * @param {string} [orgSlug] 
+         * @param {File} [file] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1ExportImportImportPreviewPost(orgSlug?: string, file?: File, options?: RawAxiosRequestConfig): AxiosPromise<ImportPreviewResponse> {
+            return localVarFp.apiV1ExportImportImportPreviewPost(orgSlug, file, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * ExportImportApi - object-oriented interface
+ */
+export class ExportImportApi extends BaseAPI {
+    /**
+     * 
+     * @summary Export time entries or daily report as CSV file.
+     * @param {ExportRequest} [exportRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1ExportImportExportPost(exportRequest?: ExportRequest, options?: RawAxiosRequestConfig) {
+        return ExportImportApiFp(this.configuration).apiV1ExportImportExportPost(exportRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Confirm and execute a CSV import, creating time entries.
+     * @param {string} [orgSlug] 
+     * @param {Array<ImportEntryRequest>} [importEntryRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1ExportImportImportConfirmPost(orgSlug?: string, importEntryRequest?: Array<ImportEntryRequest>, options?: RawAxiosRequestConfig) {
+        return ExportImportApiFp(this.configuration).apiV1ExportImportImportConfirmPost(orgSlug, importEntryRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Preview a CSV file for import (parse and check for duplicates).
+     * @param {string} [orgSlug] 
+     * @param {File} [file] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1ExportImportImportPreviewPost(orgSlug?: string, file?: File, options?: RawAxiosRequestConfig) {
+        return ExportImportApiFp(this.configuration).apiV1ExportImportImportPreviewPost(orgSlug, file, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -4936,111 +5274,6 @@ export const TimeTrackingApiAxiosParamCreator = function (configuration?: Config
         },
         /**
          * 
-         * @summary Export time entries as CSV file.
-         * @param {number} [organizationId] Filter by organization ID.
-         * @param {string} [from] Start of date range.
-         * @param {string} [to] End of date range.
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        apiV1TimeTrackingExportGet: async (organizationId?: number, from?: string, to?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/api/v1/TimeTracking/export`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication Bearer required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-            if (organizationId !== undefined) {
-                localVarQueryParameter['organizationId'] = organizationId;
-            }
-
-            if (from !== undefined) {
-                localVarQueryParameter['from'] = (from as any instanceof Date) ?
-                    (from as any).toISOString() :
-                    from;
-            }
-
-            if (to !== undefined) {
-                localVarQueryParameter['to'] = (to as any instanceof Date) ?
-                    (to as any).toISOString() :
-                    to;
-            }
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * Generates a day-by-day summary including target hours from work schedules,  actual worked hours, overtime tracking (cumulative from initial overtime),  holidays, absences (sick/vacation), and individual time entry details.  Defaults to the current month if no date range is specified.
-         * @summary Export a comprehensive daily report for an organization as CSV.
-         * @param {string} orgSlug Organization slug.
-         * @param {string} [from] Start of date range (default: first day of current month).
-         * @param {string} [to] End of date range (default: last day of current month).
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        apiV1TimeTrackingExportOrgSlugDailyReportGet: async (orgSlug: string, from?: string, to?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'orgSlug' is not null or undefined
-            assertParamExists('apiV1TimeTrackingExportOrgSlugDailyReportGet', 'orgSlug', orgSlug)
-            const localVarPath = `/api/v1/TimeTracking/export/{orgSlug}/daily-report`
-                .replace(`{${"orgSlug"}}`, encodeURIComponent(String(orgSlug)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication Bearer required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-            if (from !== undefined) {
-                localVarQueryParameter['from'] = (from as any instanceof Date) ?
-                    (from as any).toISOString() :
-                    from;
-            }
-
-            if (to !== undefined) {
-                localVarQueryParameter['to'] = (to as any instanceof Date) ?
-                    (to as any).toISOString() :
-                    to;
-            }
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
          * @summary Get past time entries with optional filters and pagination.
          * @param {number} [organizationId] Filter by organization ID.
          * @param {string} [from] Start of date range.
@@ -5281,36 +5514,6 @@ export const TimeTrackingApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Export time entries as CSV file.
-         * @param {number} [organizationId] Filter by organization ID.
-         * @param {string} [from] Start of date range.
-         * @param {string} [to] End of date range.
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async apiV1TimeTrackingExportGet(organizationId?: number, from?: string, to?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1TimeTrackingExportGet(organizationId, from, to, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['TimeTrackingApi.apiV1TimeTrackingExportGet']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * Generates a day-by-day summary including target hours from work schedules,  actual worked hours, overtime tracking (cumulative from initial overtime),  holidays, absences (sick/vacation), and individual time entry details.  Defaults to the current month if no date range is specified.
-         * @summary Export a comprehensive daily report for an organization as CSV.
-         * @param {string} orgSlug Organization slug.
-         * @param {string} [from] Start of date range (default: first day of current month).
-         * @param {string} [to] End of date range (default: last day of current month).
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async apiV1TimeTrackingExportOrgSlugDailyReportGet(orgSlug: string, from?: string, to?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1TimeTrackingExportOrgSlugDailyReportGet(orgSlug, from, to, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['TimeTrackingApi.apiV1TimeTrackingExportOrgSlugDailyReportGet']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 
          * @summary Get past time entries with optional filters and pagination.
          * @param {number} [organizationId] Filter by organization ID.
          * @param {string} [from] Start of date range.
@@ -5399,30 +5602,6 @@ export const TimeTrackingApiFactory = function (configuration?: Configuration, b
         },
         /**
          * 
-         * @summary Export time entries as CSV file.
-         * @param {number} [organizationId] Filter by organization ID.
-         * @param {string} [from] Start of date range.
-         * @param {string} [to] End of date range.
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        apiV1TimeTrackingExportGet(organizationId?: number, from?: string, to?: string, options?: RawAxiosRequestConfig): AxiosPromise<File> {
-            return localVarFp.apiV1TimeTrackingExportGet(organizationId, from, to, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * Generates a day-by-day summary including target hours from work schedules,  actual worked hours, overtime tracking (cumulative from initial overtime),  holidays, absences (sick/vacation), and individual time entry details.  Defaults to the current month if no date range is specified.
-         * @summary Export a comprehensive daily report for an organization as CSV.
-         * @param {string} orgSlug Organization slug.
-         * @param {string} [from] Start of date range (default: first day of current month).
-         * @param {string} [to] End of date range (default: last day of current month).
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        apiV1TimeTrackingExportOrgSlugDailyReportGet(orgSlug: string, from?: string, to?: string, options?: RawAxiosRequestConfig): AxiosPromise<File> {
-            return localVarFp.apiV1TimeTrackingExportOrgSlugDailyReportGet(orgSlug, from, to, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @summary Get past time entries with optional filters and pagination.
          * @param {number} [organizationId] Filter by organization ID.
          * @param {string} [from] Start of date range.
@@ -5491,32 +5670,6 @@ export class TimeTrackingApi extends BaseAPI {
      */
     public apiV1TimeTrackingCurrentGet(options?: RawAxiosRequestConfig) {
         return TimeTrackingApiFp(this.configuration).apiV1TimeTrackingCurrentGet(options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Export time entries as CSV file.
-     * @param {number} [organizationId] Filter by organization ID.
-     * @param {string} [from] Start of date range.
-     * @param {string} [to] End of date range.
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public apiV1TimeTrackingExportGet(organizationId?: number, from?: string, to?: string, options?: RawAxiosRequestConfig) {
-        return TimeTrackingApiFp(this.configuration).apiV1TimeTrackingExportGet(organizationId, from, to, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * Generates a day-by-day summary including target hours from work schedules,  actual worked hours, overtime tracking (cumulative from initial overtime),  holidays, absences (sick/vacation), and individual time entry details.  Defaults to the current month if no date range is specified.
-     * @summary Export a comprehensive daily report for an organization as CSV.
-     * @param {string} orgSlug Organization slug.
-     * @param {string} [from] Start of date range (default: first day of current month).
-     * @param {string} [to] End of date range (default: last day of current month).
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public apiV1TimeTrackingExportOrgSlugDailyReportGet(orgSlug: string, from?: string, to?: string, options?: RawAxiosRequestConfig) {
-        return TimeTrackingApiFp(this.configuration).apiV1TimeTrackingExportOrgSlugDailyReportGet(orgSlug, from, to, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

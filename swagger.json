@@ -977,6 +977,184 @@
                                                                               }
                                                             }
                                                },
+                  "/api/v1/ExportImport/export":  {
+                                                      "post":  {
+                                                                   "tags":  [
+                                                                                "ExportImport"
+                                                                            ],
+                                                                   "summary":  "Export time entries or daily report as CSV file.",
+                                                                   "requestBody":  {
+                                                                                       "content":  {
+                                                                                                       "application/json":  {
+                                                                                                                                "schema":  {
+                                                                                                                                               "$ref":  "#/components/schemas/ExportRequest"
+                                                                                                                                           }
+                                                                                                                            },
+                                                                                                       "text/json":  {
+                                                                                                                         "schema":  {
+                                                                                                                                        "$ref":  "#/components/schemas/ExportRequest"
+                                                                                                                                    }
+                                                                                                                     },
+                                                                                                       "application/*+json":  {
+                                                                                                                                  "schema":  {
+                                                                                                                                                 "$ref":  "#/components/schemas/ExportRequest"
+                                                                                                                                             }
+                                                                                                                              }
+                                                                                                   }
+                                                                                   },
+                                                                   "responses":  {
+                                                                                     "200":  {
+                                                                                                 "description":  "OK",
+                                                                                                 "content":  {
+                                                                                                                 "text/plain":  {
+                                                                                                                                    "schema":  {
+                                                                                                                                                   "type":  "string",
+                                                                                                                                                   "format":  "binary"
+                                                                                                                                               }
+                                                                                                                                },
+                                                                                                                 "application/json":  {
+                                                                                                                                          "schema":  {
+                                                                                                                                                         "type":  "string",
+                                                                                                                                                         "format":  "binary"
+                                                                                                                                                     }
+                                                                                                                                      },
+                                                                                                                 "text/json":  {
+                                                                                                                                   "schema":  {
+                                                                                                                                                  "type":  "string",
+                                                                                                                                                  "format":  "binary"
+                                                                                                                                              }
+                                                                                                                               }
+                                                                                                             }
+                                                                                             }
+                                                                                 }
+                                                               }
+                                                  },
+                  "/api/v1/ExportImport/import/preview":  {
+                                                              "post":  {
+                                                                           "tags":  [
+                                                                                        "ExportImport"
+                                                                                    ],
+                                                                           "summary":  "Preview a CSV file for import (parse and check for duplicates).",
+                                                                           "parameters":  [
+                                                                                              {
+                                                                                                  "name":  "orgSlug",
+                                                                                                  "in":  "query",
+                                                                                                  "schema":  {
+                                                                                                                 "type":  "string"
+                                                                                                             }
+                                                                                              }
+                                                                                          ],
+                                                                           "requestBody":  {
+                                                                                               "content":  {
+                                                                                                               "multipart/form-data":  {
+                                                                                                                                           "schema":  {
+                                                                                                                                                          "type":  "object",
+                                                                                                                                                          "properties":  {
+                                                                                                                                                                             "file":  {
+                                                                                                                                                                                          "type":  "string",
+                                                                                                                                                                                          "format":  "binary"
+                                                                                                                                                                                      }
+                                                                                                                                                                         }
+                                                                                                                                                      },
+                                                                                                                                           "encoding":  {
+                                                                                                                                                            "file":  {
+                                                                                                                                                                         "style":  "form"
+                                                                                                                                                                     }
+                                                                                                                                                        }
+                                                                                                                                       }
+                                                                                                           }
+                                                                                           },
+                                                                           "responses":  {
+                                                                                             "200":  {
+                                                                                                         "description":  "OK",
+                                                                                                         "content":  {
+                                                                                                                         "text/plain":  {
+                                                                                                                                            "schema":  {
+                                                                                                                                                           "$ref":  "#/components/schemas/ImportPreviewResponse"
+                                                                                                                                                       }
+                                                                                                                                        },
+                                                                                                                         "application/json":  {
+                                                                                                                                                  "schema":  {
+                                                                                                                                                                 "$ref":  "#/components/schemas/ImportPreviewResponse"
+                                                                                                                                                             }
+                                                                                                                                              },
+                                                                                                                         "text/json":  {
+                                                                                                                                           "schema":  {
+                                                                                                                                                          "$ref":  "#/components/schemas/ImportPreviewResponse"
+                                                                                                                                                      }
+                                                                                                                                       }
+                                                                                                                     }
+                                                                                                     }
+                                                                                         }
+                                                                       }
+                                                          },
+                  "/api/v1/ExportImport/import/confirm":  {
+                                                              "post":  {
+                                                                           "tags":  [
+                                                                                        "ExportImport"
+                                                                                    ],
+                                                                           "summary":  "Confirm and execute a CSV import, creating time entries.",
+                                                                           "parameters":  [
+                                                                                              {
+                                                                                                  "name":  "orgSlug",
+                                                                                                  "in":  "query",
+                                                                                                  "schema":  {
+                                                                                                                 "type":  "string"
+                                                                                                             }
+                                                                                              }
+                                                                                          ],
+                                                                           "requestBody":  {
+                                                                                               "content":  {
+                                                                                                               "application/json":  {
+                                                                                                                                        "schema":  {
+                                                                                                                                                       "type":  "array",
+                                                                                                                                                       "items":  {
+                                                                                                                                                                     "$ref":  "#/components/schemas/ImportEntryRequest"
+                                                                                                                                                                 }
+                                                                                                                                                   }
+                                                                                                                                    },
+                                                                                                               "text/json":  {
+                                                                                                                                 "schema":  {
+                                                                                                                                                "type":  "array",
+                                                                                                                                                "items":  {
+                                                                                                                                                              "$ref":  "#/components/schemas/ImportEntryRequest"
+                                                                                                                                                          }
+                                                                                                                                            }
+                                                                                                                             },
+                                                                                                               "application/*+json":  {
+                                                                                                                                          "schema":  {
+                                                                                                                                                         "type":  "array",
+                                                                                                                                                         "items":  {
+                                                                                                                                                                       "$ref":  "#/components/schemas/ImportEntryRequest"
+                                                                                                                                                                   }
+                                                                                                                                                     }
+                                                                                                                                      }
+                                                                                                           }
+                                                                                           },
+                                                                           "responses":  {
+                                                                                             "200":  {
+                                                                                                         "description":  "OK",
+                                                                                                         "content":  {
+                                                                                                                         "text/plain":  {
+                                                                                                                                            "schema":  {
+                                                                                                                                                           "$ref":  "#/components/schemas/ImportResultResponse"
+                                                                                                                                                       }
+                                                                                                                                        },
+                                                                                                                         "application/json":  {
+                                                                                                                                                  "schema":  {
+                                                                                                                                                                 "$ref":  "#/components/schemas/ImportResultResponse"
+                                                                                                                                                             }
+                                                                                                                                              },
+                                                                                                                         "text/json":  {
+                                                                                                                                           "schema":  {
+                                                                                                                                                          "$ref":  "#/components/schemas/ImportResultResponse"
+                                                                                                                                                      }
+                                                                                                                                       }
+                                                                                                                     }
+                                                                                                     }
+                                                                                         }
+                                                                       }
+                                                          },
                   "/api/v1/organizations/{slug}/holidays":  {
                                                                 "get":  {
                                                                             "tags":  [
@@ -2908,131 +3086,6 @@
                                                                                  }
                                                                }
                                                 },
-                  "/api/v1/TimeTracking/export":  {
-                                                      "get":  {
-                                                                  "tags":  [
-                                                                               "TimeTracking"
-                                                                           ],
-                                                                  "summary":  "Export time entries as CSV file.",
-                                                                  "parameters":  [
-                                                                                     {
-                                                                                         "name":  "organizationId",
-                                                                                         "in":  "query",
-                                                                                         "description":  "Filter by organization ID.",
-                                                                                         "schema":  {
-                                                                                                        "type":  "integer",
-                                                                                                        "format":  "int32"
-                                                                                                    }
-                                                                                     },
-                                                                                     {
-                                                                                         "name":  "from",
-                                                                                         "in":  "query",
-                                                                                         "description":  "Start of date range.",
-                                                                                         "schema":  {
-                                                                                                        "type":  "string",
-                                                                                                        "format":  "date-time"
-                                                                                                    }
-                                                                                     },
-                                                                                     {
-                                                                                         "name":  "to",
-                                                                                         "in":  "query",
-                                                                                         "description":  "End of date range.",
-                                                                                         "schema":  {
-                                                                                                        "type":  "string",
-                                                                                                        "format":  "date-time"
-                                                                                                    }
-                                                                                     }
-                                                                                 ],
-                                                                  "responses":  {
-                                                                                    "200":  {
-                                                                                                "description":  "OK",
-                                                                                                "content":  {
-                                                                                                                "text/plain":  {
-                                                                                                                                   "schema":  {
-                                                                                                                                                  "type":  "string",
-                                                                                                                                                  "format":  "binary"
-                                                                                                                                              }
-                                                                                                                               },
-                                                                                                                "application/json":  {
-                                                                                                                                         "schema":  {
-                                                                                                                                                        "type":  "string",
-                                                                                                                                                        "format":  "binary"
-                                                                                                                                                    }
-                                                                                                                                     },
-                                                                                                                "text/json":  {
-                                                                                                                                  "schema":  {
-                                                                                                                                                 "type":  "string",
-                                                                                                                                                 "format":  "binary"
-                                                                                                                                             }
-                                                                                                                              }
-                                                                                                            }
-                                                                                            }
-                                                                                }
-                                                              }
-                                                  },
-                  "/api/v1/TimeTracking/export/{orgSlug}/daily-report":  {
-                                                                             "get":  {
-                                                                                         "tags":  [
-                                                                                                      "TimeTracking"
-                                                                                                  ],
-                                                                                         "summary":  "Export a comprehensive daily report for an organization as CSV.",
-                                                                                         "description":  "Generates a day-by-day summary including target hours from work schedules,\r\nactual worked hours, overtime tracking (cumulative from initial overtime),\r\nholidays, absences (sick/vacation), and individual time entry details.\r\nDefaults to the current month if no date range is specified.",
-                                                                                         "parameters":  [
-                                                                                                            {
-                                                                                                                "name":  "orgSlug",
-                                                                                                                "in":  "path",
-                                                                                                                "description":  "Organization slug.",
-                                                                                                                "required":  true,
-                                                                                                                "schema":  {
-                                                                                                                               "type":  "string"
-                                                                                                                           }
-                                                                                                            },
-                                                                                                            {
-                                                                                                                "name":  "from",
-                                                                                                                "in":  "query",
-                                                                                                                "description":  "Start of date range (default: first day of current month).",
-                                                                                                                "schema":  {
-                                                                                                                               "type":  "string",
-                                                                                                                               "format":  "date-time"
-                                                                                                                           }
-                                                                                                            },
-                                                                                                            {
-                                                                                                                "name":  "to",
-                                                                                                                "in":  "query",
-                                                                                                                "description":  "End of date range (default: last day of current month).",
-                                                                                                                "schema":  {
-                                                                                                                               "type":  "string",
-                                                                                                                               "format":  "date-time"
-                                                                                                                           }
-                                                                                                            }
-                                                                                                        ],
-                                                                                         "responses":  {
-                                                                                                           "200":  {
-                                                                                                                       "description":  "OK",
-                                                                                                                       "content":  {
-                                                                                                                                       "text/plain":  {
-                                                                                                                                                          "schema":  {
-                                                                                                                                                                         "type":  "string",
-                                                                                                                                                                         "format":  "binary"
-                                                                                                                                                                     }
-                                                                                                                                                      },
-                                                                                                                                       "application/json":  {
-                                                                                                                                                                "schema":  {
-                                                                                                                                                                               "type":  "string",
-                                                                                                                                                                               "format":  "binary"
-                                                                                                                                                                           }
-                                                                                                                                                            },
-                                                                                                                                       "text/json":  {
-                                                                                                                                                         "schema":  {
-                                                                                                                                                                        "type":  "string",
-                                                                                                                                                                        "format":  "binary"
-                                                                                                                                                                    }
-                                                                                                                                                     }
-                                                                                                                                   }
-                                                                                                                   }
-                                                                                                       }
-                                                                                     }
-                                                                         },
                   "/health":  {
                                   "get":  {
                                               "tags":  [
@@ -4010,6 +4063,46 @@
                                                                          "additionalProperties":  false,
                                                                          "description":  "Request payload for creating a work schedule."
                                                                      },
+                                       "ExportRequest":  {
+                                                             "required":  [
+                                                                              "type"
+                                                                          ],
+                                                             "type":  "object",
+                                                             "properties":  {
+                                                                                "type":  {
+                                                                                             "minLength":  1,
+                                                                                             "type":  "string",
+                                                                                             "description":  "Export type: \"entries\" for individual time entries, \"daily\" for daily summary."
+                                                                                         },
+                                                                                "organizationSlug":  {
+                                                                                                         "type":  "string",
+                                                                                                         "description":  "Organization slug to filter by. Null for all organizations.",
+                                                                                                         "nullable":  true
+                                                                                                     },
+                                                                                "from":  {
+                                                                                             "type":  "string",
+                                                                                             "description":  "Start of date range (inclusive).",
+                                                                                             "format":  "date-time",
+                                                                                             "nullable":  true
+                                                                                         },
+                                                                                "to":  {
+                                                                                           "type":  "string",
+                                                                                           "description":  "End of date range (inclusive).",
+                                                                                           "format":  "date-time",
+                                                                                           "nullable":  true
+                                                                                       },
+                                                                                "columns":  {
+                                                                                                "type":  "array",
+                                                                                                "items":  {
+                                                                                                              "type":  "string"
+                                                                                                          },
+                                                                                                "description":  "Columns to include in the export. If empty/null, all columns are included.",
+                                                                                                "nullable":  true
+                                                                                            }
+                                                                            },
+                                                             "additionalProperties":  false,
+                                                             "description":  "Request payload for exporting time entries or daily reports."
+                                                         },
                                        "HolidayResponse":  {
                                                                "required":  [
                                                                                 "name"
@@ -4039,6 +4132,130 @@
                                                                "additionalProperties":  false,
                                                                "description":  "Organization holiday entry."
                                                            },
+                                       "ImportEntryRequest":  {
+                                                                  "required":  [
+                                                                                   "date",
+                                                                                   "endTime",
+                                                                                   "startTime"
+                                                                               ],
+                                                                  "type":  "object",
+                                                                  "properties":  {
+                                                                                     "date":  {
+                                                                                                  "minLength":  1,
+                                                                                                  "type":  "string"
+                                                                                              },
+                                                                                     "startTime":  {
+                                                                                                       "minLength":  1,
+                                                                                                       "type":  "string"
+                                                                                                   },
+                                                                                     "endTime":  {
+                                                                                                     "minLength":  1,
+                                                                                                     "type":  "string"
+                                                                                                 },
+                                                                                     "pauseMinutes":  {
+                                                                                                          "type":  "integer",
+                                                                                                          "format":  "int32"
+                                                                                                      },
+                                                                                     "description":  {
+                                                                                                         "type":  "string",
+                                                                                                         "nullable":  true
+                                                                                                     }
+                                                                                 },
+                                                                  "additionalProperties":  false,
+                                                                  "description":  "Request payload to confirm and execute a CSV import."
+                                                              },
+                                       "ImportPreviewResponse":  {
+                                                                     "required":  [
+                                                                                      "rows"
+                                                                                  ],
+                                                                     "type":  "object",
+                                                                     "properties":  {
+                                                                                        "rows":  {
+                                                                                                     "type":  "array",
+                                                                                                     "items":  {
+                                                                                                                   "$ref":  "#/components/schemas/ImportPreviewRow"
+                                                                                                               },
+                                                                                                     "nullable":  true
+                                                                                                 },
+                                                                                        "totalRows":  {
+                                                                                                          "type":  "integer",
+                                                                                                          "format":  "int32"
+                                                                                                      },
+                                                                                        "duplicateCount":  {
+                                                                                                               "type":  "integer",
+                                                                                                               "format":  "int32"
+                                                                                                           },
+                                                                                        "warnings":  {
+                                                                                                         "type":  "array",
+                                                                                                         "items":  {
+                                                                                                                       "type":  "string"
+                                                                                                                   },
+                                                                                                         "nullable":  true
+                                                                                                     }
+                                                                                    },
+                                                                     "additionalProperties":  false,
+                                                                     "description":  "Preview of parsed CSV rows before confirming import."
+                                                                 },
+                                       "ImportPreviewRow":  {
+                                                                "type":  "object",
+                                                                "properties":  {
+                                                                                   "rowNumber":  {
+                                                                                                     "type":  "integer",
+                                                                                                     "format":  "int32"
+                                                                                                 },
+                                                                                   "date":  {
+                                                                                                "type":  "string",
+                                                                                                "nullable":  true
+                                                                                            },
+                                                                                   "startTime":  {
+                                                                                                     "type":  "string",
+                                                                                                     "nullable":  true
+                                                                                                 },
+                                                                                   "endTime":  {
+                                                                                                   "type":  "string",
+                                                                                                   "nullable":  true
+                                                                                               },
+                                                                                   "pauseMinutes":  {
+                                                                                                        "type":  "integer",
+                                                                                                        "format":  "int32"
+                                                                                                    },
+                                                                                   "description":  {
+                                                                                                       "type":  "string",
+                                                                                                       "nullable":  true
+                                                                                                   },
+                                                                                   "isDuplicate":  {
+                                                                                                       "type":  "boolean"
+                                                                                                   },
+                                                                                   "warning":  {
+                                                                                                   "type":  "string",
+                                                                                                   "nullable":  true
+                                                                                               }
+                                                                               },
+                                                                "additionalProperties":  false,
+                                                                "description":  "A single row from the parsed CSV preview."
+                                                            },
+                                       "ImportResultResponse":  {
+                                                                    "type":  "object",
+                                                                    "properties":  {
+                                                                                       "importedCount":  {
+                                                                                                             "type":  "integer",
+                                                                                                             "format":  "int32"
+                                                                                                         },
+                                                                                       "skippedCount":  {
+                                                                                                            "type":  "integer",
+                                                                                                            "format":  "int32"
+                                                                                                        },
+                                                                                       "errors":  {
+                                                                                                      "type":  "array",
+                                                                                                      "items":  {
+                                                                                                                    "type":  "string"
+                                                                                                                },
+                                                                                                      "nullable":  true
+                                                                                                  }
+                                                                                   },
+                                                                    "additionalProperties":  false,
+                                                                    "description":  "Result of a confirmed CSV import."
+                                                                },
                                        "LoginRequest":  {
                                                             "required":  [
                                                                              "email",
@@ -4268,6 +4485,7 @@
                                                                                },
                                        "OrganizationDetailResponse":  {
                                                                           "required":  [
+                                                                                           "csvImportMode",
                                                                                            "editPastEntriesMode",
                                                                                            "editPauseMode",
                                                                                            "initialOvertimeMode",
@@ -4332,6 +4550,10 @@
                                                                                              "require2fa":  {
                                                                                                                 "type":  "boolean"
                                                                                                             },
+                                                                                             "csvImportMode":  {
+                                                                                                                   "type":  "string",
+                                                                                                                   "nullable":  true
+                                                                                                               },
                                                                                              "settingsUpdatedAt":  {
                                                                                                                        "type":  "string",
                                                                                                                        "format":  "date-time",
@@ -4648,7 +4870,8 @@
                                                                         1,
                                                                         2,
                                                                         3,
-                                                                        4
+                                                                        4,
+                                                                        5
                                                                     ],
                                                            "type":  "integer",
                                                            "format":  "int32"
@@ -5000,7 +5223,10 @@
                                                                                                     "require2fa":  {
                                                                                                                        "type":  "boolean",
                                                                                                                        "nullable":  true
-                                                                                                                   }
+                                                                                                                   },
+                                                                                                    "csvImportMode":  {
+                                                                                                                          "$ref":  "#/components/schemas/RuleMode"
+                                                                                                                      }
                                                                                                 },
                                                                                  "additionalProperties":  false,
                                                                                  "description":  "Request payload for updating org-level settings and policies."
@@ -5334,6 +5560,9 @@
                  },
                  {
                      "name":  "Auth"
+                 },
+                 {
+                     "name":  "ExportImport"
                  },
                  {
                      "name":  "Holiday"

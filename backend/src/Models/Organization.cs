@@ -92,6 +92,14 @@ public class Organization
     public bool Require2fa { get; set; } = false;
     
     /// <summary>
+    /// Controls whether members can import time entries from CSV files.
+    /// Allowed = user can import freely.
+    /// RequiresApproval = user must request and admin approves.
+    /// Disabled = CSV import is not available.
+    /// </summary>
+    public RuleMode CsvImportMode { get; set; } = RuleMode.Disabled;
+    
+    /// <summary>
     /// Timestamp of the last settings update. Used to notify members of rule changes.
     /// </summary>
     public DateTime? SettingsUpdatedAt { get; set; }

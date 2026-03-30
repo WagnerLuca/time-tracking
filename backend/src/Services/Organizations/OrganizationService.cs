@@ -79,6 +79,7 @@ public class OrganizationService : IOrganizationService
                 WorkScheduleChangeMode = o.WorkScheduleChangeMode.ToString(),
                 MemberTimeEntryVisibility = o.MemberTimeEntryVisibility,
                 Require2fa = o.Require2fa,
+                CsvImportMode = o.CsvImportMode.ToString(),
                 SettingsUpdatedAt = o.SettingsUpdatedAt,
                 CreatedAt = o.CreatedAt,
                 Members = o.UserOrganizations
@@ -435,6 +436,7 @@ public class OrganizationService : IOrganizationService
         if (request.WorkScheduleChangeMode.HasValue) org.WorkScheduleChangeMode = request.WorkScheduleChangeMode.Value;
         if (request.MemberTimeEntryVisibility.HasValue) org.MemberTimeEntryVisibility = request.MemberTimeEntryVisibility.Value;
         if (request.Require2fa.HasValue) org.Require2fa = request.Require2fa.Value;
+        if (request.CsvImportMode.HasValue) org.CsvImportMode = request.CsvImportMode.Value;
 
         org.UpdatedAt = DateTime.UtcNow;
         org.SettingsUpdatedAt = DateTime.UtcNow;
@@ -472,7 +474,8 @@ public class OrganizationService : IOrganizationService
             JoinPolicy = org.JoinPolicy.ToString(),
             WorkScheduleChangeMode = org.WorkScheduleChangeMode.ToString(),
             org.MemberTimeEntryVisibility,
-            org.Require2fa
+            org.Require2fa,
+            CsvImportMode = org.CsvImportMode.ToString()
         });
     }
 

@@ -32,6 +32,14 @@ export function canRequestEditPause(org: OrganizationDetailResponse | null): boo
 	return isRequiresApproval(org?.editPauseMode);
 }
 
+export function canImportCsv(org: OrganizationDetailResponse | null): boolean {
+	return isAllowed(org?.csvImportMode);
+}
+
+export function csvImportEnabled(org: OrganizationDetailResponse | null): boolean {
+	return !isDisabled(org?.csvImportMode);
+}
+
 // ── Settings page helpers ──
 
 export function parseRuleMode(mode: string | null | undefined): number {
@@ -100,6 +108,11 @@ export const ruleSettings: RuleSetting[] = [
 		key: 'workScheduleChangeMode',
 		label: 'Schedule Periods',
 		description: 'Control whether members can create/modify their own schedule periods.'
+	},
+	{
+		key: 'csvImportMode',
+		label: 'CSV Import',
+		description: 'Control whether members can import time entries from CSV files.'
 	}
 ];
 

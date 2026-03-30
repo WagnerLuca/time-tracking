@@ -15,7 +15,8 @@ public enum RequestType
     EditPastEntry = 1,
     EditPause = 2,
     SetInitialOvertime = 3,
-    WorkScheduleChange = 4
+    WorkScheduleChange = 4,
+    CsvImport = 5
 }
 
 public class OrgRequest

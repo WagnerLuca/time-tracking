@@ -127,6 +127,8 @@ export function formatRequestType(type: string | null | undefined): string {
 		case 'EditPastEntry': return 'Edit Entry';
 		case 'EditPause': return 'Edit Pause';
 		case 'SetInitialOvertime': return 'Set Overtime';
+		case 'WorkScheduleChange': return 'Schedule';
+		case 'CsvImport': return 'CSV Import';
 		default: return type ?? 'Unknown';
 	}
 }
@@ -140,6 +142,8 @@ export function formatRequestTypeFull(type: string | null | undefined): string {
 		case 'EditPastEntry': return 'Edit Past Time Entry';
 		case 'EditPause': return 'Edit Pause Duration';
 		case 'SetInitialOvertime': return 'Set Initial Overtime';
+		case 'WorkScheduleChange': return 'Change Work Schedule';
+		case 'CsvImport': return 'Import CSV Time Entries';
 		default: return type ?? 'Unknown';
 	}
 }

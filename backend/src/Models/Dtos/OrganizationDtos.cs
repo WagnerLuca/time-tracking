@@ -33,6 +33,7 @@ public record OrganizationDetailResponse
     public required string WorkScheduleChangeMode { get; init; }
     public bool MemberTimeEntryVisibility { get; init; }
     public bool Require2fa { get; init; }
+    public required string CsvImportMode { get; init; }
     public DateTime? SettingsUpdatedAt { get; init; }
     public DateTime CreatedAt { get; init; }
     public required List<OrganizationMemberResponse> Members { get; init; }
@@ -130,6 +131,7 @@ public record UpdateOrganizationSettingsRequest
     public RuleMode? WorkScheduleChangeMode { get; init; }
     public bool? MemberTimeEntryVisibility { get; init; }
     public bool? Require2fa { get; init; }
+    public RuleMode? CsvImportMode { get; init; }
 }
 
 /// <summary>Automatic pause rule (deduct X minutes after Y hours worked).</summary>

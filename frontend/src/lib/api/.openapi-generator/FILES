@@ -20,8 +20,14 @@ docs/CreateOrgRequestRequest.md
 docs/CreateOrganizationRequest.md
 docs/CreatePauseRuleRequest.md
 docs/CreateWorkScheduleRequest.md
+docs/ExportImportApi.md
+docs/ExportRequest.md
 docs/HolidayApi.md
 docs/HolidayResponse.md
+docs/ImportEntryRequest.md
+docs/ImportPreviewResponse.md
+docs/ImportPreviewRow.md
+docs/ImportResultResponse.md
 docs/LoginRequest.md
 docs/LoginResponse.md
 docs/MemberTimeOverviewResponse.md
