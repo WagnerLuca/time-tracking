@@ -2,14 +2,19 @@
 	import { onMount } from 'svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { timeTrackingApi, organizationsApi, workScheduleApi, requestsApi, holidayApi, absenceDayApi } from '$lib/apiClient';
-	import type { TimeEntryResponse, UpdateTimeEntryRequest, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/api';
-	import { RequestType } from '$lib/api';
+	import { timeTrackingApi, organizationsApi, workScheduleApi } from '$lib/apiClient';
+	import type { TimeEntryResponse, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/api';
 	import { formatHours, formatDelta, formatDuration, formatTime, formatDateFull, barWidth } from '$lib/utils/formatters';
-	import { dateKey, toLocalDateTimeInput } from '$lib/utils/dateHelpers';
+	import { dateKey } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, getHeatColor } from '$lib/utils/scheduleHelpers';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { canEditEntries, canRequestEditEntries, canEditPause, canRequestEditPause } from '$lib/utils/orgRules';
+	import { loadDaysOff as fetchDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
+	import { createEntryEditor } from '$lib/utils/entryEditor.svelte';
+	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+	import DayTypeLegend from '$lib/components/DayTypeLegend.svelte';
+	import EntryEditForm from '$lib/components/EntryEditForm.svelte';
+	import RequestModal from '$lib/components/RequestModal.svelte';
 
 	// View mode
 	let viewMode = $state<'month' | 'year'>('month');
@@ -25,11 +30,12 @@
 	let schedulePeriods = $state<WorkScheduleResponse[]>([]);
 
 	// Day-type maps
-	let holidayDates = $state<Map<string, string>>(new Map());
-	let sickDayDates = $state<Set<string>>(new Set());
-	let vacationDates = $state<Set<string>>(new Set());
-	let otherAbsenceDates = $state<Set<string>>(new Set());
-	let daysOffSet = $state<Set<string>>(new Set());
+	let daysOff = $state<DaysOffData>(emptyDaysOff());
+	let holidayDates = $derived(daysOff.holidayDates);
+	let sickDayDates = $derived(daysOff.sickDayDates);
+	let vacationDates = $derived(daysOff.vacationDates);
+	let otherAbsenceDates = $derived(daysOff.otherAbsenceDates);
+	let daysOffSet = $derived(daysOff.daysOffSet);
 
 	// Year view data
 	let yearEntries = $state<TimeEntryResponse[]>([]);
@@ -42,25 +48,14 @@
 	let selectedDayKey = $state<string | null>(null);
 	let orgDetail = $state<OrganizationDetailResponse | null>(null);
 
-	// Edit entry
-	let editingEntryId = $state<number | null>(null);
-	let editStartTime = $state('');
-	let editEndTime = $state('');
-	let editDescription = $state('');
-	let editPause = $state<number>(0);
-	let editError = $state('');
-	let editSaving = $state(false);
-
-	// Request functionality for RequiresApproval modes
-	let requestingEntryId = $state<number | null>(null);
-	let requestType = $state<'edit' | 'pause' | null>(null);
-	let requestMessage = $state('');
-	let requestSending = $state(false);
-	let requestSuccess = $state('');
-	let requestNewStart = $state('');
-	let requestNewEnd = $state('');
-	let requestNewPause = $state(0);
-	let actionError = $state('');
+	// Shared entry editing + request logic
+	const editor = createEntryEditor({
+		getOrgDetail: () => orgDetail,
+		getOrgSlug: () => orgContext.selectedOrgSlug,
+		onSaved: async () => { await loadEntries(); await loadCumulativeBalance(); },
+		onDeleted: async () => { await loadEntries(); await loadCumulativeBalance(); },
+		findEntry: (id) => selectedDayEntries.find(e => e.id === id)
+	});
 
 	// Computed
 	const monthName = $derived(new Date(currentYear, currentMonth).toLocaleDateString('en-US', { month: 'long' }));
@@ -174,40 +169,7 @@
 	}
 
 	async function loadDaysOff() {
-		if (!orgContext.selectedOrgSlug) {
-			holidayDates = new Map(); sickDayDates = new Set(); vacationDates = new Set(); otherAbsenceDates = new Set(); daysOffSet = new Set();
-			return;
-		}
-		try {
-			const [holRes, absRes] = await Promise.all([
-				holidayApi.apiV1OrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
-				absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug, auth.user?.id)
-			]);
-			const off = new Set<string>();
-			const hDates = new Map<string, string>();
-			const sDates = new Set<string>();
-			const vDates = new Set<string>();
-			const oDates = new Set<string>();
-			for (const h of holRes.data) {
-				if (h.date) { off.add(h.date); hDates.set(h.date, h.name ?? 'Holiday'); }
-			}
-			const absences = absRes.data.items ?? [];
-			for (const a of absences) {
-				if (a.date) {
-					off.add(a.date);
-					if (a.type === 'SickDay') sDates.add(a.date);
-					else if (a.type === 'Vacation') vDates.add(a.date);
-					else oDates.add(a.date);
-				}
-			}
-			daysOffSet = off;
-			holidayDates = hDates;
-			sickDayDates = sDates;
-			vacationDates = vDates;
-			otherAbsenceDates = oDates;
-		} catch {
-			holidayDates = new Map(); sickDayDates = new Set(); vacationDates = new Set(); otherAbsenceDates = new Set(); daysOffSet = new Set();
-		}
+		daysOff = await fetchDaysOff(orgContext.selectedOrgSlug, auth.user?.id);
 	}
 
 	async function loadCumulativeBalance() {
@@ -334,110 +296,7 @@
 	function selectDay(day: CalendarDay) {
 		if (!day.isCurrentMonth) return;
 		selectedDayKey = day.key;
-		editingEntryId = null;
-	}
-
-	// Entry editing
-	function startEditEntry(entry: TimeEntryResponse) {
-		editingEntryId = entry.id ?? null;
-		editStartTime = toLocalDateTimeInput(entry.startTime!);
-		editEndTime = entry.endTime ? toLocalDateTimeInput(entry.endTime) : '';
-		editDescription = entry.description ?? '';
-		editPause = entry.pauseDurationMinutes ?? 0;
-		editError = '';
-	}
-
-	function cancelEditEntry() {
-		editingEntryId = null;
-		editError = '';
-	}
-
-	async function saveEditEntry(entryId: number) {
-		editError = '';
-		editSaving = true;
-		try {
-			const payload: UpdateTimeEntryRequest = {};
-			if (editStartTime) payload.startTime = new Date(editStartTime).toISOString();
-			if (editEndTime) payload.endTime = new Date(editEndTime).toISOString();
-			payload.description = editDescription.trim() || undefined;
-			if (canEditPause(orgDetail)) {
-				payload.pauseDurationMinutes = Math.max(0, Number(editPause) || 0);
-			}
-			await timeTrackingApi.apiV1TimeTrackingIdPut(entryId, payload);
-			await loadEntries();
-			await loadCumulativeBalance();
-			editingEntryId = null;
-		} catch (err) {
-			editError = extractErrorMessage(err, 'Failed to update entry.');
-		} finally {
-			editSaving = false;
-		}
-	}
-
-	async function deleteEntry(id: number) {
-		if (!confirm('Delete this time entry?')) return;
-		try {
-			await timeTrackingApi.apiV1TimeTrackingIdDelete(id);
-			await loadEntries();
-			await loadCumulativeBalance();
-		} catch (err) {
-			actionError = extractErrorMessage(err, 'Failed to delete entry.');
-		}
-	}
-
-	// Request modal
-	function startRequest(entryId: number, type: 'edit' | 'pause') {
-		requestingEntryId = entryId;
-		requestType = type;
-		requestMessage = '';
-		requestSuccess = '';
-		const entry = selectedDayEntries.find((e: TimeEntryResponse) => e.id === entryId);
-		if (entry) {
-			if (type === 'edit') {
-				requestNewStart = entry.startTime ? toLocalDateTimeInput(entry.startTime) : '';
-				requestNewEnd = entry.endTime ? toLocalDateTimeInput(entry.endTime) : '';
-			} else {
-				requestNewPause = entry.pauseDurationMinutes ?? 0;
-			}
-		}
-	}
-
-	function cancelRequest() {
-		requestingEntryId = null;
-		requestType = null;
-		requestMessage = '';
-	}
-
-	async function submitRequest() {
-		if (!requestingEntryId || !requestType || !orgContext.selectedOrgSlug) return;
-		requestSending = true;
-		try {
-			const rType = requestType === 'edit' ? 1 as RequestType : 2 as RequestType;
-			let requestData: string | undefined;
-			if (requestType === 'edit') {
-				const data: Record<string, string> = {};
-				if (requestNewStart) data.startTime = new Date(requestNewStart).toISOString();
-				if (requestNewEnd) data.endTime = new Date(requestNewEnd).toISOString();
-				requestData = JSON.stringify(data);
-			} else {
-				requestData = String(Math.max(0, requestNewPause));
-			}
-			await requestsApi.apiV1OrganizationsSlugRequestsPost(orgContext.selectedOrgSlug, {
-				type: rType,
-				relatedEntityId: requestingEntryId,
-				requestData,
-				message: requestMessage || undefined
-			});
-			requestSuccess = 'Request submitted! An admin will review it.';
-			requestingEntryId = null;
-			requestType = null;
-			requestMessage = '';
-			setTimeout(() => (requestSuccess = ''), 4000);
-		} catch (err) {
-			actionError = extractErrorMessage(err, 'Failed to submit request.');
-		} finally {
-			requestSending = false;
-		}
+		editor.cancelEditEntry();
 	}
 
 	function isPastOrToday(date: Date): boolean {
@@ -628,7 +487,7 @@
 	</div>
 
 	{#if loading}
-		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>Loading...</span></div>
+		<LoadingSpinner message="Loading..." size="sm" />
 	{:else if viewMode === 'month'}
 		<!-- MONTH VIEW -->
 		<div class="month-view">
@@ -790,54 +649,29 @@
 						{/if}
 					</div>
 
-					{#if actionError}
-						<div class="alert alert-error text-sm mb-3 py-2 px-3">{actionError}</div>
+					{#if editor.actionError}
+						<div class="alert alert-error text-sm mb-3 py-2 px-3">{editor.actionError}</div>
 					{/if}
-					{#if requestSuccess}
-						<div class="alert alert-success text-sm mb-3 py-2 px-3">{requestSuccess}</div>
+					{#if editor.requestSuccess}
+						<div class="alert alert-success text-sm mb-3 py-2 px-3">{editor.requestSuccess}</div>
 					{/if}
 
 					{#if dayEntries.length > 0}
 						<ul class="flex flex-col gap-2">
 							{#each dayEntries as entry}
 								<li class="rounded-lg border border-base-300 bg-base-200/40 overflow-hidden">
-									{#if editingEntryId === entry.id}
-										<!-- Inline edit form -->
-										<div class="p-3 bg-base-200/50">
-											{#if editError}
-												<div class="alert alert-error text-sm mb-3 py-2 px-3">{editError}</div>
-											{/if}
-											<div class="flex gap-3 flex-wrap mb-3">
-												<div class="flex flex-col gap-1">
-													<!-- svelte-ignore a11y_label_has_associated_control -->
-													<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Start</label>
-													<input class="input input-bordered input-sm" type="datetime-local" bind:value={editStartTime} disabled={editSaving} />
-												</div>
-												<div class="flex flex-col gap-1">
-													<!-- svelte-ignore a11y_label_has_associated_control -->
-													<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">End</label>
-													<input class="input input-bordered input-sm" type="datetime-local" bind:value={editEndTime} disabled={editSaving} />
-												</div>
-												<div class="flex flex-col gap-1 flex-1 min-w-[150px]">
-													<!-- svelte-ignore a11y_label_has_associated_control -->
-													<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Note</label>
-													<input class="input input-bordered input-sm w-full" type="text" bind:value={editDescription} placeholder="Optional note" disabled={editSaving} />
-												</div>
-												{#if canEditPause(orgDetail)}
-													<div class="flex flex-col gap-1">
-														<!-- svelte-ignore a11y_label_has_associated_control -->
-														<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Pause (min)</label>
-														<input class="input input-bordered input-sm w-20" type="number" min="0" bind:value={editPause} disabled={editSaving} />
-													</div>
-												{/if}
-											</div>
-											<div class="flex gap-2">
-												<button class="btn btn-primary btn-sm" onclick={() => saveEditEntry(entry.id!)} disabled={editSaving}>
-													{editSaving ? 'Saving...' : 'Save'}
-												</button>
-												<button class="btn btn-ghost btn-sm" onclick={cancelEditEntry}>Cancel</button>
-											</div>
-										</div>
+									{#if editor.editingEntryId === entry.id}
+										<EntryEditForm
+											bind:startTime={editor.editStartTime}
+											bind:endTime={editor.editEndTime}
+											bind:description={editor.editDescription}
+											bind:pause={editor.editPause}
+											error={editor.editError}
+											saving={editor.editSaving}
+											{orgDetail}
+											onsave={() => editor.saveEditEntry(entry.id!)}
+											oncancel={editor.cancelEditEntry}
+										/>
 									{:else}
 										<!-- Entry display row -->
 										<div class="flex items-start justify-between gap-3 px-3 py-2">
@@ -852,16 +686,16 @@
 												<div class="flex flex-wrap gap-1 mt-1">
 													{#if (entry.pauseDurationMinutes ?? 0) > 0}
 														{#if canEditPause(orgDetail) && !entry.isRunning}
-															<button class="badge badge-warning badge-sm badge-outline cursor-pointer hover:bg-warning/20" title="Click to edit pause" onclick={() => startEditEntry(entry)}>&#8722;{entry.pauseDurationMinutes}m pause &#9998;</button>
+															<button class="badge badge-warning badge-sm badge-outline cursor-pointer hover:bg-warning/20" title="Click to edit pause" onclick={() => editor.startEditEntry(entry)}>&#8722;{entry.pauseDurationMinutes}m pause &#9998;</button>
 														{:else if canRequestEditPause(orgDetail) && !entry.isRunning}
-															<button class="badge badge-warning badge-sm badge-outline border-dashed border-warning cursor-pointer hover:bg-warning/10" title="Request pause edit" onclick={() => startRequest(entry.id!, 'pause')}>&#8722;{entry.pauseDurationMinutes}m pause &#128233;</button>
+															<button class="badge badge-warning badge-sm badge-outline border-dashed border-warning cursor-pointer hover:bg-warning/10" title="Request pause edit" onclick={() => editor.startRequest(entry.id!, 'pause')}>&#8722;{entry.pauseDurationMinutes}m pause &#128233;</button>
 														{:else}
 															<span class="badge badge-warning badge-sm badge-outline">&#8722;{entry.pauseDurationMinutes}m pause</span>
 														{/if}
 													{:else if canEditPause(orgDetail) && !entry.isRunning}
-														<button class="badge badge-ghost badge-sm cursor-pointer hover:badge-warning hover:badge-outline" title="Click to add pause" onclick={() => startEditEntry(entry)}>+pause &#9998;</button>
+														<button class="badge badge-ghost badge-sm cursor-pointer hover:badge-warning hover:badge-outline" title="Click to add pause" onclick={() => editor.startEditEntry(entry)}>+pause &#9998;</button>
 													{:else if canRequestEditPause(orgDetail) && !entry.isRunning}
-														<button class="badge badge-ghost badge-sm cursor-pointer border-dashed border-warning hover:bg-warning/10" title="Request to add pause" onclick={() => startRequest(entry.id!, 'pause')}>+pause &#128233;</button>
+														<button class="badge badge-ghost badge-sm cursor-pointer border-dashed border-warning hover:bg-warning/10" title="Request to add pause" onclick={() => editor.startRequest(entry.id!, 'pause')}>+pause &#128233;</button>
 													{/if}
 												</div>
 											</div>
@@ -873,11 +707,11 @@
 												{#if !entry.isRunning}
 													<div class="flex gap-0.5 ml-1">
 														{#if canEditEntries(orgDetail)}
-															<button class="btn btn-ghost btn-xs text-primary opacity-40 hover:opacity-100" title="Edit" onclick={() => startEditEntry(entry)}>&#9998;</button>
+															<button class="btn btn-ghost btn-xs text-primary opacity-40 hover:opacity-100" title="Edit" onclick={() => editor.startEditEntry(entry)}>&#9998;</button>
 														{:else if canRequestEditEntries(orgDetail)}
-															<button class="btn btn-ghost btn-xs text-warning opacity-50 hover:opacity-100" title="Request edit" onclick={() => startRequest(entry.id!, 'edit')}>&#128233;</button>
+															<button class="btn btn-ghost btn-xs text-warning opacity-50 hover:opacity-100" title="Request edit" onclick={() => editor.startRequest(entry.id!, 'edit')}>&#128233;</button>
 														{/if}
-														<button class="btn btn-ghost btn-xs text-error opacity-40 hover:opacity-100" title="Delete" onclick={() => deleteEntry(entry.id!)}>&times;</button>
+														<button class="btn btn-ghost btn-xs text-error opacity-40 hover:opacity-100" title="Delete" onclick={() => editor.deleteEntry(entry.id!)}>&times;</button>
 													</div>
 												{/if}
 											</div>
@@ -892,53 +726,17 @@
 				</div>
 			{/if}
 
-			<!-- Request modal -->
-			{#if requestingEntryId}
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<div class="fixed inset-0 bg-black/30 z-[100]" onclick={cancelRequest}></div>
-				<div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-base-100 rounded-xl p-6 w-[90%] max-w-[420px] shadow-2xl z-[101]">
-					<h3 class="text-lg font-bold mb-1">{requestType === 'edit' ? 'Request Entry Edit' : 'Request Pause Edit'}</h3>
-					<p class="text-sm text-base-content/60 mb-4">Specify the new values. An admin will review and apply them.</p>
-
-					{#if requestType === 'edit'}
-						<div class="flex flex-col gap-3 mb-3">
-							<div>
-								<!-- svelte-ignore a11y_label_has_associated_control -->
-								<label class="text-xs font-semibold text-base-content/70 mb-1">New Start Time</label>
-								<input class="input input-bordered input-sm w-full" type="datetime-local" bind:value={requestNewStart} disabled={requestSending} />
-							</div>
-							<div>
-								<!-- svelte-ignore a11y_label_has_associated_control -->
-								<label class="text-xs font-semibold text-base-content/70 mb-1">New End Time</label>
-								<input class="input input-bordered input-sm w-full" type="datetime-local" bind:value={requestNewEnd} disabled={requestSending} />
-							</div>
-						</div>
-					{:else}
-						<div class="flex flex-col gap-3 mb-3">
-							<div>
-								<!-- svelte-ignore a11y_label_has_associated_control -->
-								<label class="text-xs font-semibold text-base-content/70 mb-1">New Pause Duration (minutes)</label>
-								<input class="input input-bordered input-sm w-full" type="number" min="0" bind:value={requestNewPause} disabled={requestSending} />
-							</div>
-						</div>
-					{/if}
-
-					<textarea
-						class="textarea textarea-bordered w-full text-sm mb-4"
-						bind:value={requestMessage}
-						placeholder="Optional message for the admin..."
-						rows="2"
-						disabled={requestSending}
-					></textarea>
-					<div class="flex gap-2">
-						<button class="btn btn-primary btn-sm" onclick={submitRequest} disabled={requestSending}>
-							{requestSending ? 'Sending...' : 'Submit Request'}
-						</button>
-						<button class="btn btn-ghost btn-sm" onclick={cancelRequest}>Cancel</button>
-					</div>
-				</div>
-			{/if}
+			<RequestModal
+				open={!!editor.requestingEntryId}
+				type={editor.requestType}
+				bind:newStart={editor.requestNewStart}
+				bind:newEnd={editor.requestNewEnd}
+				bind:newPause={editor.requestNewPause}
+				bind:message={editor.requestMessage}
+				sending={editor.requestSending}
+				onsubmit={editor.submitRequest}
+				oncancel={editor.cancelRequest}
+			/>
 		</div>
 
 	{:else}
@@ -951,7 +749,7 @@
 			</div>
 
 			{#if yearLoading}
-				<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>Loading year data...</span></div>
+				<LoadingSpinner message="Loading year data..." size="sm" />
 			{:else}
 				<!-- Year summary -->
 				{@const yearTotal = yearMonths.reduce((s, m) => s + m.workedMinutes, 0)}

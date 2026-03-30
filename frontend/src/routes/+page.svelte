@@ -2,13 +2,16 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { timeTrackingApi, organizationsApi, workScheduleApi, holidayApi, absenceDayApi } from '$lib/apiClient';
+	import { timeTrackingApi, organizationsApi, workScheduleApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, StartTimeEntryRequest, WorkScheduleResponse } from '$lib/api';
 	import { formatHours, formatDelta, barWidth, getMonthName } from '$lib/utils/formatters';
 	import { isToday, isFuture, sumMinutes } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, absenceCreditsForRange, getDayType, getDayTypeLabel, getTargetForRange } from '$lib/utils/scheduleHelpers';
 	import { DAY_NAMES, MAX_ENTRIES_FOR_OVERTIME, WEEKLY_ENTRY_LIMIT, MONTHLY_ENTRY_LIMIT } from '$lib/utils/constants';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import { loadDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
+	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+	import DayTypeLegend from '$lib/components/DayTypeLegend.svelte';
 
 	let currentEntry = $state<TimeEntryResponse | null>(null);
 	let todayMinutes = $state(0);
@@ -33,13 +36,14 @@
 	let monthWeeks = $state<Array<{label: string, worked: number, target: number}>>([]);
 	// First entry date
 	let firstEntryDate = $state<Date | null>(null);
-	// Days off (holidays + absences) — date strings like "2025-01-01"
-	let daysOffSet = $state<Set<string>>(new Set());
-	// Separate day-type maps for color coding
-	let holidayDates = $state<Map<string, string>>(new Map()); // date -> name
-	let sickDayDates = $state<Set<string>>(new Set());
-	let vacationDates = $state<Set<string>>(new Set());
-	let otherAbsenceDates = $state<Set<string>>(new Set());
+	// Days off (holidays + absences)
+	let daysOff = $state<DaysOffData>(emptyDaysOff());
+	// Convenience accessors
+	let holidayDates = $derived(daysOff.holidayDates);
+	let sickDayDates = $derived(daysOff.sickDayDates);
+	let vacationDates = $derived(daysOff.vacationDates);
+	let otherAbsenceDates = $derived(daysOff.otherAbsenceDates);
+	let daysOffSet = $derived(daysOff.daysOffSet);
 
 	onMount(async () => {
 		if (!auth.user) return;
@@ -95,52 +99,7 @@
 
 	async function loadStats() {
 		try {
-			// Load holidays + absences for days-off calculation and color coding
-			if (orgContext.selectedOrgSlug) {
-				try {
-					const [holRes, absRes] = await Promise.all([
-						holidayApi.apiV1OrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
-						absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug, auth.user?.id)
-					]);
-					const offDates = new Set<string>();
-					const holidays = new Map<string, string>();
-					const sick = new Set<string>();
-					const vacation = new Set<string>();
-					const otherAbs = new Set<string>();
-					for (const h of holRes.data) {
-						if (h.date) {
-							offDates.add(h.date);
-							holidays.set(h.date, h.name ?? 'Holiday');
-						}
-					}
-					const absences = absRes.data.items ?? [];
-					for (const a of absences) {
-						if (a.date) {
-							offDates.add(a.date);
-							if (a.type === 'SickDay') sick.add(a.date);
-							else if (a.type === 'Vacation') vacation.add(a.date);
-							else otherAbs.add(a.date);
-						}
-					}
-					daysOffSet = offDates;
-					holidayDates = holidays;
-					sickDayDates = sick;
-					vacationDates = vacation;
-					otherAbsenceDates = otherAbs;
-				} catch {
-					daysOffSet = new Set();
-					holidayDates = new Map();
-					sickDayDates = new Set();
-					vacationDates = new Set();
-					otherAbsenceDates = new Set();
-				}
-			} else {
-				daysOffSet = new Set();
-				holidayDates = new Map();
-				sickDayDates = new Set();
-				vacationDates = new Set();
-				otherAbsenceDates = new Set();
-			}
+			daysOff = await loadDaysOff(orgContext.selectedOrgSlug, auth.user?.id);
 
 			const now = new Date();
 
@@ -322,10 +281,7 @@
 
 <div>
 	{#if loading}
-		<div class="flex flex-col items-center justify-center py-16 px-8 gap-4 text-base-content/60">
-			<span class="loading loading-spinner loading-md"></span>
-			<p>Loading dashboard...</p>
-		</div>
+		<LoadingSpinner message="Loading dashboard..." />
 	{:else}
 	<!-- Header with org context -->
 	<div class="flex items-start justify-between mb-6">
@@ -449,15 +405,7 @@
 		</a>
 	{/if}
 
-	<!-- Day Type Legend -->
-	{#if holidayDates.size > 0 || sickDayDates.size > 0 || vacationDates.size > 0 || otherAbsenceDates.size > 0}
-		<div class="flex gap-4 flex-wrap text-xs text-base-content/50 mb-4">
-			{#if holidayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-secondary"></span> Holiday</span>{/if}
-			{#if sickDayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-error"></span> Sick Day</span>{/if}
-			{#if vacationDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-success"></span> Vacation</span>{/if}
-			{#if otherAbsenceDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-base-content/40"></span> Other Absence</span>{/if}
-		</div>
-	{/if}
+	<DayTypeLegend {holidayDates} {sickDayDates} {vacationDates} {otherAbsenceDates} />
 
 	<!-- Monthly Overview -->
 	{#if monthWeeks.length > 0}

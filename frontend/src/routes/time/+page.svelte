@@ -2,15 +2,20 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { timeTrackingApi, organizationsApi, workScheduleApi, requestsApi, holidayApi, absenceDayApi } from '$lib/apiClient';
-	import type { TimeEntryResponse, StartTimeEntryRequest, UpdateTimeEntryRequest, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/api';
-	import { RequestType } from '$lib/api';
+	import { timeTrackingApi, organizationsApi, workScheduleApi } from '$lib/apiClient';
+	import type { TimeEntryResponse, StartTimeEntryRequest, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/api';
 	import { formatHoursDecimal, formatDelta, formatDuration, formatTime, formatDateShort, formatWeekLabel, formatHours } from '$lib/utils/formatters';
-	import { dateKey, isToday, getWeekRange, toLocalDateTimeInput } from '$lib/utils/dateHelpers';
+	import { dateKey, isToday, getWeekRange } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel } from '$lib/utils/scheduleHelpers';
 	import { DAY_NAMES, MAX_ENTRIES_FOR_OVERTIME } from '$lib/utils/constants';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { canEditEntries, canRequestEditEntries, canEditPause, canRequestEditPause } from '$lib/utils/orgRules';
+	import { loadDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
+	import { createEntryEditor } from '$lib/utils/entryEditor.svelte';
+	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+	import DayTypeLegend from '$lib/components/DayTypeLegend.svelte';
+	import EntryEditForm from '$lib/components/EntryEditForm.svelte';
+	import RequestModal from '$lib/components/RequestModal.svelte';
 
 	let current = $state<TimeEntryResponse | null>(null);
 	let weekEntries = $state<TimeEntryResponse[]>([]);
@@ -28,12 +33,12 @@
 	let cumulativeOvertimeWeekEnd = $state(0);
 	let hasWeekEndOvertimeData = $state(false);
 	// Days off (holidays + absences)
-	let daysOffSet = $state<Set<string>>(new Set());
-	// Day-type tracking for color-coded display
-	let holidayDates = $state<Map<string, string>>(new Map()); // date -> name
-	let sickDayDates = $state<Set<string>>(new Set());
-	let vacationDates = $state<Set<string>>(new Set());
-	let otherAbsenceDates = $state<Set<string>>(new Set());
+	let daysOff = $state<DaysOffData>(emptyDaysOff());
+	let holidayDates = $derived(daysOff.holidayDates);
+	let sickDayDates = $derived(daysOff.sickDayDates);
+	let vacationDates = $derived(daysOff.vacationDates);
+	let otherAbsenceDates = $derived(daysOff.otherAbsenceDates);
+	let daysOffSet = $derived(daysOff.daysOffSet);
 
 	// Timer display
 	let elapsed = $state('00:00:00');
@@ -207,52 +212,7 @@
 	}
 
 	async function loadCumulativeOvertime() {
-		// Load holidays + absences for days-off calculation
-		if (orgContext.selectedOrgSlug) {
-			try {
-				const [holRes, absRes] = await Promise.all([
-					holidayApi.apiV1OrganizationsSlugHolidaysGet(orgContext.selectedOrgSlug),
-					absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgContext.selectedOrgSlug, auth.user?.id)
-				]);
-				const offDates = new Set<string>();
-				const hDates = new Map<string, string>();
-				const sDates = new Set<string>();
-				const vDates = new Set<string>();
-				const oDates = new Set<string>();
-				for (const h of holRes.data) {
-					if (h.date) {
-						offDates.add(h.date);
-						hDates.set(h.date, h.name ?? 'Holiday');
-					}
-				}
-				const absences = absRes.data.items ?? [];
-				for (const a of absences) {
-					if (a.date) {
-						offDates.add(a.date);
-						if (a.type === 'SickDay') sDates.add(a.date);
-						else if (a.type === 'Vacation') vDates.add(a.date);
-						else oDates.add(a.date);
-					}
-				}
-				daysOffSet = offDates;
-				holidayDates = hDates;
-				sickDayDates = sDates;
-				vacationDates = vDates;
-				otherAbsenceDates = oDates;
-			} catch {
-				daysOffSet = new Set();
-				holidayDates = new Map();
-				sickDayDates = new Set();
-				vacationDates = new Set();
-				otherAbsenceDates = new Set();
-			}
-		} else {
-			daysOffSet = new Set();
-			holidayDates = new Map();
-			sickDayDates = new Set();
-			vacationDates = new Set();
-			otherAbsenceDates = new Set();
-		}
+		daysOff = await loadDaysOff(orgContext.selectedOrgSlug, auth.user?.id);
 
 		if (!workSchedule) {
 			cumulativeOvertime = 0;
@@ -336,7 +296,7 @@
 			await timeTrackingApi.apiV1TimeTrackingIdDelete(id);
 			weekEntries = weekEntries.filter((e) => e.id !== id);
 		} catch (err) {
-			actionError = extractErrorMessage(err, 'Failed to delete entry.');
+			editor.actionError = extractErrorMessage(err, 'Failed to delete entry.');
 		}
 	}
 
@@ -346,115 +306,14 @@
 		loadCumulativeOvertime();
 	}
 
-	// Edit entry
-	let editingEntryId = $state<number | null>(null);
-	let editStartTime = $state('');
-	let editEndTime = $state('');
-	let editDescription = $state('');
-	let editPause = $state<number>(0);
-	let editError = $state('');
-	let editSaving = $state(false);
-
-	function startEditEntry(entry: TimeEntryResponse) {
-		editingEntryId = entry.id ?? null;
-		editStartTime = toLocalDateTimeInput(entry.startTime!);
-		editEndTime = entry.endTime ? toLocalDateTimeInput(entry.endTime) : '';
-		editDescription = entry.description ?? '';
-		editPause = entry.pauseDurationMinutes ?? 0;
-		editError = '';
-	}
-
-	function cancelEditEntry() {
-		editingEntryId = null;
-		editError = '';
-	}
-
-	async function saveEditEntry(entryId: number) {
-		editError = '';
-		editSaving = true;
-		try {
-			const payload: UpdateTimeEntryRequest = {};
-			if (editStartTime) payload.startTime = new Date(editStartTime).toISOString();
-			if (editEndTime) payload.endTime = new Date(editEndTime).toISOString();
-			payload.description = editDescription.trim() || undefined;
-			if (canEditPause(orgDetail)) {
-				payload.pauseDurationMinutes = Math.max(0, Number(editPause) || 0);
-			}
-			await timeTrackingApi.apiV1TimeTrackingIdPut(entryId, payload);
-			await loadWeek();
-			editingEntryId = null;
-		} catch (err) {
-			editError = extractErrorMessage(err, 'Failed to update entry.');
-		} finally {
-			editSaving = false;
-		}
-	}
-
-	// Request functionality for RequiresApproval modes
-	let requestingEntryId = $state<number | null>(null);
-	let requestType = $state<'edit' | 'pause' | null>(null);
-	let requestMessage = $state('');
-	let requestSending = $state(false);
-	let requestSuccess = $state('');
-	// Values for the request
-	let requestNewStart = $state('');
-	let requestNewEnd = $state('');
-	let requestNewPause = $state(0);
-
-	function startRequest(entryId: number, type: 'edit' | 'pause') {
-		requestingEntryId = entryId;
-		requestType = type;
-		requestMessage = '';
-		requestSuccess = '';
-		// Pre-fill with current values
-		const entry = weekEntries.find((e: TimeEntryResponse) => e.id === entryId);
-		if (entry) {
-			if (type === 'edit') {
-				requestNewStart = entry.startTime ? toLocalDateTimeInput(entry.startTime) : '';
-				requestNewEnd = entry.endTime ? toLocalDateTimeInput(entry.endTime) : '';
-			} else {
-				requestNewPause = entry.pauseDurationMinutes ?? 0;
-			}
-		}
-	}
-
-	function cancelRequest() {
-		requestingEntryId = null;
-		requestType = null;
-		requestMessage = '';
-	}
-
-	async function submitRequest() {
-		if (!requestingEntryId || !requestType || !orgContext.selectedOrgSlug) return;
-		requestSending = true;
-		try {
-			const rType = requestType === 'edit' ? 1 as RequestType : 2 as RequestType;
-			let requestData: string | undefined;
-			if (requestType === 'edit') {
-				const data: Record<string, string> = {};
-				if (requestNewStart) data.startTime = new Date(requestNewStart).toISOString();
-				if (requestNewEnd) data.endTime = new Date(requestNewEnd).toISOString();
-				requestData = JSON.stringify(data);
-			} else {
-				requestData = String(Math.max(0, requestNewPause));
-			}
-			await requestsApi.apiV1OrganizationsSlugRequestsPost(orgContext.selectedOrgSlug, {
-				type: rType,
-				relatedEntityId: requestingEntryId,
-				requestData,
-				message: requestMessage || undefined
-			});
-			requestSuccess = 'Request submitted! An admin will review it.';
-			requestingEntryId = null;
-			requestType = null;
-			requestMessage = '';
-			setTimeout(() => (requestSuccess = ''), 4000);
-		} catch (err) {
-			actionError = extractErrorMessage(err, 'Failed to submit request.');
-		} finally {
-			requestSending = false;
-		}
-	}
+	// Shared entry editing + request logic
+	const editor = createEntryEditor({
+		getOrgDetail: () => orgDetail,
+		getOrgSlug: () => orgContext.selectedOrgSlug,
+		onSaved: () => loadWeek(),
+		onDeleted: async () => { weekEntries = weekEntries.filter(e => e.id !== editor.editingEntryId); },
+		findEntry: (id) => weekEntries.find(e => e.id === id)
+	});
 </script>
 
 <svelte:head>
@@ -463,7 +322,7 @@
 
 <div class="max-w-3xl mx-auto p-6">
 	{#if loading}
-		<p class="text-base-content/50">Loading...</p>
+		<LoadingSpinner message="Loading..." size="sm" />
 	{:else}
 		{#if actionError}
 			<div class="alert alert-error mb-4 text-sm">{actionError}
@@ -570,15 +429,7 @@
 				{/each}
 			</div>
 
-			<!-- Day Type Legend -->
-			{#if holidayDates.size > 0 || sickDayDates.size > 0 || vacationDates.size > 0 || otherAbsenceDates.size > 0}
-				<div class="flex gap-4 flex-wrap text-xs text-base-content/60 mt-3">
-					{#if holidayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block bg-secondary"></span> Holiday</span>{/if}
-					{#if sickDayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block bg-error"></span> Sick Day</span>{/if}
-					{#if vacationDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block bg-accent"></span> Vacation</span>{/if}
-					{#if otherAbsenceDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block bg-base-content/40"></span> Other Absence</span>{/if}
-				</div>
-			{/if}
+			<DayTypeLegend {holidayDates} {sickDayDates} {vacationDates} {otherAbsenceDates} />
 		</section>
 
 		<!-- Cumulative overtime -->
@@ -614,42 +465,19 @@
 			{:else}
 				<div class="card bg-base-100 border border-base-300 overflow-hidden">
 					{#each weekEntries as entry}
-						{#if editingEntryId === entry.id}
-							<!-- Inline edit form -->
-							<div class="p-4 bg-base-200/50 border-b border-base-300 overflow-hidden">
-								{#if editError}
-									<div class="alert alert-error text-sm mb-3 py-2 px-3">{editError}</div>
-								{/if}
-								<div class="flex gap-3 flex-wrap mb-3 max-w-full overflow-hidden">
-									<div class="flex flex-col gap-1">
-										<!-- svelte-ignore a11y_label_has_associated_control -->
-										<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Start</label>
-										<input class="input input-bordered input-sm" type="datetime-local" bind:value={editStartTime} disabled={editSaving} />
-									</div>
-									<div class="flex flex-col gap-1">
-										<!-- svelte-ignore a11y_label_has_associated_control -->
-										<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">End</label>
-										<input class="input input-bordered input-sm" type="datetime-local" bind:value={editEndTime} disabled={editSaving} />
-									</div>
-									<div class="flex flex-col gap-1 flex-1 min-w-[150px]">
-										<!-- svelte-ignore a11y_label_has_associated_control -->
-										<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Note</label>
-										<input class="input input-bordered input-sm w-full" type="text" bind:value={editDescription} placeholder="Optional note" disabled={editSaving} />
-									</div>
-									{#if canEditPause(orgDetail)}
-										<div class="flex flex-col gap-1">
-											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Pause (min)</label>
-											<input class="input input-bordered input-sm w-20" type="number" min="0" bind:value={editPause} disabled={editSaving} />
-										</div>
-									{/if}
-								</div>
-								<div class="flex gap-2">
-									<button class="btn btn-primary btn-sm" onclick={() => saveEditEntry(entry.id!)} disabled={editSaving}>
-										{editSaving ? 'Saving...' : 'Save'}
-									</button>
-									<button class="btn btn-ghost btn-sm" onclick={cancelEditEntry}>Cancel</button>
-								</div>
+						{#if editor.editingEntryId === entry.id}
+							<div class="border-b border-base-300">
+								<EntryEditForm
+									bind:startTime={editor.editStartTime}
+									bind:endTime={editor.editEndTime}
+									bind:description={editor.editDescription}
+									bind:pause={editor.editPause}
+									error={editor.editError}
+									saving={editor.editSaving}
+									{orgDetail}
+									onsave={() => editor.saveEditEntry(entry.id!)}
+									oncancel={editor.cancelEditEntry}
+								/>
 							</div>
 						{:else}
 							<div class="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 py-3 px-4 border-b border-base-200 last:border-b-0 {entry.isRunning ? 'bg-success/5' : ''}">
@@ -671,16 +499,16 @@
 									{/if}
 									{#if (entry.pauseDurationMinutes ?? 0) > 0}
 										{#if canEditPause(orgDetail) && !entry.isRunning}
-											<button class="badge badge-warning badge-sm badge-outline cursor-pointer hover:bg-warning/20" title="Click to edit pause" onclick={() => startEditEntry(entry)}>&#8722;{entry.pauseDurationMinutes}m pause &#9998;</button>
+											<button class="badge badge-warning badge-sm badge-outline cursor-pointer hover:bg-warning/20" title="Click to edit pause" onclick={() => editor.startEditEntry(entry)}>&#8722;{entry.pauseDurationMinutes}m pause &#9998;</button>
 										{:else if canRequestEditPause(orgDetail) && !entry.isRunning}
-											<button class="badge badge-warning badge-sm badge-outline border-dashed border-warning cursor-pointer hover:bg-warning/10" title="Request pause edit" onclick={() => startRequest(entry.id!, 'pause')}>&#8722;{entry.pauseDurationMinutes}m pause &#128233;</button>
+											<button class="badge badge-warning badge-sm badge-outline border-dashed border-warning cursor-pointer hover:bg-warning/10" title="Request pause edit" onclick={() => editor.startRequest(entry.id!, 'pause')}>&#8722;{entry.pauseDurationMinutes}m pause &#128233;</button>
 										{:else}
 											<span class="badge badge-warning badge-sm badge-outline">&#8722;{entry.pauseDurationMinutes}m pause</span>
 										{/if}
 									{:else if canEditPause(orgDetail) && !entry.isRunning}
-										<button class="badge badge-ghost badge-sm cursor-pointer hover:badge-warning hover:badge-outline" title="Click to add pause" onclick={() => startEditEntry(entry)}>+pause &#9998;</button>
+										<button class="badge badge-ghost badge-sm cursor-pointer hover:badge-warning hover:badge-outline" title="Click to add pause" onclick={() => editor.startEditEntry(entry)}>+pause &#9998;</button>
 									{:else if canRequestEditPause(orgDetail) && !entry.isRunning}
-										<button class="badge badge-ghost badge-sm cursor-pointer border-dashed border-warning hover:bg-warning/10" title="Request to add pause" onclick={() => startRequest(entry.id!, 'pause')}>+pause &#128233;</button>
+										<button class="badge badge-ghost badge-sm cursor-pointer border-dashed border-warning hover:bg-warning/10" title="Request to add pause" onclick={() => editor.startRequest(entry.id!, 'pause')}>+pause &#128233;</button>
 									{/if}
 								</div>
 								<div class="font-semibold text-sm text-base-content/70 min-w-[56px] text-right tabular-nums">
@@ -696,9 +524,9 @@
 								<div class="min-w-[28px] flex gap-0.5">
 									{#if !entry.isRunning}
 										{#if canEditEntries(orgDetail)}
-											<button class="btn btn-ghost btn-xs text-primary opacity-40 hover:opacity-100" title="Edit" onclick={() => startEditEntry(entry)}>&#9998;</button>
+											<button class="btn btn-ghost btn-xs text-primary opacity-40 hover:opacity-100" title="Edit" onclick={() => editor.startEditEntry(entry)}>&#9998;</button>
 										{:else if canRequestEditEntries(orgDetail)}
-											<button class="btn btn-ghost btn-xs text-warning opacity-50 hover:opacity-100" title="Request edit" onclick={() => startRequest(entry.id!, 'edit')}>&#128233;</button>
+											<button class="btn btn-ghost btn-xs text-warning opacity-50 hover:opacity-100" title="Request edit" onclick={() => editor.startRequest(entry.id!, 'edit')}>&#128233;</button>
 										{/if}
 										<button class="btn btn-ghost btn-xs text-error opacity-40 hover:opacity-100" title="Delete" onclick={() => deleteEntry(entry.id!)}>
 											&times;
@@ -713,54 +541,19 @@
 		</section>
 	{/if}
 
-	{#if requestSuccess}
-		<div class="alert alert-success mt-4 text-sm">{requestSuccess}</div>
+	{#if editor.requestSuccess}
+		<div class="alert alert-success mt-4 text-sm">{editor.requestSuccess}</div>
 	{/if}
 
-	{#if requestingEntryId}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<!-- svelte-ignore a11y_click_events_have_key_events -->
-		<div class="fixed inset-0 bg-black/30 z-[100]" onclick={cancelRequest}></div>
-		<div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-base-100 rounded-xl p-6 w-[90%] max-w-[420px] shadow-2xl z-[101]">
-			<h3 class="text-lg font-bold mb-1">{requestType === 'edit' ? 'Request Entry Edit' : 'Request Pause Edit'}</h3>
-			<p class="text-sm text-base-content/60 mb-4">Specify the new values. An admin will review and apply them.</p>
-
-			{#if requestType === 'edit'}
-				<div class="flex flex-col gap-3 mb-3">
-					<div>
-						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label class="text-xs font-semibold text-base-content/70 mb-1">New Start Time</label>
-						<input class="input input-bordered input-sm w-full" type="datetime-local" bind:value={requestNewStart} disabled={requestSending} />
-					</div>
-					<div>
-						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label class="text-xs font-semibold text-base-content/70 mb-1">New End Time</label>
-						<input class="input input-bordered input-sm w-full" type="datetime-local" bind:value={requestNewEnd} disabled={requestSending} />
-					</div>
-				</div>
-			{:else}
-				<div class="flex flex-col gap-3 mb-3">
-					<div>
-						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label class="text-xs font-semibold text-base-content/70 mb-1">New Pause Duration (minutes)</label>
-						<input class="input input-bordered input-sm w-full" type="number" min="0" bind:value={requestNewPause} disabled={requestSending} />
-					</div>
-				</div>
-			{/if}
-
-			<textarea
-				class="textarea textarea-bordered w-full text-sm mb-4"
-				bind:value={requestMessage}
-				placeholder="Optional message for the admin..."
-				rows="2"
-				disabled={requestSending}
-			></textarea>
-			<div class="flex gap-2">
-				<button class="btn btn-primary btn-sm" onclick={submitRequest} disabled={requestSending}>
-					{requestSending ? 'Sending...' : 'Submit Request'}
-				</button>
-				<button class="btn btn-ghost btn-sm" onclick={cancelRequest}>Cancel</button>
-			</div>
-		</div>
-	{/if}
+	<RequestModal
+		open={!!editor.requestingEntryId}
+		type={editor.requestType}
+		bind:newStart={editor.requestNewStart}
+		bind:newEnd={editor.requestNewEnd}
+		bind:newPause={editor.requestNewPause}
+		bind:message={editor.requestMessage}
+		sending={editor.requestSending}
+		onsubmit={editor.submitRequest}
+		oncancel={editor.cancelRequest}
+	/>
 </div>
