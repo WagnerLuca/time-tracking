@@ -533,6 +533,23 @@
 		}
 	}
 
+	async function toggleRequire2fa() {
+		if (!org) return;
+		settingsSaving = true;
+		settingsError = '';
+		try {
+			const payload: UpdateOrganizationSettingsRequest = {
+				require2fa: !org.require2fa
+			};
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
+			await reloadOrg();
+		} catch (err) {
+			settingsError = extractErrorMessage(err, 'Failed to update setting.');
+		} finally {
+			settingsSaving = false;
+		}
+	}
+
 	function parseRuleMode(mode: string | null | undefined): number {
 		if (mode === 'Disabled') return 0;
 		if (mode === 'RequiresApproval') return 1;
@@ -1650,6 +1667,21 @@
 									aria-label="Toggle member time entry visibility"
 								>
 									<span class="absolute top-[3px] {org.memberTimeEntryVisibility ? 'translate-x-[22px]' : 'translate-x-0'} left-[3px] w-5 h-5 bg-base-100 rounded-full transition-transform shadow-sm"></span>
+								</button>
+							</div>
+
+							<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
+								<div class="setting-info">
+									<div class="font-semibold text-base-content mb-0.5">Require Two-Factor Authentication</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">When enabled, all members must set up 2FA before they can use the application.</div>
+								</div>
+								<button
+									class="relative w-12 h-[26px] {org.require2fa ? 'bg-primary' : 'bg-base-300'} rounded-full border-none cursor-pointer transition-colors shrink-0 p-0"
+									onclick={toggleRequire2fa}
+									disabled={settingsSaving}
+									aria-label="Toggle require two-factor authentication"
+								>
+									<span class="absolute top-[3px] {org.require2fa ? 'translate-x-[22px]' : 'translate-x-0'} left-[3px] w-5 h-5 bg-base-100 rounded-full transition-transform shadow-sm"></span>
 								</button>
 							</div>
 						</div>

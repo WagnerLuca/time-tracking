@@ -311,6 +311,7 @@ export interface OrganizationDetailResponse {
     'joinPolicy': string | null;
     'workScheduleChangeMode': string | null;
     'memberTimeEntryVisibility'?: boolean;
+    'require2fa'?: boolean;
     'settingsUpdatedAt'?: string | null;
     'createdAt'?: string;
     'members': Array<OrganizationMemberResponse> | null;
@@ -574,6 +575,51 @@ export interface TimeEntryResponsePaginatedResponse {
     'hasMore'?: boolean;
 }
 /**
+ * Request to confirm and enable 2FA by providing a valid TOTP code.
+ */
+export interface TwoFactorConfirmRequest {
+    /**
+     * 6-digit TOTP code from the authenticator app to confirm setup.
+     */
+    'code': string;
+}
+/**
+ * Response after successfully enabling 2FA, includes one-time backup codes.
+ */
+export interface TwoFactorConfirmResponse {
+    'enabled'?: boolean;
+    /**
+     * One-time backup codes the user should store securely.
+     */
+    'backupCodes': Array<string> | null;
+}
+/**
+ * Response returned when setting up 2FA — contains the shared secret and QR URI.
+ */
+export interface TwoFactorSetupResponse {
+    /**
+     * Base32-encoded shared secret for manual entry.
+     */
+    'sharedKey': string | null;
+    /**
+     * otpauth:// URI for scanning as a QR code.
+     */
+    'authenticatorUri': string | null;
+}
+/**
+ * Request to verify a TOTP code during login.
+ */
+export interface TwoFactorVerifyRequest {
+    /**
+     * Temporary token from the login step.
+     */
+    'twoFactorToken': string;
+    /**
+     * 6-digit TOTP code from authenticator app, or a backup code.
+     */
+    'code': string;
+}
+/**
  * Request payload for updating a holiday.
  */
 export interface UpdateHolidayRequest {
@@ -610,6 +656,7 @@ export interface UpdateOrganizationSettingsRequest {
     'joinPolicy'?: RuleMode;
     'workScheduleChangeMode'?: RuleMode;
     'memberTimeEntryVisibility'?: boolean | null;
+    'require2fa'?: boolean | null;
 }
 
 
@@ -686,6 +733,7 @@ export interface UserInfo {
     'lastName': string | null;
     'profileImageUrl'?: string | null;
     'emailConfirmed'?: boolean;
+    'twoFactorEnabled'?: boolean;
 }
 /**
  * User notification: requests that have been responded to
@@ -705,6 +753,7 @@ export interface UserOrganizationResponse {
     'role': string | null;
     'joinedAt'?: string;
     'memberCount'?: number;
+    'require2fa'?: boolean;
 }
 /**
  * Work schedule defining target hours per weekday.
@@ -1119,6 +1168,154 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
     return {
         /**
          * 
+         * @summary Confirm 2FA setup by providing a valid TOTP code from the authenticator app
+         * @param {TwoFactorConfirmRequest} [twoFactorConfirmRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1Auth2faConfirmPost: async (twoFactorConfirmRequest?: TwoFactorConfirmRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Auth/2fa/confirm`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(twoFactorConfirmRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Disable 2FA for the authenticated user (requires current password)
+         * @param {ChangePasswordRequest} [changePasswordRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1Auth2faDisablePost: async (changePasswordRequest?: ChangePasswordRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Auth/2fa/disable`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(changePasswordRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Begin 2FA setup — generates a TOTP secret and returns the authenticator URI
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1Auth2faSetupPost: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Auth/2fa/setup`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Verify TOTP code to complete login when 2FA is enabled
+         * @param {TwoFactorVerifyRequest} [twoFactorVerifyRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1Auth2faVerifyPost: async (twoFactorVerifyRequest?: TwoFactorVerifyRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Auth/2fa/verify`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(twoFactorVerifyRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Delete the authenticated user\'s account and all associated data
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -1424,6 +1621,57 @@ export const AuthApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
+         * @summary Confirm 2FA setup by providing a valid TOTP code from the authenticator app
+         * @param {TwoFactorConfirmRequest} [twoFactorConfirmRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1Auth2faConfirmPost(twoFactorConfirmRequest?: TwoFactorConfirmRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<TwoFactorConfirmResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1Auth2faConfirmPost(twoFactorConfirmRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1Auth2faConfirmPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Disable 2FA for the authenticated user (requires current password)
+         * @param {ChangePasswordRequest} [changePasswordRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1Auth2faDisablePost(changePasswordRequest?: ChangePasswordRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AuthResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1Auth2faDisablePost(changePasswordRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1Auth2faDisablePost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Begin 2FA setup — generates a TOTP secret and returns the authenticator URI
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1Auth2faSetupPost(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<TwoFactorSetupResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1Auth2faSetupPost(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1Auth2faSetupPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Verify TOTP code to complete login when 2FA is enabled
+         * @param {TwoFactorVerifyRequest} [twoFactorVerifyRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1Auth2faVerifyPost(twoFactorVerifyRequest?: TwoFactorVerifyRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1Auth2faVerifyPost(twoFactorVerifyRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1Auth2faVerifyPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Delete the authenticated user\'s account and all associated data
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -1535,6 +1783,45 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
     return {
         /**
          * 
+         * @summary Confirm 2FA setup by providing a valid TOTP code from the authenticator app
+         * @param {TwoFactorConfirmRequest} [twoFactorConfirmRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1Auth2faConfirmPost(twoFactorConfirmRequest?: TwoFactorConfirmRequest, options?: RawAxiosRequestConfig): AxiosPromise<TwoFactorConfirmResponse> {
+            return localVarFp.apiV1Auth2faConfirmPost(twoFactorConfirmRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Disable 2FA for the authenticated user (requires current password)
+         * @param {ChangePasswordRequest} [changePasswordRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1Auth2faDisablePost(changePasswordRequest?: ChangePasswordRequest, options?: RawAxiosRequestConfig): AxiosPromise<AuthResponse> {
+            return localVarFp.apiV1Auth2faDisablePost(changePasswordRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Begin 2FA setup — generates a TOTP secret and returns the authenticator URI
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1Auth2faSetupPost(options?: RawAxiosRequestConfig): AxiosPromise<TwoFactorSetupResponse> {
+            return localVarFp.apiV1Auth2faSetupPost(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Verify TOTP code to complete login when 2FA is enabled
+         * @param {TwoFactorVerifyRequest} [twoFactorVerifyRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1Auth2faVerifyPost(twoFactorVerifyRequest?: TwoFactorVerifyRequest, options?: RawAxiosRequestConfig): AxiosPromise<LoginResponse> {
+            return localVarFp.apiV1Auth2faVerifyPost(twoFactorVerifyRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Delete the authenticated user\'s account and all associated data
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -1618,6 +1905,49 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
  * AuthApi - object-oriented interface
  */
 export class AuthApi extends BaseAPI {
+    /**
+     * 
+     * @summary Confirm 2FA setup by providing a valid TOTP code from the authenticator app
+     * @param {TwoFactorConfirmRequest} [twoFactorConfirmRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1Auth2faConfirmPost(twoFactorConfirmRequest?: TwoFactorConfirmRequest, options?: RawAxiosRequestConfig) {
+        return AuthApiFp(this.configuration).apiV1Auth2faConfirmPost(twoFactorConfirmRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Disable 2FA for the authenticated user (requires current password)
+     * @param {ChangePasswordRequest} [changePasswordRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1Auth2faDisablePost(changePasswordRequest?: ChangePasswordRequest, options?: RawAxiosRequestConfig) {
+        return AuthApiFp(this.configuration).apiV1Auth2faDisablePost(changePasswordRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Begin 2FA setup — generates a TOTP secret and returns the authenticator URI
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1Auth2faSetupPost(options?: RawAxiosRequestConfig) {
+        return AuthApiFp(this.configuration).apiV1Auth2faSetupPost(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Verify TOTP code to complete login when 2FA is enabled
+     * @param {TwoFactorVerifyRequest} [twoFactorVerifyRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1Auth2faVerifyPost(twoFactorVerifyRequest?: TwoFactorVerifyRequest, options?: RawAxiosRequestConfig) {
+        return AuthApiFp(this.configuration).apiV1Auth2faVerifyPost(twoFactorVerifyRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
     /**
      * 
      * @summary Delete the authenticated user\'s account and all associated data

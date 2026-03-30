@@ -23,27 +23,9 @@ const axiosInstance = axios.create({
     headers: { 'Content-Type': 'application/json' },
 });
 
-const ensureVersionedApiPath = (url?: string): string | undefined => {
-    if (!url) {
-        return url;
-    }
-
-    if (url.startsWith('/api/v')) {
-        return url;
-    }
-
-    if (url.startsWith('/api/')) {
-        return `/api/v1/${url.substring('/api/'.length)}`;
-    }
-
-    return url;
-};
-
 // Request interceptor: inject Bearer token
 axiosInstance.interceptors.request.use(
     (config) => {
-        config.url = ensureVersionedApiPath(config.url);
-
         const token = localStorage.getItem('authToken');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
@@ -85,3 +67,10 @@ export const pauseRulesApi = new PauseRulesApi(config, undefined, axiosInstance)
 export const requestsApi = new RequestsApi(config, undefined, axiosInstance);
 export const timeTrackingApi = new TimeTrackingApi(config, undefined, axiosInstance);
 export const workScheduleApi = new WorkScheduleApi(config, undefined, axiosInstance);
+
+// Type for the polymorphic 2FA-required login response (not in generated types
+// because the login endpoint declares LoginResponse as its return type).
+export interface TwoFactorRequiredResponse {
+	twoFactorToken: string;
+	requiresTwoFactor: boolean;
+}

@@ -1,4 +1,5 @@
 import { authApi } from '$lib/apiClient';
+import type { TwoFactorRequiredResponse } from '$lib/apiClient';
 import type { LoginRequest, LoginResponse, RegisterRequest, UserInfo } from '$lib/api';
 
 const TOKEN_KEY = 'authToken';
@@ -9,6 +10,8 @@ function createAuthStore() {
 	let user = $state<UserInfo | null>(null);
 	let token = $state<string | null>(null);
 	let loading = $state(true);
+	let twoFactorRequired = $state(false);
+	let twoFactorToken = $state<string | null>(null);
 
 	// Initialize from localStorage
 	function init() {
@@ -45,9 +48,30 @@ function createAuthStore() {
 		localStorage.removeItem(USER_KEY);
 	}
 
-	async function login(request: LoginRequest): Promise<void> {
+	async function login(request: LoginRequest): Promise<'success' | '2fa'> {
 		const { data } = await authApi.apiV1AuthLoginPost(request);
+		// Check if the response is a TwoFactorRequiredResponse
+		const maybeTwo = data as unknown as TwoFactorRequiredResponse;
+		if (maybeTwo.requiresTwoFactor && maybeTwo.twoFactorToken) {
+			twoFactorRequired = true;
+			twoFactorToken = maybeTwo.twoFactorToken;
+			return '2fa';
+		}
 		setAuth(data);
+		return 'success';
+	}
+
+	async function verifyTwoFactor(code: string): Promise<void> {
+		if (!twoFactorToken) throw new Error('No 2FA token available');
+		const { data } = await authApi.apiV1Auth2faVerifyPost({ twoFactorToken, code });
+		twoFactorRequired = false;
+		twoFactorToken = null;
+		setAuth(data);
+	}
+
+	function clearTwoFactor() {
+		twoFactorRequired = false;
+		twoFactorToken = null;
 	}
 
 	async function register(request: RegisterRequest): Promise<void> {
@@ -83,8 +107,11 @@ function createAuthStore() {
 		get token() { return token; },
 		get loading() { return loading; },
 		get isAuthenticated() { return !!token && !!user; },
+		get twoFactorRequired() { return twoFactorRequired; },
 		init,
 		login,
+		verifyTwoFactor,
+		clearTwoFactor,
 		register,
 		logout,
 		fetchCurrentUser

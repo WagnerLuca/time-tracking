@@ -3,7 +3,7 @@
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { goto } from '$app/navigation';
 	import { authApi, workScheduleApi } from '$lib/apiClient';
-	import type { WorkScheduleResponse, UpdateProfileRequest } from '$lib/api';
+	import type { WorkScheduleResponse, UpdateProfileRequest, TwoFactorSetupResponse } from '$lib/api';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { theme } from '$lib/stores/theme.svelte';
 
@@ -24,6 +24,16 @@
 	let profileSuccess = $state('');
 	let deleteAccountSaving = $state(false);
 	let deleteAccountError = $state('');
+
+	// Two-Factor Authentication state
+	let twoFactorStep = $state<'idle' | 'setup' | 'confirm' | 'backup'>('idle');
+	let twoFactorSetup = $state<TwoFactorSetupResponse | null>(null);
+	let twoFactorConfirmCode = $state('');
+	let twoFactorBackupCodes = $state<string[]>([]);
+	let twoFactorError = $state('');
+	let twoFactorSuccess = $state('');
+	let twoFactorSaving = $state(false);
+	let twoFactorDisablePassword = $state('');
 
 	// Schedule periods state
 	let currentSchedule = $state<WorkScheduleResponse | null>(null);
@@ -285,6 +295,76 @@
 		}
 	}
 
+	async function handleSetup2FA() {
+		twoFactorError = '';
+		twoFactorSaving = true;
+		try {
+			const { data } = await authApi.apiV1Auth2faSetupPost();
+			twoFactorSetup = data;
+			twoFactorStep = 'setup';
+		} catch (err) {
+			twoFactorError = extractErrorMessage(err, 'Failed to start 2FA setup.');
+		} finally {
+			twoFactorSaving = false;
+		}
+	}
+
+	async function handleConfirm2FA() {
+		if (!twoFactorConfirmCode || twoFactorConfirmCode.length !== 6) {
+			twoFactorError = 'Please enter a 6-digit code.';
+			return;
+		}
+		twoFactorError = '';
+		twoFactorSaving = true;
+		try {
+			const { data } = await authApi.apiV1Auth2faConfirmPost({ code: twoFactorConfirmCode });
+			twoFactorBackupCodes = data.backupCodes ?? [];
+			twoFactorStep = 'backup';
+			twoFactorConfirmCode = '';
+			await auth.fetchCurrentUser();
+		} catch (err) {
+			twoFactorError = extractErrorMessage(err, 'Invalid code. Please try again.');
+		} finally {
+			twoFactorSaving = false;
+		}
+	}
+
+	function handleFinish2FASetup() {
+		twoFactorStep = 'idle';
+		twoFactorSetup = null;
+		twoFactorBackupCodes = [];
+		twoFactorSuccess = 'Two-factor authentication is now enabled.';
+		setTimeout(() => (twoFactorSuccess = ''), 5000);
+	}
+
+	async function handleDisable2FA() {
+		if (!twoFactorDisablePassword) {
+			twoFactorError = 'Password is required to disable 2FA.';
+			return;
+		}
+		twoFactorError = '';
+		twoFactorSaving = true;
+		try {
+			await authApi.apiV1Auth2faDisablePost({ currentPassword: twoFactorDisablePassword, newPassword: twoFactorDisablePassword });
+			twoFactorDisablePassword = '';
+			twoFactorSuccess = 'Two-factor authentication has been disabled.';
+			setTimeout(() => (twoFactorSuccess = ''), 5000);
+			await auth.fetchCurrentUser();
+		} catch (err) {
+			twoFactorError = extractErrorMessage(err, 'Failed to disable 2FA.');
+		} finally {
+			twoFactorSaving = false;
+		}
+	}
+
+	function cancelSetup2FA() {
+		twoFactorStep = 'idle';
+		twoFactorSetup = null;
+		twoFactorConfirmCode = '';
+		twoFactorBackupCodes = [];
+		twoFactorError = '';
+	}
+
 	async function handleLogout() {
 		await auth.logout();
 		goto('/login');
@@ -403,6 +483,105 @@
 				<button class="btn btn-primary btn-sm" onclick={handleChangePassword} disabled={saving}>
 					{saving ? 'Saving...' : 'Change Password'}
 				</button>
+			</div>
+		</section>
+
+		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
+			<div class="card-body">
+				<h2 class="card-title text-base">Two-Factor Authentication</h2>
+
+				{#if twoFactorError}
+					<div class="alert alert-error text-sm mb-4">{twoFactorError}</div>
+				{/if}
+				{#if twoFactorSuccess}
+					<div class="alert alert-success text-sm mb-4">{twoFactorSuccess}</div>
+				{/if}
+
+				{#if twoFactorStep === 'idle'}
+					{#if auth.user?.twoFactorEnabled}
+						<div class="flex items-center gap-2 mb-4">
+							<span class="badge badge-success badge-sm">Enabled</span>
+							<span class="text-sm text-base-content/60">Two-factor authentication is active on your account.</span>
+						</div>
+						<p class="text-sm text-base-content/60 mb-3">To disable 2FA, enter your password below.</p>
+						<div class="flex gap-2 items-end">
+							<div>
+								<label for="disable2faPassword" class="block text-sm font-medium text-base-content/80 mb-1.5">Password</label>
+								<input
+									id="disable2faPassword"
+									type="password"
+									bind:value={twoFactorDisablePassword}
+									class="input input-bordered input-sm w-full max-w-xs"
+									placeholder="Your current password"
+								/>
+							</div>
+							<button class="btn btn-error btn-sm" onclick={handleDisable2FA} disabled={twoFactorSaving || !twoFactorDisablePassword}>
+								{twoFactorSaving ? 'Disabling...' : 'Disable 2FA'}
+							</button>
+						</div>
+					{:else}
+						<p class="text-sm text-base-content/60 mb-3">Add an extra layer of security to your account using an authenticator app (e.g. Google Authenticator, Authy).</p>
+						<button class="btn btn-primary btn-sm" onclick={handleSetup2FA} disabled={twoFactorSaving}>
+							{twoFactorSaving ? 'Setting up...' : 'Set Up 2FA'}
+						</button>
+					{/if}
+				{:else if twoFactorStep === 'setup'}
+					<p class="text-sm text-base-content/60 mb-4">Scan this QR code with your authenticator app or enter the key manually.</p>
+
+					{#if twoFactorSetup}
+						<div class="flex flex-col items-center gap-4 mb-4 p-4 bg-base-200/50 rounded-lg border border-base-300">
+							<div class="bg-white p-3 rounded-lg">
+								<img
+										src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={encodeURIComponent(twoFactorSetup.authenticatorUri ?? '')}"
+									alt="2FA QR Code"
+									width="200"
+									height="200"
+									class="block"
+								/>
+							</div>
+							<div class="text-center">
+								<p class="text-xs text-base-content/50 mb-1">Or enter this key manually:</p>
+								<code class="text-sm font-mono bg-base-300 px-3 py-1.5 rounded select-all">{twoFactorSetup.sharedKey}</code>
+							</div>
+						</div>
+
+						<p class="text-sm text-base-content/60 mb-3">Enter the 6-digit code from your authenticator app to confirm:</p>
+						<div class="flex gap-2 items-end">
+							<div>
+								<label for="confirm2faCode" class="block text-sm font-medium text-base-content/80 mb-1.5">Verification Code</label>
+								<input
+									id="confirm2faCode"
+									type="text"
+									inputmode="numeric"
+									autocomplete="one-time-code"
+									bind:value={twoFactorConfirmCode}
+									class="input input-bordered input-sm w-[160px] text-center tracking-[0.2em] font-mono"
+									placeholder="000000"
+									maxlength="6"
+								/>
+							</div>
+							<button class="btn btn-primary btn-sm" onclick={handleConfirm2FA} disabled={twoFactorSaving || twoFactorConfirmCode.length !== 6}>
+								{twoFactorSaving ? 'Verifying...' : 'Verify & Enable'}
+							</button>
+						</div>
+					{/if}
+
+					<button type="button" class="btn btn-ghost btn-sm mt-3" onclick={cancelSetup2FA}>Cancel</button>
+				{:else if twoFactorStep === 'backup'}
+					<div class="alert alert-warning text-sm mb-4">
+						<span>Save these backup codes in a safe place. Each code can only be used once. You will not see them again.</span>
+					</div>
+
+					<div class="grid grid-cols-2 gap-2 mb-4 p-4 bg-base-200/50 rounded-lg border border-base-300 max-w-xs">
+						{#each twoFactorBackupCodes as code}
+							<code class="text-sm font-mono text-center py-1">{code}</code>
+						{/each}
+					</div>
+
+					<button class="btn btn-primary btn-sm" onclick={handleFinish2FASetup}>
+						I've saved my backup codes
+					</button>
+				{/if}
 			</div>
 		</section>
 

@@ -52,6 +52,10 @@ docs/TimeEntryResponse.md
 docs/TimeEntryResponsePaginatedResponse.md
 docs/TimeTrackingApi.md
 docs/TimeTrackingApiApi.md
+docs/TwoFactorConfirmRequest.md
+docs/TwoFactorConfirmResponse.md
+docs/TwoFactorSetupResponse.md
+docs/TwoFactorVerifyRequest.md
 docs/UpdateHolidayRequest.md
 docs/UpdateMemberRoleRequest.md
 docs/UpdateOrganizationRequest.md

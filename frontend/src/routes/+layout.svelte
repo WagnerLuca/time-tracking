@@ -26,6 +26,15 @@
 	let userNotifRequests = $state<OrgRequestResponse[]>([]);
 	let totalNotifCount = $derived(pendingCount + userNotifCount);
 
+	// 2FA enforcement: check if selected org requires 2FA but user hasn't set it up
+	let requires2faSetup = $derived(() => {
+		if (!auth.isAuthenticated || !auth.user) return false;
+		if (auth.user.twoFactorEnabled) return false;
+		const selectedOrg = orgContext.selectedOrg;
+		if (!selectedOrg) return false;
+		return selectedOrg.require2fa === true;
+	});
+
 	onMount(() => {
 		auth.init();
 		orgContext.init();
@@ -347,7 +356,24 @@
 	{/if}
 
 	<main class="max-w-5xl mx-auto px-6 py-8">
-		{@render children?.()}
+		{#if requires2faSetup() && !$page.url.pathname.startsWith('/settings')}
+			<div class="flex items-center justify-center min-h-[60vh]">
+				<div class="card bg-base-100 border border-warning shadow-lg w-full max-w-md">
+					<div class="card-body text-center">
+						<div class="text-4xl mb-3">🔐</div>
+						<h2 class="card-title justify-center text-lg">Two-Factor Authentication Required</h2>
+						<p class="text-sm text-base-content/60 mt-2">
+							Your organization requires two-factor authentication. Please set up 2FA in your account settings to continue.
+						</p>
+						<div class="mt-4">
+							<a href="/settings" class="btn btn-primary">Go to Settings</a>
+						</div>
+					</div>
+				</div>
+			</div>
+		{:else}
+			{@render children?.()}
+		{/if}
 	</main>
 {:else}
 	{@render children?.()}
