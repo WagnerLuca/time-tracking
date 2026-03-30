@@ -165,10 +165,11 @@ public class TimeTrackingService : ITimeTrackingService
                 .AsNoTracking()
                 .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId);
 
-            if (org != null && org.EditPastEntriesMode == RuleMode.Disabled)
-                return ServiceResult.Forbidden<TimeEntryResponse>("Editing past entries is disabled in this organization.");
-            if (org != null && org.EditPastEntriesMode == RuleMode.RequiresApproval)
-                return ServiceResult.Forbidden<TimeEntryResponse>("Editing past entries requires admin approval in this organization. Please submit a request.");
+            if (org != null)
+            {
+                var check = OrgRuleHelper.EnforceAllowed<TimeEntryResponse>(org.EditPastEntriesMode, "Editing past entries");
+                if (check != null) return check;
+            }
         }
 
         if (request.StartTime.HasValue)  entry.StartTime = request.StartTime.Value;
@@ -209,10 +210,11 @@ public class TimeTrackingService : ITimeTrackingService
                 var pauseOrg = await _context.Organizations
                     .AsNoTracking()
                     .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId);
-                if (pauseOrg != null && pauseOrg.EditPauseMode == RuleMode.Disabled)
-                    return ServiceResult.Forbidden<TimeEntryResponse>("Editing pause duration is disabled in this organization.");
-                if (pauseOrg != null && pauseOrg.EditPauseMode == RuleMode.RequiresApproval)
-                    return ServiceResult.Forbidden<TimeEntryResponse>("Editing pause duration requires admin approval in this organization. Please submit a request.");
+                if (pauseOrg != null)
+                {
+                    var check = OrgRuleHelper.EnforceAllowed<TimeEntryResponse>(pauseOrg.EditPauseMode, "Editing pause duration");
+                    if (check != null) return check;
+                }
             }
             entry.PauseDurationMinutes = Math.Max(0, request.PauseDurationMinutes.Value);
         }

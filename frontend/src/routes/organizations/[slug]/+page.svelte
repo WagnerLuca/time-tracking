@@ -6,6 +6,10 @@
 	import { organizationsApi, pauseRulesApi, workScheduleApi, requestsApi, holidayApi, absenceDayApi, notificationsApi } from '$lib/apiClient';
 	import { formatRequestType, formatTimeAgo, statusBadgeClass, parseRequestData, absenceTypeLabel, absenceTypeBadge } from '$lib/utils/formatters';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
+	import {
+		parseRuleMode, ruleModeLabel, joinPolicyLabel, ruleModeButtonClass,
+		ruleSettings, toggleSettings
+	} from '$lib/utils/orgRules';
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationRequest,
@@ -436,15 +440,14 @@
 	let settingsSaving = $state(false);
 	let settingsError = $state('');
 
-	async function toggleAutoPause() {
+	async function cycleSetting(key: string) {
 		if (!org) return;
 		settingsSaving = true;
 		settingsError = '';
 		try {
-			const payload: UpdateOrganizationSettingsRequest = {
-				autoPauseEnabled: !org.autoPauseEnabled
-			};
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
+			const current = parseRuleMode((org as Record<string, any>)[key]);
+			const next = ((current + 1) % 3) as RuleMode;
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { [key]: next } as UpdateOrganizationSettingsRequest);
 			await reloadOrg();
 		} catch (err) {
 			settingsError = extractErrorMessage(err, 'Failed to update setting.');
@@ -453,126 +456,19 @@
 		}
 	}
 
-	async function cycleEditPastEntriesMode() {
+	async function toggleSetting(key: string) {
 		if (!org) return;
 		settingsSaving = true;
 		settingsError = '';
 		try {
-			const modes: RuleMode[] = [0, 1, 2]; // Disabled, RequiresApproval, Allowed
-			const current = parseRuleMode(org.editPastEntriesMode);
-			const next = modes[(current + 1) % 3] as RuleMode;
-			const payload: UpdateOrganizationSettingsRequest = {
-				editPastEntriesMode: next
-			};
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
+			const current = (org as Record<string, any>)[key];
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { [key]: !current } as UpdateOrganizationSettingsRequest);
 			await reloadOrg();
 		} catch (err) {
 			settingsError = extractErrorMessage(err, 'Failed to update setting.');
 		} finally {
 			settingsSaving = false;
 		}
-	}
-
-	async function cycleEditPauseMode() {
-		if (!org) return;
-		settingsSaving = true;
-		settingsError = '';
-		try {
-			const modes: RuleMode[] = [0, 1, 2];
-			const current = parseRuleMode(org.editPauseMode);
-			const next = modes[(current + 1) % 3] as RuleMode;
-			const payload: UpdateOrganizationSettingsRequest = {
-				editPauseMode: next
-			};
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
-			await reloadOrg();
-		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to update setting.');
-		} finally {
-			settingsSaving = false;
-		}
-	}
-
-	async function cycleInitialOvertimeMode() {
-		if (!org) return;
-		settingsSaving = true;
-		settingsError = '';
-		try {
-			const modes: RuleMode[] = [0, 1, 2];
-			const current = parseRuleMode(org.initialOvertimeMode);
-			const next = modes[(current + 1) % 3] as RuleMode;
-			const payload: UpdateOrganizationSettingsRequest = {
-				initialOvertimeMode: next
-			};
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
-			await reloadOrg();
-		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to update setting.');
-		} finally {
-			settingsSaving = false;
-		}
-	}
-
-	async function cycleJoinPolicy() {
-		if (!org) return;
-		settingsSaving = true;
-		settingsError = '';
-		try {
-			const modes: RuleMode[] = [0, 1, 2];
-			const current = parseRuleMode(org.joinPolicy);
-			const next = modes[(current + 1) % 3] as RuleMode;
-			const payload: UpdateOrganizationSettingsRequest = {
-				joinPolicy: next
-			};
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
-			await reloadOrg();
-		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to update setting.');
-		} finally {
-			settingsSaving = false;
-		}
-	}
-
-	async function toggleRequire2fa() {
-		if (!org) return;
-		settingsSaving = true;
-		settingsError = '';
-		try {
-			const payload: UpdateOrganizationSettingsRequest = {
-				require2fa: !org.require2fa
-			};
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
-			await reloadOrg();
-		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to update setting.');
-		} finally {
-			settingsSaving = false;
-		}
-	}
-
-	function parseRuleMode(mode: string | null | undefined): number {
-		if (mode === 'Disabled') return 0;
-		if (mode === 'RequiresApproval') return 1;
-		if (mode === 'Allowed') return 2;
-		return 2; // default to Allowed
-	}
-
-	function ruleModeLabel(mode: string | null | undefined): string {
-		if (mode === 'Disabled') return 'Disabled';
-		if (mode === 'RequiresApproval') return 'Requires Approval';
-		return 'Allowed';
-	}
-
-	function joinPolicyLabel(mode: string | null | undefined): string {
-		if (mode === 'Disabled') return 'Admin Only';
-		if (mode === 'RequiresApproval') return 'Requires Approval';
-		return 'Open';
-	}
-
-	function ruleModeColor(mode: string | null | undefined): string {
-		if (mode === 'Disabled') return 'mode-disabled';
-		if (mode === 'RequiresApproval') return 'mode-approval';
-		return 'mode-allowed';
 	}
 
 	// Pause Rules
@@ -956,42 +852,10 @@
 		}
 	}
 
-	// Settings: cycle work schedule change mode
-	async function cycleWorkScheduleChangeMode() {
-		if (!org) return;
-		settingsSaving = true;
-		settingsError = '';
-		try {
-			const modes: RuleMode[] = [0, 1, 2];
-			const current = parseRuleMode(org.workScheduleChangeMode);
-			const next = modes[(current + 1) % 3] as RuleMode;
-			const payload: UpdateOrganizationSettingsRequest = {
-				workScheduleChangeMode: next
-			};
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
-			await reloadOrg();
-		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to update setting.');
-		} finally {
-			settingsSaving = false;
-		}
-	}
+	// Settings: cycle work schedule change mode — handled by generic cycleSetting now
 
 	async function toggleMemberTimeEntryVisibility() {
-		if (!org) return;
-		settingsSaving = true;
-		settingsError = '';
-		try {
-			const payload: UpdateOrganizationSettingsRequest = {
-				memberTimeEntryVisibility: !org.memberTimeEntryVisibility
-			};
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, payload);
-			await reloadOrg();
-		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to update setting.');
-		} finally {
-			settingsSaving = false;
-		}
+		await toggleSetting('memberTimeEntryVisibility');
 	}
 
 	async function importHolidays() {
@@ -1570,120 +1434,43 @@
 						{/if}
 
 						<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-							<div class="flex items-center justify-between p-4 border-b border-base-200">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Auto-Pause Tracking</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Automatically deduct break time from tracked hours based on configurable rules.</div>
+							<!-- Toggle settings (booleans) -->
+							{#each toggleSettings as ts}
+								{@const value = (org as Record<string, any>)[ts.key]}
+								<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
+									<div class="setting-info">
+										<div class="font-semibold text-base-content mb-0.5">{ts.label}</div>
+										<div class="text-sm text-base-content/60 max-w-[400px]">{ts.description}</div>
+									</div>
+									<button
+										class="relative w-12 h-[26px] {value ? 'bg-primary' : 'bg-base-300'} rounded-full border-none cursor-pointer transition-colors shrink-0 p-0"
+										onclick={() => toggleSetting(ts.key)}
+										disabled={settingsSaving}
+										aria-label="Toggle {ts.label}"
+									>
+										<span class="absolute top-[3px] {value ? 'translate-x-[22px]' : 'translate-x-0'} left-[3px] w-5 h-5 bg-base-100 rounded-full transition-transform shadow-sm"></span>
+									</button>
 								</div>
-								<button
-									class="relative w-12 h-[26px] {org.autoPauseEnabled ? 'bg-primary' : 'bg-base-300'} rounded-full border-none cursor-pointer transition-colors shrink-0 p-0"
-									onclick={toggleAutoPause}
-									disabled={settingsSaving}
-									aria-label="Toggle auto-pause"
-								>
-									<span class="absolute top-[3px] {org.autoPauseEnabled ? 'translate-x-[22px]' : 'translate-x-0'} left-[3px] w-5 h-5 bg-base-100 rounded-full transition-transform shadow-sm"></span>
-								</button>
-							</div>
+							{/each}
 
-							<div class="flex items-center justify-between p-4 border-b border-base-200">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Edit Past Entries</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can edit start/end times of completed time entries.</div>
+							<!-- Rule mode settings (tri-state cycle) -->
+							{#each ruleSettings as rs}
+								{@const mode = (org as Record<string, any>)[rs.key] as string | null}
+								{@const label = rs.labelFn ? rs.labelFn(mode) : ruleModeLabel(mode)}
+								<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
+									<div class="setting-info">
+										<div class="font-semibold text-base-content mb-0.5">{rs.label}</div>
+										<div class="text-sm text-base-content/60 max-w-[400px]">{rs.description}</div>
+									</div>
+									<button
+										class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeButtonClass(mode)}"
+										onclick={() => cycleSetting(rs.key)}
+										disabled={settingsSaving}
+									>
+										{label}
+									</button>
 								</div>
-								<button
-									class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeColor(org.editPastEntriesMode) === 'mode-allowed' ? 'btn-success' : ruleModeColor(org.editPastEntriesMode) === 'mode-approval' ? 'btn-warning' : 'btn-neutral'}"
-									onclick={cycleEditPastEntriesMode}
-									disabled={settingsSaving}
-								>
-									{ruleModeLabel(org.editPastEntriesMode)}
-								</button>
-							</div>
-
-							<div class="flex items-center justify-between p-4 border-b border-base-200">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Edit Pause Duration</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can override auto-deducted break time.</div>
-								</div>
-								<button
-									class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeColor(org.editPauseMode) === 'mode-allowed' ? 'btn-success' : ruleModeColor(org.editPauseMode) === 'mode-approval' ? 'btn-warning' : 'btn-neutral'}"
-									onclick={cycleEditPauseMode}
-									disabled={settingsSaving}
-								>
-									{ruleModeLabel(org.editPauseMode)}
-								</button>
-							</div>
-
-							<div class="flex items-center justify-between p-4 border-b border-base-200">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Initial Overtime</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can set their own initial overtime balance.</div>
-								</div>
-								<button
-									class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeColor(org.initialOvertimeMode) === 'mode-allowed' ? 'btn-success' : ruleModeColor(org.initialOvertimeMode) === 'mode-approval' ? 'btn-warning' : 'btn-neutral'}"
-									onclick={cycleInitialOvertimeMode}
-									disabled={settingsSaving}
-								>
-									{ruleModeLabel(org.initialOvertimeMode)}
-								</button>
-							</div>
-
-							<div class="flex items-center justify-between p-4 border-b border-base-200">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Join Policy</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Control how new members can join the organization.</div>
-								</div>
-								<button
-									class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeColor(org.joinPolicy) === 'mode-allowed' ? 'btn-success' : ruleModeColor(org.joinPolicy) === 'mode-approval' ? 'btn-warning' : 'btn-neutral'}"
-									onclick={cycleJoinPolicy}
-									disabled={settingsSaving}
-								>
-									{joinPolicyLabel(org.joinPolicy)}
-								</button>
-							</div>
-
-							<div class="flex items-center justify-between p-4 border-b border-base-200">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Schedule Periods</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can create/modify their own schedule periods.</div>
-								</div>
-								<button
-									class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeColor(org.workScheduleChangeMode) === 'mode-allowed' ? 'btn-success' : ruleModeColor(org.workScheduleChangeMode) === 'mode-approval' ? 'btn-warning' : 'btn-neutral'}"
-									onclick={cycleWorkScheduleChangeMode}
-									disabled={settingsSaving}
-								>
-									{ruleModeLabel(org.workScheduleChangeMode)}
-								</button>
-							</div>
-
-							<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Member Time Visibility</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">When enabled, admins can view members' tracked working hours. Members will see a notification about this.</div>
-								</div>
-								<button
-									class="relative w-12 h-[26px] {org.memberTimeEntryVisibility ? 'bg-primary' : 'bg-base-300'} rounded-full border-none cursor-pointer transition-colors shrink-0 p-0"
-									onclick={toggleMemberTimeEntryVisibility}
-									disabled={settingsSaving}
-									aria-label="Toggle member time entry visibility"
-								>
-									<span class="absolute top-[3px] {org.memberTimeEntryVisibility ? 'translate-x-[22px]' : 'translate-x-0'} left-[3px] w-5 h-5 bg-base-100 rounded-full transition-transform shadow-sm"></span>
-								</button>
-							</div>
-
-							<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Require Two-Factor Authentication</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">When enabled, all members must set up 2FA before they can use the application.</div>
-								</div>
-								<button
-									class="relative w-12 h-[26px] {org.require2fa ? 'bg-primary' : 'bg-base-300'} rounded-full border-none cursor-pointer transition-colors shrink-0 p-0"
-									onclick={toggleRequire2fa}
-									disabled={settingsSaving}
-									aria-label="Toggle require two-factor authentication"
-								>
-									<span class="absolute top-[3px] {org.require2fa ? 'translate-x-[22px]' : 'translate-x-0'} left-[3px] w-5 h-5 bg-base-100 rounded-full transition-transform shadow-sm"></span>
-								</button>
-							</div>
+							{/each}
 						</div>
 
 						<!-- Pause Rules -->
@@ -1852,61 +1639,30 @@
 						<h2 class="text-xl text-base-content/70 mb-4">Organization Rules</h2>
 
 						<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-							<div class="flex items-center justify-between p-4 border-b border-base-200">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Auto-Pause Tracking</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Automatically deduct break time from tracked hours based on configurable rules.</div>
+							<!-- Toggle settings (read-only) -->
+							{#each toggleSettings as ts}
+								{@const value = (org as Record<string, any>)[ts.key]}
+								<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
+									<div class="setting-info">
+										<div class="font-semibold text-base-content mb-0.5">{ts.label}</div>
+										<div class="text-sm text-base-content/60 max-w-[400px]">{ts.description}</div>
+									</div>
+									<span class="badge {value ? 'badge-success' : 'badge-ghost'}">{value ? 'On' : 'Off'}</span>
 								</div>
-								<span class="badge {org.autoPauseEnabled ? 'badge-success' : 'badge-ghost'}">{org.autoPauseEnabled ? 'On' : 'Off'}</span>
-							</div>
+							{/each}
 
-							<div class="flex items-center justify-between p-4 border-b border-base-200">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Edit Past Entries</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can edit start/end times of completed time entries.</div>
+							<!-- Rule mode settings (read-only) -->
+							{#each ruleSettings as rs}
+								{@const mode = (org as Record<string, any>)[rs.key] as string | null}
+								{@const label = rs.labelFn ? rs.labelFn(mode) : ruleModeLabel(mode)}
+								<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
+									<div class="setting-info">
+										<div class="font-semibold text-base-content mb-0.5">{rs.label}</div>
+										<div class="text-sm text-base-content/60 max-w-[400px]">{rs.description}</div>
+									</div>
+									<span class="badge {ruleModeButtonClass(mode)}">{label}</span>
 								</div>
-								<span class="badge {ruleModeColor(org.editPastEntriesMode) === 'mode-allowed' ? 'badge-success' : ruleModeColor(org.editPastEntriesMode) === 'mode-approval' ? 'badge-warning' : 'badge-neutral'}">{ruleModeLabel(org.editPastEntriesMode)}</span>
-							</div>
-
-							<div class="flex items-center justify-between p-4 border-b border-base-200">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Edit Pause Duration</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can override auto-deducted break time.</div>
-								</div>
-								<span class="badge {ruleModeColor(org.editPauseMode) === 'mode-allowed' ? 'badge-success' : ruleModeColor(org.editPauseMode) === 'mode-approval' ? 'badge-warning' : 'badge-neutral'}">{ruleModeLabel(org.editPauseMode)}</span>
-							</div>
-
-							<div class="flex items-center justify-between p-4 border-b border-base-200">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Initial Overtime</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can set their own initial overtime balance.</div>
-								</div>
-								<span class="badge {ruleModeColor(org.initialOvertimeMode) === 'mode-allowed' ? 'badge-success' : ruleModeColor(org.initialOvertimeMode) === 'mode-approval' ? 'badge-warning' : 'badge-neutral'}">{ruleModeLabel(org.initialOvertimeMode)}</span>
-							</div>
-
-							<div class="flex items-center justify-between p-4 border-b border-base-200">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Join Policy</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Control how new members can join the organization.</div>
-								</div>
-								<span class="badge {ruleModeColor(org.joinPolicy) === 'mode-allowed' ? 'badge-success' : ruleModeColor(org.joinPolicy) === 'mode-approval' ? 'badge-warning' : 'badge-neutral'}">{joinPolicyLabel(org.joinPolicy)}</span>
-							</div>
-
-							<div class="flex items-center justify-between p-4 border-b border-base-200">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Schedule Periods</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Control whether members can create/modify their own schedule periods.</div>
-								</div>
-								<span class="badge {ruleModeColor(org.workScheduleChangeMode) === 'mode-allowed' ? 'badge-success' : ruleModeColor(org.workScheduleChangeMode) === 'mode-approval' ? 'badge-warning' : 'badge-neutral'}">{ruleModeLabel(org.workScheduleChangeMode)}</span>
-							</div>
-
-							<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Member Time Visibility</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Whether admins can view members' tracked working hours.</div>
-								</div>
-								<span class="badge {org.memberTimeEntryVisibility ? 'badge-success' : 'badge-ghost'}">{org.memberTimeEntryVisibility ? 'On' : 'Off'}</span>
-							</div>
+							{/each}
 						</div>
 
 						{#if org.autoPauseEnabled}

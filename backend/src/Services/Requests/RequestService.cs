@@ -78,14 +78,7 @@ public class RequestService : IRequestService
             if (!isMember)
                 return ServiceResult.BadRequest<OrgRequestResponse>("You must be a member of this organization.");
 
-            var ruleMode = request.Type switch
-            {
-                RequestType.EditPastEntry => org.EditPastEntriesMode,
-                RequestType.EditPause => org.EditPauseMode,
-                RequestType.SetInitialOvertime => org.InitialOvertimeMode,
-                RequestType.WorkScheduleChange => org.WorkScheduleChangeMode,
-                _ => RuleMode.Allowed
-            };
+            var ruleMode = OrgRuleHelper.GetRuleMode(org, request.Type);
 
             if (ruleMode == RuleMode.Disabled)
                 return ServiceResult.BadRequest<OrgRequestResponse>("This feature is disabled for this organization.");

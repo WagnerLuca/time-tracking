@@ -9,6 +9,7 @@
 	import { dateKey, toLocalDateTimeInput } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, getHeatColor } from '$lib/utils/scheduleHelpers';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import { canEditEntries, canRequestEditEntries, canEditPause, canRequestEditPause } from '$lib/utils/orgRules';
 
 	// View mode
 	let viewMode = $state<'month' | 'year'>('month');
@@ -359,7 +360,7 @@
 			if (editStartTime) payload.startTime = new Date(editStartTime).toISOString();
 			if (editEndTime) payload.endTime = new Date(editEndTime).toISOString();
 			payload.description = editDescription.trim() || undefined;
-			if (orgDetail?.editPauseMode === 'Allowed') {
+			if (canEditPause(orgDetail)) {
 				payload.pauseDurationMinutes = Math.max(0, Number(editPause) || 0);
 			}
 			await timeTrackingApi.apiV1TimeTrackingIdPut(entryId, payload);
@@ -822,7 +823,7 @@
 													<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Note</label>
 													<input class="input input-bordered input-sm w-full" type="text" bind:value={editDescription} placeholder="Optional note" disabled={editSaving} />
 												</div>
-												{#if orgDetail?.editPauseMode === 'Allowed'}
+												{#if canEditPause(orgDetail)}
 													<div class="flex flex-col gap-1">
 														<!-- svelte-ignore a11y_label_has_associated_control -->
 														<label class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Pause (min)</label>
@@ -850,16 +851,16 @@
 												<!-- Pause display -->
 												<div class="flex flex-wrap gap-1 mt-1">
 													{#if (entry.pauseDurationMinutes ?? 0) > 0}
-														{#if orgDetail?.editPauseMode === 'Allowed' && !entry.isRunning}
+														{#if canEditPause(orgDetail) && !entry.isRunning}
 															<button class="badge badge-warning badge-sm badge-outline cursor-pointer hover:bg-warning/20" title="Click to edit pause" onclick={() => startEditEntry(entry)}>&#8722;{entry.pauseDurationMinutes}m pause &#9998;</button>
-														{:else if orgDetail?.editPauseMode === 'RequiresApproval' && !entry.isRunning}
+														{:else if canRequestEditPause(orgDetail) && !entry.isRunning}
 															<button class="badge badge-warning badge-sm badge-outline border-dashed border-warning cursor-pointer hover:bg-warning/10" title="Request pause edit" onclick={() => startRequest(entry.id!, 'pause')}>&#8722;{entry.pauseDurationMinutes}m pause &#128233;</button>
 														{:else}
 															<span class="badge badge-warning badge-sm badge-outline">&#8722;{entry.pauseDurationMinutes}m pause</span>
 														{/if}
-													{:else if orgDetail?.editPauseMode === 'Allowed' && !entry.isRunning}
+													{:else if canEditPause(orgDetail) && !entry.isRunning}
 														<button class="badge badge-ghost badge-sm cursor-pointer hover:badge-warning hover:badge-outline" title="Click to add pause" onclick={() => startEditEntry(entry)}>+pause &#9998;</button>
-													{:else if orgDetail?.editPauseMode === 'RequiresApproval' && !entry.isRunning}
+													{:else if canRequestEditPause(orgDetail) && !entry.isRunning}
 														<button class="badge badge-ghost badge-sm cursor-pointer border-dashed border-warning hover:bg-warning/10" title="Request to add pause" onclick={() => startRequest(entry.id!, 'pause')}>+pause &#128233;</button>
 													{/if}
 												</div>
@@ -871,9 +872,9 @@
 												<!-- Edit / Delete buttons -->
 												{#if !entry.isRunning}
 													<div class="flex gap-0.5 ml-1">
-														{#if orgDetail?.editPastEntriesMode === 'Allowed'}
+														{#if canEditEntries(orgDetail)}
 															<button class="btn btn-ghost btn-xs text-primary opacity-40 hover:opacity-100" title="Edit" onclick={() => startEditEntry(entry)}>&#9998;</button>
-														{:else if orgDetail?.editPastEntriesMode === 'RequiresApproval'}
+														{:else if canRequestEditEntries(orgDetail)}
 															<button class="btn btn-ghost btn-xs text-warning opacity-50 hover:opacity-100" title="Request edit" onclick={() => startRequest(entry.id!, 'edit')}>&#128233;</button>
 														{/if}
 														<button class="btn btn-ghost btn-xs text-error opacity-40 hover:opacity-100" title="Delete" onclick={() => deleteEntry(entry.id!)}>&times;</button>
