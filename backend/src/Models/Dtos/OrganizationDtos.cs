@@ -32,6 +32,7 @@ public record OrganizationDetailResponse
     public required string JoinPolicy { get; init; }
     public required string WorkScheduleChangeMode { get; init; }
     public bool MemberTimeEntryVisibility { get; init; }
+    public bool Require2fa { get; init; }
     public DateTime? SettingsUpdatedAt { get; init; }
     public DateTime CreatedAt { get; init; }
     public required List<OrganizationMemberResponse> Members { get; init; }
@@ -61,6 +62,7 @@ public record UserOrganizationResponse
     public required string Role { get; init; }
     public DateTime JoinedAt { get; init; }
     public int MemberCount { get; init; }
+    public bool Require2fa { get; init; }
 }
 
 /// <summary>Request payload for creating a new organization.</summary>
@@ -127,6 +129,7 @@ public record UpdateOrganizationSettingsRequest
     public RuleMode? JoinPolicy { get; init; }
     public RuleMode? WorkScheduleChangeMode { get; init; }
     public bool? MemberTimeEntryVisibility { get; init; }
+    public bool? Require2fa { get; init; }
 }
 
 /// <summary>Automatic pause rule (deduct X minutes after Y hours worked).</summary>

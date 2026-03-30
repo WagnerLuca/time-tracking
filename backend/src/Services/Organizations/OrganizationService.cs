@@ -78,6 +78,7 @@ public class OrganizationService : IOrganizationService
                 JoinPolicy = o.JoinPolicy.ToString(),
                 WorkScheduleChangeMode = o.WorkScheduleChangeMode.ToString(),
                 MemberTimeEntryVisibility = o.MemberTimeEntryVisibility,
+                Require2fa = o.Require2fa,
                 SettingsUpdatedAt = o.SettingsUpdatedAt,
                 CreatedAt = o.CreatedAt,
                 Members = o.UserOrganizations
@@ -131,7 +132,8 @@ public class OrganizationService : IOrganizationService
                 Slug = uo.Organization.Slug,
                 Role = uo.Role.ToString(),
                 JoinedAt = uo.JoinedAt,
-                MemberCount = uo.Organization.UserOrganizations.Count()
+                MemberCount = uo.Organization.UserOrganizations.Count(),
+                Require2fa = uo.Organization.Require2fa
             })
             .ToListAsync();
 
@@ -432,6 +434,7 @@ public class OrganizationService : IOrganizationService
         if (request.JoinPolicy.HasValue)          org.JoinPolicy = request.JoinPolicy.Value;
         if (request.WorkScheduleChangeMode.HasValue) org.WorkScheduleChangeMode = request.WorkScheduleChangeMode.Value;
         if (request.MemberTimeEntryVisibility.HasValue) org.MemberTimeEntryVisibility = request.MemberTimeEntryVisibility.Value;
+        if (request.Require2fa.HasValue) org.Require2fa = request.Require2fa.Value;
 
         org.UpdatedAt = DateTime.UtcNow;
         org.SettingsUpdatedAt = DateTime.UtcNow;
@@ -468,7 +471,8 @@ public class OrganizationService : IOrganizationService
             InitialOvertimeMode = org.InitialOvertimeMode.ToString(),
             JoinPolicy = org.JoinPolicy.ToString(),
             WorkScheduleChangeMode = org.WorkScheduleChangeMode.ToString(),
-            org.MemberTimeEntryVisibility
+            org.MemberTimeEntryVisibility,
+            org.Require2fa
         });
     }
 

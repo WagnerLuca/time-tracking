@@ -65,6 +65,15 @@ public class AuthController : ControllerBase
 
         if (!success)
         {
+            // Two-factor authentication required — return 200 with 2FA token
+            if (message == "TwoFactorRequired" && response != null)
+            {
+                return Ok(new TwoFactorRequiredResponse
+                {
+                    TwoFactorToken = response.RefreshToken
+                });
+            }
+
             return Problem(
                 type: "https://httpstatuses.io/401",
                 title: "Authentication Failed",
@@ -241,7 +250,8 @@ public class AuthController : ControllerBase
             FirstName = user.FirstName,
             LastName = user.LastName,
             ProfileImageUrl = user.ProfileImageUrl,
-            EmailConfirmed = user.EmailConfirmed
+            EmailConfirmed = user.EmailConfirmed,
+            TwoFactorEnabled = user.TwoFactorEnabled
         };
 
         return Ok(userInfo);
@@ -280,5 +290,106 @@ public class AuthController : ControllerBase
         }
 
         return Ok(user);
+    }
+
+    // ── Two-Factor Authentication Endpoints ──
+
+    /// <summary>
+    /// Verify TOTP code to complete login when 2FA is enabled
+    /// </summary>
+    [HttpPost("2fa/verify")]
+    [AllowAnonymous]
+    [EnableRateLimiting("AuthStrict")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> VerifyTwoFactor([FromBody] TwoFactorVerifyRequest request)
+    {
+        var (success, message, response) = await _authService.VerifyTwoFactorAsync(request);
+
+        if (!success)
+        {
+            return Problem(
+                type: "https://httpstatuses.io/401",
+                title: "Two-Factor Verification Failed",
+                statusCode: StatusCodes.Status401Unauthorized,
+                detail: message);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Begin 2FA setup — generates a TOTP secret and returns the authenticator URI
+    /// </summary>
+    [HttpPost("2fa/setup")]
+    [ProducesResponseType(typeof(TwoFactorSetupResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> SetupTwoFactor()
+    {
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            return Unauthorized();
+
+        var (success, message, response) = await _authService.SetupTwoFactorAsync(userId);
+        if (!success)
+        {
+            return Problem(
+                type: "https://httpstatuses.io/400",
+                title: "Two-Factor Setup Failed",
+                statusCode: StatusCodes.Status400BadRequest,
+                detail: message);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Confirm 2FA setup by providing a valid TOTP code from the authenticator app
+    /// </summary>
+    [HttpPost("2fa/confirm")]
+    [ProducesResponseType(typeof(TwoFactorConfirmResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConfirmTwoFactor([FromBody] TwoFactorConfirmRequest request)
+    {
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            return Unauthorized();
+
+        var (success, message, response) = await _authService.ConfirmTwoFactorAsync(userId, request);
+        if (!success)
+        {
+            return Problem(
+                type: "https://httpstatuses.io/400",
+                title: "Two-Factor Confirmation Failed",
+                statusCode: StatusCodes.Status400BadRequest,
+                detail: message);
+        }
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Disable 2FA for the authenticated user (requires current password)
+    /// </summary>
+    [HttpPost("2fa/disable")]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> DisableTwoFactor([FromBody] ChangePasswordRequest request)
+    {
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+            return Unauthorized();
+
+        var (success, message) = await _authService.DisableTwoFactorAsync(userId, request.CurrentPassword);
+        if (!success)
+        {
+            return Problem(
+                type: "https://httpstatuses.io/400",
+                title: "Failed to Disable 2FA",
+                statusCode: StatusCodes.Status400BadRequest,
+                detail: message);
+        }
+
+        return Ok(new AuthResponse { Success = true, Message = message });
     }
 }

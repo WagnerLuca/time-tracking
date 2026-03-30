@@ -86,6 +86,12 @@ public class Organization
     public bool MemberTimeEntryVisibility { get; set; } = false;
     
     /// <summary>
+    /// When true, all members of this organization must have two-factor authentication enabled.
+    /// Members without 2FA will be prompted to set it up before they can use the application.
+    /// </summary>
+    public bool Require2fa { get; set; } = false;
+    
+    /// <summary>
     /// Timestamp of the last settings update. Used to notify members of rule changes.
     /// </summary>
     public DateTime? SettingsUpdatedAt { get; set; }

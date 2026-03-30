@@ -145,6 +145,7 @@ builder.Services.AddAuthorization();
 
 // Register application services
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<ITotpService, TotpService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddScoped<ITimeTrackingService, TimeTrackingService>();

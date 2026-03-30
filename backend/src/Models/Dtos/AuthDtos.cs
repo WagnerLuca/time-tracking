@@ -56,6 +56,7 @@ public record UserInfo
     public required string LastName { get; init; }
     public string? ProfileImageUrl { get; init; }
     public bool EmailConfirmed { get; init; }
+    public bool TwoFactorEnabled { get; init; }
 }
 
 /// <summary>Request containing a refresh token (used for refresh and logout).</summary>
@@ -109,4 +110,53 @@ public record UpdateProfileRequest
     /// <summary>Updated email address.</summary>
     [EmailAddress, MaxLength(255)]
     public string? Email { get; init; }
+}
+
+// ── Two-Factor Authentication DTOs ──
+
+/// <summary>Response when login succeeds but 2FA verification is required.</summary>
+public record TwoFactorRequiredResponse
+{
+    /// <summary>Temporary token to submit with the TOTP code.</summary>
+    public required string TwoFactorToken { get; init; }
+    /// <summary>Hint that 2FA verification is needed.</summary>
+    public bool RequiresTwoFactor { get; init; } = true;
+}
+
+/// <summary>Request to verify a TOTP code during login.</summary>
+public record TwoFactorVerifyRequest
+{
+    /// <summary>Temporary token from the login step.</summary>
+    [Required]
+    public required string TwoFactorToken { get; init; }
+
+    /// <summary>6-digit TOTP code from authenticator app, or a backup code.</summary>
+    [Required]
+    public required string Code { get; init; }
+}
+
+/// <summary>Response returned when setting up 2FA — contains the shared secret and QR URI.</summary>
+public record TwoFactorSetupResponse
+{
+    /// <summary>Base32-encoded shared secret for manual entry.</summary>
+    public required string SharedKey { get; init; }
+
+    /// <summary>otpauth:// URI for scanning as a QR code.</summary>
+    public required string AuthenticatorUri { get; init; }
+}
+
+/// <summary>Request to confirm and enable 2FA by providing a valid TOTP code.</summary>
+public record TwoFactorConfirmRequest
+{
+    /// <summary>6-digit TOTP code from the authenticator app to confirm setup.</summary>
+    [Required, StringLength(6, MinimumLength = 6)]
+    public required string Code { get; init; }
+}
+
+/// <summary>Response after successfully enabling 2FA, includes one-time backup codes.</summary>
+public record TwoFactorConfirmResponse
+{
+    public bool Enabled { get; init; } = true;
+    /// <summary>One-time backup codes the user should store securely.</summary>
+    public required List<string> BackupCodes { get; init; }
 }

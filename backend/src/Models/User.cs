@@ -36,6 +36,14 @@ public class User
     
     public DateTime? LastLoginAt { get; set; }
     
+    // Two-factor authentication
+    [JsonIgnore]
+    public string? TotpSecretKey { get; set; }
+    public bool TwoFactorEnabled { get; set; } = false;
+    public DateTime? TwoFactorEnabledAt { get; set; }
+    [JsonIgnore]
+    public string? TwoFactorBackupCodes { get; set; }
+    
     // Navigation properties
     [JsonIgnore]
     public ICollection<UserOrganization> UserOrganizations { get; set; } = new List<UserOrganization>();
