@@ -73,6 +73,25 @@ public record EditEntryRequestData
 }
 
 /// <summary>
+/// JSON payload for CsvImport request data.
+/// Contains the actual entries to import when the request is approved.
+/// </summary>
+public record CsvImportRequestData
+{
+    public List<CsvImportEntry>? Entries { get; init; }
+    public string? FileName { get; init; }
+}
+
+public record CsvImportEntry
+{
+    public string? Date { get; init; }
+    public string? StartTime { get; init; }
+    public string? EndTime { get; init; }
+    public int PauseMinutes { get; init; }
+    public string? Description { get; init; }
+}
+
+/// <summary>
 /// JSON payload for WorkScheduleChange request data.
 /// Mirrors CreateWorkScheduleRequest so the approved schedule can be created directly.
 /// </summary>

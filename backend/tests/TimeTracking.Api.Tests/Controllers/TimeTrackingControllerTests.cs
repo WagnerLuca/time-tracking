@@ -288,8 +288,18 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         (await client.GetAsync("/api/v1/TimeTracking")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await client.PutAsJsonAsync("/api/v1/TimeTracking/1", new { })).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await client.DeleteAsync("/api/v1/TimeTracking/1")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await client.GetAsync("/api/v1/TimeTracking/export")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
+}
+
+/// <summary>
+/// Integration tests for the ExportImport controller: CSV export (entries + daily report)
+/// and CSV import (preview + confirm).
+/// </summary>
+public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
+{
+    private readonly TimeTrackingApiFactory _factory;
+
+    public ExportImportControllerTests(TimeTrackingApiFactory factory) => _factory = factory;
 
     // ── CSV Export ───────────────────────────────────────────────────────
 
@@ -299,14 +309,17 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync("/api/v1/TimeTracking/export");
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "entries"
+        });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.Should().Be("text/csv");
         response.Content.Headers.ContentDisposition.Should().NotBeNull();
         response.Content.Headers.ContentDisposition!.FileName.Should().EndWith(".csv");
 
         var csv = await response.Content.ReadAsStringAsync();
-        csv.Should().Contain("Date,Start Time,End Time,Duration (h),Pause (min),Net Duration (h),Organization,Description");
+        csv.Should().Contain("Date,Day,Start Time,End Time,Duration (h),Pause (min),Net Duration (h),Description,Organization");
         // Seed data should produce at least one data row
         var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         lines.Length.Should().BeGreaterThanOrEqualTo(2); // header + at least one row
@@ -319,7 +332,12 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
         // Far future date — should return only header
-        var response = await client.GetAsync("/api/v1/TimeTracking/export?from=2099-01-01&to=2099-12-31");
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "entries",
+            from = "2099-01-01T00:00:00Z",
+            to = "2099-12-31T00:00:00Z"
+        });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var csv = await response.Content.ReadAsStringAsync();
@@ -333,13 +351,14 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        // Non-existent org ID — should return only header
-        var response = await client.GetAsync("/api/v1/TimeTracking/export?organizationId=999999");
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var csv = await response.Content.ReadAsStringAsync();
-        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        lines.Length.Should().Be(1); // Only header
+        // Non-existent org slug — should return only header (no entries match)
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "entries",
+            organizationSlug = "non-existent-slug-999"
+        });
+        // Org not found → 404, since the service returns NotFound
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -350,7 +369,10 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         // Start an entry (running, no end time)
         await client.PostAsJsonAsync("/api/v1/TimeTracking/start", new { description = "Still running" });
 
-        var response = await client.GetAsync("/api/v1/TimeTracking/export");
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "entries"
+        });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var csv = await response.Content.ReadAsStringAsync();
@@ -363,6 +385,18 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         await client.PostAsJsonAsync("/api/v1/TimeTracking/stop", (object?)null);
     }
 
+    [Fact]
+    public async Task ExportCsv_Unauthenticated_Returns401()
+    {
+        var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "entries"
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
     // ── Daily Report Export ──────────────────────────────────────────────
 
     [Fact]
@@ -371,13 +405,16 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync(
-            $"/api/v1/TimeTracking/export/{TestHelpers.SeedOrgSlug}/daily-report");
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily",
+            organizationSlug = TestHelpers.SeedOrgSlug
+        });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.Should().Be("text/csv");
 
         var csv = await response.Content.ReadAsStringAsync();
-        csv.Should().Contain("Date,Day,Target (h),Worked (h),Pause (min),Net Worked (h),Overtime (h),Cumulative Overtime (h),Status,Holiday,Absence Type,Absence Note,Entries");
+        csv.Should().Contain("Date,Day,Target (h),Worked (h),Pause (min),Net Worked (h),Overtime (h),Cumulative Overtime (h),Status,Holiday,Absence Type,Absence Note,Description,Organization");
 
         // Should have header + at least one day row (defaults to current month)
         var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -391,8 +428,13 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
         // Request exactly 7 days
-        var response = await client.GetAsync(
-            $"/api/v1/TimeTracking/export/{TestHelpers.SeedOrgSlug}/daily-report?from=2026-01-05&to=2026-01-11");
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily",
+            organizationSlug = TestHelpers.SeedOrgSlug,
+            from = "2026-01-05T00:00:00Z",
+            to = "2026-01-11T00:00:00Z"
+        });
         response.EnsureSuccessStatusCode();
 
         var csv = await response.Content.ReadAsStringAsync();
@@ -409,8 +451,11 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
     {
         var (client, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "nonmember-export@test.com");
 
-        var response = await client.GetAsync(
-            $"/api/v1/TimeTracking/export/{TestHelpers.SeedOrgSlug}/daily-report");
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily",
+            organizationSlug = TestHelpers.SeedOrgSlug
+        });
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
@@ -420,8 +465,11 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
-        var response = await client.GetAsync(
-            "/api/v1/TimeTracking/export/does-not-exist-org/daily-report");
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily",
+            organizationSlug = "does-not-exist-org"
+        });
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
@@ -432,8 +480,13 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
 
         // 2026-01-10 is a Saturday, 2026-01-11 is a Sunday
-        var response = await client.GetAsync(
-            $"/api/v1/TimeTracking/export/{TestHelpers.SeedOrgSlug}/daily-report?from=2026-01-10&to=2026-01-11");
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily",
+            organizationSlug = TestHelpers.SeedOrgSlug,
+            from = "2026-01-10T00:00:00Z",
+            to = "2026-01-11T00:00:00Z"
+        });
         response.EnsureSuccessStatusCode();
 
         var csv = await response.Content.ReadAsStringAsync();
@@ -447,8 +500,11 @@ public class TimeTrackingControllerTests : IClassFixture<TimeTrackingApiFactory>
     {
         var client = _factory.CreateClient();
 
-        var response = await client.GetAsync(
-            $"/api/v1/TimeTracking/export/{TestHelpers.SeedOrgSlug}/daily-report");
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily",
+            organizationSlug = TestHelpers.SeedOrgSlug
+        });
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }

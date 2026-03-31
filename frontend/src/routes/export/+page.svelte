@@ -309,11 +309,18 @@
 		if (!orgContext.selectedOrgSlug) return;
 		requestSending = true;
 		try {
-			const summary = previewRows.length > 0
-				? `${selectedRows.size} entries from CSV (${previewRows.length} total parsed)`
-				: 'CSV import';
+			const entries = previewRows
+				.filter((r) => selectedRows.has(r.rowNumber!))
+				.map((r) => ({
+					date: r.date,
+					startTime: r.startTime,
+					endTime: r.endTime,
+					pauseMinutes: r.pauseMinutes ?? 0,
+					description: r.description ?? null
+				}));
+			const summary = `${entries.length} entries from CSV (${previewRows.length} total parsed)`;
 			const requestData = JSON.stringify({
-				entryCount: selectedRows.size,
+				entries,
 				fileName: importFile?.name ?? 'unknown'
 			});
 			await requestsApi.apiV1OrganizationsSlugRequestsPost(orgContext.selectedOrgSlug, {
@@ -323,6 +330,9 @@
 			});
 			requestSuccess = 'Import request submitted! An admin will review it.';
 			showRequestModal = false;
+			showPreview = false;
+			previewRows = [];
+			importFile = null;
 			setTimeout(() => (requestSuccess = ''), 5000);
 		} catch (err) {
 			importError = extractErrorMessage(err, 'Failed to submit request.');

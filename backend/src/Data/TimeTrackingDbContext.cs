@@ -178,7 +178,7 @@ public class TimeTrackingDbContext : DbContext
             entity.Property(e => e.Message).HasMaxLength(500);
             entity.Property(e => e.Status).IsRequired();
             entity.Property(e => e.Type).IsRequired();
-            entity.Property(e => e.RequestData).HasMaxLength(2000);
+            entity.Property(e => e.RequestData).HasMaxLength(50000);
 
             if (isInMemory)
                 entity.Property(e => e.CreatedAt).IsRequired();

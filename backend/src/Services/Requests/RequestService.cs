@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
@@ -399,6 +400,23 @@ public class RequestService : IRequestService
                     catch { /* invalid JSON — request is accepted but schedule unchanged */ }
                 }
                 break;
+
+            case RequestType.CsvImport:
+                if (orgRequest.RequestData != null)
+                {
+                    try
+                    {
+                        var importData = JsonSerializer.Deserialize<CsvImportRequestData>(
+                            orgRequest.RequestData,
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        if (importData?.Entries != null)
+                        {
+                            await ApplyCsvImportAsync(orgRequest.UserId, org.Id, importData.Entries);
+                        }
+                    }
+                    catch { /* invalid JSON — request is accepted but entries not imported */ }
+                }
+                break;
         }
     }
 
@@ -443,6 +461,46 @@ public class RequestService : IRequestService
             openSchedule.ValidTo = data.ValidFrom.AddDays(-1);
 
         _context.WorkSchedules.Add(schedule);
+    }
+
+    private async Task ApplyCsvImportAsync(int userId, int orgId, List<CsvImportEntry> entries)
+    {
+        var imported = 0;
+        foreach (var entry in entries)
+        {
+            if (string.IsNullOrEmpty(entry.Date) || string.IsNullOrEmpty(entry.StartTime)
+                || string.IsNullOrEmpty(entry.EndTime))
+                continue;
+
+            if (!DateTime.TryParse($"{entry.Date} {entry.StartTime}", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var startTime))
+                continue;
+            if (!DateTime.TryParse($"{entry.Date} {entry.EndTime}", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var endTime))
+                continue;
+            if (endTime <= startTime)
+                continue;
+
+            _context.TimeEntries.Add(new TimeEntry
+            {
+                UserId = userId,
+                OrganizationId = orgId,
+                StartTime = DateTime.SpecifyKind(startTime, DateTimeKind.Utc),
+                EndTime = DateTime.SpecifyKind(endTime, DateTimeKind.Utc),
+                IsRunning = false,
+                PauseDurationMinutes = Math.Max(0, entry.PauseMinutes),
+                Description = entry.Description,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            });
+            imported++;
+        }
+
+        if (imported > 0)
+            await _context.SaveChangesAsync();
+
+        _logger.LogInformation("CSV import approved: {Count} entries created for user {UserId} in org {OrgId}",
+            imported, userId, orgId);
     }
 
     private static OrgRequestResponse MapToResponse(
