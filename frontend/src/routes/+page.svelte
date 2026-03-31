@@ -40,9 +40,11 @@
 	let daysOff = $state<DaysOffData>(emptyDaysOff());
 	// Convenience accessors
 	let holidayDates = $derived(daysOff.holidayDates);
+	let halfDayHolidays = $derived(daysOff.halfDayHolidays);
 	let sickDayDates = $derived(daysOff.sickDayDates);
 	let vacationDates = $derived(daysOff.vacationDates);
 	let otherAbsenceDates = $derived(daysOff.otherAbsenceDates);
+	let halfDayAbsences = $derived(daysOff.halfDayAbsences);
 	let daysOffSet = $derived(daysOff.daysOffSet);
 
 	onMount(async () => {
@@ -144,14 +146,14 @@
 				firstEntryDate = null;
 			}
 
-			todayMinutes = sumMinutes(todayEntries) + getAbsenceCredit(now, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates);
-			weekMinutes = sumMinutes(weekEntries) + absenceCreditsForRange(weekStart, weekEnd, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates);
-			monthMinutes = sumMinutes(monthEntries) + absenceCreditsForRange(monthStart, monthEnd, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates);
+			todayMinutes = sumMinutes(todayEntries) + getAbsenceCredit(now, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, [], halfDayAbsences, halfDayHolidays);
+			weekMinutes = sumMinutes(weekEntries) + absenceCreditsForRange(weekStart, weekEnd, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, [], halfDayAbsences, halfDayHolidays);
+			monthMinutes = sumMinutes(monthEntries) + absenceCreditsForRange(monthStart, monthEnd, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, [], halfDayAbsences, halfDayHolidays);
 
 			// Compute targets — only since first tracked entry
-			todayTarget = getDayTarget(now, workSchedule, holidayDates);
-			weekTarget = getTargetForRange(weekStart, todayEnd, workSchedule, holidayDates, [], firstEntryDate);
-			monthTarget = getTargetForRange(monthStart, todayEnd, workSchedule, holidayDates, [], firstEntryDate);
+			todayTarget = getDayTarget(now, workSchedule, holidayDates, [], halfDayHolidays);
+			weekTarget = getTargetForRange(weekStart, todayEnd, workSchedule, holidayDates, [], firstEntryDate, halfDayHolidays);
+			monthTarget = getTargetForRange(monthStart, todayEnd, workSchedule, holidayDates, [], firstEntryDate, halfDayHolidays);
 
 			// Build weekly breakdown (Mon-Sun)
 			const dayNames = DAY_NAMES;
@@ -165,7 +167,7 @@
 					const t = new Date(e.startTime!);
 					return t >= dStart && t <= dEnd;
 				});
-				tempWeekDays.push({ label: dayNames[i], date: d, worked: sumMinutes(dayEntries) + getAbsenceCredit(d, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates), target: getDayTarget(d, workSchedule, holidayDates) });
+				tempWeekDays.push({ label: dayNames[i], date: d, worked: sumMinutes(dayEntries) + getAbsenceCredit(d, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, [], halfDayAbsences, halfDayHolidays), target: getDayTarget(d, workSchedule, holidayDates, [], halfDayHolidays) });
 			}
 			weekDays = tempWeekDays;
 
@@ -193,7 +195,7 @@
 				tempMonthWeeks.push({
 					label: `${wkStart.getDate()}–${wkEnd.getDate()}`,
 					worked: sumMinutes(wkEntries),
-					target: getTargetForRange(wkS, wkEnd, workSchedule, holidayDates, [], firstEntryDate)
+					target: getTargetForRange(wkS, wkEnd, workSchedule, holidayDates, [], firstEntryDate, halfDayHolidays)
 				});
 				wkStart = new Date(wkEnd);
 				wkStart.setDate(wkStart.getDate() + 1);
@@ -211,7 +213,7 @@
 				let totalTargetMins = 0;
 				const cursor = new Date(fDate);
 				while (cursor <= today2) {
-					totalTargetMins += getDayTarget(cursor, workSchedule, holidayDates);
+					totalTargetMins += getDayTarget(cursor, workSchedule, holidayDates, [], halfDayHolidays);
 					cursor.setDate(cursor.getDate() + 1);
 				}
 				const initialOvertimeMins = (workSchedule?.initialOvertimeMode !== 'Disabled' && workSchedule?.initialOvertimeHours) ? workSchedule.initialOvertimeHours * 60 : 0;
@@ -382,7 +384,7 @@
 					<div class="flex items-center gap-2.5 {isToday(day.date) ? 'font-semibold' : ''} {isFuture(day.date) ? 'opacity-40' : ''} {dayType === 'holiday' ? 'bg-secondary/10 rounded px-1 -mx-1' : dayType === 'sick' ? 'bg-error/10 rounded px-1 -mx-1' : dayType === 'vacation' ? 'bg-success/10 rounded px-1 -mx-1' : dayType === 'other-absence' ? 'bg-base-content/10 rounded px-1 -mx-1' : ''}">
 						<span class="w-8 text-sm text-base-content/50 shrink-0">{day.label}</span>
 						{#if dayType}
-							<span class="w-2 h-2 rounded-full shrink-0 {dayType === 'holiday' ? 'bg-secondary' : dayType === 'sick' ? 'bg-error' : dayType === 'vacation' ? 'bg-success' : 'bg-base-content/40'}" title={getDayTypeLabel(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}></span>
+							<span class="w-2 h-2 rounded-full shrink-0 {dayType === 'holiday' ? 'bg-secondary' : dayType === 'sick' ? 'bg-error' : dayType === 'vacation' ? 'bg-success' : 'bg-base-content/40'}" title={getDayTypeLabel(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays, halfDayAbsences)}></span>
 						{/if}
 						<div class="flex-1 h-2 bg-base-200 rounded-full overflow-hidden">
 							<div class="h-full rounded-full transition-all duration-300 {day.worked > day.target && day.target > 0 ? 'bg-success' : 'bg-primary'}" style="width: {barWidth(isToday(day.date) ? day.worked + runningMinutes : day.worked, day.target)}%"></div>

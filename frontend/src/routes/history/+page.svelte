@@ -32,9 +32,11 @@
 	// Day-type maps
 	let daysOff = $state<DaysOffData>(emptyDaysOff());
 	let holidayDates = $derived(daysOff.holidayDates);
+	let halfDayHolidays = $derived(daysOff.halfDayHolidays);
 	let sickDayDates = $derived(daysOff.sickDayDates);
 	let vacationDates = $derived(daysOff.vacationDates);
 	let otherAbsenceDates = $derived(daysOff.otherAbsenceDates);
+	let halfDayAbsences = $derived(daysOff.halfDayAbsences);
 	let daysOffSet = $derived(daysOff.daysOffSet);
 
 	// Year view data
@@ -221,8 +223,8 @@
 				const endDate = now < lastDayOfMonth ? now : lastDayOfMonth;
 				while (dayCursor <= endDate) {
 					const d = new Date(dayCursor);
-					target += getDayTarget(d, workSchedule, holidayDates, schedulePeriods);
-					absCredits += getAbsenceCredit(d, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods);
+					target += getDayTarget(d, workSchedule, holidayDates, schedulePeriods, halfDayHolidays);
+					absCredits += getAbsenceCredit(d, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods, halfDayAbsences, halfDayHolidays);
 					dayCursor.setDate(dayCursor.getDate() + 1);
 				}
 				monthlyTargets.set(mk, target);
@@ -369,8 +371,8 @@
 			const isToday = cursor.toDateString() === today.toDateString();
 			const isWeekend = cursor.getDay() === 0 || cursor.getDay() === 6;
 			const entryData = entryMap.get(key) ?? { minutes: 0, count: 0 };
-			const targetMinutes = isCurrentMonth ? getDayTarget(new Date(cursor), workSchedule, holidayDates, schedulePeriods) : 0;
-			const absCredit = isCurrentMonth ? getAbsenceCredit(new Date(cursor), workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods) : 0;
+			const targetMinutes = isCurrentMonth ? getDayTarget(new Date(cursor), workSchedule, holidayDates, schedulePeriods, halfDayHolidays) : 0;
+			const absCredit = isCurrentMonth ? getAbsenceCredit(new Date(cursor), workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods, halfDayAbsences, halfDayHolidays) : 0;
 
 			days.push({
 				date: new Date(cursor),
@@ -384,7 +386,7 @@
 				targetMinutes,
 				entryCount: entryData.count,
 				dayType: getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates),
-				dayTypeLabel: getDayTypeLabel(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates),
+				dayTypeLabel: getDayTypeLabel(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays, halfDayAbsences),
 				delta: entryData.minutes + absCredit - targetMinutes
 			});
 
@@ -439,10 +441,10 @@
 				else if (dt === 'sick') sickDays++;
 				else if (dt === 'vacation') vacationDays++;
 
-				const target = getDayTarget(new Date(cursor), workSchedule, holidayDates, schedulePeriods);
+				const target = getDayTarget(new Date(cursor), workSchedule, holidayDates, schedulePeriods, halfDayHolidays);
 				if (target > 0) workDays++;
 				targetMinutes += target;
-				absenceCredits += getAbsenceCredit(new Date(cursor), workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods);
+				absenceCredits += getAbsenceCredit(new Date(cursor), workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods, halfDayAbsences, halfDayHolidays);
 
 				cursor.setDate(cursor.getDate() + 1);
 			}

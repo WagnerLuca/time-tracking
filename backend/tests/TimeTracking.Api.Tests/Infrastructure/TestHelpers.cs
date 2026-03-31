@@ -257,6 +257,7 @@ public record HolidayResponseDto
     public string Date { get; init; } = "";
     public string Name { get; init; } = "";
     public bool IsRecurring { get; init; }
+    public bool IsHalfDay { get; init; }
 }
 
 public record AbsenceDayResponseDto
@@ -266,6 +267,7 @@ public record AbsenceDayResponseDto
     public int OrganizationId { get; init; }
     public string Date { get; init; } = "";
     public string Type { get; init; } = "";
+    public bool IsHalfDay { get; init; }
     public string? Note { get; init; }
     public string? UserFirstName { get; init; }
     public string? UserLastName { get; init; }

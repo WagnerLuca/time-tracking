@@ -47,6 +47,7 @@
 	let absenceToDate = $state('');
 	let absenceType = $state<number>(0);
 	let absenceNote = $state('');
+	let absenceHalfDay = $state(false);
 	let absenceSaving = $state(false);
 	let absenceError = $state('');
 
@@ -219,6 +220,7 @@
 					userId: memberId,
 					date: dateStr,
 					type: absenceType as AbsenceType,
+					isHalfDay: absenceHalfDay,
 					note: absenceNote || undefined
 				});
 			}
@@ -227,6 +229,7 @@
 			absenceToDate = '';
 			absenceType = 0;
 			absenceNote = '';
+			absenceHalfDay = false;
 			loadAbsences();
 		} catch (e) {
 			absenceError = extractErrorMessage(e, 'Failed to add absence.');
@@ -571,6 +574,10 @@
 						<option value={2}>Other</option>
 					</select>
 					<input type="text" bind:value={absenceNote} placeholder="Note (optional)" class="input input-bordered input-sm flex-1" />
+					<label class="label cursor-pointer flex items-center gap-1.5 text-sm text-base-content/70">
+						<input type="checkbox" class="checkbox checkbox-sm" bind:checked={absenceHalfDay} />
+						Half day
+					</label>
 					<button class="btn btn-primary btn-sm" onclick={addAbsence} disabled={absenceSaving || !absenceFromDate}>
 						{absenceSaving ? 'Saving...' : 'Add'}
 					</button>
@@ -589,6 +596,9 @@
 						<div class="flex items-center gap-3 py-2 px-2.5 bg-base-200/30 rounded-md border border-base-200 text-sm">
 							<span class="font-medium text-base-content/70 min-w-[100px]">{formatDateFull(absence.date!)}</span>
 							<span class="badge badge-sm {absenceTypeBadge(absence.type) === 'badge-sick' ? 'badge-error' : absenceTypeBadge(absence.type) === 'badge-vacation' ? 'badge-info' : 'badge-accent'}">{absenceTypeLabel(absence.type)}</span>
+							{#if absence.isHalfDay}
+								<span class="badge badge-warning badge-xs">½ Day</span>
+							{/if}
 							{#if absence.note}
 								<span class="text-base-content/40 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs">{absence.note}</span>
 							{/if}

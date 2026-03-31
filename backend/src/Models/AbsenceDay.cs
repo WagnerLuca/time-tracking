@@ -20,6 +20,9 @@ public class AbsenceDay
 
     public AbsenceType Type { get; set; } = AbsenceType.SickDay;
 
+    /// <summary>If true, this absence counts as half a day.</summary>
+    public bool IsHalfDay { get; set; }
+
     /// <summary>Optional note, e.g. reason.</summary>
     public string? Note { get; set; }
 

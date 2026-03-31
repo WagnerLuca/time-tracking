@@ -32,6 +32,7 @@ export interface AbsenceDayResponse {
     'organizationId'?: number;
     'date'?: string;
     'type': string | null;
+    'isHalfDay'?: boolean;
     'note'?: string | null;
     'userFirstName'?: string | null;
     'userLastName'?: string | null;
@@ -87,6 +88,7 @@ export interface AdminCreateAbsenceDayRequest {
     'userId'?: number;
     'date'?: string;
     'type'?: AbsenceType;
+    'isHalfDay'?: boolean;
     'note'?: string | null;
 }
 
@@ -124,6 +126,7 @@ export interface ChangePasswordRequest {
 export interface CreateAbsenceDayRequest {
     'date'?: string;
     'type'?: AbsenceType;
+    'isHalfDay'?: boolean;
     'note'?: string | null;
 }
 
@@ -135,6 +138,7 @@ export interface CreateHolidayRequest {
     'date'?: string;
     'name': string;
     'isRecurring'?: boolean;
+    'isHalfDay'?: boolean;
 }
 /**
  * Request payload for creating a new organization request.
@@ -227,6 +231,7 @@ export interface HolidayResponse {
     'date'?: string;
     'name': string | null;
     'isRecurring'?: boolean;
+    'isHalfDay'?: boolean;
 }
 /**
  * Request payload to confirm and execute a CSV import.
@@ -693,6 +698,7 @@ export interface UpdateHolidayRequest {
     'date'?: string | null;
     'name'?: string | null;
     'isRecurring'?: boolean | null;
+    'isHalfDay'?: boolean | null;
 }
 /**
  * Request payload for changing a member\'s role.

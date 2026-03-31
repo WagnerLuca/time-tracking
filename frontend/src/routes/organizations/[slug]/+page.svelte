@@ -98,7 +98,9 @@
 	let editHolidayDate = $state('');
 	let editHolidaySaving = $state(false);
 	let newHolidayRecurring = $state(false);
+	let newHolidayHalfDay = $state(false);
 	let editHolidayRecurring = $state(false);
+	let editHolidayHalfDay = $state(false);
 	let importingHolidays = $state(false);
 	let importPreset = $state('de');
 	let importYear = $state(new Date().getFullYear());
@@ -112,6 +114,7 @@
 	let newAbsenceToDate = $state('');
 	let newAbsenceType = $state(0); // SickDay
 	let newAbsenceNote = $state('');
+	let newAbsenceHalfDay = $state(false);
 	let addingAbsence = $state(false);
 	let absenceError = $state('');
 	// Admin absence
@@ -120,6 +123,7 @@
 	let adminAbsenceDate = $state('');
 	let adminAbsenceType = $state(0);
 	let adminAbsenceNote = $state('');
+	let adminAbsenceHalfDay = $state(false);
 	let addingAdminAbsence = $state(false);
 	let adminAbsenceError = $state('');
 	let adminAbsenceFilter = $state<number | null>(null); // userId filter
@@ -610,7 +614,8 @@
 			await holidayApi.apiV1OrganizationsSlugHolidaysPost(orgSlug, {
 				date: newHolidayDate,
 				name: newHolidayName,
-				isRecurring: newHolidayRecurring
+				isRecurring: newHolidayRecurring,
+				isHalfDay: newHolidayHalfDay
 			});
 			holidaysLoaded = false;
 			await loadHolidays();
@@ -618,6 +623,7 @@
 			newHolidayName = '';
 			newHolidayDate = '';
 			newHolidayRecurring = false;
+			newHolidayHalfDay = false;
 		} catch (err) {
 			holidayError = extractErrorMessage(err, 'Failed to add holiday.');
 		} finally {
@@ -630,6 +636,7 @@
 		editHolidayName = h.name ?? '';
 		editHolidayDate = h.date ?? '';
 		editHolidayRecurring = h.isRecurring ?? false;
+		editHolidayHalfDay = h.isHalfDay ?? false;
 	}
 
 	async function saveEditHoliday(id: number) {
@@ -639,7 +646,8 @@
 			await holidayApi.apiV1OrganizationsSlugHolidaysIdPut(orgSlug, id, {
 				date: editHolidayDate,
 				name: editHolidayName,
-				isRecurring: editHolidayRecurring
+				isRecurring: editHolidayRecurring,
+				isHalfDay: editHolidayHalfDay
 			});
 			editingHolidayId = null;
 			holidaysLoaded = false;
@@ -714,6 +722,7 @@
 				await absenceDayApi.apiV1OrganizationsSlugAbsencesPost(orgSlug, {
 					date: dateStr,
 					type: newAbsenceType as AbsenceType,
+					isHalfDay: newAbsenceHalfDay,
 					note: newAbsenceNote || undefined
 				});
 			}
@@ -724,6 +733,7 @@
 			newAbsenceToDate = '';
 			newAbsenceType = 0;
 			newAbsenceNote = '';
+			newAbsenceHalfDay = false;
 		} catch (err) {
 			absenceError = extractErrorMessage(err, 'Failed to add absence.');
 		} finally {
@@ -753,6 +763,7 @@
 				userId: adminAbsenceUserId,
 				date: adminAbsenceDate,
 				type: adminAbsenceType as AbsenceType,
+				isHalfDay: adminAbsenceHalfDay,
 				note: adminAbsenceNote || undefined
 			});
 			absencesLoaded = false;
@@ -761,6 +772,7 @@
 			adminAbsenceDate = '';
 			adminAbsenceType = 0;
 			adminAbsenceNote = '';
+			adminAbsenceHalfDay = false;
 			adminAbsenceUserId = null;
 		} catch (err) {
 			adminAbsenceError = extractErrorMessage(err, 'Failed to add absence.');
@@ -1113,6 +1125,12 @@
 											<label class="min-w-[80px] text-sm font-medium text-base-content/70">Note</label>
 											<input type="text" class="input input-bordered input-sm flex-1" bind:value={newAbsenceNote} placeholder="Optional note" disabled={addingAbsence} />
 										</div>
+										<div class="flex items-center gap-2">
+											<label class="label cursor-pointer flex items-center gap-1.5 text-sm text-base-content/70">
+												<input type="checkbox" class="checkbox checkbox-sm" bind:checked={newAbsenceHalfDay} disabled={addingAbsence} />
+												Half day
+											</label>
+										</div>
 										<div class="flex gap-2 mt-1">
 											<button type="submit" class="btn btn-primary btn-sm" disabled={addingAbsence}>
 												{addingAbsence ? 'Adding...' : 'Add'}
@@ -1130,6 +1148,9 @@
 											<div class="flex items-center gap-3 py-2 px-3 bg-base-200/30 rounded-md text-sm">
 												<span class="font-medium text-base-content/70 min-w-[90px]">{formatDateDisplay(a.date)}</span>
 												<span class="badge badge-sm {absenceTypeBadge(a.type) === 'badge-sick' ? 'badge-error' : absenceTypeBadge(a.type) === 'badge-vacation' ? 'badge-info' : 'badge-ghost'}">{absenceTypeLabel(a.type)}</span>
+												{#if a.isHalfDay}
+													<span class="badge badge-warning badge-xs">½ Day</span>
+												{/if}
 												{#if a.note}
 													<span class="text-base-content/40 text-sm italic flex-1">{a.note}</span>
 												{/if}
@@ -1373,6 +1394,10 @@
 												<input type="checkbox" class="checkbox checkbox-sm" bind:checked={newHolidayRecurring} disabled={addingHoliday} />
 												Yearly recurring
 											</label>
+											<label class="label cursor-pointer flex items-center gap-1.5 text-sm text-base-content/70">
+												<input type="checkbox" class="checkbox checkbox-sm" bind:checked={newHolidayHalfDay} disabled={addingHoliday} />
+												Half day
+											</label>
 										</div>
 										<div class="flex gap-2 mt-1">
 											<button type="submit" class="btn btn-primary btn-sm" disabled={addingHoliday}>
@@ -1395,6 +1420,10 @@
 														<input type="checkbox" class="checkbox checkbox-sm" bind:checked={editHolidayRecurring} disabled={editHolidaySaving} />
 														Yearly
 													</label>
+													<label class="label cursor-pointer flex items-center gap-1.5 text-[0.8rem] whitespace-nowrap text-sm text-base-content/70">
+														<input type="checkbox" class="checkbox checkbox-sm" bind:checked={editHolidayHalfDay} disabled={editHolidaySaving} />
+														Half
+													</label>
 													<div class="flex items-center gap-1.5">
 														<button class="btn btn-primary btn-sm" onclick={() => saveEditHoliday(h.id!)} disabled={editHolidaySaving}>Save</button>
 														<button class="btn btn-ghost btn-sm" onclick={() => (editingHolidayId = null)}>Cancel</button>
@@ -1402,6 +1431,9 @@
 												{:else}
 													<span class="font-medium text-base-content/70 min-w-[90px]">{formatDateDisplay(h.date)}</span>
 													<span class="flex-1 text-base-content/60">{h.name}</span>
+													{#if h.isHalfDay}
+														<span class="badge badge-warning badge-xs">½ Day</span>
+													{/if}
 													{#if h.isRecurring}
 														<span class="badge badge-info badge-xs" title="Repeats every year">&#x1f501; Yearly</span>
 													{/if}

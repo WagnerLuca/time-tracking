@@ -16,6 +16,9 @@ public class Holiday
     /// <summary>If true, this holiday repeats every year on the same month/day.</summary>
     public bool IsRecurring { get; set; }
 
+    /// <summary>If true, this holiday counts as half a day (e.g. half-day off).</summary>
+    public bool IsHalfDay { get; set; }
+
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

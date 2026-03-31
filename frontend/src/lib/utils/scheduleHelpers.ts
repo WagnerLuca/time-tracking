@@ -31,10 +31,11 @@ export interface SchedulePeriodLike extends ScheduleLike {
  * Get the target minutes for a specific day, considering holidays and schedule periods.
  *
  * Priority order:
- * 1. Holidays → 0 (no target)
- * 2. Matching schedule period (by date range) → use that period's targets
- * 3. Base schedule → use its targets
- * 4. No schedule → 0
+ * 1. Full-day holidays → 0 (no target)
+ * 2. Half-day holidays → 50% of normal target
+ * 3. Matching schedule period (by date range) → use that period's targets
+ * 4. Base schedule → use its targets
+ * 5. No schedule → 0
  *
  * Target values are stored in hours in the DB/API; this function returns MINUTES.
  */
@@ -42,13 +43,20 @@ export function getDayTarget(
 	date: Date,
 	schedule: ScheduleLike | null | undefined,
 	holidayDates: Map<string, string> | Set<string>,
-	periods: SchedulePeriodLike[] = []
+	periods: SchedulePeriodLike[] = [],
+	halfDayHolidays?: Set<string>
 ): number {
 	if (!schedule && periods.length === 0) return 0;
 	const key = dateKey(date);
 
-	// Holidays reduce target to 0
-	if (holidayDates.has(key)) return 0;
+	// Holidays reduce target
+	if (holidayDates.has(key)) {
+		if (halfDayHolidays?.has(key)) {
+			// Half-day holiday: return 50% of normal target
+			return getFullDayTarget(date, schedule, periods) * 0.5;
+		}
+		return 0;
+	}
 
 	// Weekend → 0
 	const dow = date.getDay();
@@ -62,6 +70,22 @@ export function getDayTarget(
 	}
 
 	// Fall back to base schedule
+	if (!schedule) return 0;
+	return getTargetForDow(dow, schedule);
+}
+
+/**
+ * Get the full (unreduced) day target, ignoring holidays. Used internally for half-day calculations.
+ */
+function getFullDayTarget(date: Date, schedule: ScheduleLike | null | undefined, periods: SchedulePeriodLike[]): number {
+	const dow = date.getDay();
+	if (dow === 0 || dow === 6) return 0;
+	const key = dateKey(date);
+	for (const p of periods) {
+		if (p.validFrom && p.validFrom <= key && (!p.validTo || p.validTo >= key)) {
+			return getTargetForDow(dow, p);
+		}
+	}
 	if (!schedule) return 0;
 	return getTargetForDow(dow, schedule);
 }
@@ -82,7 +106,7 @@ function getTargetForDow(dow: number, schedule: ScheduleLike): number {
 
 /**
  * Get absence credit for a specific day (minutes credited for sick/vacation/other absence days).
- * Returns the full day target if the day has an absence; 0 otherwise.
+ * Returns the full day target if the day has a full-day absence; 50% for half-day absences; 0 otherwise.
  */
 export function getAbsenceCredit(
 	date: Date,
@@ -91,11 +115,17 @@ export function getAbsenceCredit(
 	sickDayDates: Set<string>,
 	vacationDates: Set<string>,
 	otherAbsenceDates: Set<string>,
-	periods: SchedulePeriodLike[] = []
+	periods: SchedulePeriodLike[] = [],
+	halfDayAbsences?: Set<string>,
+	halfDayHolidays?: Set<string>
 ): number {
 	const key = dateKey(date);
 	if (sickDayDates.has(key) || vacationDates.has(key) || otherAbsenceDates.has(key)) {
-		return getDayTarget(date, schedule, holidayDates, periods);
+		const target = getDayTarget(date, schedule, holidayDates, periods, halfDayHolidays);
+		if (halfDayAbsences?.has(key)) {
+			return target * 0.5;
+		}
+		return target;
 	}
 	return 0;
 }
@@ -111,7 +141,9 @@ export function absenceCreditsForRange(
 	sickDayDates: Set<string>,
 	vacationDates: Set<string>,
 	otherAbsenceDates: Set<string>,
-	periods: SchedulePeriodLike[] = []
+	periods: SchedulePeriodLike[] = [],
+	halfDayAbsences?: Set<string>,
+	halfDayHolidays?: Set<string>
 ): number {
 	let credits = 0;
 	const cursor = new Date(from);
@@ -119,7 +151,7 @@ export function absenceCreditsForRange(
 	const end = new Date(to);
 	end.setHours(23, 59, 59, 999);
 	while (cursor <= end) {
-		credits += getAbsenceCredit(cursor, schedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, periods);
+		credits += getAbsenceCredit(cursor, schedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, periods, halfDayAbsences, halfDayHolidays);
 		cursor.setDate(cursor.getDate() + 1);
 	}
 	return credits;
@@ -151,13 +183,19 @@ export function getDayTypeLabel(
 	holidayDates: Map<string, string>,
 	sickDayDates: Set<string>,
 	vacationDates: Set<string>,
-	otherAbsenceDates: Set<string>
+	otherAbsenceDates: Set<string>,
+	halfDayHolidays?: Set<string>,
+	halfDayAbsences?: Set<string>
 ): string {
 	const key = typeof date === 'string' ? date : dateKey(date);
-	if (holidayDates.has(key)) return holidayDates.get(key) ?? 'Holiday';
-	if (sickDayDates.has(key)) return 'Sick Day';
-	if (vacationDates.has(key)) return 'Vacation';
-	if (otherAbsenceDates.has(key)) return 'Other Absence';
+	if (holidayDates.has(key)) {
+		const name = holidayDates.get(key) ?? 'Holiday';
+		return halfDayHolidays?.has(key) ? `${name} (Half Day)` : name;
+	}
+	const halfSuffix = halfDayAbsences?.has(key) ? ' (Half Day)' : '';
+	if (sickDayDates.has(key)) return 'Sick Day' + halfSuffix;
+	if (vacationDates.has(key)) return 'Vacation' + halfSuffix;
+	if (otherAbsenceDates.has(key)) return 'Other Absence' + halfSuffix;
 	return '';
 }
 
@@ -171,7 +209,8 @@ export function getTargetForRange(
 	schedule: ScheduleLike | null | undefined,
 	holidayDates: Map<string, string> | Set<string>,
 	periods: SchedulePeriodLike[],
-	firstEntryDate: Date | null = null
+	firstEntryDate: Date | null = null,
+	halfDayHolidays?: Set<string>
 ): number {
 	if (!schedule && periods.length === 0) return 0;
 	const effectiveStart = firstEntryDate && firstEntryDate > rangeStart ? firstEntryDate : rangeStart;
@@ -183,7 +222,7 @@ export function getTargetForRange(
 	const end = new Date(rangeEnd);
 	end.setHours(23, 59, 59, 999);
 	while (cursor <= end) {
-		total += getDayTarget(cursor, schedule, holidayDates, periods);
+		total += getDayTarget(cursor, schedule, holidayDates, periods, halfDayHolidays);
 		cursor.setDate(cursor.getDate() + 1);
 	}
 	return total;

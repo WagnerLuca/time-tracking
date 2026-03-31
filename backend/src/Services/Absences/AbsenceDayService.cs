@@ -55,6 +55,7 @@ public class AbsenceDayService : IAbsenceDayService
                 OrganizationId = a.OrganizationId,
                 Date = a.Date,
                 Type = a.Type.ToString(),
+                IsHalfDay = a.IsHalfDay,
                 Note = a.Note,
                 UserFirstName = a.User.FirstName,
                 UserLastName = a.User.LastName
@@ -93,6 +94,7 @@ public class AbsenceDayService : IAbsenceDayService
             OrganizationId = org.Id,
             Date = request.Date,
             Type = request.Type,
+            IsHalfDay = request.IsHalfDay,
             Note = request.Note
         };
 
@@ -131,6 +133,7 @@ public class AbsenceDayService : IAbsenceDayService
             OrganizationId = org.Id,
             Date = request.Date,
             Type = request.Type,
+            IsHalfDay = request.IsHalfDay,
             Note = request.Note
         };
 
@@ -178,6 +181,7 @@ public class AbsenceDayService : IAbsenceDayService
         OrganizationId = absence.OrganizationId,
         Date = absence.Date,
         Type = absence.Type.ToString(),
+        IsHalfDay = absence.IsHalfDay,
         Note = absence.Note,
         UserFirstName = user?.FirstName,
         UserLastName = user?.LastName

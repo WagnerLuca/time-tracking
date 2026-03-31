@@ -187,4 +187,98 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
+
+    // ── Half-day holidays ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateHoliday_HalfDay_Succeeds()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        await TestHelpers.CreateOrganizationAsync(client, "Half Day Test", "half-day-test-org");
+
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/half-day-test-org/holidays", new
+        {
+            date = "2026-12-24",
+            name = "Christmas Eve",
+            isRecurring = true,
+            isHalfDay = true
+        });
+        response.EnsureSuccessStatusCode();
+
+        var holiday = await response.Content.ReadFromJsonAsync<HolidayResponseDto>(TestHelpers.JsonOptions);
+        holiday!.Name.Should().Be("Christmas Eve");
+        holiday.IsRecurring.Should().BeTrue();
+        holiday.IsHalfDay.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CreateHoliday_FullDay_DefaultsIsHalfDayToFalse()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        await TestHelpers.CreateOrganizationAsync(client, "Full Day Default", "full-day-default-org");
+
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/full-day-default-org/holidays", new
+        {
+            date = "2026-01-01",
+            name = "New Year",
+            isRecurring = true
+        });
+        response.EnsureSuccessStatusCode();
+
+        var holiday = await response.Content.ReadFromJsonAsync<HolidayResponseDto>(TestHelpers.JsonOptions);
+        holiday!.IsHalfDay.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UpdateHoliday_SetHalfDay_Succeeds()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        await TestHelpers.CreateOrganizationAsync(client, "Update Half", "update-half-org");
+
+        var createResp = await client.PostAsJsonAsync("/api/v1/organizations/update-half-org/holidays", new
+        {
+            date = "2026-12-31",
+            name = "New Year Eve",
+            isRecurring = true,
+            isHalfDay = false
+        });
+        var created = await createResp.Content.ReadFromJsonAsync<HolidayResponseDto>(TestHelpers.JsonOptions);
+        created!.IsHalfDay.Should().BeFalse();
+
+        var updateResp = await client.PutAsJsonAsync(
+            $"/api/v1/organizations/update-half-org/holidays/{created.Id}", new
+            {
+                isHalfDay = true
+            });
+        updateResp.EnsureSuccessStatusCode();
+
+        var updated = await updateResp.Content.ReadFromJsonAsync<HolidayResponseDto>(TestHelpers.JsonOptions);
+        updated!.IsHalfDay.Should().BeTrue();
+        updated.Name.Should().Be("New Year Eve"); // unchanged
+    }
+
+    [Fact]
+    public async Task GetHolidays_IncludesIsHalfDay()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        await TestHelpers.CreateOrganizationAsync(client, "List Half", "list-half-org");
+
+        await client.PostAsJsonAsync("/api/v1/organizations/list-half-org/holidays", new
+        {
+            date = "2026-12-24",
+            name = "Christmas Eve",
+            isRecurring = true,
+            isHalfDay = true
+        });
+
+        var response = await client.GetAsync("/api/v1/organizations/list-half-org/holidays");
+        response.EnsureSuccessStatusCode();
+
+        var holidays = await response.Content.ReadFromJsonAsync<List<HolidayResponseDto>>(TestHelpers.JsonOptions);
+        holidays.Should().ContainSingle(h => h.Name == "Christmas Eve" && h.IsHalfDay);
+    }
 }

@@ -35,9 +35,11 @@
 	// Days off (holidays + absences)
 	let daysOff = $state<DaysOffData>(emptyDaysOff());
 	let holidayDates = $derived(daysOff.holidayDates);
+	let halfDayHolidays = $derived(daysOff.halfDayHolidays);
 	let sickDayDates = $derived(daysOff.sickDayDates);
 	let vacationDates = $derived(daysOff.vacationDates);
 	let otherAbsenceDates = $derived(daysOff.otherAbsenceDates);
+	let halfDayAbsences = $derived(daysOff.halfDayAbsences);
 	let daysOffSet = $derived(daysOff.daysOffSet);
 
 	// Timer display
@@ -96,7 +98,7 @@
 			const date = new Date(range.start);
 			date.setDate(range.start.getDate() + i);
 			const isPastOrToday = date <= now;
-			return { name, date: new Date(date), minutes: 0, targetMinutes: getDayTarget(date, schedule, holidayDates), entryCount: 0, isPastOrToday };
+			return { name, date: new Date(date), minutes: 0, targetMinutes: getDayTarget(date, schedule, holidayDates, [], halfDayHolidays), entryCount: 0, isPastOrToday };
 		});
 
 		for (const entry of entries) {
@@ -130,8 +132,8 @@
 		let absenceCredits = 0;
 		const cursor = new Date(firstTrackedDate);
 		while (cursor <= rangeEnd) {
-			targetMinutes += getDayTarget(cursor, workSchedule, holidayDates);
-			absenceCredits += getAbsenceCredit(cursor, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates);
+			targetMinutes += getDayTarget(cursor, workSchedule, holidayDates, [], halfDayHolidays);
+			absenceCredits += getAbsenceCredit(cursor, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, [], halfDayAbsences, halfDayHolidays);
 			cursor.setDate(cursor.getDate() + 1);
 		}
 
@@ -410,7 +412,7 @@
 					{@const dayType = getDayType(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}
 					<div class="grid grid-cols-[36px_70px_1fr_auto] items-center gap-2 py-1.5 px-2 {isToday(day.date) ? 'font-semibold' : ''} {!day.isPastOrToday ? 'opacity-50' : ''} {dayType === 'holiday' ? 'bg-secondary/10 rounded-md' : dayType === 'sick' ? 'bg-error/10 rounded-md' : dayType === 'vacation' ? 'bg-accent/10 rounded-md' : dayType === 'other-absence' ? 'bg-base-300/30 rounded-md' : ''}">
 						<span class="text-sm text-base-content/70">{day.name}</span>
-						<span class="text-xs text-base-content/40">{formatDateShort(day.date)}{#if dayType} <span class="w-2 h-2 rounded-full shrink-0 inline-block align-middle ml-1 {dayType === 'holiday' ? 'bg-secondary' : dayType === 'sick' ? 'bg-error' : dayType === 'vacation' ? 'bg-accent' : 'bg-base-content/40'}" title={getDayTypeLabel(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}></span>{/if}</span>
+						<span class="text-xs text-base-content/40">{formatDateShort(day.date)}{#if dayType} <span class="w-2 h-2 rounded-full shrink-0 inline-block align-middle ml-1 {dayType === 'holiday' ? 'bg-secondary' : dayType === 'sick' ? 'bg-error' : dayType === 'vacation' ? 'bg-accent' : 'bg-base-content/40'}" title={getDayTypeLabel(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays, halfDayAbsences)}></span>{/if}</span>
 						<div class="h-5 bg-base-200 rounded overflow-hidden relative">
 							{#if targetPct > 0}
 								<div class="absolute top-0 bottom-0 w-0.5 bg-base-content/30 z-[1]" style="left: {targetPct}%"></div>

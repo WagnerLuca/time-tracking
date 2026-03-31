@@ -36,7 +36,8 @@ public class HolidayService : IHolidayService
                 OrganizationId = h.OrganizationId,
                 Date = h.Date,
                 Name = h.Name,
-                IsRecurring = h.IsRecurring
+                IsRecurring = h.IsRecurring,
+                IsHalfDay = h.IsHalfDay
             })
             .ToListAsync();
 
@@ -64,7 +65,8 @@ public class HolidayService : IHolidayService
             OrganizationId = org.Id,
             Date = request.Date,
             Name = request.Name,
-            IsRecurring = request.IsRecurring
+            IsRecurring = request.IsRecurring,
+            IsHalfDay = request.IsHalfDay
         };
 
         _context.Holidays.Add(holiday);
@@ -93,6 +95,7 @@ public class HolidayService : IHolidayService
         if (request.Date.HasValue)       holiday.Date = request.Date.Value;
         if (request.Name != null)        holiday.Name = request.Name;
         if (request.IsRecurring.HasValue) holiday.IsRecurring = request.IsRecurring.Value;
+        if (request.IsHalfDay.HasValue)  holiday.IsHalfDay = request.IsHalfDay.Value;
 
         await _context.SaveChangesAsync();
         return ServiceResult.Ok(MapToResponse(holiday));
@@ -160,7 +163,8 @@ public class HolidayService : IHolidayService
                 OrganizationId = org.Id,
                 Date = date,
                 Name = name,
-                IsRecurring = isRecurring
+                IsRecurring = isRecurring,
+                IsHalfDay = false
             });
         }
 
@@ -189,7 +193,8 @@ public class HolidayService : IHolidayService
         OrganizationId = h.OrganizationId,
         Date = h.Date,
         Name = h.Name,
-        IsRecurring = h.IsRecurring
+        IsRecurring = h.IsRecurring,
+        IsHalfDay = h.IsHalfDay
     };
 
     private async Task<Organization?> GetOrgBySlugAsync(string slug)

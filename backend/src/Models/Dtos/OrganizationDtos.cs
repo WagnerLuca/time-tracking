@@ -240,6 +240,7 @@ public record HolidayResponse
     public DateOnly Date { get; init; }
     public required string Name { get; init; }
     public bool IsRecurring { get; init; }
+    public bool IsHalfDay { get; init; }
 }
 
 /// <summary>Request payload for creating a holiday.</summary>
@@ -251,6 +252,7 @@ public record CreateHolidayRequest
     public required string Name { get; init; }
 
     public bool IsRecurring { get; init; }
+    public bool IsHalfDay { get; init; }
 }
 
 /// <summary>Request payload for updating a holiday.</summary>
@@ -262,6 +264,7 @@ public record UpdateHolidayRequest
     public string? Name { get; init; }
 
     public bool? IsRecurring { get; init; }
+    public bool? IsHalfDay { get; init; }
 }
 
 /// <summary>Absence day entry (sick day, vacation, etc.).</summary>
@@ -272,6 +275,7 @@ public record AbsenceDayResponse
     public int OrganizationId { get; init; }
     public DateOnly Date { get; init; }
     public required string Type { get; init; }
+    public bool IsHalfDay { get; init; }
     public string? Note { get; init; }
     public string? UserFirstName { get; init; }
     public string? UserLastName { get; init; }
@@ -282,6 +286,7 @@ public record CreateAbsenceDayRequest
 {
     public DateOnly Date { get; init; }
     public AbsenceType Type { get; init; } = AbsenceType.SickDay;
+    public bool IsHalfDay { get; init; }
 
     [MaxLength(500)]
     public string? Note { get; init; }
@@ -293,6 +298,7 @@ public record AdminCreateAbsenceDayRequest
     public int UserId { get; init; }
     public DateOnly Date { get; init; }
     public AbsenceType Type { get; init; } = AbsenceType.SickDay;
+    public bool IsHalfDay { get; init; }
 
     [MaxLength(500)]
     public string? Note { get; init; }

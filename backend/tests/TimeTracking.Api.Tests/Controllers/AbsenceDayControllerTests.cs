@@ -198,4 +198,94 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
         (await client.DeleteAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences/1"))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
+
+    // ── Half-day absences ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateAbsence_HalfDay_Succeeds()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        await TestHelpers.CreateOrganizationAsync(client, "Half Abs Test", "half-abs-test");
+
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/half-abs-test/absences", new
+        {
+            date = "2026-07-15",
+            type = 1, // Vacation
+            isHalfDay = true,
+            note = "Afternoon off"
+        });
+        response.EnsureSuccessStatusCode();
+
+        var absence = await response.Content.ReadFromJsonAsync<AbsenceDayResponseDto>(TestHelpers.JsonOptions);
+        absence!.Type.Should().Be("Vacation");
+        absence.IsHalfDay.Should().BeTrue();
+        absence.Note.Should().Be("Afternoon off");
+    }
+
+    [Fact]
+    public async Task CreateAbsence_FullDay_DefaultsIsHalfDayToFalse()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        await TestHelpers.CreateOrganizationAsync(client, "Full Abs Def", "full-abs-def");
+
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/full-abs-def/absences", new
+        {
+            date = "2026-09-10",
+            type = 0
+        });
+        response.EnsureSuccessStatusCode();
+
+        var absence = await response.Content.ReadFromJsonAsync<AbsenceDayResponseDto>(TestHelpers.JsonOptions);
+        absence!.IsHalfDay.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AdminCreateAbsence_HalfDay_Succeeds()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        var detail = await client.GetFromJsonAsync<OrganizationDetailResponseDto>(
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
+        var tom = detail!.Members.First(m => m.Email == TestHelpers.SeedMemberEmail);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences/admin", new
+            {
+                userId = tom.Id,
+                date = "2026-11-20",
+                type = 1, // Vacation
+                isHalfDay = true,
+                note = "Half day vacation"
+            });
+        response.EnsureSuccessStatusCode();
+
+        var absence = await response.Content.ReadFromJsonAsync<AbsenceDayResponseDto>(TestHelpers.JsonOptions);
+        absence!.IsHalfDay.Should().BeTrue();
+        absence.Type.Should().Be("Vacation");
+    }
+
+    [Fact]
+    public async Task GetAbsences_IncludesIsHalfDay()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        await TestHelpers.CreateOrganizationAsync(client, "List Half Abs", "list-half-abs");
+
+        await client.PostAsJsonAsync("/api/v1/organizations/list-half-abs/absences", new
+        {
+            date = "2026-06-01",
+            type = 0,
+            isHalfDay = true,
+            note = "Morning sick"
+        });
+
+        var response = await client.GetAsync("/api/v1/organizations/list-half-abs/absences");
+        response.EnsureSuccessStatusCode();
+
+        var page = await response.Content.ReadFromJsonAsync<PaginatedResponseDto<AbsenceDayResponseDto>>(TestHelpers.JsonOptions);
+        page!.Items.Should().ContainSingle(a => a.Date == "2026-06-01" && a.IsHalfDay);
+    }
 }

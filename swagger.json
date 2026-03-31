@@ -3722,6 +3722,9 @@
                                                                                                   "type":  "string",
                                                                                                   "nullable":  true
                                                                                               },
+                                                                                     "isHalfDay":  {
+                                                                                                       "type":  "boolean"
+                                                                                                   },
                                                                                      "note":  {
                                                                                                   "type":  "string",
                                                                                                   "nullable":  true
@@ -3816,6 +3819,9 @@
                                                                                                "type":  {
                                                                                                             "$ref":  "#/components/schemas/AbsenceType"
                                                                                                         },
+                                                                                               "isHalfDay":  {
+                                                                                                                 "type":  "boolean"
+                                                                                                             },
                                                                                                "note":  {
                                                                                                             "maxLength":  500,
                                                                                                             "type":  "string",
@@ -3896,6 +3902,9 @@
                                                                                           "type":  {
                                                                                                        "$ref":  "#/components/schemas/AbsenceType"
                                                                                                    },
+                                                                                          "isHalfDay":  {
+                                                                                                            "type":  "boolean"
+                                                                                                        },
                                                                                           "note":  {
                                                                                                        "maxLength":  500,
                                                                                                        "type":  "string",
@@ -3922,7 +3931,10 @@
                                                                                                 },
                                                                                        "isRecurring":  {
                                                                                                            "type":  "boolean"
-                                                                                                       }
+                                                                                                       },
+                                                                                       "isHalfDay":  {
+                                                                                                         "type":  "boolean"
+                                                                                                     }
                                                                                    },
                                                                     "additionalProperties":  false,
                                                                     "description":  "Request payload for creating a holiday."
@@ -4127,7 +4139,10 @@
                                                                                            },
                                                                                   "isRecurring":  {
                                                                                                       "type":  "boolean"
-                                                                                                  }
+                                                                                                  },
+                                                                                  "isHalfDay":  {
+                                                                                                    "type":  "boolean"
+                                                                                                }
                                                                               },
                                                                "additionalProperties":  false,
                                                                "description":  "Organization holiday entry."
@@ -5144,7 +5159,11 @@
                                                                                        "isRecurring":  {
                                                                                                            "type":  "boolean",
                                                                                                            "nullable":  true
-                                                                                                       }
+                                                                                                       },
+                                                                                       "isHalfDay":  {
+                                                                                                         "type":  "boolean",
+                                                                                                         "nullable":  true
+                                                                                                     }
                                                                                    },
                                                                     "additionalProperties":  false,
                                                                     "description":  "Request payload for updating a holiday."
