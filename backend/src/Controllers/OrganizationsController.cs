@@ -189,4 +189,18 @@ public class OrganizationsController : OrganizationBaseController
         if (userId == null) return Unauthorized();
         return ToResponse(await _service.SetMemberInitialOvertimeAsync(slug, userId.Value, memberId, request));
     }
+
+    /// <summary>Set a member's vacation days allowance per year (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID to update.</param>
+    [HttpPut("{slug}/members/{memberId}/vacation-days")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetMemberVacationDays(
+        string slug, int memberId, [FromBody] SetVacationDaysRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.SetMemberVacationDaysAsync(slug, userId.Value, memberId, request));
+    }
 }

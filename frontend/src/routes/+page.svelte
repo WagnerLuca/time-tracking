@@ -5,7 +5,7 @@
 	import { timeTrackingApi, organizationsApi, workScheduleApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, StartTimeEntryRequest, WorkScheduleResponse } from '$lib/api';
 	import { formatHours, formatDelta, barWidth, getMonthName } from '$lib/utils/formatters';
-	import { isToday, isFuture, sumMinutes } from '$lib/utils/dateHelpers';
+	import { isToday, isFuture, sumMinutes, dateKey } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, absenceCreditsForRange, getDayType, getDayTypeLabel, getTargetForRange } from '$lib/utils/scheduleHelpers';
 	import { DAY_NAMES, MAX_ENTRIES_FOR_OVERTIME, WEEKLY_ENTRY_LIMIT, MONTHLY_ENTRY_LIMIT } from '$lib/utils/constants';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
@@ -46,6 +46,13 @@
 	let otherAbsenceDates = $derived(daysOff.otherAbsenceDates);
 	let halfDayAbsences = $derived(daysOff.halfDayAbsences);
 	let daysOffSet = $derived(daysOff.daysOffSet);
+
+	// Week-scoped sets for legend (only show legend items for day types visible this week)
+	let weekKeys = $derived(weekDays.map(d => dateKey(d.date)));
+	let weekHolidayDates = $derived(new Map([...holidayDates].filter(([k]) => weekKeys.includes(k))));
+	let weekSickDates = $derived(new Set([...sickDayDates].filter(k => weekKeys.includes(k))));
+	let weekVacationDates = $derived(new Set([...vacationDates].filter(k => weekKeys.includes(k))));
+	let weekOtherAbsenceDates = $derived(new Set([...otherAbsenceDates].filter(k => weekKeys.includes(k))));
 
 	onMount(async () => {
 		if (!auth.user) return;
@@ -380,7 +387,7 @@
 			</div>
 			<div class="flex flex-col gap-2">
 				{#each weekDays as day}
-					{@const dayType = getDayType(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}
+					{@const dayType = getDayType(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays)}
 					<div class="flex items-center gap-2.5 {isToday(day.date) ? 'font-semibold' : ''} {isFuture(day.date) ? 'opacity-40' : ''} {dayType === 'holiday' ? 'bg-secondary/10 rounded px-1 -mx-1' : dayType === 'sick' ? 'bg-error/10 rounded px-1 -mx-1' : dayType === 'vacation' ? 'bg-success/10 rounded px-1 -mx-1' : dayType === 'other-absence' ? 'bg-base-content/10 rounded px-1 -mx-1' : ''}">
 						<span class="w-8 text-sm text-base-content/50 shrink-0">{day.label}</span>
 						{#if dayType}
@@ -407,7 +414,7 @@
 		</a>
 	{/if}
 
-	<DayTypeLegend {holidayDates} {sickDayDates} {vacationDates} {otherAbsenceDates} />
+	<DayTypeLegend holidayDates={weekHolidayDates} sickDayDates={weekSickDates} vacationDates={weekVacationDates} otherAbsenceDates={weekOtherAbsenceDates} />
 
 	<!-- Monthly Overview -->
 	{#if monthWeeks.length > 0}

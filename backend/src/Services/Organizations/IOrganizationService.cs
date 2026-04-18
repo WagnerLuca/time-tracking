@@ -29,4 +29,7 @@ public interface IOrganizationService
 
     // ── Initial overtime (admin) ──
     Task<ServiceResult<object>> SetMemberInitialOvertimeAsync(string slug, int callerUserId, int userId, SetInitialOvertimeRequest request);
+
+    // ── Vacation days (admin) ──
+    Task<ServiceResult<object>> SetMemberVacationDaysAsync(string slug, int callerUserId, int userId, SetVacationDaysRequest request);
 }

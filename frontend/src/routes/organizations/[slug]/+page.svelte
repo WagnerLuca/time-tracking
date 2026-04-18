@@ -8,7 +8,8 @@
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import {
 		parseRuleMode, ruleModeLabel, joinPolicyLabel, ruleModeButtonClass,
-		ruleSettings, toggleSettings
+		ruleSettings, toggleSettings,
+		visibilitySettings, parseVisibilityMode, visibilityModeLabel, visibilityModeButtonClass
 	} from '$lib/utils/orgRules';
 	import type {
 		OrganizationDetailResponse,
@@ -18,6 +19,7 @@
 		PauseRuleResponse,
 		CreatePauseRuleRequest,
 		RuleMode,
+		VisibilityMode,
 		WorkScheduleResponse,
 		OrgRequestResponse,
 		HolidayResponse,
@@ -62,7 +64,7 @@
 	let actionError = $state('');
 
 	// Tab navigation
-	let activeTab = $state<'my-schedule' | 'team' | 'settings'>('my-schedule');
+	let activeTab = $state<'my-schedule' | 'team' | 'absences' | 'settings'>('my-schedule');
 
 	// Team overview data (admin)
 	let teamOverview = $state<MemberTimeOverviewResponse[]>([]);
@@ -77,6 +79,13 @@
 	let myOvertimeHours = $state(0);
 	let myOvertimeSaving = $state(false);
 	let myOvertimeError = $state('');
+
+	// My vacation days editing (inline)
+	let editingMyVacation = $state(false);
+	let myVacationDays = $state(0);
+	let myVacationSaving = $state(false);
+	let myVacationError = $state('');
+	let myMember = $derived(org?.members?.find(m => m.id === auth.user?.id) ?? null);
 
 	// Request history (admin)
 	let requestHistory = $state<OrgRequestResponse[]>([]);
@@ -101,9 +110,7 @@
 	let newHolidayHalfDay = $state(false);
 	let editHolidayRecurring = $state(false);
 	let editHolidayHalfDay = $state(false);
-	let importingHolidays = $state(false);
-	let importPreset = $state('de');
-	let importYear = $state(new Date().getFullYear());
+
 
 	// Absences / sick days
 	let absences = $state<AbsenceDayResponse[]>([]);
@@ -127,6 +134,9 @@
 	let addingAdminAbsence = $state(false);
 	let adminAbsenceError = $state('');
 	let adminAbsenceFilter = $state<number | null>(null); // userId filter
+	let panelTypeFilter = $state<string>('all'); // 'all', 'Vacation', 'SickDay', 'Other'
+	let calendarMonth = $state(new Date().getMonth()); // 0-11
+	let calendarYear = $state(new Date().getFullYear());
 
 	// Schedule periods
 	let schedulePeriods = $state<WorkScheduleResponse[]>([]);
@@ -315,6 +325,26 @@
 		}
 	}
 
+	function startEditMyVacation() {
+		myVacationDays = myMember?.vacationDaysPerYear ?? 0;
+		myVacationError = '';
+		editingMyVacation = true;
+	}
+
+	async function saveMyVacation() {
+		myVacationSaving = true;
+		myVacationError = '';
+		try {
+			await organizationsApi.apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(orgSlug, auth.user!.id!, { days: myVacationDays });
+			await reloadOrg();
+			editingMyVacation = false;
+		} catch (err) {
+			myVacationError = extractErrorMessage(err, 'Failed to save vacation days.');
+		} finally {
+			myVacationSaving = false;
+		}
+	}
+
 	async function loadUsersForDropdown() {
 		if (usersLoaded) return;
 		try {
@@ -451,6 +481,22 @@
 		try {
 			const current = parseRuleMode((org as Record<string, any>)[key]);
 			const next = ((current + 1) % 3) as RuleMode;
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { [key]: next } as UpdateOrganizationSettingsRequest);
+			await reloadOrg();
+		} catch (err) {
+			settingsError = extractErrorMessage(err, 'Failed to update setting.');
+		} finally {
+			settingsSaving = false;
+		}
+	}
+
+	async function cycleVisibilitySetting(key: string) {
+		if (!org) return;
+		settingsSaving = true;
+		settingsError = '';
+		try {
+			const current = parseVisibilityMode((org as Record<string, any>)[key]);
+			const next = ((current + 1) % 3) as VisibilityMode;
 			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { [key]: next } as UpdateOrganizationSettingsRequest);
 			await reloadOrg();
 		} catch (err) {
@@ -802,6 +848,70 @@
 		}
 	}
 
+	// Calendar helpers
+	function calendarDays(year: number, month: number): { date: Date; inMonth: boolean }[] {
+		const first = new Date(year, month, 1);
+		const last = new Date(year, month + 1, 0);
+		const startDay = (first.getDay() + 6) % 7; // Monday = 0
+		const days: { date: Date; inMonth: boolean }[] = [];
+		// Fill leading days from prev month
+		for (let i = startDay - 1; i >= 0; i--) {
+			const d = new Date(year, month, -i);
+			days.push({ date: d, inMonth: false });
+		}
+		// Days in month
+		for (let d = 1; d <= last.getDate(); d++) {
+			days.push({ date: new Date(year, month, d), inMonth: true });
+		}
+		// Fill trailing days to complete the grid
+		while (days.length % 7 !== 0) {
+			const d = new Date(year, month + 1, days.length - last.getDate() - startDay + 1);
+			days.push({ date: d, inMonth: false });
+		}
+		return days;
+	}
+
+	function dateToKey(d: Date): string {
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	}
+
+	function buildAbsenceMap(absenceList: AbsenceDayResponse[]): Map<string, AbsenceDayResponse[]> {
+		const map = new Map<string, AbsenceDayResponse[]>();
+		for (const a of absenceList) {
+			const key = a.date ?? '';
+			if (!map.has(key)) map.set(key, []);
+			map.get(key)!.push(a);
+		}
+		return map;
+	}
+
+	function buildHolidayMap(holidayList: HolidayResponse[]): Map<string, HolidayResponse[]> {
+		const map = new Map<string, HolidayResponse[]>();
+		for (const h of holidayList) {
+			const key = h.date ?? '';
+			if (!map.has(key)) map.set(key, []);
+			map.get(key)!.push(h);
+		}
+		return map;
+	}
+
+	function navigateMonth(delta: number) {
+		let m = calendarMonth + delta;
+		let y = calendarYear;
+		if (m < 0) { m = 11; y--; }
+		else if (m > 11) { m = 0; y++; }
+		calendarMonth = m;
+		calendarYear = y;
+	}
+
+	function absenceColor(type: string | null | undefined): string {
+		switch (type) {
+			case 'Vacation': return 'bg-info/20 text-info border-info/30';
+			case 'SickDay': return 'bg-error/20 text-error border-error/30';
+			default: return 'bg-warning/20 text-warning border-warning/30';
+		}
+	}
+
 	async function addSchedulePeriod(e: Event) {
 		e.preventDefault();
 		if (!newPeriodFrom) {
@@ -870,19 +980,7 @@
 		await toggleSetting('memberTimeEntryVisibility');
 	}
 
-	async function importHolidays() {
-		importingHolidays = true;
-		holidayError = '';
-		try {
-			await holidayApi.apiV1OrganizationsSlugHolidaysImportPresetPost(orgSlug, importPreset, importYear);
-			holidaysLoaded = false;
-			await loadHolidays();
-		} catch (err) {
-			holidayError = extractErrorMessage(err, 'Failed to import holidays.');
-		} finally {
-			importingHolidays = false;
-		}
-	}
+
 </script>
 
 <svelte:head>
@@ -986,6 +1084,12 @@
 					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
 					Team
 				</button>
+				{#if canEdit}
+					<button class="tab {activeTab === 'absences' ? 'tab-active' : ''}" onclick={() => (activeTab = 'absences')}>
+						<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
+						Absences
+					</button>
+				{/if}
 				<button class="tab {activeTab === 'settings' ? 'tab-active' : ''}" onclick={() => (activeTab = 'settings')}>
 					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
 					{canEdit ? 'Settings' : 'Rules'}
@@ -1077,6 +1181,64 @@
 						{/if}
 					{/if}
 
+					<!-- Vacation Days -->
+					{#if myRole && myMember}
+						<section class="mt-4 bg-base-200/30 rounded-lg p-5 border border-base-300">
+							<div class="flex items-center justify-between mb-4">
+								<h2 class="text-xl font-bold text-base-content">Vacation Days</h2>
+								{#if canEdit && !editingMyVacation}
+									<button class="btn btn-outline btn-info btn-xs" onclick={startEditMyVacation}>Edit</button>
+								{/if}
+							</div>
+
+							{#if editingMyVacation}
+								<div class="flex flex-col gap-3 py-2">
+									{#if myVacationError}
+										<div class="alert alert-error text-sm py-1.5 px-2.5">{myVacationError}</div>
+									{/if}
+									<div class="flex items-center gap-3">
+										<label for="my-vacation-days" class="text-sm text-base-content/70 font-medium min-w-[100px]">Days / Year</label>
+										<input id="my-vacation-days" type="number" class="input input-bordered input-xs w-20" bind:value={myVacationDays} step="0.5" min="0" max="365" />
+									</div>
+									<div class="flex gap-2 mt-1">
+										<button class="btn btn-primary btn-sm" onclick={saveMyVacation} disabled={myVacationSaving}>
+											{myVacationSaving ? 'Saving...' : 'Save'}
+										</button>
+										<button class="btn btn-ghost btn-sm" onclick={() => (editingMyVacation = false)}>Cancel</button>
+									</div>
+								</div>
+							{:else}
+								{@const allowed = myMember.vacationDaysPerYear ?? 0}
+								{@const used = myMember.vacationDaysUsed ?? 0}
+								{@const remaining = myMember.vacationDaysRemaining ?? 0}
+								{#if allowed > 0}
+									<div class="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] gap-2 mb-3">
+										<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+											<span class="text-xs text-base-content/60 font-medium">Remaining</span>
+											<span class="text-lg font-bold text-success">{remaining}</span>
+										</div>
+										<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+											<span class="text-xs text-base-content/60 font-medium">Used</span>
+											<span class="text-lg font-bold text-base-content">{used}</span>
+										</div>
+										<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
+											<span class="text-xs text-base-content/60 font-medium">Total</span>
+											<span class="text-lg font-bold text-base-content">{allowed}</span>
+										</div>
+									</div>
+									<div class="w-full bg-base-200 rounded-full h-2.5">
+										<div
+											class="h-2.5 rounded-full transition-all {used / allowed > 0.9 ? 'bg-error' : used / allowed > 0.7 ? 'bg-warning' : 'bg-success'}"
+											style="width: {Math.min(100, (used / allowed) * 100)}%"
+										></div>
+									</div>
+								{:else}
+									<p class="text-base-content/50 text-sm">No vacation allowance set. {canEdit ? 'Click Edit to set your annual days.' : 'Ask an admin to set your vacation allowance.'}</p>
+								{/if}
+							{/if}
+						</section>
+					{/if}
+
 					<!-- My Absences -->
 					{#if myRole}
 						<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
@@ -1143,21 +1305,33 @@
 								{#if myAbsences.length === 0}
 									<p class="text-base-content/40">No absences recorded.</p>
 								{:else}
-									<div class="flex flex-col gap-1.5">
-										{#each myAbsences as a}
-											<div class="flex items-center gap-3 py-2 px-3 bg-base-200/30 rounded-md text-sm">
-												<span class="font-medium text-base-content/70 min-w-[90px]">{formatDateDisplay(a.date)}</span>
-												<span class="badge badge-sm {absenceTypeBadge(a.type) === 'badge-sick' ? 'badge-error' : absenceTypeBadge(a.type) === 'badge-vacation' ? 'badge-info' : 'badge-ghost'}">{absenceTypeLabel(a.type)}</span>
-												{#if a.isHalfDay}
-													<span class="badge badge-warning badge-xs">½ Day</span>
-												{/if}
-												{#if a.note}
-													<span class="text-base-content/40 text-sm italic flex-1">{a.note}</span>
-												{/if}
-												<button class="btn btn-ghost btn-xs text-error" title="Delete" onclick={() => deleteAbsence(a.id!)}>&times;</button>
+									{@const absencesByYear = Object.entries(
+										myAbsences.reduce<Record<string, typeof myAbsences>>((acc, a) => {
+											const year = a.date?.substring(0, 4) ?? 'Unknown';
+											(acc[year] ??= []).push(a);
+											return acc;
+										}, {})
+									).sort(([a], [b]) => b.localeCompare(a))}
+									{#each absencesByYear as [year, yearAbsences]}
+										<div class="mb-4">
+											<h3 class="text-sm font-semibold text-base-content/50 mb-2">{year}</h3>
+											<div class="flex flex-col gap-1.5">
+												{#each yearAbsences as a}
+													<div class="flex items-center gap-3 py-2 px-3 bg-base-200/30 rounded-md text-sm">
+														<span class="font-medium text-base-content/70 min-w-[90px]">{formatDateDisplay(a.date)}</span>
+														<span class="badge badge-sm {absenceTypeBadge(a.type) === 'badge-sick' ? 'badge-error' : absenceTypeBadge(a.type) === 'badge-vacation' ? 'badge-info' : 'badge-ghost'}">{absenceTypeLabel(a.type)}</span>
+														{#if a.isHalfDay}
+															<span class="badge badge-warning badge-xs">½ Day</span>
+														{/if}
+														{#if a.note}
+															<span class="text-base-content/40 text-sm italic flex-1">{a.note}</span>
+														{/if}
+														<button class="btn btn-ghost btn-xs text-error" title="Delete" onclick={() => deleteAbsence(a.id!)}>&times;</button>
+													</div>
+												{/each}
 											</div>
-										{/each}
-									</div>
+										</div>
+									{/each}
 								{/if}
 							{/if}
 						</section>
@@ -1336,6 +1510,11 @@
 										{/if}
 									</div>
 									<div class="flex items-center gap-2 shrink-0">
+										{#if (member.vacationDaysPerYear ?? 0) > 0}
+											<span class="badge badge-sm badge-outline" title="Vacation: {member.vacationDaysUsed ?? 0}/{member.vacationDaysPerYear} used">
+												🏖 {member.vacationDaysRemaining ?? member.vacationDaysPerYear}d left
+											</span>
+										{/if}
 										<span class="badge badge-sm uppercase tracking-wide {(member.role?.toLowerCase() ?? 'member') === 'owner' ? 'badge-warning' : (member.role?.toLowerCase() ?? 'member') === 'admin' ? 'badge-info' : 'badge-ghost'}">{member.role}</span>
 										<svg class="w-5 h-5 text-base-content/20 group-hover:text-primary transition-colors" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
 									</div>
@@ -1363,19 +1542,7 @@
 									<div class="alert alert-error text-sm py-1.5 px-2.5">{holidayError}</div>
 								{/if}
 
-								{#if canEdit}
-									<div class="flex items-center gap-2 mb-3 flex-wrap">
-										<select bind:value={importPreset} class="input input-bordered input-xs w-20" disabled={importingHolidays}>
-											<option value="de">Germany</option>
-											<option value="at">Austria</option>
-											<option value="ch">Switzerland</option>
-										</select>
-										<input type="number" bind:value={importYear} class="input input-bordered input-xs w-20" min="2020" max="2099" style="width:80px" disabled={importingHolidays} />
-										<button class="btn btn-ghost btn-sm" onclick={importHolidays} disabled={importingHolidays}>
-											{importingHolidays ? 'Importing...' : 'Import Holidays'}
-										</button>
-									</div>
-								{/if}
+	
 
 								{#if showAddHoliday && canEdit}
 									<form onsubmit={addHoliday} class="flex flex-col gap-2.5 p-3 bg-base-200/30 rounded-lg mb-3 border border-base-300">
@@ -1410,46 +1577,223 @@
 								{#if holidays.length === 0}
 									<p class="text-base-content/40">No holidays configured.</p>
 								{:else}
-									<div class="flex flex-col gap-1.5">
-										{#each holidays as h}
-											<div class="flex items-center gap-3 py-2 px-3 bg-base-200/30 rounded-md text-sm">
-												{#if editingHolidayId === h.id && canEdit}
-													<input type="date" bind:value={editHolidayDate} class="input input-bordered input-xs w-20" disabled={editHolidaySaving} />
-													<input type="text" bind:value={editHolidayName} class="input input-bordered input-xs w-20" disabled={editHolidaySaving} />
-													<label class="label cursor-pointer flex items-center gap-1.5 text-[0.8rem] whitespace-nowrap text-sm text-base-content/70">
-														<input type="checkbox" class="checkbox checkbox-sm" bind:checked={editHolidayRecurring} disabled={editHolidaySaving} />
-														Yearly
-													</label>
-													<label class="label cursor-pointer flex items-center gap-1.5 text-[0.8rem] whitespace-nowrap text-sm text-base-content/70">
-														<input type="checkbox" class="checkbox checkbox-sm" bind:checked={editHolidayHalfDay} disabled={editHolidaySaving} />
-														Half
-													</label>
-													<div class="flex items-center gap-1.5">
-														<button class="btn btn-primary btn-sm" onclick={() => saveEditHoliday(h.id!)} disabled={editHolidaySaving}>Save</button>
-														<button class="btn btn-ghost btn-sm" onclick={() => (editingHolidayId = null)}>Cancel</button>
+									{@const holidaysByYear = Object.entries(
+										holidays.reduce<Record<string, typeof holidays>>((acc, h) => {
+											const year = h.isRecurring ? 'Recurring' : (h.date?.substring(0, 4) ?? 'Unknown');
+											(acc[year] ??= []).push(h);
+											return acc;
+										}, {})
+									).sort(([a], [b]) => a === 'Recurring' ? 1 : b === 'Recurring' ? -1 : b.localeCompare(a))}
+									{#each holidaysByYear as [year, yearHolidays]}
+										<div class="mb-4">
+											<h3 class="text-sm font-semibold text-base-content/50 mb-2">{year}</h3>
+											<div class="flex flex-col gap-1.5">
+												{#each yearHolidays as h}
+													<div class="flex items-center gap-3 py-2 px-3 bg-base-200/30 rounded-md text-sm">
+														{#if editingHolidayId === h.id && canEdit}
+															<input type="date" bind:value={editHolidayDate} class="input input-bordered input-xs w-20" disabled={editHolidaySaving} />
+															<input type="text" bind:value={editHolidayName} class="input input-bordered input-xs w-20" disabled={editHolidaySaving} />
+															<label class="label cursor-pointer flex items-center gap-1.5 text-[0.8rem] whitespace-nowrap text-sm text-base-content/70">
+																<input type="checkbox" class="checkbox checkbox-sm" bind:checked={editHolidayRecurring} disabled={editHolidaySaving} />
+																Yearly
+															</label>
+															<label class="label cursor-pointer flex items-center gap-1.5 text-[0.8rem] whitespace-nowrap text-sm text-base-content/70">
+																<input type="checkbox" class="checkbox checkbox-sm" bind:checked={editHolidayHalfDay} disabled={editHolidaySaving} />
+																Half
+															</label>
+															<div class="flex items-center gap-1.5">
+																<button class="btn btn-primary btn-sm" onclick={() => saveEditHoliday(h.id!)} disabled={editHolidaySaving}>Save</button>
+																<button class="btn btn-ghost btn-sm" onclick={() => (editingHolidayId = null)}>Cancel</button>
+															</div>
+														{:else}
+															<span class="font-medium text-base-content/70 min-w-[90px]">{formatDateDisplay(h.date)}</span>
+															<span class="flex-1 text-base-content/60">{h.name}</span>
+															{#if h.isHalfDay}
+																<span class="badge badge-warning badge-xs">½ Day</span>
+															{/if}
+															{#if h.isRecurring}
+																<span class="badge badge-info badge-xs" title="Repeats every year">🔁 Yearly</span>
+															{/if}
+															{#if canEdit}
+																<div class="flex items-center gap-1.5">
+																	<button class="btn btn-ghost btn-sm" onclick={() => startEditHoliday(h)}>Edit</button>
+																	<button class="btn btn-ghost btn-xs text-error" title="Delete" onclick={() => deleteHoliday(h.id!)}>&times;</button>
+																</div>
+															{/if}
+														{/if}
 													</div>
-												{:else}
-													<span class="font-medium text-base-content/70 min-w-[90px]">{formatDateDisplay(h.date)}</span>
-													<span class="flex-1 text-base-content/60">{h.name}</span>
-													{#if h.isHalfDay}
-														<span class="badge badge-warning badge-xs">½ Day</span>
-													{/if}
-													{#if h.isRecurring}
-														<span class="badge badge-info badge-xs" title="Repeats every year">&#x1f501; Yearly</span>
-													{/if}
-													{#if canEdit}
-														<div class="flex items-center gap-1.5">
-															<button class="btn btn-ghost btn-sm" onclick={() => startEditHoliday(h)}>Edit</button>
-															<button class="btn btn-ghost btn-xs text-error" title="Delete" onclick={() => deleteHoliday(h.id!)}>&times;</button>
-														</div>
-													{/if}
-												{/if}
+												{/each}
 											</div>
-										{/each}
-									</div>
+										</div>
+									{/each}
 								{/if}
 							{/if}
 						</section>
+					{/if}
+				</div>
+
+			<!-- ==================== ABSENCES TAB (Admin) ==================== -->
+			{:else if activeTab === 'absences' && canEdit}
+				<div class="pt-2">
+					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Calendar overview of absences and vacation days across all members.</p>
+
+					<!-- Calendar Navigation -->
+					{#if org}
+					{@const absenceMap = buildAbsenceMap(absences)}
+					{@const holidayMap = buildHolidayMap(holidays)}
+					{@const days = calendarDays(calendarYear, calendarMonth)}
+					{@const monthLabel = new Date(calendarYear, calendarMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+					{@const today = dateToKey(new Date())}
+
+					<section>
+						<div class="flex items-center justify-between mb-4">
+							<button class="btn btn-ghost btn-sm" aria-label="Previous month" onclick={() => navigateMonth(-1)}>
+								<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd"/></svg>
+							</button>
+							<div class="flex items-center gap-3">
+								<h2 class="text-xl font-bold text-base-content">{monthLabel}</h2>
+								<button class="btn btn-ghost btn-xs" onclick={() => { calendarMonth = new Date().getMonth(); calendarYear = new Date().getFullYear(); }}>Today</button>
+							</div>
+							<button class="btn btn-ghost btn-sm" aria-label="Next month" onclick={() => navigateMonth(1)}>
+								<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
+							</button>
+						</div>
+
+						<!-- Day-of-week headers -->
+						<div class="grid grid-cols-7 gap-px mb-px">
+							{#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as dow}
+								<div class="text-center text-xs font-semibold text-base-content/50 py-2 {dow === 'Sat' || dow === 'Sun' ? 'text-base-content/30' : ''}">{dow}</div>
+							{/each}
+						</div>
+
+						<!-- Calendar grid -->
+						<div class="grid grid-cols-7 gap-px bg-base-300/50 border border-base-300 rounded-lg overflow-hidden">
+							{#each days as { date, inMonth }}
+								{@const key = dateToKey(date)}
+								{@const isToday = key === today}
+								{@const isWeekend = date.getDay() === 0 || date.getDay() === 6}
+								{@const dayAbsences = absenceMap.get(key) ?? []}
+								{@const dayHolidays = holidayMap.get(key) ?? []}
+								<div class="min-h-[90px] p-1.5 flex flex-col {inMonth ? 'bg-base-100' : 'bg-base-200/50'} {isWeekend && inMonth ? 'bg-base-200/30' : ''}">
+									<div class="flex items-center justify-between mb-1">
+										<span class="text-xs font-medium {isToday ? 'bg-primary text-primary-content rounded-full w-6 h-6 flex items-center justify-center' : ''} {inMonth ? 'text-base-content' : 'text-base-content/25'} {isWeekend && inMonth ? 'text-base-content/40' : ''}">
+											{date.getDate()}
+										</span>
+										{#if dayAbsences.length > 0}
+											<span class="text-[10px] text-base-content/40">{dayAbsences.length}</span>
+										{/if}
+									</div>
+									{#each dayHolidays as h}
+										<div class="text-[10px] px-1 py-0.5 rounded bg-success/15 text-success border border-success/20 mb-0.5 truncate" title={h.name ?? ''}>
+											🎉 {h.name}
+										</div>
+									{/each}
+									{#each dayAbsences.slice(0, 3) as a}
+										<a href="/organizations/{orgSlug}/members/{a.userId}" class="block text-[10px] px-1 py-0.5 rounded border mb-0.5 truncate no-underline hover:brightness-90 transition-all cursor-pointer {absenceColor(a.type)}" title="{a.userFirstName} {a.userLastName} — {absenceTypeLabel(a.type ?? '')}{a.isHalfDay ? ' (½)' : ''}{a.note ? ': ' + a.note : ''}">
+											{(a.userFirstName?.[0] ?? '')}{(a.userLastName?.[0] ?? '')} {a.userFirstName}{#if a.isHalfDay} ½{/if}
+										</a>
+									{/each}
+									{#if dayAbsences.length > 3}
+										<div class="text-[10px] text-base-content/40 text-center">+{dayAbsences.length - 3} more</div>
+									{/if}
+								</div>
+							{/each}
+						</div>
+
+						<!-- Legend -->
+						<div class="flex flex-wrap gap-4 mt-3 text-xs text-base-content/60">
+							<span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-info/20 border border-info/30"></span> Vacation</span>
+							<span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-error/20 border border-error/30"></span> Sick Day</span>
+							<span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-warning/20 border border-warning/30"></span> Other</span>
+							<span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-success/15 border border-success/20"></span> Holiday</span>
+						</div>
+					</section>
+
+					<!-- Vacation Days Summary -->
+					<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
+						<h2 class="text-xl font-bold text-base-content mb-4">Vacation Days Balance</h2>
+						{#if org}
+						{@const membersWithVacation = (org.members ?? []).filter(m => (m.vacationDaysPerYear ?? 0) > 0).sort((a, b) => ((a.vacationDaysRemaining ?? 0) - (b.vacationDaysRemaining ?? 0)))}
+						{#if membersWithVacation.length === 0}
+							<p class="text-base-content/40 text-sm">No members have vacation days configured.</p>
+						{:else}
+							<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+								{#each membersWithVacation as member}
+									{@const total = member.vacationDaysPerYear ?? 0}
+									{@const used = member.vacationDaysUsed ?? 0}
+									{@const remaining = member.vacationDaysRemaining ?? total}
+									{@const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0}
+									<a href="/organizations/{orgSlug}/members/{member.id}" class="flex items-start gap-3 p-3 bg-base-100 rounded-lg border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all no-underline text-base-content">
+										<div class="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">
+											{(member.firstName?.[0] ?? '').toUpperCase()}{(member.lastName?.[0] ?? '').toUpperCase()}
+										</div>
+										<div class="flex-1 min-w-0">
+											<div class="font-semibold text-sm truncate">{member.firstName} {member.lastName}</div>
+											<div class="flex items-center gap-2 mt-1">
+												<progress class="progress {pct >= 90 ? 'progress-error' : pct >= 70 ? 'progress-warning' : 'progress-primary'} flex-1 h-2" value={pct} max="100"></progress>
+												<span class="text-xs text-base-content/50 shrink-0">{pct}%</span>
+											</div>
+											<div class="flex justify-between mt-1 text-xs text-base-content/50">
+												<span>{used}d used / {total}d</span>
+												<span class="font-semibold {remaining <= 2 ? 'text-error' : remaining <= 5 ? 'text-warning' : 'text-success'}">{remaining}d left</span>
+											</div>
+										</div>
+									</a>
+								{/each}
+							</div>
+						{/if}
+						{/if}
+					</section>
+					<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
+						<div class="flex items-center justify-between mb-4">
+							<h2 class="text-xl font-bold text-base-content">Manage Absences</h2>
+							<button class="btn btn-primary btn-sm" onclick={() => { showAdminAddAbsence = !showAdminAddAbsence; if (showAdminAddAbsence) loadUsersForDropdown(); }}>
+								{showAdminAddAbsence ? 'Cancel' : '+ Add Absence'}
+							</button>
+						</div>
+
+						{#if showAdminAddAbsence}
+							<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
+								{#if adminAbsenceError}
+									<div class="alert alert-error text-sm py-1.5 px-2.5 mb-2">{adminAbsenceError}</div>
+								{/if}
+								<form onsubmit={addAdminAbsence} class="flex flex-wrap gap-2 items-end">
+									<div class="flex flex-col gap-1">
+										<span class="text-xs text-base-content/60">Member</span>
+										<select bind:value={adminAbsenceUserId} class="select select-bordered select-sm min-w-[180px]" required>
+											<option value={null}>Select member...</option>
+											{#each (org.members ?? []) as m}
+												<option value={m.id}>{m.firstName} {m.lastName}</option>
+											{/each}
+										</select>
+									</div>
+									<div class="flex flex-col gap-1">
+										<span class="text-xs text-base-content/60">Date</span>
+										<input type="date" class="input input-bordered input-sm" bind:value={adminAbsenceDate} required />
+									</div>
+									<div class="flex flex-col gap-1">
+										<span class="text-xs text-base-content/60">Type</span>
+										<select bind:value={adminAbsenceType} class="select select-bordered select-sm">
+											<option value={0}>Sick Day</option>
+											<option value={1}>Vacation</option>
+											<option value={2}>Other</option>
+										</select>
+									</div>
+									<div class="flex flex-col gap-1">
+										<span class="text-xs text-base-content/60">Note</span>
+										<input type="text" class="input input-bordered input-sm" bind:value={adminAbsenceNote} placeholder="Optional" />
+									</div>
+									<label class="label cursor-pointer flex items-center gap-1.5 text-sm">
+										<input type="checkbox" class="checkbox checkbox-sm" bind:checked={adminAbsenceHalfDay} />
+										Half day
+									</label>
+									<button type="submit" class="btn btn-primary btn-sm" disabled={addingAdminAbsence}>
+										{addingAdminAbsence ? 'Adding...' : 'Add'}
+									</button>
+								</form>
+							</div>
+						{/if}
+					</section>
 					{/if}
 				</div>
 
@@ -1503,6 +1847,54 @@
 									</button>
 								</div>
 							{/each}
+
+							<!-- Visibility settings (Private / Admin Only / All Members) -->
+							{#each visibilitySettings as vs}
+								{@const mode = (org as Record<string, any>)[vs.key] as string | null}
+								<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
+									<div class="setting-info">
+										<div class="font-semibold text-base-content mb-0.5">{vs.label}</div>
+										<div class="text-sm text-base-content/60 max-w-[400px]">{vs.description}</div>
+									</div>
+									<button
+										class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {visibilityModeButtonClass(mode)}"
+										onclick={() => cycleVisibilitySetting(vs.key)}
+										disabled={settingsSaving}
+									>
+										{visibilityModeLabel(mode)}
+									</button>
+								</div>
+							{/each}
+						</div>
+						<div class="bg-base-200/50 rounded-lg p-4 mt-4 border border-base-300">
+							<div class="flex items-center justify-between">
+								<div class="setting-info">
+									<div class="font-semibold text-base-content mb-0.5">Default Vacation Days</div>
+									<div class="text-sm text-base-content/60 max-w-[400px]">Default number of vacation days per year for new members. Existing members can be set individually.</div>
+								</div>
+								<div class="flex items-center gap-2">
+									<input
+										type="number"
+										class="input input-bordered input-sm w-20 text-center"
+										step="0.5"
+										min="0"
+										max="365"
+										value={org.defaultVacationDays ?? 0}
+										onchange={async (e) => {
+											const val = parseFloat((e.target as HTMLInputElement).value);
+											if (isNaN(val) || val < 0 || !org) return;
+											settingsSaving = true;
+											try {
+												await organizationsApi.apiV1OrganizationsSlugSettingsPut(org.slug!, { defaultVacationDays: val });
+												await loadOrg();
+											} catch { /* ignore */ }
+											settingsSaving = false;
+										}}
+										disabled={settingsSaving}
+									/>
+									<span class="text-sm text-base-content/60">days/year</span>
+								</div>
+							</div>
 						</div>
 
 						<!-- Pause Rules -->
@@ -1693,6 +2085,18 @@
 										<div class="text-sm text-base-content/60 max-w-[400px]">{rs.description}</div>
 									</div>
 									<span class="badge {ruleModeButtonClass(mode)}">{label}</span>
+								</div>
+							{/each}
+
+							<!-- Visibility settings (read-only) -->
+							{#each visibilitySettings as vs}
+								{@const mode = (org as Record<string, any>)[vs.key] as string | null}
+								<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
+									<div class="setting-info">
+										<div class="font-semibold text-base-content mb-0.5">{vs.label}</div>
+										<div class="text-sm text-base-content/60 max-w-[400px]">{vs.description}</div>
+									</div>
+									<span class="badge {visibilityModeButtonClass(mode)}">{visibilityModeLabel(mode)}</span>
 								</div>
 							{/each}
 						</div>

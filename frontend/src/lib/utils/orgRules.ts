@@ -133,3 +133,45 @@ export const toggleSettings: ToggleSetting[] = [
 		description: 'When enabled, all members must set up 2FA before they can use the application.'
 	}
 ];
+
+// ── Visibility mode settings ──
+
+export interface VisibilitySetting {
+	key: string;
+	label: string;
+	description: string;
+}
+
+export function parseVisibilityMode(mode: string | null | undefined): number {
+	if (mode === 'Private') return 0;
+	if (mode === 'AdminOnly') return 1;
+	if (mode === 'AllMembers') return 2;
+	return 0;
+}
+
+export function visibilityModeLabel(mode: string | null | undefined): string {
+	if (mode === 'Private') return 'Private';
+	if (mode === 'AdminOnly') return 'Admin Only';
+	if (mode === 'AllMembers') return 'All Members';
+	return 'Private';
+}
+
+export function visibilityModeButtonClass(mode: string | null | undefined): string {
+	if (mode === 'Private') return 'btn-neutral';
+	if (mode === 'AdminOnly') return 'btn-warning';
+	if (mode === 'AllMembers') return 'btn-success';
+	return 'btn-neutral';
+}
+
+export const visibilitySettings: VisibilitySetting[] = [
+	{
+		key: 'vacationVisibility',
+		label: 'Vacation Day Visibility',
+		description: "Control who can see members' vacation days."
+	},
+	{
+		key: 'sickDayVisibility',
+		label: 'Sick Day Visibility',
+		description: "Control who can see members' sick days."
+	}
+];

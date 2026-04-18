@@ -190,10 +190,22 @@ public class TimeEntryExportService : ITimeEntryExportService
             var isHoliday = holidaysByDate.TryGetValue(currentDate, out var holiday);
             var isAbsence = absencesByDate.TryGetValue(currentDate, out var absence);
 
-            double effectiveTarget = targetHours;
+            // Compute effective target by subtracting holiday and absence credits
+            var holidayCredit = isHoliday ? (holiday!.IsHalfDay ? targetHours / 2.0 : targetHours) : 0;
+            var absenceCredit = isAbsence ? (absence!.IsHalfDay ? targetHours / 2.0 : targetHours) : 0;
+            double effectiveTarget = Math.Max(0, targetHours - holidayCredit - absenceCredit);
             string status;
 
-            if (isHoliday) { status = "Holiday"; effectiveTarget = 0; }
+            if (isHoliday && isAbsence)
+            {
+                status = absence!.Type switch
+                {
+                    AbsenceType.SickDay => "Sick",
+                    AbsenceType.Vacation => "Vacation",
+                    _ => "Absent"
+                };
+            }
+            else if (isHoliday) { status = holiday!.IsHalfDay ? "Half Holiday" : "Holiday"; }
             else if (isAbsence)
             {
                 status = absence!.Type switch
@@ -202,7 +214,6 @@ public class TimeEntryExportService : ITimeEntryExportService
                     AbsenceType.Vacation => "Vacation",
                     _ => "Absent"
                 };
-                effectiveTarget = 0;
             }
             else if (dayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) { status = "Weekend"; }
             else if (targetHours == 0) { status = "Day Off"; }

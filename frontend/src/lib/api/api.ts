@@ -383,6 +383,9 @@ export interface OrganizationDetailResponse {
     'memberTimeEntryVisibility'?: boolean;
     'require2fa'?: boolean;
     'csvImportMode': string | null;
+    'vacationVisibility': string | null;
+    'sickDayVisibility': string | null;
+    'defaultVacationDays'?: number;
     'settingsUpdatedAt'?: string | null;
     'createdAt'?: string;
     'members': Array<OrganizationMemberResponse> | null;
@@ -400,6 +403,9 @@ export interface OrganizationMemberResponse {
     'role': string | null;
     'joinedAt'?: string;
     'initialOvertimeHours'?: number;
+    'vacationDaysPerYear'?: number;
+    'vacationDaysUsed'?: number;
+    'vacationDaysRemaining'?: number;
 }
 /**
  * Summary view of an organization.
@@ -559,6 +565,12 @@ export type RuleMode = typeof RuleMode[keyof typeof RuleMode];
  */
 export interface SetInitialOvertimeRequest {
     'initialOvertimeHours'?: number;
+}
+/**
+ * Request payload for setting a member\'s vacation day allowance.
+ */
+export interface SetVacationDaysRequest {
+    'days'?: number;
 }
 /**
  * Request payload to start (clock in) a new time entry.
@@ -731,6 +743,9 @@ export interface UpdateOrganizationSettingsRequest {
     'memberTimeEntryVisibility'?: boolean | null;
     'require2fa'?: boolean | null;
     'csvImportMode'?: RuleMode;
+    'vacationVisibility'?: VisibilityMode;
+    'sickDayVisibility'?: VisibilityMode;
+    'defaultVacationDays'?: number | null;
 }
 
 
@@ -829,6 +844,19 @@ export interface UserOrganizationResponse {
     'memberCount'?: number;
     'require2fa'?: boolean;
 }
+/**
+ * Controls who can see certain data within an organization.
+ */
+
+export const VisibilityMode = {
+    NUMBER_0: 0,
+    NUMBER_1: 1,
+    NUMBER_2: 2
+} as const;
+
+export type VisibilityMode = typeof VisibilityMode[keyof typeof VisibilityMode];
+
+
 /**
  * Work schedule defining target hours per weekday.
  */
@@ -3606,6 +3634,52 @@ export const OrganizationsApiAxiosParamCreator = function (configuration?: Confi
         },
         /**
          * 
+         * @summary Set a member\'s vacation days allowance per year (admin only).
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Member ID to update.
+         * @param {SetVacationDaysRequest} [setVacationDaysRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdVacationDaysPut: async (slug: string, memberId: number, setVacationDaysRequest?: SetVacationDaysRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdVacationDaysPut', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdVacationDaysPut', 'memberId', memberId)
+            const localVarPath = `/api/v1/Organizations/{slug}/members/{memberId}/vacation-days`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(setVacationDaysRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Add a member to the organization (admin only).
          * @param {string} slug Organization URL slug.
          * @param {AddMemberRequest} [addMemberRequest] 
@@ -3920,6 +3994,21 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Set a member\'s vacation days allowance per year (admin only).
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Member ID to update.
+         * @param {SetVacationDaysRequest} [setVacationDaysRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug: string, memberId: number, setVacationDaysRequest?: SetVacationDaysRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug, memberId, setVacationDaysRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['OrganizationsApi.apiV1OrganizationsSlugMembersMemberIdVacationDaysPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Add a member to the organization (admin only).
          * @param {string} slug Organization URL slug.
          * @param {AddMemberRequest} [addMemberRequest] 
@@ -4086,6 +4175,18 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
         },
         /**
          * 
+         * @summary Set a member\'s vacation days allowance per year (admin only).
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Member ID to update.
+         * @param {SetVacationDaysRequest} [setVacationDaysRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug: string, memberId: number, setVacationDaysRequest?: SetVacationDaysRequest, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug, memberId, setVacationDaysRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Add a member to the organization (admin only).
          * @param {string} slug Organization URL slug.
          * @param {AddMemberRequest} [addMemberRequest] 
@@ -4243,6 +4344,19 @@ export class OrganizationsApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugMembersMemberIdPut(slug: string, memberId: number, updateMemberRoleRequest?: UpdateMemberRoleRequest, options?: RawAxiosRequestConfig) {
         return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdPut(slug, memberId, updateMemberRoleRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Set a member\'s vacation days allowance per year (admin only).
+     * @param {string} slug Organization URL slug.
+     * @param {number} memberId Member ID to update.
+     * @param {SetVacationDaysRequest} [setVacationDaysRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug: string, memberId: number, setVacationDaysRequest?: SetVacationDaysRequest, options?: RawAxiosRequestConfig) {
+        return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug, memberId, setVacationDaysRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

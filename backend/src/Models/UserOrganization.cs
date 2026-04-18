@@ -24,6 +24,9 @@ public class UserOrganization
     // Initial overtime balance in hours (set by user, applied before first tracked entry)
     public double InitialOvertimeHours { get; set; }
     
+    // Number of vacation days this member is entitled to per year
+    public double VacationDaysPerYear { get; set; }
+    
     // Navigation properties
     [JsonIgnore]
     public User User { get; set; } = null!;

@@ -15,6 +15,19 @@ public enum RuleMode
     Allowed = 2
 }
 
+/// <summary>
+/// Controls who can see certain data within an organization.
+/// </summary>
+public enum VisibilityMode
+{
+    /// <summary>Members can only see their own data.</summary>
+    Private = 0,
+    /// <summary>Admins and owners can see all members' data.</summary>
+    AdminOnly = 1,
+    /// <summary>All members can see each other's data.</summary>
+    AllMembers = 2
+}
+
 public class Organization
 {
     public int Id { get; set; }
@@ -98,6 +111,17 @@ public class Organization
     /// Disabled = CSV import is not available.
     /// </summary>
     public RuleMode CsvImportMode { get; set; } = RuleMode.Disabled;
+    
+    /// <summary>Controls who can see members' vacation days.</summary>
+    public VisibilityMode VacationVisibility { get; set; } = VisibilityMode.Private;
+    
+    /// <summary>Controls who can see members' sick days.</summary>
+    public VisibilityMode SickDayVisibility { get; set; } = VisibilityMode.Private;
+    
+    /// <summary>
+    /// Default vacation days per year for new members.
+    /// </summary>
+    public double DefaultVacationDays { get; set; }
     
     /// <summary>
     /// Timestamp of the last settings update. Used to notify members of rule changes.

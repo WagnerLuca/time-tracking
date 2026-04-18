@@ -80,6 +80,11 @@
 	let overtimeHours = $state(0);
 	let overtimeSaving = $state(false);
 
+	// Vacation days
+	let editingVacation = $state(false);
+	let vacationDays = $state(0);
+	let vacationSaving = $state(false);
+
 	// Action feedback
 	let actionError = $state('');
 
@@ -348,6 +353,19 @@
 		overtimeSaving = false;
 	}
 
+	// ── Vacation Days ──
+	async function saveVacationDays() {
+		vacationSaving = true;
+		try {
+			await organizationsApi.apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(orgSlug, memberId, { days: vacationDays });
+			editingVacation = false;
+			loadAll();
+		} catch (e) {
+			actionError = extractErrorMessage(e, 'Failed to update vacation days.');
+		}
+		vacationSaving = false;
+	}
+
 	// ── Member Management ──
 	async function changeMemberRole(newRole: number) {
 		try {
@@ -538,6 +556,12 @@
 						<span class="block text-xl font-bold text-base-content">{schedule?.initialOvertimeHours ?? 0}h</span>
 						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Initial Overtime</span>
 					</div>
+					{#if (member?.vacationDaysPerYear ?? 0) > 0}
+						<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
+							<span class="block text-xl font-bold text-info">{member?.vacationDaysRemaining ?? 0}/{member?.vacationDaysPerYear}</span>
+							<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Vacation Days Left</span>
+						</div>
+					{/if}
 				</div>
 			{:else}
 				<p class="text-base-content/40 text-sm">No cumulative data available.</p>
@@ -591,25 +615,37 @@
 			{:else if absences.length === 0}
 				<p class="text-base-content/40 text-sm">No absences recorded.</p>
 			{:else}
-				<div class="flex flex-col gap-1.5">
-					{#each absences as absence}
-						<div class="flex items-center gap-3 py-2 px-2.5 bg-base-200/30 rounded-md border border-base-200 text-sm">
-							<span class="font-medium text-base-content/70 min-w-[100px]">{formatDateFull(absence.date!)}</span>
-							<span class="badge badge-sm {absenceTypeBadge(absence.type) === 'badge-sick' ? 'badge-error' : absenceTypeBadge(absence.type) === 'badge-vacation' ? 'badge-info' : 'badge-accent'}">{absenceTypeLabel(absence.type)}</span>
-							{#if absence.isHalfDay}
-								<span class="badge badge-warning badge-xs">½ Day</span>
-							{/if}
-							{#if absence.note}
-								<span class="text-base-content/40 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs">{absence.note}</span>
-							{/if}
-							{#if canEdit}
-								<button class="btn btn-ghost btn-xs text-base-content/30 hover:text-error" onclick={() => deleteAbsence(absence.id!)} title="Delete" aria-label="Delete absence">
-									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-								</button>
-							{/if}
+				{@const absencesByYear = Object.entries(
+					absences.reduce<Record<string, typeof absences>>((acc, a) => {
+						const year = a.date?.substring(0, 4) ?? 'Unknown';
+						(acc[year] ??= []).push(a);
+						return acc;
+					}, {})
+				).sort(([a], [b]) => b.localeCompare(a))}
+				{#each absencesByYear as [year, yearAbsences]}
+					<div class="mb-4">
+						<h3 class="text-sm font-semibold text-base-content/50 mb-2">{year}</h3>
+						<div class="flex flex-col gap-1.5">
+							{#each yearAbsences as absence}
+								<div class="flex items-center gap-3 py-2 px-2.5 bg-base-200/30 rounded-md border border-base-200 text-sm">
+									<span class="font-medium text-base-content/70 min-w-[100px]">{formatDateFull(absence.date!)}</span>
+									<span class="badge badge-sm {absenceTypeBadge(absence.type) === 'badge-sick' ? 'badge-error' : absenceTypeBadge(absence.type) === 'badge-vacation' ? 'badge-info' : 'badge-accent'}">{absenceTypeLabel(absence.type)}</span>
+									{#if absence.isHalfDay}
+										<span class="badge badge-warning badge-xs">½ Day</span>
+									{/if}
+									{#if absence.note}
+										<span class="text-base-content/40 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs">{absence.note}</span>
+									{/if}
+									{#if canEdit}
+										<button class="btn btn-ghost btn-xs text-base-content/30 hover:text-error" onclick={() => deleteAbsence(absence.id!)} title="Delete" aria-label="Delete absence">
+											<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+										</button>
+									{/if}
+								</div>
+							{/each}
 						</div>
-					{/each}
-				</div>
+					</div>
+				{/each}
 			{/if}
 		</section>
 		{/if}
@@ -672,6 +708,58 @@
 			{:else}
 				<p class="text-2xl font-bold text-base-content mb-1">{schedule?.initialOvertimeHours ?? 0}h</p>
 				<p class="text-base-content/40 text-sm" style="font-size: 0.75rem;">Carry-over overtime from before time tracking started.</p>
+			{/if}
+		</section>
+
+		<!-- ═══ Vacation Days ═══ -->
+		<section class="card bg-base-100 border border-base-300 p-5 mb-5">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-base font-bold text-base-content flex items-center gap-2 m-0">
+					<svg class="text-base-content/60" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+					Vacation Days
+				</h2>
+				{#if canEdit && !editingVacation}
+					<button class="btn btn-ghost btn-sm" onclick={() => { vacationDays = member?.vacationDaysPerYear ?? 0; editingVacation = true; }}>Edit</button>
+				{/if}
+			</div>
+
+			{#if editingVacation}
+				<div class="flex items-center gap-2 flex-wrap mb-3">
+					<input type="number" bind:value={vacationDays} step="0.5" min="0" max="365" class="input input-bordered input-sm" style="width: 100px;" />
+					<span class="text-base-content/40 text-sm">days/year</span>
+					<button class="btn btn-primary btn-sm" onclick={saveVacationDays} disabled={vacationSaving}>
+						{vacationSaving ? 'Saving...' : 'Save'}
+					</button>
+					<button class="btn btn-ghost btn-sm" onclick={() => editingVacation = false}>Cancel</button>
+				</div>
+			{:else}
+				{@const allowed = member?.vacationDaysPerYear ?? 0}
+				{@const used = member?.vacationDaysUsed ?? 0}
+				{@const remaining = member?.vacationDaysRemaining ?? 0}
+				{#if allowed > 0}
+					<div class="flex gap-6 mb-3">
+						<div>
+							<span class="text-2xl font-bold text-base-content">{remaining}</span>
+							<span class="text-sm text-base-content/50 ml-1">remaining</span>
+						</div>
+						<div>
+							<span class="text-lg font-semibold text-base-content/60">{used}</span>
+							<span class="text-sm text-base-content/50 ml-1">used</span>
+						</div>
+						<div>
+							<span class="text-lg font-semibold text-base-content/60">{allowed}</span>
+							<span class="text-sm text-base-content/50 ml-1">total</span>
+						</div>
+					</div>
+					<div class="w-full bg-base-200 rounded-full h-2.5">
+						<div
+							class="h-2.5 rounded-full transition-all {used / allowed > 0.9 ? 'bg-error' : used / allowed > 0.7 ? 'bg-warning' : 'bg-success'}"
+							style="width: {Math.min(100, (used / allowed) * 100)}%"
+						></div>
+					</div>
+				{:else}
+					<p class="text-base-content/40 text-sm">No vacation allowance set.</p>
+				{/if}
 			{/if}
 		</section>
 

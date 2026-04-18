@@ -385,7 +385,7 @@
 				creditedMinutes: absCredit,
 				targetMinutes,
 				entryCount: entryData.count,
-				dayType: getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates),
+				dayType: getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays),
 				dayTypeLabel: getDayTypeLabel(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays, halfDayAbsences),
 				delta: entryData.minutes + absCredit - targetMinutes
 			});
@@ -436,7 +436,7 @@
 			const cursor = new Date(firstDay);
 			while (cursor <= lastDay) {
 				const key = dateKey(cursor);
-				const dt = getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates);
+				const dt = getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays);
 				if (dt === 'holiday') holidays++;
 				else if (dt === 'sick') sickDays++;
 				else if (dt === 'vacation') vacationDays++;

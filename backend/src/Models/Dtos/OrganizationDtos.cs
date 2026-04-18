@@ -34,6 +34,9 @@ public record OrganizationDetailResponse
     public bool MemberTimeEntryVisibility { get; init; }
     public bool Require2fa { get; init; }
     public required string CsvImportMode { get; init; }
+    public required string VacationVisibility { get; init; }
+    public required string SickDayVisibility { get; init; }
+    public double DefaultVacationDays { get; init; }
     public DateTime? SettingsUpdatedAt { get; init; }
     public DateTime CreatedAt { get; init; }
     public required List<OrganizationMemberResponse> Members { get; init; }
@@ -51,6 +54,9 @@ public record OrganizationMemberResponse
     public required string Role { get; init; }
     public DateTime JoinedAt { get; init; }
     public double InitialOvertimeHours { get; init; }
+    public double VacationDaysPerYear { get; init; }
+    public double VacationDaysUsed { get; init; }
+    public double VacationDaysRemaining { get; init; }
 }
 
 /// <summary>Lightweight org view from the user's perspective.</summary>
@@ -132,6 +138,9 @@ public record UpdateOrganizationSettingsRequest
     public bool? MemberTimeEntryVisibility { get; init; }
     public bool? Require2fa { get; init; }
     public RuleMode? CsvImportMode { get; init; }
+    public VisibilityMode? VacationVisibility { get; init; }
+    public VisibilityMode? SickDayVisibility { get; init; }
+    public double? DefaultVacationDays { get; init; }
 }
 
 /// <summary>Automatic pause rule (deduct X minutes after Y hours worked).</summary>
@@ -230,6 +239,13 @@ public record MemberTimeOverviewResponse
 public record SetInitialOvertimeRequest
 {
     public double InitialOvertimeHours { get; init; }
+}
+
+/// <summary>Request payload for setting a member's vacation day allowance.</summary>
+public record SetVacationDaysRequest
+{
+    [Range(0, 365)]
+    public double Days { get; init; }
 }
 
 /// <summary>Organization holiday entry.</summary>

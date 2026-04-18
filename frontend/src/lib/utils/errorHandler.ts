@@ -19,14 +19,35 @@
  */
 export function extractErrorMessage(err: unknown, fallback = 'An unexpected error occurred.'): string {
 	if (err && typeof err === 'object' && 'response' in err) {
-		const res = (err as { response?: { data?: { message?: string } | string } }).response;
+		const res = (err as { response?: { status?: number; data?: Record<string, unknown> | string } }).response;
 		if (res?.data) {
-			if (typeof res.data === 'object' && 'message' in res.data && typeof res.data.message === 'string') {
-				return res.data.message;
+			if (typeof res.data === 'object') {
+				// Backend ServiceResult / custom JSON: { message: "..." }
+				if ('message' in res.data && typeof res.data.message === 'string') {
+					return res.data.message;
+				}
+				// ASP.NET Core ProblemDetails: { title, detail, errors }
+				if ('detail' in res.data && typeof res.data.detail === 'string') {
+					return res.data.detail;
+				}
+				// Model validation errors: { errors: { Field: ["msg1", ...] } }
+				if ('errors' in res.data && typeof res.data.errors === 'object' && res.data.errors) {
+					const errors = res.data.errors as Record<string, string[]>;
+					const messages = Object.entries(errors)
+						.flatMap(([, msgs]) => msgs);
+					if (messages.length > 0) return messages.join(' ');
+				}
+				if ('title' in res.data && typeof res.data.title === 'string') {
+					return res.data.title;
+				}
 			}
 			if (typeof res.data === 'string' && res.data.length > 0) {
 				return res.data;
 			}
+		}
+		// If we have a status but no parseable body, include the status code
+		if (res?.status) {
+			return `${fallback} (HTTP ${res.status})`;
 		}
 	}
 	if (err instanceof Error) return err.message;

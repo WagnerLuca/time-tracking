@@ -33,11 +33,54 @@ public class AbsenceDayService : IAbsenceDayService
             .Include(a => a.User)
             .Where(a => a.OrganizationId == org.Id);
 
-        // Non-admins can only see their own
-        if (callerRole < OrganizationRole.Admin)
+        // Admins always see all absences; visibility settings only restrict regular members
+        bool isAdmin = callerRole >= OrganizationRole.Admin;
+
+        if (isAdmin)
+        {
+            // Admin/Owner — full access, only filter by user if requested
+            if (filterUserId.HasValue)
+                query = query.Where(a => a.UserId == filterUserId.Value);
+        }
+        else if (filterUserId.HasValue && filterUserId.Value == callerUserId)
+        {
+            // Viewing own absences — always allowed
             query = query.Where(a => a.UserId == callerUserId);
-        else if (filterUserId.HasValue)
-            query = query.Where(a => a.UserId == filterUserId.Value);
+        }
+        else
+        {
+            // Non-admin viewing others or all
+            bool canSeeVacation = org.VacationVisibility >= VisibilityMode.AllMembers;
+            bool canSeeSick = org.SickDayVisibility >= VisibilityMode.AllMembers;
+
+            if (filterUserId.HasValue)
+            {
+                // Viewing a specific other member's absences
+                query = query.Where(a => a.UserId == filterUserId.Value);
+                if (!canSeeVacation && !canSeeSick)
+                    query = query.Where(a => a.UserId == callerUserId); // fallback to own
+                else if (!canSeeVacation)
+                    query = query.Where(a => a.Type != AbsenceType.Vacation);
+                else if (!canSeeSick)
+                    query = query.Where(a => a.Type != AbsenceType.SickDay);
+            }
+            else
+            {
+                // No filter — list all
+                if (!canSeeVacation && !canSeeSick)
+                {
+                    query = query.Where(a => a.UserId == callerUserId);
+                }
+                else
+                {
+                    query = query.Where(a =>
+                        a.UserId == callerUserId ||
+                        (canSeeVacation && a.Type == AbsenceType.Vacation) ||
+                        (canSeeSick && a.Type == AbsenceType.SickDay) ||
+                        (canSeeVacation && canSeeSick && a.Type == AbsenceType.Other));
+                }
+            }
+        }
 
         if (from.HasValue) query = query.Where(a => a.Date >= from.Value);
         if (to.HasValue)   query = query.Where(a => a.Date <= to.Value);

@@ -1,6 +1,5 @@
 .gitignore
 .npmignore
-.openapi-generator-ignore
 api.ts
 base.ts
 common.ts
@@ -53,6 +52,7 @@ docs/RequestsApi.md
 docs/RespondToOrgRequestRequest.md
 docs/RuleMode.md
 docs/SetInitialOvertimeRequest.md
+docs/SetVacationDaysRequest.md
 docs/StartTimeEntryRequest.md
 docs/StopTimeEntryRequest.md
 docs/TimeEntryResponse.md
@@ -74,6 +74,7 @@ docs/UpdateWorkScheduleRequest.md
 docs/UserInfo.md
 docs/UserNotificationResponse.md
 docs/UserOrganizationResponse.md
+docs/VisibilityMode.md
 docs/WorkScheduleApi.md
 docs/WorkScheduleResponse.md
 git_push.sh

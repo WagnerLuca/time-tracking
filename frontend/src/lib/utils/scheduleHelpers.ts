@@ -121,11 +121,12 @@ export function getAbsenceCredit(
 ): number {
 	const key = dateKey(date);
 	if (sickDayDates.has(key) || vacationDates.has(key) || otherAbsenceDates.has(key)) {
-		const target = getDayTarget(date, schedule, holidayDates, periods, halfDayHolidays);
 		if (halfDayAbsences?.has(key)) {
-			return target * 0.5;
+			// Use full (unreduced) target so half-day absences on half-holidays
+			// give the correct credit (e.g. 4h on an 8h day, not 2h).
+			return getFullDayTarget(date, schedule, periods) * 0.5;
 		}
-		return target;
+		return getDayTarget(date, schedule, holidayDates, periods, halfDayHolidays);
 	}
 	return 0;
 }
@@ -165,10 +166,19 @@ export function getDayType(
 	holidayDates: Map<string, string> | Set<string>,
 	sickDayDates: Set<string>,
 	vacationDates: Set<string>,
-	otherAbsenceDates: Set<string>
+	otherAbsenceDates: Set<string>,
+	halfDayHolidays?: Set<string>
 ): 'holiday' | 'sick' | 'vacation' | 'other-absence' | null {
 	const key = typeof date === 'string' ? date : dateKey(date);
-	if (holidayDates.has(key)) return 'holiday';
+	if (holidayDates.has(key)) {
+		// On half-day holidays, prioritize the absence type so it shows in stats/history
+		if (halfDayHolidays?.has(key)) {
+			if (sickDayDates.has(key)) return 'sick';
+			if (vacationDates.has(key)) return 'vacation';
+			if (otherAbsenceDates.has(key)) return 'other-absence';
+		}
+		return 'holiday';
+	}
 	if (sickDayDates.has(key)) return 'sick';
 	if (vacationDates.has(key)) return 'vacation';
 	if (otherAbsenceDates.has(key)) return 'other-absence';
@@ -190,7 +200,16 @@ export function getDayTypeLabel(
 	const key = typeof date === 'string' ? date : dateKey(date);
 	if (holidayDates.has(key)) {
 		const name = holidayDates.get(key) ?? 'Holiday';
-		return halfDayHolidays?.has(key) ? `${name} (Half Day)` : name;
+		if (halfDayHolidays?.has(key)) {
+			// Show combined label when half-holiday + absence
+			const halfSuffix = halfDayAbsences?.has(key) ? ' (Half Day)' : '';
+			let absLabel = '';
+			if (sickDayDates.has(key)) absLabel = 'Sick Day' + halfSuffix;
+			else if (vacationDates.has(key)) absLabel = 'Vacation' + halfSuffix;
+			else if (otherAbsenceDates.has(key)) absLabel = 'Other Absence' + halfSuffix;
+			return absLabel ? `${name} (Half Day) / ${absLabel}` : `${name} (Half Day)`;
+		}
+		return name;
 	}
 	const halfSuffix = halfDayAbsences?.has(key) ? ' (Half Day)' : '';
 	if (sickDayDates.has(key)) return 'Sick Day' + halfSuffix;

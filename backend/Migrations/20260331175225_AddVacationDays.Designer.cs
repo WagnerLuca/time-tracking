@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TimeTracking.Api.Data;
@@ -11,9 +12,11 @@ using TimeTracking.Api.Data;
 namespace TimeTracking.Api.Migrations
 {
     [DbContext(typeof(TimeTrackingDbContext))]
-    partial class TimeTrackingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260331175225_AddVacationDays")]
+    partial class AddVacationDays
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -265,9 +268,6 @@ namespace TimeTracking.Api.Migrations
                     b.Property<DateTime?>("SettingsUpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("SickDayVisibility")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -275,9 +275,6 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("VacationVisibility")
-                        .HasColumnType("integer");
 
                     b.Property<string>("Website")
                         .HasColumnType("text");

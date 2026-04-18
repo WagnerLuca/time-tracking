@@ -409,7 +409,7 @@
 					{@const pct = maxMins > 0 ? Math.min((day.minutes / maxMins) * 100, 100) : 0}
 					{@const targetPct = maxMins > 0 && day.targetMinutes > 0 ? Math.min((day.targetMinutes / maxMins) * 100, 100) : 0}
 					{@const delta = day.isPastOrToday && day.targetMinutes > 0 ? day.minutes - day.targetMinutes : 0}
-					{@const dayType = getDayType(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates)}
+					{@const dayType = getDayType(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays)}
 					<div class="grid grid-cols-[36px_70px_1fr_auto] items-center gap-2 py-1.5 px-2 {isToday(day.date) ? 'font-semibold' : ''} {!day.isPastOrToday ? 'opacity-50' : ''} {dayType === 'holiday' ? 'bg-secondary/10 rounded-md' : dayType === 'sick' ? 'bg-error/10 rounded-md' : dayType === 'vacation' ? 'bg-accent/10 rounded-md' : dayType === 'other-absence' ? 'bg-base-300/30 rounded-md' : ''}">
 						<span class="text-sm text-base-content/70">{day.name}</span>
 						<span class="text-xs text-base-content/40">{formatDateShort(day.date)}{#if dayType} <span class="w-2 h-2 rounded-full shrink-0 inline-block align-middle ml-1 {dayType === 'holiday' ? 'bg-secondary' : dayType === 'sick' ? 'bg-error' : dayType === 'vacation' ? 'bg-accent' : 'bg-base-content/40'}" title={getDayTypeLabel(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays, halfDayAbsences)}></span>{/if}</span>

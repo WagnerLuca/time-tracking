@@ -80,6 +80,9 @@ public class OrganizationService : IOrganizationService
                 MemberTimeEntryVisibility = o.MemberTimeEntryVisibility,
                 Require2fa = o.Require2fa,
                 CsvImportMode = o.CsvImportMode.ToString(),
+                VacationVisibility = o.VacationVisibility.ToString(),
+                SickDayVisibility = o.SickDayVisibility.ToString(),
+                DefaultVacationDays = o.DefaultVacationDays,
                 SettingsUpdatedAt = o.SettingsUpdatedAt,
                 CreatedAt = o.CreatedAt,
                 Members = o.UserOrganizations
@@ -92,7 +95,8 @@ public class OrganizationService : IOrganizationService
                         ProfileImageUrl = uo.User.ProfileImageUrl,
                         Role = uo.Role.ToString(),
                         JoinedAt = uo.JoinedAt,
-                        InitialOvertimeHours = uo.InitialOvertimeHours
+                        InitialOvertimeHours = uo.InitialOvertimeHours,
+                        VacationDaysPerYear = uo.VacationDaysPerYear
                     })
                     .ToList(),
                 PauseRules = o.PauseRules
@@ -118,7 +122,38 @@ public class OrganizationService : IOrganizationService
             return ServiceResult.Ok(organization with { Members = new List<OrganizationMemberResponse>() });
         }
 
-        return ServiceResult.Ok(organization);
+        // Compute vacation days used for each member (current year)
+        var currentYear = DateTime.UtcNow.Year;
+        var yearStart = new DateOnly(currentYear, 1, 1);
+        var yearEnd = new DateOnly(currentYear, 12, 31);
+        var memberIds = organization.Members.Select(m => m.Id).ToList();
+
+        var vacationUsage = await _context.AbsenceDays.AsNoTracking()
+            .Where(a => a.OrganizationId == organization.Id
+                     && memberIds.Contains(a.UserId)
+                     && a.Type == AbsenceType.Vacation
+                     && a.Date >= yearStart && a.Date <= yearEnd)
+            .GroupBy(a => a.UserId)
+            .Select(g => new
+            {
+                UserId = g.Key,
+                DaysUsed = g.Sum(a => a.IsHalfDay ? 0.5 : 1.0)
+            })
+            .ToListAsync();
+
+        var usageByUser = vacationUsage.ToDictionary(v => v.UserId, v => v.DaysUsed);
+
+        var membersWithVacation = organization.Members.Select(m =>
+        {
+            var used = usageByUser.GetValueOrDefault(m.Id, 0);
+            return m with
+            {
+                VacationDaysUsed = used,
+                VacationDaysRemaining = Math.Max(0, m.VacationDaysPerYear - used)
+            };
+        }).ToList();
+
+        return ServiceResult.Ok(organization with { Members = membersWithVacation });
     }
 
     public async Task<ServiceResult<List<UserOrganizationResponse>>> GetUserOrganizationsAsync(int callerUserId)
@@ -303,7 +338,8 @@ public class OrganizationService : IOrganizationService
                 OrganizationId = org.Id,
                 Role = request.Role,
                 JoinedAt = DateTime.UtcNow,
-                IsActive = true
+                IsActive = true,
+                VacationDaysPerYear = org.DefaultVacationDays
             };
             _context.UserOrganizations.Add(existing);
         }
@@ -322,7 +358,8 @@ public class OrganizationService : IOrganizationService
             ProfileImageUrl = user.ProfileImageUrl,
             Role = existing.Role.ToString(),
             JoinedAt = existing.JoinedAt,
-            InitialOvertimeHours = existing.InitialOvertimeHours
+            InitialOvertimeHours = existing.InitialOvertimeHours,
+            VacationDaysPerYear = existing.VacationDaysPerYear
         });
     }
 
@@ -437,6 +474,9 @@ public class OrganizationService : IOrganizationService
         if (request.MemberTimeEntryVisibility.HasValue) org.MemberTimeEntryVisibility = request.MemberTimeEntryVisibility.Value;
         if (request.Require2fa.HasValue) org.Require2fa = request.Require2fa.Value;
         if (request.CsvImportMode.HasValue) org.CsvImportMode = request.CsvImportMode.Value;
+        if (request.VacationVisibility.HasValue) org.VacationVisibility = request.VacationVisibility.Value;
+        if (request.SickDayVisibility.HasValue) org.SickDayVisibility = request.SickDayVisibility.Value;
+        if (request.DefaultVacationDays.HasValue) org.DefaultVacationDays = request.DefaultVacationDays.Value;
 
         org.UpdatedAt = DateTime.UtcNow;
         org.SettingsUpdatedAt = DateTime.UtcNow;
@@ -648,6 +688,32 @@ public class OrganizationService : IOrganizationService
         _logger.LogInformation("Initial overtime set to {Hours}h for user {UserId} in org {OrgId} by user {CallerId}", request.InitialOvertimeHours, userId, org.Id, callerUserId);
 
         return ServiceResult.Ok<object>(new { userId, InitialOvertimeHours = membership.InitialOvertimeHours });
+    }
+
+    public async Task<ServiceResult<object>> SetMemberVacationDaysAsync(
+        string slug, int callerUserId, int userId, SetVacationDaysRequest request)
+    {
+        var org = await GetOrgBySlugAsync(slug);
+        if (org == null)
+            return ServiceResult.NotFound<object>("Organization not found");
+
+        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        if (callerRole == null || callerRole < OrganizationRole.Admin)
+            return ServiceResult.Forbidden<object>();
+
+        var membership = await _context.UserOrganizations
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
+
+        if (membership == null)
+            return ServiceResult.NotFound<object>("Member not found in this organization.");
+
+        membership.VacationDaysPerYear = request.Days;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Vacation days set to {Days} for user {UserId} in org {OrgId} by user {CallerId}",
+            request.Days, userId, org.Id, callerUserId);
+
+        return ServiceResult.Ok<object>(new { userId, VacationDaysPerYear = membership.VacationDaysPerYear });
     }
 
     // ────────────────────────────────────────────────────
