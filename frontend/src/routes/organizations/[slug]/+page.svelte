@@ -3,25 +3,17 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { organizationsApi, pauseRulesApi, workScheduleApi, requestsApi, holidayApi, absenceDayApi, notificationsApi } from '$lib/apiClient';
-	import { formatRequestType, formatTimeAgo, statusBadgeClass, parseRequestData, absenceTypeLabel, absenceTypeBadge } from '$lib/utils/formatters';
+	import { organizationsApi, workScheduleApi, holidayApi, absenceDayApi, notificationsApi } from '$lib/apiClient';
+	import { absenceTypeLabel, absenceTypeBadge } from '$lib/utils/formatters';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import {
-		parseRuleMode, ruleModeLabel, joinPolicyLabel, ruleModeButtonClass,
-		ruleSettings, toggleSettings,
-		visibilitySettings, parseVisibilityMode, visibilityModeLabel, visibilityModeButtonClass
+		ruleModeLabel
 	} from '$lib/utils/orgRules';
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationRequest,
 		AddMemberRequest,
-		UpdateOrganizationSettingsRequest,
-		PauseRuleResponse,
-		CreatePauseRuleRequest,
-		RuleMode,
-		VisibilityMode,
 		WorkScheduleResponse,
-		OrgRequestResponse,
 		HolidayResponse,
 		AbsenceDayResponse,
 		AbsenceType,
@@ -64,7 +56,7 @@
 	let actionError = $state('');
 
 	// Tab navigation
-	let activeTab = $state<'my-schedule' | 'team' | 'absences' | 'settings'>('my-schedule');
+	let activeTab = $state<'my-schedule' | 'team'>('my-schedule');
 
 	// Team overview data (admin)
 	let teamOverview = $state<MemberTimeOverviewResponse[]>([]);
@@ -88,10 +80,6 @@
 	let myMember = $derived(org?.members?.find(m => m.id === auth.user?.id) ?? null);
 
 	// Request history (admin)
-	let requestHistory = $state<OrgRequestResponse[]>([]);
-	let requestHistoryLoading = $state(false);
-	let requestHistoryLoaded = $state(false);
-	let requestHistoryFilter = $state<string>('all'); // 'all', 'Pending', 'Accepted', 'Declined'
 
 	// Holidays
 	let holidays = $state<HolidayResponse[]>([]);
@@ -128,27 +116,17 @@
 	let showAdminAddAbsence = $state(false);
 	let adminAbsenceUserId = $state<number | null>(null);
 	let adminAbsenceDate = $state('');
-	let adminAbsenceType = $state(0);
-	let adminAbsenceNote = $state('');
 	let adminAbsenceHalfDay = $state(false);
-	let addingAdminAbsence = $state(false);
-	let adminAbsenceError = $state('');
 	let adminAbsenceFilter = $state<number | null>(null); // userId filter
-	let panelTypeFilter = $state<string>('all'); // 'all', 'Vacation', 'SickDay', 'Other'
-	let calendarMonth = $state(new Date().getMonth()); // 0-11
 	let calendarYear = $state(new Date().getFullYear());
 	// Day-click add-absence dialog
-	let showDayDialog = $state(false);
 	let dayDialogDate = $state('');
 	let dayDialogToDate = $state('');
 	let dayDialogUserId = $state<number | null>(null);
 	let dayDialogType = $state(1); // default Vacation
-	let dayDialogNote = $state('');
 	let dayDialogHalfDay = $state(false);
 	let dayDialogSaving = $state(false);
-	let dayDialogError = $state('');
 	// Absence list year dropdown
-	let selectedListYear = $state(new Date().getFullYear());
 
 	// Schedule periods
 	let schedulePeriods = $state<WorkScheduleResponse[]>([]);
@@ -167,13 +145,12 @@
 	let addingPeriod = $state(false);
 	let periodError = $state('');
 
-	// Settings change notification
 	let showSettingsChangedBanner = $state(false);
 	let settingsNotificationIds: number[] = $state([]);
 
 	let orgSlug = $state('');
 
-	const validTabs = ['my-schedule', 'team', 'absences', 'settings'] as const;
+	const validTabs = ['my-schedule', 'team'] as const;
 
 	function readHashTab(): typeof activeTab {
 		if (typeof window === 'undefined') return 'my-schedule';
@@ -256,7 +233,6 @@
 		loadAbsences();
 		loadSchedulePeriods();
 		loadUsersForDropdown();
-		loadRequestHistory();
 		loadTeamOverview();
 	}
 
@@ -309,25 +285,6 @@
 		} catch (err) {
 			actionError = extractErrorMessage(err, 'Failed to reload organization.');
 		}
-	}
-
-	async function loadRequestHistory() {
-		if (requestHistoryLoaded) return;
-		requestHistoryLoading = true;
-		try {
-			const { data } = await requestsApi.apiV1OrganizationsSlugRequestsGet(orgSlug);
-			requestHistory = data.items ?? [];
-			requestHistoryLoaded = true;
-		} catch {
-			requestHistory = [];
-		} finally {
-			requestHistoryLoading = false;
-		}
-	}
-
-	function filteredRequests(): OrgRequestResponse[] {
-		if (requestHistoryFilter === 'all') return requestHistory;
-		return requestHistory.filter(r => r.status === requestHistoryFilter);
 	}
 
 	function normalizeDateOnly(value: string): string {
@@ -502,171 +459,9 @@
 		}
 	}
 
-	// Settings
-	let settingsSaving = $state(false);
-	let settingsError = $state('');
 
-	async function cycleSetting(key: string) {
-		if (!org) return;
-		settingsSaving = true;
-		settingsError = '';
-		try {
-			const current = parseRuleMode((org as Record<string, any>)[key]);
-			const next = ((current + 1) % 3) as RuleMode;
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { [key]: next } as UpdateOrganizationSettingsRequest);
-			await reloadOrg();
-		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to update setting.');
-		} finally {
-			settingsSaving = false;
-		}
-	}
 
-	async function cycleVisibilitySetting(key: string) {
-		if (!org) return;
-		settingsSaving = true;
-		settingsError = '';
-		try {
-			const current = parseVisibilityMode((org as Record<string, any>)[key]);
-			const next = ((current + 1) % 3) as VisibilityMode;
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { [key]: next } as UpdateOrganizationSettingsRequest);
-			await reloadOrg();
-		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to update setting.');
-		} finally {
-			settingsSaving = false;
-		}
-	}
 
-	async function toggleSetting(key: string) {
-		if (!org) return;
-		settingsSaving = true;
-		settingsError = '';
-		try {
-			const current = (org as Record<string, any>)[key];
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { [key]: !current } as UpdateOrganizationSettingsRequest);
-			await reloadOrg();
-		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to update setting.');
-		} finally {
-			settingsSaving = false;
-		}
-	}
-
-	// Pause Rules
-	function getPauseRules(): PauseRuleResponse[] {
-		return org?.pauseRules ? [...org.pauseRules].sort((a, b) => (a.minHours ?? 0) - (b.minHours ?? 0)) : [];
-	}
-	let showAddRule = $state(false);
-	let newRuleMinHours = $state(6);
-	let newRulePauseMinutes = $state(30);
-	let addRuleError = $state('');
-	let addingRule = $state(false);
-
-	// Edit rule
-	let editingRuleId = $state<number | null>(null);
-	let editRuleMinHours = $state(0);
-	let editRulePauseMinutes = $state(0);
-	let editRuleError = $state('');
-	let editingRuleSaving = $state(false);
-
-	// Initial overtime per member (admin feature)
-	let editingOvertimeMemberId = $state<number | null>(null);
-	let editOvertimeMinutes = $state(0);
-	let editOvertimeSaving = $state(false);
-	let editOvertimeError = $state('');
-
-	async function addPauseRule(e: Event) {
-		e.preventDefault();
-		addRuleError = '';
-		addingRule = true;
-		try {
-			const payload: CreatePauseRuleRequest = {
-				minHours: newRuleMinHours,
-				pauseMinutes: newRulePauseMinutes
-			};
-			await pauseRulesApi.apiV1OrganizationsSlugPauseRulesPost(orgSlug, payload);
-			await reloadOrg();
-			showAddRule = false;
-			newRuleMinHours = 6;
-			newRulePauseMinutes = 30;
-		} catch (err) {
-			addRuleError = extractErrorMessage(err, 'Failed to add rule.');
-		} finally {
-			addingRule = false;
-		}
-	}
-
-	function startEditRule(rule: PauseRuleResponse) {
-		editingRuleId = rule.id ?? null;
-		editRuleMinHours = rule.minHours ?? 0;
-		editRulePauseMinutes = rule.pauseMinutes ?? 0;
-		editRuleError = '';
-	}
-
-	function cancelEditRule() {
-		editingRuleId = null;
-	}
-
-	async function saveEditRule(ruleId: number) {
-		editRuleError = '';
-		editingRuleSaving = true;
-		try {
-			await pauseRulesApi.apiV1OrganizationsSlugPauseRulesRuleIdPut(orgSlug, ruleId, {
-				minHours: editRuleMinHours,
-				pauseMinutes: editRulePauseMinutes
-			});
-			await reloadOrg();
-			editingRuleId = null;
-		} catch (err) {
-			editRuleError = extractErrorMessage(err, 'Failed to update rule.');
-		} finally {
-			editingRuleSaving = false;
-		}
-	}
-
-	async function deleteRule(ruleId: number) {
-		if (!confirm('Delete this pause rule?')) return;
-		try {
-			await pauseRulesApi.apiV1OrganizationsSlugPauseRulesRuleIdDelete(orgSlug, ruleId);
-			await reloadOrg();
-		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to delete rule.');
-		}
-	}
-
-	function startEditOvertime(memberId: number, currentMinutes: number) {
-		editingOvertimeMemberId = memberId;
-		editOvertimeMinutes = currentMinutes;
-		editOvertimeError = '';
-	}
-
-	function cancelEditOvertime() {
-		editingOvertimeMemberId = null;
-		editOvertimeError = '';
-	}
-
-	async function saveOvertime(userId: number) {
-		editOvertimeSaving = true;
-		editOvertimeError = '';
-		try {
-			await organizationsApi.apiV1OrganizationsSlugMembersMemberIdInitialOvertimePut(
-				orgSlug, userId, { initialOvertimeHours: editOvertimeMinutes }
-			);
-			editingOvertimeMemberId = null;
-			await reloadOrg();
-		} catch (err) {
-			editOvertimeError = extractErrorMessage(err, 'Failed to update overtime.');
-		} finally {
-			editOvertimeSaving = false;
-		}
-	}
-
-	function formatOvertimeHours(minutes: number): string {
-		if (minutes === 0) return 'Â±0h';
-		const sign = minutes > 0 ? '+' : '';
-		return sign + (minutes / 60).toFixed(1) + 'h';
-	}
 
 	// â”€â”€ Holidays â”€â”€
 	async function loadHolidays() {
@@ -833,40 +628,6 @@
 	}
 
 	// Admin absence
-	async function addAdminAbsence(e: Event) {
-		e.preventDefault();
-		if (!adminAbsenceUserId) return;
-		addingAdminAbsence = true;
-		adminAbsenceError = '';
-		try {
-			await absenceDayApi.apiV1OrganizationsSlugAbsencesAdminPost(orgSlug, {
-				userId: adminAbsenceUserId,
-				date: adminAbsenceDate,
-				type: adminAbsenceType as AbsenceType,
-				isHalfDay: adminAbsenceHalfDay,
-				note: adminAbsenceNote || undefined
-			});
-			absencesLoaded = false;
-			await loadAbsences();
-			await reloadOrg();
-			showAdminAddAbsence = false;
-			adminAbsenceDate = '';
-			adminAbsenceType = 0;
-			adminAbsenceNote = '';
-			adminAbsenceHalfDay = false;
-			adminAbsenceUserId = null;
-		} catch (err) {
-			adminAbsenceError = extractErrorMessage(err, 'Failed to add absence.');
-		} finally {
-			addingAdminAbsence = false;
-		}
-	}
-
-	function filteredAbsences(): AbsenceDayResponse[] {
-		if (!adminAbsenceFilter) return absences;
-		return absences.filter(a => a.userId === adminAbsenceFilter);
-	}
-
 	// â”€â”€ Schedule Periods â”€â”€
 	async function loadSchedulePeriods() {
 		if (schedulePeriodsLoaded) return;
@@ -884,238 +645,7 @@
 	}
 
 	// Calendar helpers
-	function calendarDays(year: number, month: number): { date: Date; inMonth: boolean }[] {
-		const first = new Date(year, month, 1);
-		const last = new Date(year, month + 1, 0);
-		const startDay = (first.getDay() + 6) % 7; // Monday = 0
-		const days: { date: Date; inMonth: boolean }[] = [];
-		// Fill leading days from prev month
-		for (let i = startDay - 1; i >= 0; i--) {
-			const d = new Date(year, month, -i);
-			days.push({ date: d, inMonth: false });
-		}
-		// Days in month
-		for (let d = 1; d <= last.getDate(); d++) {
-			days.push({ date: new Date(year, month, d), inMonth: true });
-		}
-		// Fill trailing days to complete the grid
-		while (days.length % 7 !== 0) {
-			const d = new Date(year, month + 1, days.length - last.getDate() - startDay + 1);
-			days.push({ date: d, inMonth: false });
-		}
-		return days;
-	}
-
-	function dateToKey(d: Date): string {
-		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-	}
-
-	function buildAbsenceMap(absenceList: AbsenceDayResponse[]): Map<string, AbsenceDayResponse[]> {
-		const map = new Map<string, AbsenceDayResponse[]>();
-		for (const a of absenceList) {
-			const key = a.date ?? '';
-			if (!map.has(key)) map.set(key, []);
-			map.get(key)!.push(a);
-		}
-		return map;
-	}
-
-	function buildHolidayMap(holidayList: HolidayResponse[]): Map<string, HolidayResponse[]> {
-		const map = new Map<string, HolidayResponse[]>();
-		for (const h of holidayList) {
-			const key = h.date ?? '';
-			if (!map.has(key)) map.set(key, []);
-			map.get(key)!.push(h);
-		}
-		return map;
-	}
-
-	function navigateMonth(delta: number) {
-		let m = calendarMonth + delta;
-		let y = calendarYear;
-		if (m < 0) { m = 11; y--; }
-		else if (m > 11) { m = 0; y++; }
-		calendarMonth = m;
-		calendarYear = y;
-	}
-
-	function absenceColor(type: string | null | undefined): string {
-		switch (type) {
-			case 'Vacation': return 'bg-info/20 text-info border-info/30';
-			case 'SickDay': return 'bg-error/20 text-error border-error/30';
-			default: return 'bg-warning/20 text-warning border-warning/30';
-		}
-	}
-
-	function openDayDialog(dateKey: string) {
-		dayDialogDate = dateKey;
-		dayDialogToDate = '';
-		dayDialogUserId = canEdit ? null : (auth.user?.id ?? null);
-		dayDialogType = 1; // Vacation
-		dayDialogNote = '';
-		dayDialogHalfDay = false;
-		dayDialogError = '';
-		showDayDialog = true;
-	}
-
-	async function submitDayDialog(e: Event) {
-		e.preventDefault();
-		if (!dayDialogDate) return;
-		dayDialogSaving = true;
-		dayDialogError = '';
-		try {
-			const from = new Date(dayDialogDate + 'T00:00:00');
-			const to = dayDialogToDate ? new Date(dayDialogToDate + 'T00:00:00') : from;
-			const workdays: string[] = [];
-			const cursor = new Date(from);
-			while (cursor <= to) {
-				const dow = cursor.getDay();
-				if (dow >= 1 && dow <= 5) {
-					workdays.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`);
-				}
-				cursor.setDate(cursor.getDate() + 1);
-			}
-			if (workdays.length === 0) {
-				dayDialogError = 'No workdays in selected range.';
-				dayDialogSaving = false;
-				return;
-			}
-			for (const dateStr of workdays) {
-				if (canEdit && dayDialogUserId) {
-					await absenceDayApi.apiV1OrganizationsSlugAbsencesAdminPost(orgSlug, {
-						userId: dayDialogUserId,
-						date: dateStr,
-						type: dayDialogType as AbsenceType,
-						isHalfDay: dayDialogHalfDay,
-						note: dayDialogNote || undefined
-					});
-				} else {
-					await absenceDayApi.apiV1OrganizationsSlugAbsencesPost(orgSlug, {
-						date: dateStr,
-						type: dayDialogType as AbsenceType,
-						isHalfDay: dayDialogHalfDay,
-						note: dayDialogNote || undefined
-					});
-				}
-			}
-			absencesLoaded = false;
-			await loadAbsences();
-			await reloadOrg();
-			showDayDialog = false;
-		} catch (err) {
-			dayDialogError = extractErrorMessage(err, 'Failed to add absence.');
-		} finally {
-			dayDialogSaving = false;
-		}
-	}
-
 	/** Group per-user absences of same type into consecutive-day spans */
-	interface AbsenceSpan {
-		userId: number;
-		userFirstName: string;
-		userLastName: string;
-		type: string;
-		startDate: string;
-		endDate: string;
-		days: number;
-		isHalfDay: boolean;
-		note: string;
-		ids: number[];
-	}
-
-	function buildAbsenceSpans(absenceList: AbsenceDayResponse[]): AbsenceSpan[] {
-		// Sort by userId, type, date
-		const sorted = [...absenceList].sort((a, b) => {
-			if ((a.userId ?? 0) !== (b.userId ?? 0)) return (a.userId ?? 0) - (b.userId ?? 0);
-			if ((a.type ?? '') !== (b.type ?? '')) return (a.type ?? '').localeCompare(b.type ?? '');
-			return (a.date ?? '').localeCompare(b.date ?? '');
-		});
-
-		const spans: AbsenceSpan[] = [];
-		let current: AbsenceSpan | null = null;
-
-		for (const a of sorted) {
-			if (current && a.userId === current.userId && a.type === current.type) {
-				// Check if this date is consecutive (next workday)
-				const prevDate = new Date(current.endDate + 'T00:00:00');
-				const thisDate = new Date((a.date ?? '') + 'T00:00:00');
-				const diffDays = Math.round((thisDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
-				// Allow gaps of up to 3 days (weekends + possible holiday)
-				if (diffDays >= 1 && diffDays <= 3) {
-					current.endDate = a.date ?? '';
-					current.days++;
-					current.ids.push(a.id ?? 0);
-					if (a.note && !current.note) current.note = a.note;
-					continue;
-				}
-			}
-			// Start new span
-			current = {
-				userId: a.userId ?? 0,
-				userFirstName: a.userFirstName ?? '',
-				userLastName: a.userLastName ?? '',
-				type: a.type ?? '',
-				startDate: a.date ?? '',
-				endDate: a.date ?? '',
-				days: 1,
-				isHalfDay: a.isHalfDay ?? false,
-				note: a.note ?? '',
-				ids: [a.id ?? 0]
-			};
-			spans.push(current);
-		}
-
-		return spans.sort((a, b) => a.startDate.localeCompare(b.startDate));
-	}
-
-	interface SpanEntry {
-		span: AbsenceSpan;
-		position: 'single' | 'start' | 'middle' | 'end';
-	}
-
-	function buildSpanMap(absenceList: AbsenceDayResponse[]): Map<string, SpanEntry[]> {
-		const spans = buildAbsenceSpans(absenceList);
-		const map = new Map<string, SpanEntry[]>();
-
-		for (const span of spans) {
-			if (span.days === 1) {
-				const entries = map.get(span.startDate) ?? [];
-				entries.push({ span, position: 'single' });
-				map.set(span.startDate, entries);
-			} else {
-				// Walk through each actual absence date in this span
-				const dates = absenceList
-					.filter(a => a.userId === span.userId && a.type === span.type &&
-						(a.date ?? '') >= span.startDate && (a.date ?? '') <= span.endDate)
-					.map(a => a.date ?? '')
-					.sort();
-				for (let i = 0; i < dates.length; i++) {
-					const pos: SpanEntry['position'] = i === 0 ? 'start' : i === dates.length - 1 ? 'end' : 'middle';
-					const entries = map.get(dates[i]) ?? [];
-					entries.push({ span, position: pos });
-					map.set(dates[i], entries);
-				}
-			}
-		}
-		return map;
-	}
-
-	function spanBgColor(type: string | null | undefined): string {
-		switch (type) {
-			case 'Vacation': return 'bg-info/25 border-info/40';
-			case 'SickDay': return 'bg-error/25 border-error/40';
-			default: return 'bg-warning/25 border-warning/40';
-		}
-	}
-
-	function spanTextColor(type: string | null | undefined): string {
-		switch (type) {
-			case 'Vacation': return 'text-info';
-			case 'SickDay': return 'text-error';
-			default: return 'text-warning';
-		}
-	}
-
 	/** Color palette for distinguishing different users' vacations */
 	const userColorPalette = [
 		{ bg: 'bg-sky-200/60 border-sky-400/60', text: 'text-sky-900' },
@@ -1133,64 +663,9 @@
 		{ bg: 'bg-blue-200/60 border-blue-400/60', text: 'text-blue-900' },
 	];
 
-	function userSpanBg(userId: number, type: string | null | undefined): string {
-		if (type === 'SickDay') return 'bg-error/25 border-error/40';
-		if (type === 'Other') return 'bg-warning/25 border-warning/40';
-		const idx = (userId ?? 0) % userColorPalette.length;
-		return userColorPalette[idx].bg;
-	}
-
-	function userSpanText(userId: number, type: string | null | undefined): string {
-		if (type === 'SickDay') return 'text-error';
-		if (type === 'Other') return 'text-warning';
-		const idx = (userId ?? 0) % userColorPalette.length;
-		return userColorPalette[idx].text;
-	}
-
-	interface WeekLane {
-		userId: number;
-		userFirstName: string;
-		userLastName: string;
-	}
-
 	/** Get weeks as groups of 7 days from calendarDays */
-	function getWeeks(days: { date: Date; inMonth: boolean }[]): { date: Date; inMonth: boolean }[][] {
-		const weeks: { date: Date; inMonth: boolean }[][] = [];
-		for (let i = 0; i < days.length; i += 7) {
-			weeks.push(days.slice(i, i + 7));
-		}
-		return weeks;
-	}
-
 	/** Determine all unique user lanes for a week (one lane per user) */
-	function getWeekLanes(weekDays: { date: Date }[], spanMap: Map<string, SpanEntry[]>): WeekLane[] {
-		const seen = new Map<number, WeekLane>();
-		for (const { date } of weekDays) {
-			const key = dateToKey(date);
-			for (const entry of (spanMap.get(key) ?? [])) {
-				if (!seen.has(entry.span.userId)) {
-					seen.set(entry.span.userId, {
-						userId: entry.span.userId,
-						userFirstName: entry.span.userFirstName,
-						userLastName: entry.span.userLastName,
-					});
-				}
-			}
-		}
-		return [...seen.values()].sort((a, b) => a.userId - b.userId);
-	}
-
 	/** Find a span entry for a specific user on a specific day */
-	function getLaneEntry(dayKey: string, lane: WeekLane, spanMap: Map<string, SpanEntry[]>): SpanEntry | null {
-		const entries = spanMap.get(dayKey) ?? [];
-		return entries.find(e => e.span.userId === lane.userId) ?? null;
-	}
-
-	function getAvailableAbsenceYears(): number[] {
-		const years = [...new Set(absences.map(a => (a.date ?? '').substring(0, 4)).filter(y => y))].sort((a, b) => b.localeCompare(a));
-		return years.length > 0 ? years.map(y => parseInt(y)) : [new Date().getFullYear()];
-	}
-
 	async function addSchedulePeriod(e: Event) {
 		e.preventDefault();
 		if (!newPeriodFrom) {
@@ -1253,11 +728,7 @@
 		}
 	}
 
-	// Settings: cycle work schedule change mode — handled by generic cycleSetting now
 
-	async function toggleMemberTimeEntryVisibility() {
-		await toggleSetting('memberTimeEntryVisibility');
-	}
 
 
 </script>
@@ -1319,9 +790,6 @@
 				</div>
 				{#if canEdit}
 					<div class="flex gap-2">
-						{#if org.memberTimeEntryVisibility}
-							<a href="/organizations/{orgSlug}/time-overview" class="btn btn-outline btn-sm">Time Overview</a>
-						{/if}
 						<button class="btn btn-outline btn-sm" onclick={startEdit}>Edit</button>
 						{#if isOwner}
 							<button class="btn btn-outline btn-error btn-sm" onclick={deleteOrg}>Delete</button>
@@ -1340,7 +808,7 @@
 			{#if showSettingsChangedBanner}
 				<div class="alert alert-info mb-4 text-sm">
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-					Organization rules have been updated. Check the <button class="link link-primary font-semibold" onclick={() => { setTab('settings'); dismissSettingsNotifications(); }}>Rules</button> tab for details.
+					Organization rules have been updated. Check the <a href="/organizations/{orgSlug}/settings" class="link link-primary font-semibold" onclick={() => dismissSettingsNotifications()}>Settings</a> page for details.
 					<button class="btn btn-ghost btn-xs ml-auto text-lg" onclick={() => dismissSettingsNotifications()}>&times;</button>
 				</div>
 			{/if}
@@ -1362,16 +830,6 @@
 				<button class="tab {activeTab === 'team' ? 'tab-active' : ''}" onclick={() => setTab('team')}>
 					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
 					Team
-				</button>
-				{#if canEdit}
-					<button class="tab {activeTab === 'absences' ? 'tab-active' : ''}" onclick={() => setTab('absences')}>
-						<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
-						Absences
-					</button>
-				{/if}
-				<button class="tab {activeTab === 'settings' ? 'tab-active' : ''}" onclick={() => setTab('settings')}>
-					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
-					{canEdit ? 'Settings' : 'Rules'}
 				</button>
 			</div>
 
@@ -1910,626 +1368,8 @@
 						</section>
 					{/if}
 				</div>
-
-			<!-- ==================== ABSENCES TAB (Admin) ==================== -->
-			{:else if activeTab === 'absences' && canEdit}
-				<div class="pt-2">
-					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Calendar overview of absences and vacation days across all members.</p>
-
-					<!-- Calendar Navigation -->
-					{#if org}
-					{@const absenceMap = buildAbsenceMap(absences)}
-					{@const spanMap = buildSpanMap(absences)}
-					{@const holidayMap = buildHolidayMap(holidays)}
-					{@const days = calendarDays(calendarYear, calendarMonth)}
-					{@const monthLabel = new Date(calendarYear, calendarMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-					{@const today = dateToKey(new Date())}
-
-					<section>
-						<div class="flex items-center justify-between mb-4">
-							<button class="btn btn-ghost btn-sm" aria-label="Previous month" onclick={() => navigateMonth(-1)}>
-								<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd"/></svg>
-							</button>
-							<div class="flex items-center gap-3">
-								<h2 class="text-xl font-bold text-base-content">{monthLabel}</h2>
-								<button class="btn btn-ghost btn-xs" onclick={() => { calendarMonth = new Date().getMonth(); calendarYear = new Date().getFullYear(); }}>Today</button>
-							</div>
-							<div class="flex items-center gap-1">
-								<button class="btn btn-ghost btn-sm" aria-label="Next month" onclick={() => navigateMonth(1)}>
-									<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
-								</button>
-							</div>
-						</div>
-
-						<!-- Day-of-week headers -->
-						<div class="grid grid-cols-7 gap-px mb-px">
-							{#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as dow}
-								<div class="text-center text-xs font-semibold text-base-content/50 py-2 {dow === 'Sat' || dow === 'Sun' ? 'text-base-content/30' : ''}">{dow}</div>
-							{/each}
-						</div>
-
-						<!-- Calendar grid (week-based with stable lanes) -->
-						<div class="border border-base-300 rounded-lg overflow-hidden">
-							{#each getWeeks(days) as weekDays, wi}
-								{@const weekLanes = getWeekLanes(weekDays, spanMap)}
-								<div class="grid grid-cols-7 gap-px bg-base-300/50 {wi > 0 ? 'border-t-2 border-base-300' : ''}">
-									{#each weekDays as { date, inMonth }}
-										{@const key = dateToKey(date)}
-										{@const isToday = key === today}
-										{@const isWeekend = date.getDay() === 0 || date.getDay() === 6}
-										{@const dayHolidays = holidayMap.get(key) ?? []}
-										<!-- svelte-ignore a11y_click_events_have_key_events -->
-										<!-- svelte-ignore a11y_no_static_element_interactions -->
-										<div
-											class="min-h-[60px] p-1 pt-1.5 pb-3 flex flex-col cursor-pointer hover:bg-primary/5 transition-colors {inMonth && !isWeekend ? 'bg-primary/[0.03]' : ''} {inMonth && isWeekend ? 'bg-base-200/30' : ''} {!inMonth ? 'bg-base-200/50' : ''}"
-											onclick={() => { if (inMonth) openDayDialog(key); }}
-											title="Click to add absence on {key}"
-										>
-											<div class="flex items-center justify-between mb-1.5">
-												<span class="text-[10px] font-medium leading-none {isToday ? 'bg-primary text-primary-content rounded-full w-5 h-5 flex items-center justify-center' : ''} {inMonth ? 'text-base-content' : 'text-base-content/25'} {isWeekend && inMonth ? 'text-base-content/40' : ''}">
-													{date.getDate()}
-												</span>
-											</div>
-											{#each dayHolidays as h}
-												<div class="h-[16px] text-[9px] leading-none flex items-center px-1 rounded bg-success/15 text-success border border-success/20 mb-px truncate" title={h.name ?? ''}>
-													{h.name}
-												</div>
-											{/each}
-											<div class="flex flex-col gap-[2px] mt-1 min-h-[48px]">
-												{#each weekLanes as lane}
-													{@const entry = getLaneEntry(key, lane, spanMap)}
-													{#if entry}
-														<!-- svelte-ignore a11y_click_events_have_key_events -->
-														<a
-															href="/organizations/{orgSlug}/members/{entry.span.userId}"
-															onclick={(e) => e.stopPropagation()}
-															class="h-[16px] flex items-center text-[9px] leading-none px-1 border truncate no-underline hover:brightness-90 transition-all cursor-pointer {userSpanBg(entry.span.userId, entry.span.type)} {userSpanText(entry.span.userId, entry.span.type)} {entry.position === 'start' ? 'rounded-l border-r-0 -mr-1' : entry.position === 'end' ? 'rounded-r border-l-0 -ml-1' : entry.position === 'single' ? 'rounded' : 'border-x-0 -mx-1'}"
-															title="{entry.span.userFirstName} {entry.span.userLastName} — {absenceTypeLabel(entry.span.type)}{entry.span.days > 1 ? ` (${entry.span.days} days)` : ''}{entry.span.isHalfDay ? ' (½)' : ''}{entry.span.note ? ': ' + entry.span.note : ''}"
-														>
-															{#if entry.position === 'start' || entry.position === 'single'}
-																{entry.span.userFirstName}{#if entry.span.days > 1}&nbsp;→{/if}{#if entry.span.isHalfDay && entry.position === 'single'}&nbsp;½{/if}
-															{:else if entry.position === 'end'}
-																→&nbsp;{entry.span.userFirstName}
-															{:else}
-																&nbsp;
-															{/if}
-														</a>
-													{:else}
-														<div class="h-[16px]"></div>
-													{/if}
-												{/each}
-											</div>
-										</div>
-									{/each}
-								</div>
-							{/each}
-						</div>
-
-						<!-- Legend -->
-						<div class="flex flex-wrap gap-4 mt-3 text-xs text-base-content/60">
-							<span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-error/20 border border-error/30"></span> Sick Day</span>
-							<span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-warning/20 border border-warning/30"></span> Other</span>
-							<span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-success/15 border border-success/20"></span> Holiday</span>
-							<span class="text-base-content/40">Vacation colors vary by person</span>
-						</div>
-					</section>
-
-					<!-- Day-click Add Absence Dialog -->
-					{#if showDayDialog}
-						{@const dayAbsences = absences.filter(a => a.date === dayDialogDate)}
-						<!-- svelte-ignore a11y_click_events_have_key_events -->
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onclick={() => (showDayDialog = false)}>
-							<!-- svelte-ignore a11y_click_events_have_key_events -->
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div class="bg-base-100 rounded-xl shadow-xl p-6 w-full max-w-md mx-4 border border-base-300 max-h-[90vh] overflow-y-auto" onclick={(e) => e.stopPropagation()}>
-								<div class="flex items-center justify-between mb-4">
-									<h3 class="text-lg font-bold text-base-content">
-										{new Date(dayDialogDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-									</h3>
-									<button class="btn btn-ghost btn-sm btn-circle" onclick={() => (showDayDialog = false)}>✕</button>
-								</div>
-
-								<!-- Existing absences on this day -->
-								{#if dayAbsences.length > 0}
-									<div class="mb-4">
-										<h4 class="text-sm font-semibold text-base-content/60 mb-2">Absences on this day</h4>
-										<div class="flex flex-col gap-1">
-											{#each dayAbsences as ab}
-												<div class="flex items-center gap-2 p-2 bg-base-200/50 rounded-lg text-sm">
-													<div class="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-[10px] font-semibold shrink-0">
-														{(ab.userFirstName?.[0] ?? '').toUpperCase()}{(ab.userLastName?.[0] ?? '').toUpperCase()}
-													</div>
-													<span class="font-medium">{ab.userFirstName} {ab.userLastName}</span>
-													<span class="badge badge-xs {absenceColor(ab.type)}">{absenceTypeLabel(ab.type ?? '')}</span>
-													{#if ab.isHalfDay}<span class="badge badge-xs badge-outline">½</span>{/if}
-													{#if ab.note}<span class="text-base-content/40 text-xs truncate">{ab.note}</span>{/if}
-												</div>
-											{/each}
-										</div>
-									</div>
-									<div class="divider my-2 text-xs text-base-content/40">Add new absence</div>
-								{/if}
-
-								{#if dayDialogError}
-									<div class="alert alert-error text-sm py-1.5 px-2.5 mb-3">{dayDialogError}</div>
-								{/if}
-								<form onsubmit={submitDayDialog} class="flex flex-col gap-3">
-									{#if canEdit}
-										<div class="flex flex-col gap-1">
-											<span class="text-sm font-medium text-base-content/70">Member</span>
-											<select bind:value={dayDialogUserId} class="select select-bordered select-sm" required>
-												<option value={null}>Select member...</option>
-												{#each (org?.members ?? []) as m}
-													<option value={m.id}>{m.firstName} {m.lastName}{m.id === auth.user?.id ? ' (You)' : ''}</option>
-												{/each}
-											</select>
-										</div>
-									{/if}
-									<div class="grid grid-cols-2 gap-3">
-										<div class="flex flex-col gap-1">
-											<span class="text-sm font-medium text-base-content/70">From</span>
-											<input type="date" class="input input-bordered input-sm" bind:value={dayDialogDate} required />
-										</div>
-										<div class="flex flex-col gap-1">
-											<span class="text-sm font-medium text-base-content/70">To (optional)</span>
-											<input type="date" class="input input-bordered input-sm" bind:value={dayDialogToDate} min={dayDialogDate} />
-										</div>
-									</div>
-									<div class="flex flex-col gap-1">
-										<span class="text-sm font-medium text-base-content/70">Type</span>
-										<select bind:value={dayDialogType} class="select select-bordered select-sm">
-											<option value={0}>Sick Day</option>
-											<option value={1}>Vacation</option>
-											<option value={2}>Other</option>
-										</select>
-									</div>
-									<div class="flex flex-col gap-1">
-										<span class="text-sm font-medium text-base-content/70">Note (optional)</span>
-										<input type="text" class="input input-bordered input-sm" bind:value={dayDialogNote} placeholder="e.g. Doctor's appointment" />
-									</div>
-									<label class="label cursor-pointer flex items-center gap-2 text-sm">
-										<input type="checkbox" class="checkbox checkbox-sm" bind:checked={dayDialogHalfDay} />
-										Half day
-									</label>
-									<div class="flex justify-end gap-2 mt-2">
-										<button type="button" class="btn btn-ghost btn-sm" onclick={() => (showDayDialog = false)}>Cancel</button>
-										<button type="submit" class="btn btn-primary btn-sm" disabled={dayDialogSaving}>
-											{dayDialogSaving ? 'Adding...' : 'Add Absence'}
-										</button>
-									</div>
-								</form>
-							</div>
-						</div>
-					{/if}
-
-					<!-- Vacation Days Summary -->
-					<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
-						<h2 class="text-xl font-bold text-base-content mb-4">Vacation Days Balance</h2>
-						{#if org}
-						{@const membersWithVacation = (org.members ?? []).filter(m => (m.vacationDaysPerYear ?? 0) > 0).sort((a, b) => ((a.vacationDaysRemaining ?? 0) - (b.vacationDaysRemaining ?? 0)))}
-						{#if membersWithVacation.length === 0}
-							<p class="text-base-content/40 text-sm">No members have vacation days configured.</p>
-						{:else}
-							<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-								{#each membersWithVacation as member}
-									{@const total = member.vacationDaysPerYear ?? 0}
-									{@const used = member.vacationDaysUsed ?? 0}
-									{@const remaining = member.vacationDaysRemaining ?? total}
-									{@const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0}
-									<a href="/organizations/{orgSlug}/members/{member.id}" class="flex items-start gap-3 p-3 bg-base-100 rounded-lg border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all no-underline text-base-content">
-										<div class="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">
-											{(member.firstName?.[0] ?? '').toUpperCase()}{(member.lastName?.[0] ?? '').toUpperCase()}
-										</div>
-										<div class="flex-1 min-w-0">
-											<div class="font-semibold text-sm truncate">{member.firstName} {member.lastName}</div>
-											<div class="flex items-center gap-2 mt-1">
-												<progress class="progress {pct >= 90 ? 'progress-error' : pct >= 70 ? 'progress-warning' : 'progress-primary'} flex-1 h-2" value={pct} max="100"></progress>
-												<span class="text-xs text-base-content/50 shrink-0">{pct}%</span>
-											</div>
-											<div class="flex justify-between mt-1 text-xs text-base-content/50">
-												<span>{used}d used / {total}d</span>
-												<span class="font-semibold {remaining <= 2 ? 'text-error' : remaining <= 5 ? 'text-warning' : 'text-success'}">{remaining}d left</span>
-											</div>
-										</div>
-									</a>
-								{/each}
-							</div>
-						{/if}
-						{/if}
-					</section>
-					<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
-						<h2 class="text-xl font-bold text-base-content mb-4">Absence List</h2>
-						<!-- Filters -->
-						<div class="flex flex-wrap gap-2 mb-4">
-							<select bind:value={selectedListYear} class="select select-bordered select-sm">
-								{#each getAvailableAbsenceYears() as y}
-									<option value={y}>{y}</option>
-								{/each}
-							</select>
-							<select bind:value={adminAbsenceFilter} class="select select-bordered select-sm">
-								<option value={null}>All members</option>
-								{#each (org?.members ?? []) as m}
-									<option value={m.id}>{m.firstName} {m.lastName}</option>
-								{/each}
-							</select>
-							<select bind:value={panelTypeFilter} class="select select-bordered select-sm">
-								<option value="all">All types</option>
-								<option value="Vacation">Vacation</option>
-								<option value="SickDay">Sick Day</option>
-								<option value="Other">Other</option>
-							</select>
-						</div>
-						{#if absencesLoading}
-							<p class="text-base-content/40 text-sm">Loading...</p>
-						{:else}
-							{@const yearStr = String(selectedListYear)}
-							{@const filtered = absences
-								.filter(a => (a.date ?? '').startsWith(yearStr))
-								.filter(a => !adminAbsenceFilter || a.userId === adminAbsenceFilter)
-								.filter(a => panelTypeFilter === 'all' || a.type === panelTypeFilter)}
-							{@const spans = buildAbsenceSpans(filtered)}
-							{#if spans.length === 0}
-								<p class="text-base-content/40 text-sm text-center py-4">No absences found for {selectedListYear}.</p>
-							{:else}
-								<div class="flex flex-col gap-1.5">
-									{#each spans as span}
-										{@const dateLabel = span.days === 1
-											? span.startDate
-											: `${span.startDate} → ${span.endDate}`}
-										<div class="flex items-center gap-3 p-2.5 bg-base-100 rounded-lg border border-base-300 text-sm">
-											<span class="text-base-content/50 font-mono shrink-0 min-w-[180px]">{dateLabel}</span>
-											<a href="/organizations/{orgSlug}/members/{span.userId}" class="flex items-center gap-1.5 font-medium link link-hover min-w-[130px]">
-												<div class="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-[10px] font-semibold shrink-0">
-													{span.userFirstName[0]?.toUpperCase() ?? ''}{span.userLastName[0]?.toUpperCase() ?? ''}
-												</div>
-												{span.userFirstName} {span.userLastName}
-											</a>
-											<span class="badge badge-sm {absenceColor(span.type)}">
-												{absenceTypeLabel(span.type)}
-											</span>
-											{#if span.days > 1}
-												<span class="badge badge-sm badge-outline">{span.days} days</span>
-											{/if}
-											{#if span.isHalfDay && span.days === 1}
-												<span class="badge badge-sm badge-outline">½ day</span>
-											{/if}
-											{#if span.note}
-												<span class="text-base-content/40 truncate">{span.note}</span>
-											{/if}
-										</div>
-									{/each}
-								</div>
-								<p class="text-xs text-base-content/40 mt-2">{spans.length} entries ({filtered.length} days total)</p>
-							{/if}
-						{/if}
-					</section>
-					{/if}
-				</div>
-
-			<!-- ==================== SETTINGS TAB (Admin) ==================== -->
-			{:else if activeTab === 'settings' && canEdit}
-				<div class="pt-2">
-					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Organization-wide rules, permissions, and approval workflows.</p>
-
-					<!-- Organization Settings -->
-					<section class="mt-10">
-						<h2 class="text-xl text-base-content/70 mb-4">Organization Settings</h2>
-						{#if settingsError}
-							<div class="alert alert-error mb-4 text-sm">{settingsError}</div>
-						{/if}
-
-						<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-							<!-- Toggle settings (booleans) -->
-							{#each toggleSettings as ts}
-								{@const value = (org as Record<string, any>)[ts.key]}
-								<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-									<div class="setting-info">
-										<div class="font-semibold text-base-content mb-0.5">{ts.label}</div>
-										<div class="text-sm text-base-content/60 max-w-[400px]">{ts.description}</div>
-									</div>
-									<button
-										class="relative w-12 h-[26px] {value ? 'bg-primary' : 'bg-base-300'} rounded-full border-none cursor-pointer transition-colors shrink-0 p-0"
-										onclick={() => toggleSetting(ts.key)}
-										disabled={settingsSaving}
-										aria-label="Toggle {ts.label}"
-									>
-										<span class="absolute top-[3px] {value ? 'translate-x-[22px]' : 'translate-x-0'} left-[3px] w-5 h-5 bg-base-100 rounded-full transition-transform shadow-sm"></span>
-									</button>
-								</div>
-							{/each}
-
-							<!-- Rule mode settings (tri-state cycle) -->
-							{#each ruleSettings as rs}
-								{@const mode = (org as Record<string, any>)[rs.key] as string | null}
-								{@const label = rs.labelFn ? rs.labelFn(mode) : ruleModeLabel(mode)}
-								<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-									<div class="setting-info">
-										<div class="font-semibold text-base-content mb-0.5">{rs.label}</div>
-										<div class="text-sm text-base-content/60 max-w-[400px]">{rs.description}</div>
-									</div>
-									<button
-										class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeButtonClass(mode)}"
-										onclick={() => cycleSetting(rs.key)}
-										disabled={settingsSaving}
-									>
-										{label}
-									</button>
-								</div>
-							{/each}
-
-							<!-- Visibility settings (Private / Admin Only / All Members) -->
-							{#each visibilitySettings as vs}
-								{@const mode = (org as Record<string, any>)[vs.key] as string | null}
-								<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-									<div class="setting-info">
-										<div class="font-semibold text-base-content mb-0.5">{vs.label}</div>
-										<div class="text-sm text-base-content/60 max-w-[400px]">{vs.description}</div>
-									</div>
-									<button
-										class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {visibilityModeButtonClass(mode)}"
-										onclick={() => cycleVisibilitySetting(vs.key)}
-										disabled={settingsSaving}
-									>
-										{visibilityModeLabel(mode)}
-									</button>
-								</div>
-							{/each}
-						</div>
-						<div class="bg-base-200/50 rounded-lg p-4 mt-4 border border-base-300">
-							<div class="flex items-center justify-between">
-								<div class="setting-info">
-									<div class="font-semibold text-base-content mb-0.5">Default Vacation Days</div>
-									<div class="text-sm text-base-content/60 max-w-[400px]">Default number of vacation days per year for new members. Existing members can be set individually.</div>
-								</div>
-								<div class="flex items-center gap-2">
-									<input
-										type="number"
-										class="input input-bordered input-sm w-20 text-center"
-										step="0.5"
-										min="0"
-										max="365"
-										value={org.defaultVacationDays ?? 0}
-										onchange={async (e) => {
-											const val = parseFloat((e.target as HTMLInputElement).value);
-											if (isNaN(val) || val < 0 || !org) return;
-											settingsSaving = true;
-											try {
-												await organizationsApi.apiV1OrganizationsSlugSettingsPut(org.slug!, { defaultVacationDays: val });
-												await loadOrg();
-											} catch { /* ignore */ }
-											settingsSaving = false;
-										}}
-										disabled={settingsSaving}
-									/>
-									<span class="text-sm text-base-content/60">days/year</span>
-								</div>
-							</div>
-						</div>
-
-						<!-- Pause Rules -->
-						{#if org.autoPauseEnabled}
-							<div class="mt-6">
-								<div class="flex items-center justify-between mb-4">
-									<h3 class="text-base font-bold text-base-content/70">Pause Rules</h3>
-									<button class="btn btn-primary btn-sm" onclick={() => (showAddRule = !showAddRule)}>
-										{showAddRule ? 'Cancel' : '+ Add Rule'}
-									</button>
-								</div>
-
-								{#if showAddRule}
-									<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
-										{#if addRuleError}
-											<div class="alert alert-error mb-4 text-sm">{addRuleError}</div>
-										{/if}
-										<form onsubmit={addPauseRule} class="flex gap-2 items-center flex-wrap">
-											<div class="flex items-center gap-1.5">
-												<!-- svelte-ignore a11y_label_has_associated_control -->
-												<label class="text-sm text-base-content/70 font-medium whitespace-nowrap">When tracked &ge;</label>
-												<input type="number" class="input input-bordered input-xs w-[70px] text-center" step="0.5" min="0.5" bind:value={newRuleMinHours} required disabled={addingRule} />
-												<span class="text-sm text-base-content/60 whitespace-nowrap">hours</span>
-											</div>
-											<div class="flex items-center gap-1.5">
-												<!-- svelte-ignore a11y_label_has_associated_control -->
-												<label class="text-sm text-base-content/70 font-medium whitespace-nowrap">deduct</label>
-												<input type="number" class="input input-bordered input-xs w-[70px] text-center" min="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
-												<span class="text-sm text-base-content/60 whitespace-nowrap">min pause</span>
-											</div>
-											<button type="submit" class="btn btn-primary btn-sm" disabled={addingRule}>
-												{addingRule ? 'Adding...' : 'Add Rule'}
-											</button>
-										</form>
-									</div>
-								{/if}
-
-								{#if getPauseRules().length === 0}
-									<p class="text-base-content/40">No pause rules configured. Add rules to automatically deduct break time.</p>
-								{:else}
-									<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-										{#each getPauseRules() as rule}
-											<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0 flex-wrap gap-2">
-												{#if editingRuleId === rule.id}
-													{#if editRuleError}
-														<div class="alert alert-error mb-4 text-sm" style="width:100%">{editRuleError}</div>
-													{/if}
-													<div class="flex items-center gap-3 flex-wrap w-full">
-														<div class="flex items-center gap-1.5">
-															<!-- svelte-ignore a11y_label_has_associated_control -->
-															<label class="text-sm text-base-content/70 font-medium whitespace-nowrap">&ge;</label>
-															<input type="number" class="input input-bordered input-xs w-[70px] text-center" step="0.5" min="0.5" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
-															<span class="text-sm text-base-content/60 whitespace-nowrap">h</span>
-														</div>
-														<div class="flex items-center gap-1.5">
-															<!-- svelte-ignore a11y_label_has_associated_control -->
-															<label class="text-sm text-base-content/70 font-medium whitespace-nowrap">&rarr;</label>
-															<input type="number" class="input input-bordered input-xs w-[70px] text-center" min="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
-															<span class="text-sm text-base-content/60 whitespace-nowrap">min</span>
-														</div>
-														<div class="flex items-center gap-1.5">
-															<button class="btn btn-primary btn-sm" onclick={() => saveEditRule(rule.id!)} disabled={editingRuleSaving}>Save</button>
-															<button class="btn btn-ghost btn-sm" onclick={cancelEditRule}>Cancel</button>
-														</div>
-													</div>
-												{:else}
-													<div class="text-[0.9375rem] text-base-content/70">
-														<strong>&ge; {rule.minHours}h</strong> tracked &rarr; <strong>{rule.pauseMinutes} min</strong> pause deducted
-													</div>
-													<div class="flex items-center gap-1.5">
-														<button class="btn btn-ghost btn-sm" onclick={() => startEditRule(rule)}>Edit</button>
-														<button class="btn btn-ghost btn-xs text-error" title="Delete rule" onclick={() => deleteRule(rule.id!)}>&times;</button>
-													</div>
-												{/if}
-											</div>
-										{/each}
-									</div>
-								{/if}
-							</div>
-						{/if}
-					</section>
-
-					<!-- Request History -->
-					<section class="mt-8">
-						<div class="flex items-center justify-between mb-4">
-							<h2 class="text-xl font-bold text-base-content">Request History</h2>
-						</div>
-
-						{#if requestHistoryLoading}
-							<p class="text-base-content/40">Loading requests...</p>
-						{:else if requestHistoryLoaded}
-							<div class="flex gap-1.5 mb-4 flex-wrap">
-								<button class="btn btn-sm rounded-full {requestHistoryFilter === 'all' ? 'btn-neutral' : 'btn-outline'}" onclick={() => (requestHistoryFilter = 'all')}>All ({requestHistory.length})</button>
-								<button class="btn btn-sm rounded-full {requestHistoryFilter === 'Pending' ? 'btn-neutral' : 'btn-outline'}" onclick={() => (requestHistoryFilter = 'Pending')}>Pending ({requestHistory.filter(r => r.status === 'Pending').length})</button>
-								<button class="btn btn-sm rounded-full {requestHistoryFilter === 'Accepted' ? 'btn-neutral' : 'btn-outline'}" onclick={() => (requestHistoryFilter = 'Accepted')}>Accepted ({requestHistory.filter(r => r.status === 'Accepted').length})</button>
-								<button class="btn btn-sm rounded-full {requestHistoryFilter === 'Declined' ? 'btn-neutral' : 'btn-outline'}" onclick={() => (requestHistoryFilter = 'Declined')}>Declined ({requestHistory.filter(r => r.status === 'Declined').length})</button>
-							</div>
-
-							{#if filteredRequests().length === 0}
-								<p class="text-base-content/40">No requests found.</p>
-							{:else}
-								<div class="flex flex-col gap-3">
-									{#each filteredRequests() as req}
-										<div class="bg-base-200/30 border border-base-300 rounded-lg p-4">
-											<div class="flex items-center gap-2 mb-2">
-												<span class="badge badge-primary badge-sm">{formatRequestType(req.type)}</span>
-												<span class="badge badge-sm {statusBadgeClass(req.status) === 'status-pending' ? 'badge-warning' : statusBadgeClass(req.status) === 'status-accepted' ? 'badge-success' : 'badge-error'}">{req.status}</span>
-											</div>
-											<div class="text-sm">
-												<div class="mb-1">
-													<strong>{req.userFirstName} {req.userLastName}</strong>
-													<span class="text-base-content/40 text-sm ml-1.5">{req.userEmail}</span>
-												</div>
-												{#if req.requestData}
-													<div class="text-primary text-sm my-1 py-1 px-2 bg-primary/10 rounded-md inline-block">{parseRequestData(req.type, req.requestData).join(', ')}</div>
-												{/if}
-												{#if req.message}
-													<div class="text-base-content/60 italic text-sm my-1">"{req.message}"</div>
-												{/if}
-												<div class="text-base-content/40 text-xs mt-1.5">
-													<span>Created {formatTimeAgo(req.createdAt)}</span>
-													{#if req.respondedAt}
-														<span>&middot; {req.status === 'Accepted' ? 'Accepted' : 'Declined'} by {req.respondedByName ?? 'Unknown'} {formatTimeAgo(req.respondedAt)}</span>
-													{/if}
-													{#if req.relatedEntityId}
-														<span>&middot; Entry #{req.relatedEntityId}</span>
-													{/if}
-												</div>
-											</div>
-											{#if req.status === 'Pending'}
-												<div class="flex gap-1.5 mt-3 pt-3 border-t border-base-300">
-													<button class="btn btn-success btn-sm" onclick={async () => {
-														try {
-															await requestsApi.apiV1OrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: true });
-															requestHistoryLoaded = false;
-															await loadRequestHistory();
-														} catch (e) {
-															actionError = extractErrorMessage(e, 'Failed to accept');
-														}
-													}}>Accept</button>
-													<button class="btn btn-outline btn-error btn-sm" onclick={async () => {
-														try {
-															await requestsApi.apiV1OrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: false });
-															requestHistoryLoaded = false;
-															await loadRequestHistory();
-														} catch (e) {
-															actionError = extractErrorMessage(e, 'Failed to decline');
-														}
-													}}>Decline</button>
-												</div>
-											{/if}
-										</div>
-									{/each}
-								</div>
-							{/if}
-						{/if}
-					</section>
-				</div>
-
-			<!-- ==================== RULES TAB (Member read-only) ==================== -->
-			{:else if activeTab === 'settings'}
-				<div class="pt-2">
-					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Current organization rules and policies. Only admins can change these settings.</p>
-
-					<section class="mt-10">
-						<h2 class="text-xl text-base-content/70 mb-4">Organization Rules</h2>
-
-						<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-							<!-- Toggle settings (read-only) -->
-							{#each toggleSettings as ts}
-								{@const value = (org as Record<string, any>)[ts.key]}
-								<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-									<div class="setting-info">
-										<div class="font-semibold text-base-content mb-0.5">{ts.label}</div>
-										<div class="text-sm text-base-content/60 max-w-[400px]">{ts.description}</div>
-									</div>
-									<span class="badge {value ? 'badge-success' : 'badge-ghost'}">{value ? 'On' : 'Off'}</span>
-								</div>
-							{/each}
-
-							<!-- Rule mode settings (read-only) -->
-							{#each ruleSettings as rs}
-								{@const mode = (org as Record<string, any>)[rs.key] as string | null}
-								{@const label = rs.labelFn ? rs.labelFn(mode) : ruleModeLabel(mode)}
-								<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-									<div class="setting-info">
-										<div class="font-semibold text-base-content mb-0.5">{rs.label}</div>
-										<div class="text-sm text-base-content/60 max-w-[400px]">{rs.description}</div>
-									</div>
-									<span class="badge {ruleModeButtonClass(mode)}">{label}</span>
-								</div>
-							{/each}
-
-							<!-- Visibility settings (read-only) -->
-							{#each visibilitySettings as vs}
-								{@const mode = (org as Record<string, any>)[vs.key] as string | null}
-								<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-									<div class="setting-info">
-										<div class="font-semibold text-base-content mb-0.5">{vs.label}</div>
-										<div class="text-sm text-base-content/60 max-w-[400px]">{vs.description}</div>
-									</div>
-									<span class="badge {visibilityModeButtonClass(mode)}">{visibilityModeLabel(mode)}</span>
-								</div>
-							{/each}
-						</div>
-
-						{#if org.autoPauseEnabled}
-							<div class="mt-6 pt-4 border-t border-base-300">
-								<h3 class="text-base font-bold text-base-content mb-3">Pause Rules</h3>
-								{#if (org.pauseRules ?? []).length === 0}
-									<p class="text-base-content/40">No pause rules configured.</p>
-								{:else}
-									<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-										{#each (org.pauseRules ?? []) as rule}
-											<div class="p-2 bg-base-200/50 border border-base-300 rounded-lg text-sm text-base-content/70 mb-2">
-												<strong>&ge; {rule.minHours}h</strong> tracked &rarr; <strong>{rule.pauseMinutes} min</strong> pause deducted
-											</div>
-										{/each}
-									</div>
-								{/if}
-							</div>
-						{/if}
-					</section>
-				</div>
 			{/if}
+
 		{/if}
 	{/if}
 </div>
