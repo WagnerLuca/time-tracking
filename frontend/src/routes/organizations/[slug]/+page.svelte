@@ -137,6 +137,18 @@
 	let panelTypeFilter = $state<string>('all'); // 'all', 'Vacation', 'SickDay', 'Other'
 	let calendarMonth = $state(new Date().getMonth()); // 0-11
 	let calendarYear = $state(new Date().getFullYear());
+	// Day-click add-absence dialog
+	let showDayDialog = $state(false);
+	let dayDialogDate = $state('');
+	let dayDialogToDate = $state('');
+	let dayDialogUserId = $state<number | null>(null);
+	let dayDialogType = $state(1); // default Vacation
+	let dayDialogNote = $state('');
+	let dayDialogHalfDay = $state(false);
+	let dayDialogSaving = $state(false);
+	let dayDialogError = $state('');
+	// Absence list year dropdown
+	let selectedListYear = $state(new Date().getFullYear());
 
 	// Schedule periods
 	let schedulePeriods = $state<WorkScheduleResponse[]>([]);
@@ -730,7 +742,7 @@
 		absencesLoading = true;
 		absenceError = '';
 		try {
-			const { data } = await absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug);
+			const { data } = await absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, undefined, undefined, undefined, 200);
 			absences = [...(data.items ?? [])].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
 			absencesLoaded = true;
 		} catch {
@@ -774,6 +786,7 @@
 			}
 			absencesLoaded = false;
 			await loadAbsences();
+			await reloadOrg();
 			showAddAbsence = false;
 			newAbsenceDate = '';
 			newAbsenceToDate = '';
@@ -793,6 +806,7 @@
 			await absenceDayApi.apiV1OrganizationsSlugAbsencesIdDelete(orgSlug, id);
 			absencesLoaded = false;
 			await loadAbsences();
+			await reloadOrg();
 		} catch (err) {
 			absenceError = extractErrorMessage(err, 'Failed to delete absence.');
 		}
@@ -814,6 +828,7 @@
 			});
 			absencesLoaded = false;
 			await loadAbsences();
+			await reloadOrg();
 			showAdminAddAbsence = false;
 			adminAbsenceDate = '';
 			adminAbsenceType = 0;
@@ -910,6 +925,225 @@
 			case 'SickDay': return 'bg-error/20 text-error border-error/30';
 			default: return 'bg-warning/20 text-warning border-warning/30';
 		}
+	}
+
+	function openDayDialog(dateKey: string) {
+		dayDialogDate = dateKey;
+		dayDialogToDate = '';
+		dayDialogUserId = canEdit ? null : (auth.user?.id ?? null);
+		dayDialogType = 1; // Vacation
+		dayDialogNote = '';
+		dayDialogHalfDay = false;
+		dayDialogError = '';
+		showDayDialog = true;
+	}
+
+	async function submitDayDialog(e: Event) {
+		e.preventDefault();
+		if (!dayDialogDate) return;
+		dayDialogSaving = true;
+		dayDialogError = '';
+		try {
+			const from = new Date(dayDialogDate + 'T00:00:00');
+			const to = dayDialogToDate ? new Date(dayDialogToDate + 'T00:00:00') : from;
+			const workdays: string[] = [];
+			const cursor = new Date(from);
+			while (cursor <= to) {
+				const dow = cursor.getDay();
+				if (dow >= 1 && dow <= 5) {
+					workdays.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`);
+				}
+				cursor.setDate(cursor.getDate() + 1);
+			}
+			if (workdays.length === 0) {
+				dayDialogError = 'No workdays in selected range.';
+				dayDialogSaving = false;
+				return;
+			}
+			for (const dateStr of workdays) {
+				if (canEdit && dayDialogUserId) {
+					await absenceDayApi.apiV1OrganizationsSlugAbsencesAdminPost(orgSlug, {
+						userId: dayDialogUserId,
+						date: dateStr,
+						type: dayDialogType as AbsenceType,
+						isHalfDay: dayDialogHalfDay,
+						note: dayDialogNote || undefined
+					});
+				} else {
+					await absenceDayApi.apiV1OrganizationsSlugAbsencesPost(orgSlug, {
+						date: dateStr,
+						type: dayDialogType as AbsenceType,
+						isHalfDay: dayDialogHalfDay,
+						note: dayDialogNote || undefined
+					});
+				}
+			}
+			absencesLoaded = false;
+			await loadAbsences();
+			await reloadOrg();
+			showDayDialog = false;
+		} catch (err) {
+			dayDialogError = extractErrorMessage(err, 'Failed to add absence.');
+		} finally {
+			dayDialogSaving = false;
+		}
+	}
+
+	/** Group per-user absences of same type into consecutive-day spans */
+	interface AbsenceSpan {
+		userId: number;
+		userFirstName: string;
+		userLastName: string;
+		type: string;
+		startDate: string;
+		endDate: string;
+		days: number;
+		isHalfDay: boolean;
+		note: string;
+		ids: number[];
+	}
+
+	function buildAbsenceSpans(absenceList: AbsenceDayResponse[]): AbsenceSpan[] {
+		// Sort by userId, type, date
+		const sorted = [...absenceList].sort((a, b) => {
+			if ((a.userId ?? 0) !== (b.userId ?? 0)) return (a.userId ?? 0) - (b.userId ?? 0);
+			if ((a.type ?? '') !== (b.type ?? '')) return (a.type ?? '').localeCompare(b.type ?? '');
+			return (a.date ?? '').localeCompare(b.date ?? '');
+		});
+
+		const spans: AbsenceSpan[] = [];
+		let current: AbsenceSpan | null = null;
+
+		for (const a of sorted) {
+			if (current && a.userId === current.userId && a.type === current.type) {
+				// Check if this date is consecutive (next workday)
+				const prevDate = new Date(current.endDate + 'T00:00:00');
+				const thisDate = new Date((a.date ?? '') + 'T00:00:00');
+				const diffDays = Math.round((thisDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
+				// Allow gaps of up to 3 days (weekends + possible holiday)
+				if (diffDays >= 1 && diffDays <= 3) {
+					current.endDate = a.date ?? '';
+					current.days++;
+					current.ids.push(a.id ?? 0);
+					if (a.note && !current.note) current.note = a.note;
+					continue;
+				}
+			}
+			// Start new span
+			current = {
+				userId: a.userId ?? 0,
+				userFirstName: a.userFirstName ?? '',
+				userLastName: a.userLastName ?? '',
+				type: a.type ?? '',
+				startDate: a.date ?? '',
+				endDate: a.date ?? '',
+				days: 1,
+				isHalfDay: a.isHalfDay ?? false,
+				note: a.note ?? '',
+				ids: [a.id ?? 0]
+			};
+			spans.push(current);
+		}
+
+		return spans.sort((a, b) => a.startDate.localeCompare(b.startDate));
+	}
+
+	interface SpanEntry {
+		span: AbsenceSpan;
+		position: 'single' | 'start' | 'middle' | 'end';
+	}
+
+	function buildSpanMap(absenceList: AbsenceDayResponse[]): Map<string, SpanEntry[]> {
+		const spans = buildAbsenceSpans(absenceList);
+		const map = new Map<string, SpanEntry[]>();
+
+		for (const span of spans) {
+			if (span.days === 1) {
+				const entries = map.get(span.startDate) ?? [];
+				entries.push({ span, position: 'single' });
+				map.set(span.startDate, entries);
+			} else {
+				// Walk through each actual absence date in this span
+				const dates = absenceList
+					.filter(a => a.userId === span.userId && a.type === span.type &&
+						(a.date ?? '') >= span.startDate && (a.date ?? '') <= span.endDate)
+					.map(a => a.date ?? '')
+					.sort();
+				for (let i = 0; i < dates.length; i++) {
+					const pos: SpanEntry['position'] = i === 0 ? 'start' : i === dates.length - 1 ? 'end' : 'middle';
+					const entries = map.get(dates[i]) ?? [];
+					entries.push({ span, position: pos });
+					map.set(dates[i], entries);
+				}
+			}
+		}
+		return map;
+	}
+
+	function spanBgColor(type: string | null | undefined): string {
+		switch (type) {
+			case 'Vacation': return 'bg-info/25 border-info/40';
+			case 'SickDay': return 'bg-error/25 border-error/40';
+			default: return 'bg-warning/25 border-warning/40';
+		}
+	}
+
+	function spanTextColor(type: string | null | undefined): string {
+		switch (type) {
+			case 'Vacation': return 'text-info';
+			case 'SickDay': return 'text-error';
+			default: return 'text-warning';
+		}
+	}
+
+	interface WeekLane {
+		userId: number;
+		type: string;
+		userFirstName: string;
+		userLastName: string;
+	}
+
+	/** Get weeks as groups of 7 days from calendarDays */
+	function getWeeks(days: { date: Date; inMonth: boolean }[]): { date: Date; inMonth: boolean }[][] {
+		const weeks: { date: Date; inMonth: boolean }[][] = [];
+		for (let i = 0; i < days.length; i += 7) {
+			weeks.push(days.slice(i, i + 7));
+		}
+		return weeks;
+	}
+
+	/** Determine all unique user+type lanes for a week */
+	function getWeekLanes(weekDays: { date: Date }[], spanMap: Map<string, SpanEntry[]>): WeekLane[] {
+		const seen = new Map<string, WeekLane>();
+		for (const { date } of weekDays) {
+			const key = dateToKey(date);
+			for (const entry of (spanMap.get(key) ?? [])) {
+				const laneKey = `${entry.span.userId}-${entry.span.type}`;
+				if (!seen.has(laneKey)) {
+					seen.set(laneKey, {
+						userId: entry.span.userId,
+						type: entry.span.type,
+						userFirstName: entry.span.userFirstName,
+						userLastName: entry.span.userLastName,
+					});
+				}
+			}
+		}
+		return [...seen.values()].sort((a, b) => {
+			if (a.userId !== b.userId) return a.userId - b.userId;
+			return a.type.localeCompare(b.type);
+		});
+	}
+
+	/** Find a span entry for a specific lane on a specific day */
+	function getLaneEntry(dayKey: string, lane: WeekLane, spanMap: Map<string, SpanEntry[]>): SpanEntry | null {
+		const entries = spanMap.get(dayKey) ?? [];
+		return entries.find(e => e.span.userId === lane.userId && e.span.type === lane.type) ?? null;
+	}
+
+	function getAvailableAbsenceYears(): number[] {
+		const years = [...new Set(absences.map(a => (a.date ?? '').substring(0, 4)).filter(y => y))].sort((a, b) => b.localeCompare(a));
+		return years.length > 0 ? years.map(y => parseInt(y)) : [new Date().getFullYear()];
 	}
 
 	async function addSchedulePeriod(e: Event) {
@@ -1640,6 +1874,7 @@
 					<!-- Calendar Navigation -->
 					{#if org}
 					{@const absenceMap = buildAbsenceMap(absences)}
+					{@const spanMap = buildSpanMap(absences)}
 					{@const holidayMap = buildHolidayMap(holidays)}
 					{@const days = calendarDays(calendarYear, calendarMonth)}
 					{@const monthLabel = new Date(calendarYear, calendarMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
@@ -1666,36 +1901,59 @@
 							{/each}
 						</div>
 
-						<!-- Calendar grid -->
-						<div class="grid grid-cols-7 gap-px bg-base-300/50 border border-base-300 rounded-lg overflow-hidden">
-							{#each days as { date, inMonth }}
-								{@const key = dateToKey(date)}
-								{@const isToday = key === today}
-								{@const isWeekend = date.getDay() === 0 || date.getDay() === 6}
-								{@const dayAbsences = absenceMap.get(key) ?? []}
-								{@const dayHolidays = holidayMap.get(key) ?? []}
-								<div class="min-h-[90px] p-1.5 flex flex-col {inMonth ? 'bg-base-100' : 'bg-base-200/50'} {isWeekend && inMonth ? 'bg-base-200/30' : ''}">
-									<div class="flex items-center justify-between mb-1">
-										<span class="text-xs font-medium {isToday ? 'bg-primary text-primary-content rounded-full w-6 h-6 flex items-center justify-center' : ''} {inMonth ? 'text-base-content' : 'text-base-content/25'} {isWeekend && inMonth ? 'text-base-content/40' : ''}">
-											{date.getDate()}
-										</span>
-										{#if dayAbsences.length > 0}
-											<span class="text-[10px] text-base-content/40">{dayAbsences.length}</span>
-										{/if}
-									</div>
-									{#each dayHolidays as h}
-										<div class="text-[10px] px-1 py-0.5 rounded bg-success/15 text-success border border-success/20 mb-0.5 truncate" title={h.name ?? ''}>
-											🎉 {h.name}
+						<!-- Calendar grid (week-based with stable lanes) -->
+						<div class="border border-base-300 rounded-lg overflow-hidden">
+							{#each getWeeks(days) as weekDays, wi}
+								{@const weekLanes = getWeekLanes(weekDays, spanMap)}
+								<div class="grid grid-cols-7 gap-px bg-base-300/50 {wi > 0 ? 'border-t border-base-300' : ''}">
+									{#each weekDays as { date, inMonth }}
+										{@const key = dateToKey(date)}
+										{@const isToday = key === today}
+										{@const isWeekend = date.getDay() === 0 || date.getDay() === 6}
+										{@const dayHolidays = holidayMap.get(key) ?? []}
+										<!-- svelte-ignore a11y_click_events_have_key_events -->
+										<!-- svelte-ignore a11y_no_static_element_interactions -->
+										<div
+											class="min-h-[70px] p-1 flex flex-col cursor-pointer hover:bg-primary/5 transition-colors {inMonth ? 'bg-base-100' : 'bg-base-200/50'} {isWeekend && inMonth ? 'bg-base-200/30' : ''}"
+											onclick={() => { if (inMonth) openDayDialog(key); }}
+											title="Click to add absence on {key}"
+										>
+											<div class="flex items-center justify-between mb-0.5">
+												<span class="text-xs font-medium {isToday ? 'bg-primary text-primary-content rounded-full w-5 h-5 flex items-center justify-center text-[10px]' : ''} {inMonth ? 'text-base-content' : 'text-base-content/25'} {isWeekend && inMonth ? 'text-base-content/40' : ''}">
+													{date.getDate()}
+												</span>
+											</div>
+											{#each dayHolidays as h}
+												<div class="text-[9px] px-1 py-0.5 rounded bg-success/15 text-success border border-success/20 mb-0.5 truncate" title={h.name ?? ''}>
+													{h.name}
+												</div>
+											{/each}
+											<div class="flex flex-col gap-px {weekLanes.length > 4 ? 'max-h-[60px] overflow-y-auto' : ''}">
+												{#each weekLanes as lane}
+													{@const entry = getLaneEntry(key, lane, spanMap)}
+													{#if entry}
+														<!-- svelte-ignore a11y_click_events_have_key_events -->
+														<a
+															href="/organizations/{orgSlug}/members/{entry.span.userId}"
+															onclick={(e) => e.stopPropagation()}
+															class="block text-[9px] leading-tight px-1 py-[2px] border mb-0 truncate no-underline hover:brightness-90 transition-all cursor-pointer {spanBgColor(entry.span.type)} {spanTextColor(entry.span.type)} {entry.position === 'start' ? 'rounded-l border-r-0 -mr-1' : entry.position === 'end' ? 'rounded-r border-l-0 -ml-1' : entry.position === 'single' ? 'rounded' : 'border-x-0 -mx-1'}"
+															title="{entry.span.userFirstName} {entry.span.userLastName} — {absenceTypeLabel(entry.span.type)}{entry.span.days > 1 ? ` (${entry.span.days} days)` : ''}{entry.span.isHalfDay ? ' (½)' : ''}{entry.span.note ? ': ' + entry.span.note : ''}"
+														>
+															{#if entry.position === 'start' || entry.position === 'single'}
+																{entry.span.userFirstName}{#if entry.span.days > 1}&nbsp;→{/if}{#if entry.span.isHalfDay && entry.position === 'single'}&nbsp;½{/if}
+															{:else if entry.position === 'end'}
+																→&nbsp;{entry.span.userFirstName}
+															{:else}
+																&nbsp;
+															{/if}
+														</a>
+													{:else}
+														<div class="h-[14px]"></div>
+													{/if}
+												{/each}
+											</div>
 										</div>
 									{/each}
-									{#each dayAbsences.slice(0, 3) as a}
-										<a href="/organizations/{orgSlug}/members/{a.userId}" class="block text-[10px] px-1 py-0.5 rounded border mb-0.5 truncate no-underline hover:brightness-90 transition-all cursor-pointer {absenceColor(a.type)}" title="{a.userFirstName} {a.userLastName} — {absenceTypeLabel(a.type ?? '')}{a.isHalfDay ? ' (½)' : ''}{a.note ? ': ' + a.note : ''}">
-											{(a.userFirstName?.[0] ?? '')}{(a.userLastName?.[0] ?? '')} {a.userFirstName}{#if a.isHalfDay} ½{/if}
-										</a>
-									{/each}
-									{#if dayAbsences.length > 3}
-										<div class="text-[10px] text-base-content/40 text-center">+{dayAbsences.length - 3} more</div>
-									{/if}
 								</div>
 							{/each}
 						</div>
@@ -1708,6 +1966,95 @@
 							<span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-success/15 border border-success/20"></span> Holiday</span>
 						</div>
 					</section>
+
+					<!-- Day-click Add Absence Dialog -->
+					{#if showDayDialog}
+						{@const dayAbsences = absences.filter(a => a.date === dayDialogDate)}
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onclick={() => (showDayDialog = false)}>
+							<!-- svelte-ignore a11y_click_events_have_key_events -->
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<div class="bg-base-100 rounded-xl shadow-xl p-6 w-full max-w-md mx-4 border border-base-300 max-h-[90vh] overflow-y-auto" onclick={(e) => e.stopPropagation()}>
+								<div class="flex items-center justify-between mb-4">
+									<h3 class="text-lg font-bold text-base-content">
+										{new Date(dayDialogDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+									</h3>
+									<button class="btn btn-ghost btn-sm btn-circle" onclick={() => (showDayDialog = false)}>✕</button>
+								</div>
+
+								<!-- Existing absences on this day -->
+								{#if dayAbsences.length > 0}
+									<div class="mb-4">
+										<h4 class="text-sm font-semibold text-base-content/60 mb-2">Absences on this day</h4>
+										<div class="flex flex-col gap-1">
+											{#each dayAbsences as ab}
+												<div class="flex items-center gap-2 p-2 bg-base-200/50 rounded-lg text-sm">
+													<div class="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-[10px] font-semibold shrink-0">
+														{(ab.userFirstName?.[0] ?? '').toUpperCase()}{(ab.userLastName?.[0] ?? '').toUpperCase()}
+													</div>
+													<span class="font-medium">{ab.userFirstName} {ab.userLastName}</span>
+													<span class="badge badge-xs {absenceColor(ab.type)}">{absenceTypeLabel(ab.type ?? '')}</span>
+													{#if ab.isHalfDay}<span class="badge badge-xs badge-outline">½</span>{/if}
+													{#if ab.note}<span class="text-base-content/40 text-xs truncate">{ab.note}</span>{/if}
+												</div>
+											{/each}
+										</div>
+									</div>
+									<div class="divider my-2 text-xs text-base-content/40">Add new absence</div>
+								{/if}
+
+								{#if dayDialogError}
+									<div class="alert alert-error text-sm py-1.5 px-2.5 mb-3">{dayDialogError}</div>
+								{/if}
+								<form onsubmit={submitDayDialog} class="flex flex-col gap-3">
+									{#if canEdit}
+										<div class="flex flex-col gap-1">
+											<span class="text-sm font-medium text-base-content/70">Member</span>
+											<select bind:value={dayDialogUserId} class="select select-bordered select-sm" required>
+												<option value={null}>Select member...</option>
+												{#each (org?.members ?? []) as m}
+													<option value={m.id}>{m.firstName} {m.lastName}{m.id === auth.user?.id ? ' (You)' : ''}</option>
+												{/each}
+											</select>
+										</div>
+									{/if}
+									<div class="grid grid-cols-2 gap-3">
+										<div class="flex flex-col gap-1">
+											<span class="text-sm font-medium text-base-content/70">From</span>
+											<input type="date" class="input input-bordered input-sm" bind:value={dayDialogDate} required />
+										</div>
+										<div class="flex flex-col gap-1">
+											<span class="text-sm font-medium text-base-content/70">To (optional)</span>
+											<input type="date" class="input input-bordered input-sm" bind:value={dayDialogToDate} min={dayDialogDate} />
+										</div>
+									</div>
+									<div class="flex flex-col gap-1">
+										<span class="text-sm font-medium text-base-content/70">Type</span>
+										<select bind:value={dayDialogType} class="select select-bordered select-sm">
+											<option value={0}>Sick Day</option>
+											<option value={1}>Vacation</option>
+											<option value={2}>Other</option>
+										</select>
+									</div>
+									<div class="flex flex-col gap-1">
+										<span class="text-sm font-medium text-base-content/70">Note (optional)</span>
+										<input type="text" class="input input-bordered input-sm" bind:value={dayDialogNote} placeholder="e.g. Doctor's appointment" />
+									</div>
+									<label class="label cursor-pointer flex items-center gap-2 text-sm">
+										<input type="checkbox" class="checkbox checkbox-sm" bind:checked={dayDialogHalfDay} />
+										Half day
+									</label>
+									<div class="flex justify-end gap-2 mt-2">
+										<button type="button" class="btn btn-ghost btn-sm" onclick={() => (showDayDialog = false)}>Cancel</button>
+										<button type="submit" class="btn btn-primary btn-sm" disabled={dayDialogSaving}>
+											{dayDialogSaving ? 'Adding...' : 'Add Absence'}
+										</button>
+									</div>
+								</form>
+							</div>
+						</div>
+					{/if}
 
 					<!-- Vacation Days Summary -->
 					<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
@@ -1745,53 +2092,69 @@
 						{/if}
 					</section>
 					<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
-						<div class="flex items-center justify-between mb-4">
-							<h2 class="text-xl font-bold text-base-content">Manage Absences</h2>
-							<button class="btn btn-primary btn-sm" onclick={() => { showAdminAddAbsence = !showAdminAddAbsence; if (showAdminAddAbsence) loadUsersForDropdown(); }}>
-								{showAdminAddAbsence ? 'Cancel' : '+ Add Absence'}
-							</button>
+						<h2 class="text-xl font-bold text-base-content mb-4">Absence List</h2>
+						<!-- Filters -->
+						<div class="flex flex-wrap gap-2 mb-4">
+							<select bind:value={selectedListYear} class="select select-bordered select-sm">
+								{#each getAvailableAbsenceYears() as y}
+									<option value={y}>{y}</option>
+								{/each}
+							</select>
+							<select bind:value={adminAbsenceFilter} class="select select-bordered select-sm">
+								<option value={null}>All members</option>
+								{#each (org?.members ?? []) as m}
+									<option value={m.id}>{m.firstName} {m.lastName}</option>
+								{/each}
+							</select>
+							<select bind:value={panelTypeFilter} class="select select-bordered select-sm">
+								<option value="all">All types</option>
+								<option value="Vacation">Vacation</option>
+								<option value="SickDay">Sick Day</option>
+								<option value="Other">Other</option>
+							</select>
 						</div>
-
-						{#if showAdminAddAbsence}
-							<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
-								{#if adminAbsenceError}
-									<div class="alert alert-error text-sm py-1.5 px-2.5 mb-2">{adminAbsenceError}</div>
-								{/if}
-								<form onsubmit={addAdminAbsence} class="flex flex-wrap gap-2 items-end">
-									<div class="flex flex-col gap-1">
-										<span class="text-xs text-base-content/60">Member</span>
-										<select bind:value={adminAbsenceUserId} class="select select-bordered select-sm min-w-[180px]" required>
-											<option value={null}>Select member...</option>
-											{#each (org.members ?? []) as m}
-												<option value={m.id}>{m.firstName} {m.lastName}</option>
-											{/each}
-										</select>
-									</div>
-									<div class="flex flex-col gap-1">
-										<span class="text-xs text-base-content/60">Date</span>
-										<input type="date" class="input input-bordered input-sm" bind:value={adminAbsenceDate} required />
-									</div>
-									<div class="flex flex-col gap-1">
-										<span class="text-xs text-base-content/60">Type</span>
-										<select bind:value={adminAbsenceType} class="select select-bordered select-sm">
-											<option value={0}>Sick Day</option>
-											<option value={1}>Vacation</option>
-											<option value={2}>Other</option>
-										</select>
-									</div>
-									<div class="flex flex-col gap-1">
-										<span class="text-xs text-base-content/60">Note</span>
-										<input type="text" class="input input-bordered input-sm" bind:value={adminAbsenceNote} placeholder="Optional" />
-									</div>
-									<label class="label cursor-pointer flex items-center gap-1.5 text-sm">
-										<input type="checkbox" class="checkbox checkbox-sm" bind:checked={adminAbsenceHalfDay} />
-										Half day
-									</label>
-									<button type="submit" class="btn btn-primary btn-sm" disabled={addingAdminAbsence}>
-										{addingAdminAbsence ? 'Adding...' : 'Add'}
-									</button>
-								</form>
-							</div>
+						{#if absencesLoading}
+							<p class="text-base-content/40 text-sm">Loading...</p>
+						{:else}
+							{@const yearStr = String(selectedListYear)}
+							{@const filtered = absences
+								.filter(a => (a.date ?? '').startsWith(yearStr))
+								.filter(a => !adminAbsenceFilter || a.userId === adminAbsenceFilter)
+								.filter(a => panelTypeFilter === 'all' || a.type === panelTypeFilter)}
+							{@const spans = buildAbsenceSpans(filtered)}
+							{#if spans.length === 0}
+								<p class="text-base-content/40 text-sm text-center py-4">No absences found for {selectedListYear}.</p>
+							{:else}
+								<div class="flex flex-col gap-1.5">
+									{#each spans as span}
+										{@const dateLabel = span.days === 1
+											? span.startDate
+											: `${span.startDate} → ${span.endDate}`}
+										<div class="flex items-center gap-3 p-2.5 bg-base-100 rounded-lg border border-base-300 text-sm">
+											<span class="text-base-content/50 font-mono shrink-0 min-w-[180px]">{dateLabel}</span>
+											<a href="/organizations/{orgSlug}/members/{span.userId}" class="flex items-center gap-1.5 font-medium link link-hover min-w-[130px]">
+												<div class="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-[10px] font-semibold shrink-0">
+													{span.userFirstName[0]?.toUpperCase() ?? ''}{span.userLastName[0]?.toUpperCase() ?? ''}
+												</div>
+												{span.userFirstName} {span.userLastName}
+											</a>
+											<span class="badge badge-sm {absenceColor(span.type)}">
+												{absenceTypeLabel(span.type)}
+											</span>
+											{#if span.days > 1}
+												<span class="badge badge-sm badge-outline">{span.days} days</span>
+											{/if}
+											{#if span.isHalfDay && span.days === 1}
+												<span class="badge badge-sm badge-outline">½ day</span>
+											{/if}
+											{#if span.note}
+												<span class="text-base-content/40 truncate">{span.note}</span>
+											{/if}
+										</div>
+									{/each}
+								</div>
+								<p class="text-xs text-base-content/40 mt-2">{spans.length} entries ({filtered.length} days total)</p>
+							{/if}
 						{/if}
 					</section>
 					{/if}

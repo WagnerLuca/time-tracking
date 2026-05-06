@@ -55,6 +55,40 @@ public static class DbSeeder
         context.Users.AddRange(max, anna, tom);
         await context.SaveChangesAsync();
 
+        // ── Additional team members ────────────────────────────────────
+        var extraUsers = new (string First, string Last, string Email, int MonthsAgo)[]
+        {
+            ("Lisa",   "Braun",     "lisa.braun@example.com",     5),
+            ("Felix",  "Koch",      "felix.koch@example.com",     5),
+            ("Sarah",  "Richter",   "sarah.richter@example.com",  4),
+            ("Jonas",  "Wolf",      "jonas.wolf@example.com",     4),
+            ("Laura",  "Becker",    "laura.becker@example.com",   3),
+            ("Niklas", "Hoffmann",  "niklas.hoffmann@example.com", 3),
+            ("Marie",  "Fischer",   "marie.fischer@example.com",  2),
+            ("David",  "Schaefer",  "david.schaefer@example.com", 2),
+            ("Jana",   "Meyer",     "jana.meyer@example.com",     2),
+            ("Lukas",  "Hartmann",  "lukas.hartmann@example.com", 1),
+        };
+
+        var extraUserEntities = new List<User>();
+        foreach (var (first, last, email, months) in extraUsers)
+        {
+            var u = new User
+            {
+                Email = email,
+                FirstName = first,
+                LastName = last,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123"),
+                EmailConfirmed = true,
+                CreatedAt = DateTime.UtcNow.AddMonths(-months),
+                UpdatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+            extraUserEntities.Add(u);
+        }
+        context.Users.AddRange(extraUserEntities);
+        await context.SaveChangesAsync();
+
         // ── Organization ───────────────────────────────────────────────
         var org = new Organization
         {
@@ -85,7 +119,8 @@ public static class DbSeeder
             Role = OrganizationRole.Owner,
             JoinedAt = DateTime.UtcNow.AddMonths(-6),
             IsActive = true,
-            InitialOvertimeHours = 12.5 // carried over from previous employer
+            InitialOvertimeHours = 12.5, // carried over from previous employer
+            VacationDaysPerYear = 30
         };
 
         var annaMembership = new UserOrganization
@@ -95,7 +130,8 @@ public static class DbSeeder
             Role = OrganizationRole.Admin,
             JoinedAt = DateTime.UtcNow.AddMonths(-4),
             IsActive = true,
-            InitialOvertimeHours = 0
+            InitialOvertimeHours = 0,
+            VacationDaysPerYear = 30
         };
 
         var tomMembership = new UserOrganization
@@ -105,10 +141,28 @@ public static class DbSeeder
             Role = OrganizationRole.Member,
             JoinedAt = DateTime.UtcNow.AddMonths(-3),
             IsActive = true,
-            InitialOvertimeHours = 0
+            InitialOvertimeHours = 0,
+            VacationDaysPerYear = 30
         };
 
         context.UserOrganizations.AddRange(maxMembership, annaMembership, tomMembership);
+
+        // Extra memberships (all as Member role)
+        var extraMemberships = new List<UserOrganization>();
+        for (int i = 0; i < extraUserEntities.Count; i++)
+        {
+            extraMemberships.Add(new UserOrganization
+            {
+                UserId = extraUserEntities[i].Id,
+                OrganizationId = org.Id,
+                Role = OrganizationRole.Member,
+                JoinedAt = DateTime.UtcNow.AddMonths(-extraUsers[i].MonthsAgo),
+                IsActive = true,
+                InitialOvertimeHours = 0,
+                VacationDaysPerYear = 30
+            });
+        }
+        context.UserOrganizations.AddRange(extraMemberships);
         await context.SaveChangesAsync();
 
         // ── Pause Rules ────────────────────────────────────────────────
@@ -277,6 +331,64 @@ public static class DbSeeder
         context.AbsenceDays.AddRange(maxAbsences);
         context.AbsenceDays.AddRange(annaAbsences);
         context.AbsenceDays.AddRange(tomAbsences);
+
+        // ── June 2026 vacations for extra users (overlapping) ─────────
+        // Current seed date context: May 2026, so June 2026 is next month
+        var juneAbsences = new List<AbsenceDay>();
+
+        // Lisa Braun: June 1-12 (2 weeks)
+        foreach (var d in new[] { 1, 2, 3, 4, 5, 8, 9, 10, 11, 12 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[0].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Italy trip" });
+
+        // Felix Koch: June 4-10 (1 week, overlaps with Lisa)
+        foreach (var d in new[] { 4, 5, 8, 9, 10 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[1].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Beach holiday" });
+
+        // Sarah Richter: June 8-19 (2 weeks, overlaps with Lisa & Felix)
+        foreach (var d in new[] { 8, 9, 10, 11, 12, 15, 16, 17, 18, 19 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[2].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Mountain hiking" });
+
+        // Jonas Wolf: June 1-5 (1 week, overlaps with Lisa)
+        foreach (var d in new[] { 1, 2, 3, 4, 5 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[3].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "City break" });
+
+        // Laura Becker: June 15-26 (2 weeks, overlaps with Sarah)
+        foreach (var d in new[] { 15, 16, 17, 18, 19, 22, 23, 24, 25, 26 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[4].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Family vacation" });
+
+        // Niklas Hoffmann: June 3-5 + sick June 22-24
+        foreach (var d in new[] { 3, 4, 5 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[5].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Long weekend" });
+        foreach (var d in new[] { 22, 23, 24 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[5].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.SickDay, Note = "Summer cold" });
+
+        // Marie Fischer: June 8-12 (1 week, overlaps heavily)
+        foreach (var d in new[] { 8, 9, 10, 11, 12 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[6].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Wedding" });
+
+        // David Schaefer: June 22-30 (last week+)
+        foreach (var d in new[] { 22, 23, 24, 25, 26, 29, 30 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[7].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Summer road trip" });
+
+        // Jana Meyer: June 1-3 + June 15-17 (split vacation)
+        foreach (var d in new[] { 1, 2, 3 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[8].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Short break" });
+        foreach (var d in new[] { 15, 16, 17 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[8].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Wedding attendance" });
+
+        // Lukas Hartmann: June 8-19 (2 weeks, heavy overlap week of June 8)
+        foreach (var d in new[] { 8, 9, 10, 11, 12, 15, 16, 17, 18, 19 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[9].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Greece holiday" });
+
+        // Anna also takes June 9-13 vacation (more overlap)
+        foreach (var d in new[] { 9, 10, 11, 12 })
+            annaAbsences.Add(new() { UserId = anna.Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Summer break" });
+
+        // Tom takes June 2-6 vacation
+        foreach (var d in new[] { 2, 3, 4, 5 })
+            tomAbsences.Add(new() { UserId = tom.Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Long weekend trip" });
+
+        context.AbsenceDays.AddRange(juneAbsences);
         await context.SaveChangesAsync();
 
         // Build holiday + absence date sets for entry generation
@@ -302,6 +414,18 @@ public static class DbSeeder
         context.TimeEntries.AddRange(maxEntries);
         context.TimeEntries.AddRange(annaEntries);
         context.TimeEntries.AddRange(tomEntries);
+
+        // Extra user time entries
+        for (int i = 0; i < extraUserEntities.Count; i++)
+        {
+            var extraOffDays = new HashSet<DateOnly>(holidayDates);
+            foreach (var a in juneAbsences.Where(a => a.UserId == extraUserEntities[i].Id))
+                extraOffDays.Add(a.Date);
+            var entries = GenerateEntries(extraUserEntities[i], org,
+                DateTime.UtcNow.AddMonths(-extraUsers[i].MonthsAgo), rng, extraOffDays);
+            context.TimeEntries.AddRange(entries);
+        }
+
         await context.SaveChangesAsync();
 
         // ── Work Schedules ───────────────────────────────────────────
@@ -341,6 +465,21 @@ public static class DbSeeder
                 CreatedAt = DateTime.UtcNow.AddMonths(-3)
             }
         );
+
+        // Extra users: all 40h/week
+        foreach (var (user, meta) in extraUserEntities.Zip(extraUsers))
+        {
+            context.WorkSchedules.Add(new WorkSchedule
+            {
+                UserId = user.Id, OrganizationId = org.Id,
+                ValidFrom = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-meta.MonthsAgo)),
+                ValidTo = null,
+                WeeklyWorkHours = 40,
+                TargetMon = 8, TargetTue = 8, TargetWed = 8, TargetThu = 8, TargetFri = 8,
+                CreatedAt = DateTime.UtcNow.AddMonths(-meta.MonthsAgo)
+            });
+        }
+
         await context.SaveChangesAsync();
 
         Console.WriteLine("✅ Database seeded successfully!");
@@ -355,5 +494,7 @@ public static class DbSeeder
         Console.WriteLine($"   Max Mueller: max.mueller@example.com / Password123 (Owner)");
         Console.WriteLine($"   Anna Schmidt: anna.schmidt@example.com / Password123 (Admin)");
         Console.WriteLine($"   Tom Weber: tom.weber@example.com / Password123 (Member)");
+        foreach (var u in extraUserEntities)
+            Console.WriteLine($"   {u.FirstName} {u.LastName}: {u.Email} / Password123 (Member)");
     }
 }
