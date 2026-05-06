@@ -65,6 +65,7 @@
 
 	// Tab navigation
 	let activeTab = $state<'my-schedule' | 'team' | 'absences' | 'settings'>('my-schedule');
+	let calendarExpanded = $state(false);
 
 	// Team overview data (admin)
 	let teamOverview = $state<MemberTimeOverviewResponse[]>([]);
@@ -173,9 +174,29 @@
 
 	let orgSlug = $state('');
 
+	const validTabs = ['my-schedule', 'team', 'absences', 'settings'] as const;
+
+	function readHashTab(): typeof activeTab {
+		if (typeof window === 'undefined') return 'my-schedule';
+		const hash = window.location.hash.replace('#', '');
+		return (validTabs as readonly string[]).includes(hash) ? hash as typeof activeTab : 'my-schedule';
+	}
+
+	function setTab(tab: typeof activeTab) {
+		activeTab = tab;
+		if (typeof window !== 'undefined') {
+			window.history.replaceState(null, '', `#${tab}`);
+		}
+	}
+
 	onMount(() => {
 		orgSlug = $page.params.slug ?? '';
+		activeTab = readHashTab();
 		loadOrg();
+
+		const onHashChange = () => { activeTab = readHashTab(); };
+		window.addEventListener('hashchange', onHashChange);
+		return () => window.removeEventListener('hashchange', onHashChange);
 	});
 
 	async function loadOrg() {
@@ -1096,9 +1117,39 @@
 		}
 	}
 
+	/** Color palette for distinguishing different users' vacations */
+	const userColorPalette = [
+		{ bg: 'bg-sky-200/60 border-sky-400/60', text: 'text-sky-900' },
+		{ bg: 'bg-violet-200/60 border-violet-400/60', text: 'text-violet-900' },
+		{ bg: 'bg-teal-200/60 border-teal-400/60', text: 'text-teal-900' },
+		{ bg: 'bg-amber-200/60 border-amber-400/60', text: 'text-amber-900' },
+		{ bg: 'bg-rose-200/60 border-rose-400/60', text: 'text-rose-900' },
+		{ bg: 'bg-emerald-200/60 border-emerald-400/60', text: 'text-emerald-900' },
+		{ bg: 'bg-indigo-200/60 border-indigo-400/60', text: 'text-indigo-900' },
+		{ bg: 'bg-orange-200/60 border-orange-400/60', text: 'text-orange-900' },
+		{ bg: 'bg-cyan-200/60 border-cyan-400/60', text: 'text-cyan-900' },
+		{ bg: 'bg-fuchsia-200/60 border-fuchsia-400/60', text: 'text-fuchsia-900' },
+		{ bg: 'bg-lime-200/60 border-lime-400/60', text: 'text-lime-900' },
+		{ bg: 'bg-pink-200/60 border-pink-400/60', text: 'text-pink-900' },
+		{ bg: 'bg-blue-200/60 border-blue-400/60', text: 'text-blue-900' },
+	];
+
+	function userSpanBg(userId: number, type: string | null | undefined): string {
+		if (type === 'SickDay') return 'bg-error/25 border-error/40';
+		if (type === 'Other') return 'bg-warning/25 border-warning/40';
+		const idx = (userId ?? 0) % userColorPalette.length;
+		return userColorPalette[idx].bg;
+	}
+
+	function userSpanText(userId: number, type: string | null | undefined): string {
+		if (type === 'SickDay') return 'text-error';
+		if (type === 'Other') return 'text-warning';
+		const idx = (userId ?? 0) % userColorPalette.length;
+		return userColorPalette[idx].text;
+	}
+
 	interface WeekLane {
 		userId: number;
-		type: string;
 		userFirstName: string;
 		userLastName: string;
 	}
@@ -1112,33 +1163,28 @@
 		return weeks;
 	}
 
-	/** Determine all unique user+type lanes for a week */
+	/** Determine all unique user lanes for a week (one lane per user) */
 	function getWeekLanes(weekDays: { date: Date }[], spanMap: Map<string, SpanEntry[]>): WeekLane[] {
-		const seen = new Map<string, WeekLane>();
+		const seen = new Map<number, WeekLane>();
 		for (const { date } of weekDays) {
 			const key = dateToKey(date);
 			for (const entry of (spanMap.get(key) ?? [])) {
-				const laneKey = `${entry.span.userId}-${entry.span.type}`;
-				if (!seen.has(laneKey)) {
-					seen.set(laneKey, {
+				if (!seen.has(entry.span.userId)) {
+					seen.set(entry.span.userId, {
 						userId: entry.span.userId,
-						type: entry.span.type,
 						userFirstName: entry.span.userFirstName,
 						userLastName: entry.span.userLastName,
 					});
 				}
 			}
 		}
-		return [...seen.values()].sort((a, b) => {
-			if (a.userId !== b.userId) return a.userId - b.userId;
-			return a.type.localeCompare(b.type);
-		});
+		return [...seen.values()].sort((a, b) => a.userId - b.userId);
 	}
 
-	/** Find a span entry for a specific lane on a specific day */
+	/** Find a span entry for a specific user on a specific day */
 	function getLaneEntry(dayKey: string, lane: WeekLane, spanMap: Map<string, SpanEntry[]>): SpanEntry | null {
 		const entries = spanMap.get(dayKey) ?? [];
-		return entries.find(e => e.span.userId === lane.userId && e.span.type === lane.type) ?? null;
+		return entries.find(e => e.span.userId === lane.userId) ?? null;
 	}
 
 	function getAvailableAbsenceYears(): number[] {
@@ -1295,7 +1341,7 @@
 			{#if showSettingsChangedBanner}
 				<div class="alert alert-info mb-4 text-sm">
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-					Organization rules have been updated. Check the <button class="link link-primary font-semibold" onclick={() => { activeTab = 'settings'; dismissSettingsNotifications(); }}>Rules</button> tab for details.
+					Organization rules have been updated. Check the <button class="link link-primary font-semibold" onclick={() => { setTab('settings'); dismissSettingsNotifications(); }}>Rules</button> tab for details.
 					<button class="btn btn-ghost btn-xs ml-auto text-lg" onclick={() => dismissSettingsNotifications()}>&times;</button>
 				</div>
 			{/if}
@@ -1310,21 +1356,21 @@
 
 			<!-- Tab navigation -->
 			<div class="tabs tabs-bordered mt-5">
-				<button class="tab {activeTab === 'my-schedule' ? 'tab-active' : ''}" onclick={() => (activeTab = 'my-schedule')}>
+				<button class="tab {activeTab === 'my-schedule' ? 'tab-active' : ''}" onclick={() => setTab('my-schedule')}>
 					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
 					My Schedule
 				</button>
-				<button class="tab {activeTab === 'team' ? 'tab-active' : ''}" onclick={() => (activeTab = 'team')}>
+				<button class="tab {activeTab === 'team' ? 'tab-active' : ''}" onclick={() => setTab('team')}>
 					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
 					Team
 				</button>
 				{#if canEdit}
-					<button class="tab {activeTab === 'absences' ? 'tab-active' : ''}" onclick={() => (activeTab = 'absences')}>
+					<button class="tab {activeTab === 'absences' ? 'tab-active' : ''}" onclick={() => setTab('absences')}>
 						<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
 						Absences
 					</button>
 				{/if}
-				<button class="tab {activeTab === 'settings' ? 'tab-active' : ''}" onclick={() => (activeTab = 'settings')}>
+				<button class="tab {activeTab === 'settings' ? 'tab-active' : ''}" onclick={() => setTab('settings')}>
 					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
 					{canEdit ? 'Settings' : 'Rules'}
 				</button>
@@ -1868,8 +1914,10 @@
 
 			<!-- ==================== ABSENCES TAB (Admin) ==================== -->
 			{:else if activeTab === 'absences' && canEdit}
-				<div class="pt-2">
-					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Calendar overview of absences and vacation days across all members.</p>
+				<div class="{calendarExpanded ? 'fixed inset-0 z-40 bg-base-100 overflow-y-auto p-6' : 'pt-2'}">
+					{#if !calendarExpanded}
+						<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Calendar overview of absences and vacation days across all members.</p>
+					{/if}
 
 					<!-- Calendar Navigation -->
 					{#if org}
@@ -1889,9 +1937,18 @@
 								<h2 class="text-xl font-bold text-base-content">{monthLabel}</h2>
 								<button class="btn btn-ghost btn-xs" onclick={() => { calendarMonth = new Date().getMonth(); calendarYear = new Date().getFullYear(); }}>Today</button>
 							</div>
-							<button class="btn btn-ghost btn-sm" aria-label="Next month" onclick={() => navigateMonth(1)}>
-								<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
-							</button>
+							<div class="flex items-center gap-1">
+								<button class="btn btn-ghost btn-sm" aria-label="{calendarExpanded ? 'Collapse' : 'Expand'}" onclick={() => (calendarExpanded = !calendarExpanded)} title="{calendarExpanded ? 'Collapse calendar' : 'Full-page calendar'}">
+									{#if calendarExpanded}
+										<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 00-1.06 1.06L5.44 6.5H3a.75.75 0 000 1.5h4.25a.75.75 0 00.75-.75V3a.75.75 0 00-1.5 0v2.44L3.28 2.22zM13.5 3a.75.75 0 00-1.5 0v4.25c0 .414.336.75.75.75H17a.75.75 0 000-1.5h-2.44l3.22-3.22a.75.75 0 00-1.06-1.06L13.5 5.44V3zM3 13.5a.75.75 0 000 1.5h2.44l-3.22 3.22a.75.75 0 101.06 1.06l3.22-3.22V18.5a.75.75 0 001.5 0v-4.25a.75.75 0 00-.75-.75H3zM13.5 14.56l3.22 3.22a.75.75 0 101.06-1.06l-3.22-3.22H17a.75.75 0 000-1.5h-4.25a.75.75 0 00-.75.75v4.25a.75.75 0 001.5 0v-2.44z" clip-rule="evenodd"/></svg>
+									{:else}
+										<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.28 7.78l3.22-3.22V7a.75.75 0 001.5 0V2.75a.75.75 0 00-.75-.75H13a.75.75 0 000 1.5h2.44l-3.22 3.22a.75.75 0 001.06 1.06zM2 13a.75.75 0 01.75-.75H7a.75.75 0 010 1.5H4.56l3.22 3.22a.75.75 0 11-1.06 1.06L3.5 14.81V17.25a.75.75 0 01-1.5 0V13zM2.75 2a.75.75 0 00-.75.75V7a.75.75 0 001.5 0V4.56l3.22 3.22a.75.75 0 001.06-1.06L4.56 3.5H7a.75.75 0 000-1.5H2.75zM13 18.5a.75.75 0 01-.75-.75V13.5a.75.75 0 01.75-.75h4.25a.75.75 0 010 1.5h-2.44l3.22 3.22a.75.75 0 11-1.06 1.06l-3.22-3.22v2.44a.75.75 0 01-.75.75H13z"/></svg>
+									{/if}
+								</button>
+								<button class="btn btn-ghost btn-sm" aria-label="Next month" onclick={() => navigateMonth(1)}>
+									<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
+								</button>
+							</div>
 						</div>
 
 						<!-- Day-of-week headers -->
@@ -1914,21 +1971,21 @@
 										<!-- svelte-ignore a11y_click_events_have_key_events -->
 										<!-- svelte-ignore a11y_no_static_element_interactions -->
 										<div
-											class="min-h-[70px] p-1 flex flex-col cursor-pointer hover:bg-primary/5 transition-colors {inMonth ? 'bg-base-100' : 'bg-base-200/50'} {isWeekend && inMonth ? 'bg-base-200/30' : ''}"
+											class="min-h-[60px] p-1 flex flex-col cursor-pointer hover:bg-primary/5 transition-colors {inMonth ? 'bg-base-100' : 'bg-base-200/50'} {isWeekend && inMonth ? 'bg-base-200/30' : ''}"
 											onclick={() => { if (inMonth) openDayDialog(key); }}
 											title="Click to add absence on {key}"
 										>
 											<div class="flex items-center justify-between mb-0.5">
-												<span class="text-xs font-medium {isToday ? 'bg-primary text-primary-content rounded-full w-5 h-5 flex items-center justify-center text-[10px]' : ''} {inMonth ? 'text-base-content' : 'text-base-content/25'} {isWeekend && inMonth ? 'text-base-content/40' : ''}">
+												<span class="text-[10px] font-medium leading-none {isToday ? 'bg-primary text-primary-content rounded-full w-5 h-5 flex items-center justify-center' : ''} {inMonth ? 'text-base-content' : 'text-base-content/25'} {isWeekend && inMonth ? 'text-base-content/40' : ''}">
 													{date.getDate()}
 												</span>
 											</div>
 											{#each dayHolidays as h}
-												<div class="text-[9px] px-1 py-0.5 rounded bg-success/15 text-success border border-success/20 mb-0.5 truncate" title={h.name ?? ''}>
+												<div class="h-[16px] text-[9px] leading-none flex items-center px-1 rounded bg-success/15 text-success border border-success/20 mb-px truncate" title={h.name ?? ''}>
 													{h.name}
 												</div>
 											{/each}
-											<div class="flex flex-col gap-px {weekLanes.length > 4 ? 'max-h-[60px] overflow-y-auto' : ''}">
+											<div class="flex flex-col {weekLanes.length > 5 ? 'max-h-[80px] overflow-y-auto' : ''}">
 												{#each weekLanes as lane}
 													{@const entry = getLaneEntry(key, lane, spanMap)}
 													{#if entry}
@@ -1936,7 +1993,7 @@
 														<a
 															href="/organizations/{orgSlug}/members/{entry.span.userId}"
 															onclick={(e) => e.stopPropagation()}
-															class="block text-[9px] leading-tight px-1 py-[2px] border mb-0 truncate no-underline hover:brightness-90 transition-all cursor-pointer {spanBgColor(entry.span.type)} {spanTextColor(entry.span.type)} {entry.position === 'start' ? 'rounded-l border-r-0 -mr-1' : entry.position === 'end' ? 'rounded-r border-l-0 -ml-1' : entry.position === 'single' ? 'rounded' : 'border-x-0 -mx-1'}"
+															class="h-[16px] flex items-center text-[9px] leading-none px-1 border truncate no-underline hover:brightness-90 transition-all cursor-pointer {userSpanBg(entry.span.userId, entry.span.type)} {userSpanText(entry.span.userId, entry.span.type)} {entry.position === 'start' ? 'rounded-l border-r-0 -mr-1' : entry.position === 'end' ? 'rounded-r border-l-0 -ml-1' : entry.position === 'single' ? 'rounded' : 'border-x-0 -mx-1'}"
 															title="{entry.span.userFirstName} {entry.span.userLastName} — {absenceTypeLabel(entry.span.type)}{entry.span.days > 1 ? ` (${entry.span.days} days)` : ''}{entry.span.isHalfDay ? ' (½)' : ''}{entry.span.note ? ': ' + entry.span.note : ''}"
 														>
 															{#if entry.position === 'start' || entry.position === 'single'}
@@ -1948,7 +2005,7 @@
 															{/if}
 														</a>
 													{:else}
-														<div class="h-[14px]"></div>
+														<div class="h-[16px]"></div>
 													{/if}
 												{/each}
 											</div>
@@ -1960,10 +2017,10 @@
 
 						<!-- Legend -->
 						<div class="flex flex-wrap gap-4 mt-3 text-xs text-base-content/60">
-							<span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-info/20 border border-info/30"></span> Vacation</span>
 							<span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-error/20 border border-error/30"></span> Sick Day</span>
 							<span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-warning/20 border border-warning/30"></span> Other</span>
 							<span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-success/15 border border-success/20"></span> Holiday</span>
+							<span class="text-base-content/40">Vacation colors vary by person</span>
 						</div>
 					</section>
 
