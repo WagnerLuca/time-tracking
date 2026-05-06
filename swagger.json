@@ -2215,6 +2215,59 @@
         }
       }
     },
+    "/api/v1/Organizations/{slug}/members/{memberId}/vacation-days": {
+      "put": {
+        "tags": [
+          "Organizations"
+        ],
+        "summary": "Set a member's vacation days allowance per year (admin only).",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "Organization URL slug.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "memberId",
+            "in": "path",
+            "description": "Member ID to update.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVacationDaysRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVacationDaysRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVacationDaysRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/v1/organizations/{slug}/pause-rules": {
       "get": {
         "tags": [
@@ -4507,7 +4560,9 @@
           "joinPolicy",
           "members",
           "name",
+          "sickDayVisibility",
           "slug",
+          "vacationVisibility",
           "workScheduleChangeMode"
         ],
         "type": "object",
@@ -4568,6 +4623,18 @@
           "csvImportMode": {
             "type": "string",
             "nullable": true
+          },
+          "vacationVisibility": {
+            "type": "string",
+            "nullable": true
+          },
+          "sickDayVisibility": {
+            "type": "string",
+            "nullable": true
+          },
+          "defaultVacationDays": {
+            "type": "number",
+            "format": "double"
           },
           "settingsUpdatedAt": {
             "type": "string",
@@ -4634,6 +4701,18 @@
             "format": "date-time"
           },
           "initialOvertimeHours": {
+            "type": "number",
+            "format": "double"
+          },
+          "vacationDaysPerYear": {
+            "type": "number",
+            "format": "double"
+          },
+          "vacationDaysUsed": {
+            "type": "number",
+            "format": "double"
+          },
+          "vacationDaysRemaining": {
             "type": "number",
             "format": "double"
           }
@@ -4919,6 +4998,19 @@
         },
         "additionalProperties": false,
         "description": "Request payload for setting a member's initial overtime hours."
+      },
+      "SetVacationDaysRequest": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "maximum": 365,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request payload for setting a member's vacation day allowance."
       },
       "StartTimeEntryRequest": {
         "type": "object",
@@ -5243,6 +5335,17 @@
           },
           "csvImportMode": {
             "$ref": "#/components/schemas/RuleMode"
+          },
+          "vacationVisibility": {
+            "$ref": "#/components/schemas/VisibilityMode"
+          },
+          "sickDayVisibility": {
+            "$ref": "#/components/schemas/VisibilityMode"
+          },
+          "defaultVacationDays": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
           }
         },
         "additionalProperties": false,
@@ -5484,6 +5587,16 @@
         },
         "additionalProperties": false,
         "description": "Lightweight org view from the user's perspective."
+      },
+      "VisibilityMode": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "description": "Controls who can see certain data within an organization.",
+        "format": "int32"
       },
       "WorkScheduleResponse": {
         "required": [
