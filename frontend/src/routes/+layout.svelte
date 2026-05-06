@@ -174,10 +174,6 @@
 				<a href="/export" class={navLinkClass('/export')}>Export</a>
 				{#if orgContext.selectedOrg}
 					<a href="/organizations/{orgContext.selectedOrgSlug}" class={navLinkClass(`/organizations/${orgContext.selectedOrgSlug}`)}>Organization</a>
-					{#if orgContext.selectedOrg.role === 'Admin' || orgContext.selectedOrg.role === 'Owner'}
-						<a href="/organizations/{orgContext.selectedOrgSlug}/absences" class={navLinkClass(`/organizations/${orgContext.selectedOrgSlug}/absences`)}>Absences</a>
-						<a href="/organizations/{orgContext.selectedOrgSlug}/settings" class={navLinkClass(`/organizations/${orgContext.selectedOrgSlug}/settings`)}>Settings</a>
-					{/if}
 				{/if}
 			</div>
 

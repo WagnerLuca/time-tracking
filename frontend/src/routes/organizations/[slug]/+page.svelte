@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { organizationsApi, workScheduleApi, holidayApi, absenceDayApi, notificationsApi } from '$lib/apiClient';
+	import { organizationsApi, workScheduleApi, absenceDayApi, notificationsApi } from '$lib/apiClient';
 	import { absenceTypeLabel, absenceTypeBadge } from '$lib/utils/formatters';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import {
@@ -12,12 +12,9 @@
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationRequest,
-		AddMemberRequest,
 		WorkScheduleResponse,
-		HolidayResponse,
 		AbsenceDayResponse,
-		AbsenceType,
-		MemberTimeOverviewResponse
+		AbsenceType
 	} from '$lib/api';
 
 	let org = $state<OrganizationDetailResponse | null>(null);
@@ -41,27 +38,15 @@
 	let editSaving = $state(false);
 
 	// Add member
-	let showAddMember = $state(false);
-	let newMemberEmail = $state('');
-	let newMemberRole = $state(0);
-	let addMemberError = $state('');
-	let addingMember = $state(false);
 
 	// User search for add member dropdown
-	let allUsers = $state<Array<{id: number, email: string, firstName: string, lastName: string}>>([]);
-	let selectedUserId = $state<number | null>(null);
-	let usersLoaded = $state(false);
 
 	// Action feedback
 	let actionError = $state('');
 
 	// Tab navigation
-	let activeTab = $state<'my-schedule' | 'team'>('my-schedule');
 
 	// Team overview data (admin)
-	let teamOverview = $state<MemberTimeOverviewResponse[]>([]);
-	let teamOverviewLoading = $state(false);
-	let teamOverviewLoaded = $state(false);
 
 	// Work schedule (for member view)
 	let workSchedule = $state<WorkScheduleResponse | null>(null);
@@ -79,26 +64,7 @@
 	let myVacationError = $state('');
 	let myMember = $derived(org?.members?.find(m => m.id === auth.user?.id) ?? null);
 
-	// Request history (admin)
-
 	// Holidays
-	let holidays = $state<HolidayResponse[]>([]);
-	let holidaysLoading = $state(false);
-	let holidaysLoaded = $state(false);
-	let showAddHoliday = $state(false);
-	let newHolidayName = $state('');
-	let newHolidayDate = $state('');
-	let addingHoliday = $state(false);
-	let holidayError = $state('');
-	let editingHolidayId = $state<number | null>(null);
-	let editHolidayName = $state('');
-	let editHolidayDate = $state('');
-	let editHolidaySaving = $state(false);
-	let newHolidayRecurring = $state(false);
-	let newHolidayHalfDay = $state(false);
-	let editHolidayRecurring = $state(false);
-	let editHolidayHalfDay = $state(false);
-
 
 	// Absences / sick days
 	let absences = $state<AbsenceDayResponse[]>([]);
@@ -150,29 +116,9 @@
 
 	let orgSlug = $state('');
 
-	const validTabs = ['my-schedule', 'team'] as const;
-
-	function readHashTab(): typeof activeTab {
-		if (typeof window === 'undefined') return 'my-schedule';
-		const hash = window.location.hash.replace('#', '');
-		return (validTabs as readonly string[]).includes(hash) ? hash as typeof activeTab : 'my-schedule';
-	}
-
-	function setTab(tab: typeof activeTab) {
-		activeTab = tab;
-		if (typeof window !== 'undefined') {
-			window.history.replaceState(null, '', `#${tab}`);
-		}
-	}
-
 	onMount(() => {
 		orgSlug = $page.params.slug ?? '';
-		activeTab = readHashTab();
 		loadOrg();
-
-		const onHashChange = () => { activeTab = readHashTab(); };
-		window.addEventListener('hashchange', onHashChange);
-		return () => window.removeEventListener('hashchange', onHashChange);
 	});
 
 	async function loadOrg() {
@@ -229,48 +175,11 @@
 	}
 
 	function loadAllSections() {
-		loadHolidays();
 		loadAbsences();
 		loadSchedulePeriods();
-		loadUsersForDropdown();
-		loadTeamOverview();
 	}
 
 	/** Load time overview for current week (admins only, when visibility enabled) */
-	async function loadTeamOverview() {
-		if (teamOverviewLoaded || !canEdit || !org?.memberTimeEntryVisibility) return;
-		teamOverviewLoading = true;
-		try {
-			const now = new Date();
-			const dayOfWeek = now.getDay() || 7;
-			const weekStart = new Date(now);
-			weekStart.setDate(now.getDate() - dayOfWeek + 1);
-			weekStart.setHours(0, 0, 0, 0);
-			const weekEnd = new Date(weekStart);
-			weekEnd.setDate(weekStart.getDate() + 6);
-			weekEnd.setHours(23, 59, 59, 999);
-			const { data } = await organizationsApi.apiV1OrganizationsSlugTimeOverviewGet(orgSlug, weekStart.toISOString(), weekEnd.toISOString());
-			teamOverview = data;
-			teamOverviewLoaded = true;
-		} catch {
-			teamOverview = [];
-		} finally {
-			teamOverviewLoading = false;
-		}
-	}
-
-	function getMemberOverview(memberId: number): MemberTimeOverviewResponse | null {
-		return teamOverview.find(m => m.userId === memberId) ?? null;
-	}
-
-	function formatMinutesToHours(minutes?: number | null): string {
-		if (!minutes) return '0h';
-		const h = Math.floor(Math.abs(minutes) / 60);
-		const m = Math.abs(minutes) % 60;
-		const sign = minutes < 0 ? '-' : '';
-		return m > 0 ? `${sign}${h}h ${m}m` : `${sign}${h}h`;
-	}
-
 	/** Reload org data without toggling loading state (avoids scroll-to-top) */
 	async function reloadOrg() {
 		try {
@@ -334,28 +243,6 @@
 		}
 	}
 
-	async function loadUsersForDropdown() {
-		if (usersLoaded) return;
-		try {
-			const { data: orgData } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
-			const users = orgData?.members ?? [];
-			allUsers = users.map((u: any) => ({
-				id: u.id,
-				email: u.email,
-				firstName: u.firstName,
-				lastName: u.lastName
-			}));
-			usersLoaded = true;
-		} catch {
-			allUsers = [];
-		}
-	}
-
-	function getAvailableUsers() {
-		const memberIds = new Set((org?.members ?? []).map(m => m.id));
-		return allUsers.filter(u => !memberIds.has(u.id));
-	}
-
 	function startEdit() {
 		if (!org) return;
 		editName = org.name ?? '';
@@ -402,33 +289,6 @@
 		}
 	}
 
-	async function addMember(e: Event) {
-		e.preventDefault();
-		addMemberError = '';
-		addingMember = true;
-		try {
-			if (!selectedUserId) {
-				addMemberError = 'Please select a user.';
-				addingMember = false;
-				return;
-			}
-
-			const payload: AddMemberRequest = {
-				userId: selectedUserId,
-				role: newMemberRole as any
-			};
-			await organizationsApi.apiV1OrganizationsSlugMembersPost(orgSlug, payload);
-			await reloadOrg();
-			showAddMember = false;
-			selectedUserId = null;
-			newMemberRole = 0;
-		} catch (err) {
-			addMemberError = extractErrorMessage(err, 'Failed to add member.');
-		} finally {
-			addingMember = false;
-		}
-	}
-
 	async function updateMemberRole(userId: number, newRole: number) {
 		actionError = '';
 		try {
@@ -459,90 +319,7 @@
 		}
 	}
 
-
-
-
-
 	// â”€â”€ Holidays â”€â”€
-	async function loadHolidays() {
-		if (holidaysLoaded) return;
-		holidaysLoading = true;
-		holidayError = '';
-		try {
-			const { data } = await holidayApi.apiV1OrganizationsSlugHolidaysGet(orgSlug);
-			holidays = (data as HolidayResponse[]).sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
-			holidaysLoaded = true;
-		} catch {
-			holidays = [];
-		} finally {
-			holidaysLoading = false;
-		}
-	}
-
-	async function addHoliday(e: Event) {
-		e.preventDefault();
-		addingHoliday = true;
-		holidayError = '';
-		try {
-			await holidayApi.apiV1OrganizationsSlugHolidaysPost(orgSlug, {
-				date: newHolidayDate,
-				name: newHolidayName,
-				isRecurring: newHolidayRecurring,
-				isHalfDay: newHolidayHalfDay
-			});
-			holidaysLoaded = false;
-			await loadHolidays();
-			showAddHoliday = false;
-			newHolidayName = '';
-			newHolidayDate = '';
-			newHolidayRecurring = false;
-			newHolidayHalfDay = false;
-		} catch (err) {
-			holidayError = extractErrorMessage(err, 'Failed to add holiday.');
-		} finally {
-			addingHoliday = false;
-		}
-	}
-
-	function startEditHoliday(h: HolidayResponse) {
-		editingHolidayId = h.id ?? null;
-		editHolidayName = h.name ?? '';
-		editHolidayDate = h.date ?? '';
-		editHolidayRecurring = h.isRecurring ?? false;
-		editHolidayHalfDay = h.isHalfDay ?? false;
-	}
-
-	async function saveEditHoliday(id: number) {
-		editHolidaySaving = true;
-		holidayError = '';
-		try {
-			await holidayApi.apiV1OrganizationsSlugHolidaysIdPut(orgSlug, id, {
-				date: editHolidayDate,
-				name: editHolidayName,
-				isRecurring: editHolidayRecurring,
-				isHalfDay: editHolidayHalfDay
-			});
-			editingHolidayId = null;
-			holidaysLoaded = false;
-			await loadHolidays();
-		} catch (err) {
-			holidayError = extractErrorMessage(err, 'Failed to update holiday.');
-		} finally {
-			editHolidaySaving = false;
-		}
-	}
-
-	async function deleteHoliday(id: number) {
-		if (!confirm('Delete this holiday?')) return;
-		try {
-			await holidayApi.apiV1OrganizationsSlugHolidaysIdDelete(orgSlug, id);
-			holidaysLoaded = false;
-			await loadHolidays();
-		} catch (err) {
-			holidayError = extractErrorMessage(err, 'Failed to delete holiday.');
-		}
-	}
-
 	function formatDateDisplay(dateStr?: string): string {
 		if (!dateStr) return '';
 		try {
@@ -566,8 +343,6 @@
 			absencesLoading = false;
 		}
 	}
-
-
 
 	async function addAbsence(e: Event) {
 		e.preventDefault();
@@ -728,18 +503,13 @@
 		}
 	}
 
-
-
-
 </script>
 
 <svelte:head>
 	<title>{org ? org.name : 'Organization'} - Time Tracking</title>
 </svelte:head>
 
-<div class="max-w-4xl mx-auto p-6">
-	<a href="/organizations" class="text-base-content/60 no-underline text-sm inline-block mb-3 hover:text-primary">&larr; Back to Organizations</a>
-
+<div class="max-w-5xl mx-auto px-6 pb-6">
 	{#if loading}
 		<div class="flex items-center gap-3 justify-center py-12 text-base-content/40"><span class="loading loading-spinner loading-sm"></span><span>Loading...</span></div>
 	{:else if error}
@@ -821,21 +591,7 @@
 				<a href={org.website} target="_blank" class="link link-primary text-sm inline-block mb-6">{org.website}</a>
 			{/if}
 
-			<!-- Tab navigation -->
-			<div class="tabs tabs-bordered mt-5">
-				<button class="tab {activeTab === 'my-schedule' ? 'tab-active' : ''}" onclick={() => setTab('my-schedule')}>
-					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
-					My Schedule
-				</button>
-				<button class="tab {activeTab === 'team' ? 'tab-active' : ''}" onclick={() => setTab('team')}>
-					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
-					Team
-				</button>
-			</div>
-
-			<!-- ==================== MY SCHEDULE TAB ==================== -->
-			{#if activeTab === 'my-schedule'}
-				<div class="pt-2">
+			<div class="pt-2">
 					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Your personal work schedule, overtime balance, absences and time period configurations.</p>
 					<!-- Active Work Schedule (read-only, managed via periods) -->
 					{#if myRole && workSchedule}
@@ -1167,208 +923,6 @@
 						</section>
 					{/if}
 				</div>
-
-			<!-- ==================== TEAM TAB ==================== -->
-			{:else if activeTab === 'team'}
-				<div class="pt-2">
-					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Your team at a glance. {#if canEdit}Click a member for details, schedule editing, and absence history.{:else}Click a member to see their profile.{/if}</p>
-
-					<!-- Members -->
-					<section class="mt-8">
-						<div class="flex items-center justify-between mb-4">
-							<h2 class="text-xl text-base-content/70">Members ({(org.members ?? []).length})</h2>
-							{#if canEdit}
-								<button class="btn btn-primary btn-sm" onclick={() => { showAddMember = !showAddMember; if (showAddMember) loadUsersForDropdown(); }}>
-									{showAddMember ? 'Cancel' : '+ Add Member'}
-								</button>
-							{/if}
-						</div>
-
-						{#if showAddMember && canEdit}
-							<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
-								{#if addMemberError}
-									<div class="alert alert-error mb-4 text-sm">{addMemberError}</div>
-								{/if}
-								<form onsubmit={addMember} class="flex gap-2 items-center flex-wrap">
-									<select bind:value={selectedUserId} disabled={addingMember} class="select select-bordered select-sm flex-1 min-w-[200px]">
-										<option value={null}>Select a user...</option>
-										{#each getAvailableUsers() as user}
-											<option value={user.id}>{user.firstName} {user.lastName} ({user.email})</option>
-										{/each}
-									</select>
-									<select bind:value={newMemberRole} disabled={addingMember} class="select select-bordered select-sm">
-										<option value={0}>Member</option>
-										<option value={1}>Admin</option>
-										{#if isOwner}<option value={2}>Owner</option>{/if}
-									</select>
-									<button type="submit" class="btn btn-primary btn-sm" disabled={addingMember}>
-										{addingMember ? 'Adding...' : 'Add'}
-									</button>
-								</form>
-							</div>
-						{/if}
-
-						<div class="flex flex-col gap-2">
-							{#each (org.members ?? []) as member}
-								{@const overview = getMemberOverview(member.id!)}
-								<a
-									class="group flex items-center gap-4 p-3.5 bg-base-100 border border-base-300 rounded-xl cursor-pointer transition-all hover:border-primary/30 hover:shadow-md hover:-translate-y-px no-underline text-base-content"
-									href="/organizations/{orgSlug}/members/{member.id}"
-									title="View {member.firstName}'s details"
-								>
-									<div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-sm font-semibold shrink-0">
-										{(member.firstName?.[0] ?? '').toUpperCase()}{(member.lastName?.[0] ?? '').toUpperCase()}
-									</div>
-									<div class="flex-1 min-w-0">
-										<div class="font-semibold text-base-content text-[0.9375rem] flex items-center gap-1.5">
-											{member.firstName} {member.lastName}
-											{#if member.id === auth.user?.id}
-												<span class="badge badge-info badge-xs font-semibold">You</span>
-											{/if}
-										</div>
-										<div class="text-sm text-base-content/40 mt-0.5">{member.email}</div>
-										{#if canEdit && org.memberTimeEntryVisibility && overview}
-											<div class="flex gap-3 mt-1.5 flex-wrap">
-												<span class="flex items-center gap-1 text-xs text-base-content/50" title="Tracked this week">
-													<svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5 opacity-60"><path d="M8 3.5a.5.5 0 00-1 0V8a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 7.71V3.5z"/><path d="M8 16A8 8 0 108 0a8 8 0 000 16zm7-8A7 7 0 111 8a7 7 0 0114 0z"/></svg>
-													{formatMinutesToHours(overview.netTrackedMinutes)}
-												</span>
-												<span class="flex items-center gap-1 text-xs text-base-content/50" title="Entries this week">
-													<svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5 opacity-60"><path d="M5 3.5h6A1.5 1.5 0 0112.5 5v6a1.5 1.5 0 01-1.5 1.5H5A1.5 1.5 0 013.5 11V5A1.5 1.5 0 015 3.5z"/></svg>
-													{overview.entryCount ?? 0} entries
-												</span>
-												{#if overview.weeklyWorkHours}
-													<span class="flex items-center gap-1 text-xs text-base-content/50" title="Weekly target">
-														<svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5 opacity-60"><path d="M8 15A7 7 0 118 1a7 7 0 010 14zm0 1A8 8 0 108 0a8 8 0 000 16z"/><path d="M10.97 4.97a.235.235 0 00-.02.022L7.477 9.417 5.384 7.323a.75.75 0 00-1.06 1.06L6.97 11.03a.75.75 0 001.079-.02l3.992-4.99a.75.75 0 00-1.071-1.05z"/></svg>
-														{overview.weeklyWorkHours}h/w
-													</span>
-												{/if}
-											</div>
-										{/if}
-									</div>
-									<div class="flex items-center gap-2 shrink-0">
-										{#if (member.vacationDaysPerYear ?? 0) > 0}
-											<span class="badge badge-sm badge-outline" title="Vacation: {member.vacationDaysUsed ?? 0}/{member.vacationDaysPerYear} used">
-												🏖 {member.vacationDaysRemaining ?? member.vacationDaysPerYear}d left
-											</span>
-										{/if}
-										<span class="badge badge-sm uppercase tracking-wide {(member.role?.toLowerCase() ?? 'member') === 'owner' ? 'badge-warning' : (member.role?.toLowerCase() ?? 'member') === 'admin' ? 'badge-info' : 'badge-ghost'}">{member.role}</span>
-										<svg class="w-5 h-5 text-base-content/20 group-hover:text-primary transition-colors" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
-									</div>
-								</a>
-							{/each}
-						</div>
-					</section>
-
-					<!-- Holidays -->
-					{#if myRole}
-						<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
-							<div class="flex items-center justify-between mb-4">
-								<h2 class="text-xl font-bold text-base-content">Holidays</h2>
-								{#if holidaysLoaded && canEdit}
-									<button class="btn btn-primary btn-sm" onclick={() => (showAddHoliday = !showAddHoliday)}>
-										{showAddHoliday ? 'Cancel' : '+ Add Holiday'}
-									</button>
-								{/if}
-							</div>
-
-							{#if holidaysLoading}
-								<p class="text-base-content/40">Loading holidays...</p>
-							{:else if holidaysLoaded}
-								{#if holidayError}
-									<div class="alert alert-error text-sm py-1.5 px-2.5">{holidayError}</div>
-								{/if}
-
-	
-
-								{#if showAddHoliday && canEdit}
-									<form onsubmit={addHoliday} class="flex flex-col gap-2.5 p-3 bg-base-200/30 rounded-lg mb-3 border border-base-300">
-										<div class="flex items-center gap-2">
-											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label class="min-w-[80px] text-sm font-medium text-base-content/70">Date</label>
-											<input type="date" class="input input-bordered input-sm flex-1" bind:value={newHolidayDate} required disabled={addingHoliday} />
-										</div>
-										<div class="flex items-center gap-2">
-											<!-- svelte-ignore a11y_label_has_associated_control -->
-											<label class="min-w-[80px] text-sm font-medium text-base-content/70">Name</label>
-											<input type="text" class="input input-bordered input-sm flex-1" bind:value={newHolidayName} placeholder="e.g. Christmas" required disabled={addingHoliday} />
-										</div>
-										<div class="flex items-center gap-2">
-											<label class="label cursor-pointer flex items-center gap-1.5 text-sm text-base-content/70">
-												<input type="checkbox" class="checkbox checkbox-sm" bind:checked={newHolidayRecurring} disabled={addingHoliday} />
-												Yearly recurring
-											</label>
-											<label class="label cursor-pointer flex items-center gap-1.5 text-sm text-base-content/70">
-												<input type="checkbox" class="checkbox checkbox-sm" bind:checked={newHolidayHalfDay} disabled={addingHoliday} />
-												Half day
-											</label>
-										</div>
-										<div class="flex gap-2 mt-1">
-											<button type="submit" class="btn btn-primary btn-sm" disabled={addingHoliday}>
-												{addingHoliday ? 'Adding...' : 'Add'}
-											</button>
-										</div>
-									</form>
-								{/if}
-
-								{#if holidays.length === 0}
-									<p class="text-base-content/40">No holidays configured.</p>
-								{:else}
-									{@const holidaysByYear = Object.entries(
-										holidays.reduce<Record<string, typeof holidays>>((acc, h) => {
-											const year = h.isRecurring ? 'Recurring' : (h.date?.substring(0, 4) ?? 'Unknown');
-											(acc[year] ??= []).push(h);
-											return acc;
-										}, {})
-									).sort(([a], [b]) => a === 'Recurring' ? 1 : b === 'Recurring' ? -1 : b.localeCompare(a))}
-									{#each holidaysByYear as [year, yearHolidays]}
-										<div class="mb-4">
-											<h3 class="text-sm font-semibold text-base-content/50 mb-2">{year}</h3>
-											<div class="flex flex-col gap-1.5">
-												{#each yearHolidays as h}
-													<div class="flex items-center gap-3 py-2 px-3 bg-base-200/30 rounded-md text-sm">
-														{#if editingHolidayId === h.id && canEdit}
-															<input type="date" bind:value={editHolidayDate} class="input input-bordered input-xs w-20" disabled={editHolidaySaving} />
-															<input type="text" bind:value={editHolidayName} class="input input-bordered input-xs w-20" disabled={editHolidaySaving} />
-															<label class="label cursor-pointer flex items-center gap-1.5 text-[0.8rem] whitespace-nowrap text-sm text-base-content/70">
-																<input type="checkbox" class="checkbox checkbox-sm" bind:checked={editHolidayRecurring} disabled={editHolidaySaving} />
-																Yearly
-															</label>
-															<label class="label cursor-pointer flex items-center gap-1.5 text-[0.8rem] whitespace-nowrap text-sm text-base-content/70">
-																<input type="checkbox" class="checkbox checkbox-sm" bind:checked={editHolidayHalfDay} disabled={editHolidaySaving} />
-																Half
-															</label>
-															<div class="flex items-center gap-1.5">
-																<button class="btn btn-primary btn-sm" onclick={() => saveEditHoliday(h.id!)} disabled={editHolidaySaving}>Save</button>
-																<button class="btn btn-ghost btn-sm" onclick={() => (editingHolidayId = null)}>Cancel</button>
-															</div>
-														{:else}
-															<span class="font-medium text-base-content/70 min-w-[90px]">{formatDateDisplay(h.date)}</span>
-															<span class="flex-1 text-base-content/60">{h.name}</span>
-															{#if h.isHalfDay}
-																<span class="badge badge-warning badge-xs">½ Day</span>
-															{/if}
-															{#if h.isRecurring}
-																<span class="badge badge-info badge-xs" title="Repeats every year">🔁 Yearly</span>
-															{/if}
-															{#if canEdit}
-																<div class="flex items-center gap-1.5">
-																	<button class="btn btn-ghost btn-sm" onclick={() => startEditHoliday(h)}>Edit</button>
-																	<button class="btn btn-ghost btn-xs text-error" title="Delete" onclick={() => deleteHoliday(h.id!)}>&times;</button>
-																</div>
-															{/if}
-														{/if}
-													</div>
-												{/each}
-											</div>
-										</div>
-									{/each}
-								{/if}
-							{/if}
-						</section>
-					{/if}
-				</div>
-			{/if}
 
 		{/if}
 	{/if}

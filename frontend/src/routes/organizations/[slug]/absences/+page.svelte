@@ -378,7 +378,7 @@
 	<title>{org ? `Absences - ${org.name}` : 'Absences'} - Time Tracking</title>
 </svelte:head>
 
-<div class="max-w-5xl mx-auto p-6">
+<div class="max-w-5xl mx-auto px-6 pb-6">
 	<div class="flex items-center gap-2 mb-6">
 		<a href="/organizations/{orgSlug}" class="text-base-content/60 no-underline text-sm hover:text-primary">&larr; {org?.name ?? 'Organization'}</a>
 	</div>
