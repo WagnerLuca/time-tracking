@@ -128,20 +128,29 @@ public class OrganizationService : IOrganizationService
         var yearEnd = new DateOnly(currentYear, 12, 31);
         var memberIds = organization.Members.Select(m => m.Id).ToList();
 
+        // Load holiday dates for this org (to exclude from vacation count)
+        var orgHolidays = await _context.Holidays.AsNoTracking()
+            .Where(h => h.OrganizationId == organization.Id)
+            .ToListAsync();
+        var holidayDates = new HashSet<DateOnly>(
+            orgHolidays.Select(h => h.IsRecurring
+                ? new DateOnly(currentYear, h.Date.Month, h.Date.Day)
+                : h.Date)
+            .Where(d => d >= yearStart && d <= yearEnd));
+
         var vacationUsage = await _context.AbsenceDays.AsNoTracking()
             .Where(a => a.OrganizationId == organization.Id
                      && memberIds.Contains(a.UserId)
                      && a.Type == AbsenceType.Vacation
                      && a.Date >= yearStart && a.Date <= yearEnd)
-            .GroupBy(a => a.UserId)
-            .Select(g => new
-            {
-                UserId = g.Key,
-                DaysUsed = g.Sum(a => a.IsHalfDay ? 0.5 : 1.0)
-            })
             .ToListAsync();
 
-        var usageByUser = vacationUsage.ToDictionary(v => v.UserId, v => v.DaysUsed);
+        var usageByUser = vacationUsage
+            .Where(a => !holidayDates.Contains(a.Date))
+            .GroupBy(a => a.UserId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(a => a.IsHalfDay ? 0.5 : 1.0));
 
         var membersWithVacation = organization.Members.Select(m =>
         {

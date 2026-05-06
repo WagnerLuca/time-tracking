@@ -355,10 +355,12 @@
 		return weeks;
 	}
 
-	function getWeekLanes(weekDays: { date: Date }[], spanMap: Map<string, SpanEntry[]>): WeekLane[] {
+	function getWeekLanes(weekDays: { date: Date }[], spanMap: Map<string, SpanEntry[]>, holidayMap: Map<string, HolidayResponse[]>): WeekLane[] {
 		const seen = new Map<number, WeekLane>();
+		let hasHoliday = false;
 		for (const { date } of weekDays) {
 			const key = dateToKey(date);
+			if ((holidayMap.get(key) ?? []).length > 0) hasHoliday = true;
 			for (const entry of (spanMap.get(key) ?? [])) {
 				if (!seen.has(entry.span.userId)) {
 					seen.set(entry.span.userId, {
@@ -369,7 +371,12 @@
 				}
 			}
 		}
-		return [...seen.values()].sort((a, b) => a.userId - b.userId);
+		const lanes = [...seen.values()].sort((a, b) => a.userId - b.userId);
+		// Reserve lane 0 for holidays if the week has any
+		if (hasHoliday) {
+			lanes.unshift({ userId: -1, userFirstName: 'Holiday', userLastName: '' });
+		}
+		return lanes;
 	}
 
 	function getLaneEntry(dayKey: string, lane: WeekLane, spanMap: Map<string, SpanEntry[]>): SpanEntry | null {
@@ -435,13 +442,12 @@
 			<!-- Calendar grid (week-based with stable lanes) -->
 			<div class="border border-base-300 rounded-lg overflow-hidden">
 				{#each getWeeks(days) as weekDays, wi}
-					{@const weekLanes = getWeekLanes(weekDays, spanMap)}
+					{@const weekLanes = getWeekLanes(weekDays, spanMap, holidayMap)}
 					<div class="grid grid-cols-7 gap-px bg-base-300/50 {wi > 0 ? 'border-t-2 border-base-300' : ''}">
 						{#each weekDays as { date, inMonth }}
 							{@const key = dateToKey(date)}
 							{@const isToday = key === today}
 							{@const isWeekend = date.getDay() === 0 || date.getDay() === 6}
-							{@const dayHolidays = holidayMap.get(key) ?? []}
 							<!-- svelte-ignore a11y_click_events_have_key_events -->
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
@@ -454,13 +460,18 @@
 										{date.getDate()}
 									</span>
 								</div>
-								{#each dayHolidays as h}
-									<div class="h-[16px] text-[9px] leading-none flex items-center px-1 rounded bg-success/15 text-success border border-success/20 mb-px truncate" title={h.name ?? ''}>
-										{h.name}
-									</div>
-								{/each}
 								<div class="flex flex-col gap-[2px] mt-1 min-h-[48px]">
 									{#each weekLanes as lane}
+										{#if lane.userId === -1}
+											{@const dayH = holidayMap.get(key) ?? []}
+											{#if dayH.length > 0}
+												<div class="h-[16px] text-[9px] leading-none flex items-center px-1 rounded bg-success/15 text-success border border-success/20 truncate" title={dayH.map(h => h.name).join(', ')}>
+													{dayH[0].name}
+												</div>
+											{:else}
+												<div class="h-[16px]"></div>
+											{/if}
+										{:else}
 										{@const entry = getLaneEntry(key, lane, spanMap)}
 										{#if entry}
 											<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -480,6 +491,7 @@
 											</a>
 										{:else}
 											<div class="h-[16px]"></div>
+										{/if}
 										{/if}
 									{/each}
 								</div>
