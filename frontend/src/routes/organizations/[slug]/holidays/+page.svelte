@@ -35,6 +35,27 @@
 	let editHolidayHalfDay = $state(false);
 
 	let orgSlug = $state('');
+	let selectedYear = $state(new Date().getFullYear());
+
+	function getAvailableYears(): number[] {
+		const years = new Set<number>();
+		years.add(new Date().getFullYear());
+		for (const h of holidays) {
+			if (h.date && !h.isRecurring) {
+				const y = parseInt(h.date.substring(0, 4));
+				if (!isNaN(y)) years.add(y);
+			}
+		}
+		return [...years].sort((a, b) => b - a);
+	}
+
+	function filteredHolidays(): HolidayResponse[] {
+		return holidays.filter(h => {
+			if (h.isRecurring) return true;
+			if (!h.date) return false;
+			return h.date.startsWith(String(selectedYear));
+		});
+	}
 
 	onMount(() => {
 		orgSlug = $page.params.slug ?? '';
@@ -148,7 +169,14 @@
 		<div class="pt-4">
 			<section>
 				<div class="flex items-center justify-between mb-4">
-					<h2 class="text-xl font-bold text-base-content">Holidays</h2>
+					<div class="flex items-center gap-3">
+						<h2 class="text-xl font-bold text-base-content">Holidays</h2>
+						<select class="select select-bordered select-sm" bind:value={selectedYear}>
+							{#each getAvailableYears() as year}
+								<option value={year}>{year}</option>
+							{/each}
+						</select>
+					</div>
 					{#if canEdit}
 						<button class="btn btn-primary btn-sm" onclick={() => (showAddHoliday = !showAddHoliday)}>
 							{showAddHoliday ? 'Cancel' : '+ Add Holiday'}
@@ -186,11 +214,12 @@
 					</div>
 				{/if}
 
-				{#if holidays.length === 0}
-					<p class="text-base-content/40 text-sm">No holidays configured.{#if !canEdit} Holidays are managed by organization admins.{/if}</p>
+				{@const filtered = filteredHolidays()}
+				{#if filtered.length === 0}
+					<p class="text-base-content/40 text-sm">No holidays for {selectedYear}.{#if !canEdit} Holidays are managed by organization admins.{/if}</p>
 				{:else}
 					<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-						{#each holidays as h}
+						{#each filtered as h}
 							<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0">
 								{#if editingHolidayId === h.id && canEdit}
 									<div class="flex gap-3 items-end flex-wrap w-full">
