@@ -147,10 +147,13 @@
 		}
 	}
 
-	function formatDateDisplay(dateStr?: string): string {
+	function formatDateDisplay(dateStr?: string, isRecurring?: boolean): string {
 		if (!dateStr) return '';
 		try {
 			const d = new Date(dateStr + 'T00:00:00');
+			if (isRecurring) {
+				return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+			}
 			return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
 		} catch { return dateStr; }
 	}
@@ -244,7 +247,7 @@
 								{:else}
 									<div class="flex items-center gap-3">
 										<span class="font-medium text-base-content">{h.name}</span>
-										<span class="text-base-content/50 text-sm font-mono">{formatDateDisplay(h.date)}</span>
+										<span class="text-base-content/50 text-sm font-mono">{formatDateDisplay(h.date, h.isRecurring)}</span>
 										{#if h.isRecurring}
 											<span class="badge badge-sm badge-outline">Recurring</span>
 										{/if}
