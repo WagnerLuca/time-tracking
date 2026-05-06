@@ -65,7 +65,6 @@
 
 	// Tab navigation
 	let activeTab = $state<'my-schedule' | 'team' | 'absences' | 'settings'>('my-schedule');
-	let calendarExpanded = $state(false);
 
 	// Team overview data (admin)
 	let teamOverview = $state<MemberTimeOverviewResponse[]>([]);
@@ -1914,10 +1913,8 @@
 
 			<!-- ==================== ABSENCES TAB (Admin) ==================== -->
 			{:else if activeTab === 'absences' && canEdit}
-				<div class="{calendarExpanded ? 'fixed inset-0 z-40 bg-base-100 overflow-y-auto p-6' : 'pt-2'}">
-					{#if !calendarExpanded}
-						<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Calendar overview of absences and vacation days across all members.</p>
-					{/if}
+				<div class="pt-2">
+					<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Calendar overview of absences and vacation days across all members.</p>
 
 					<!-- Calendar Navigation -->
 					{#if org}
@@ -1938,13 +1935,6 @@
 								<button class="btn btn-ghost btn-xs" onclick={() => { calendarMonth = new Date().getMonth(); calendarYear = new Date().getFullYear(); }}>Today</button>
 							</div>
 							<div class="flex items-center gap-1">
-								<button class="btn btn-ghost btn-sm" aria-label="{calendarExpanded ? 'Collapse' : 'Expand'}" onclick={() => (calendarExpanded = !calendarExpanded)} title="{calendarExpanded ? 'Collapse calendar' : 'Full-page calendar'}">
-									{#if calendarExpanded}
-										<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 00-1.06 1.06L5.44 6.5H3a.75.75 0 000 1.5h4.25a.75.75 0 00.75-.75V3a.75.75 0 00-1.5 0v2.44L3.28 2.22zM13.5 3a.75.75 0 00-1.5 0v4.25c0 .414.336.75.75.75H17a.75.75 0 000-1.5h-2.44l3.22-3.22a.75.75 0 00-1.06-1.06L13.5 5.44V3zM3 13.5a.75.75 0 000 1.5h2.44l-3.22 3.22a.75.75 0 101.06 1.06l3.22-3.22V18.5a.75.75 0 001.5 0v-4.25a.75.75 0 00-.75-.75H3zM13.5 14.56l3.22 3.22a.75.75 0 101.06-1.06l-3.22-3.22H17a.75.75 0 000-1.5h-4.25a.75.75 0 00-.75.75v4.25a.75.75 0 001.5 0v-2.44z" clip-rule="evenodd"/></svg>
-									{:else}
-										<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.28 7.78l3.22-3.22V7a.75.75 0 001.5 0V2.75a.75.75 0 00-.75-.75H13a.75.75 0 000 1.5h2.44l-3.22 3.22a.75.75 0 001.06 1.06zM2 13a.75.75 0 01.75-.75H7a.75.75 0 010 1.5H4.56l3.22 3.22a.75.75 0 11-1.06 1.06L3.5 14.81V17.25a.75.75 0 01-1.5 0V13zM2.75 2a.75.75 0 00-.75.75V7a.75.75 0 001.5 0V4.56l3.22 3.22a.75.75 0 001.06-1.06L4.56 3.5H7a.75.75 0 000-1.5H2.75zM13 18.5a.75.75 0 01-.75-.75V13.5a.75.75 0 01.75-.75h4.25a.75.75 0 010 1.5h-2.44l3.22 3.22a.75.75 0 11-1.06 1.06l-3.22-3.22v2.44a.75.75 0 01-.75.75H13z"/></svg>
-									{/if}
-								</button>
 								<button class="btn btn-ghost btn-sm" aria-label="Next month" onclick={() => navigateMonth(1)}>
 									<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
 								</button>
@@ -1962,7 +1952,7 @@
 						<div class="border border-base-300 rounded-lg overflow-hidden">
 							{#each getWeeks(days) as weekDays, wi}
 								{@const weekLanes = getWeekLanes(weekDays, spanMap)}
-								<div class="grid grid-cols-7 gap-px bg-base-300/50 {wi > 0 ? 'border-t border-base-300' : ''}">
+								<div class="grid grid-cols-7 gap-px bg-base-300/50 {wi > 0 ? 'border-t-2 border-base-300' : ''}">
 									{#each weekDays as { date, inMonth }}
 										{@const key = dateToKey(date)}
 										{@const isToday = key === today}
@@ -1971,11 +1961,11 @@
 										<!-- svelte-ignore a11y_click_events_have_key_events -->
 										<!-- svelte-ignore a11y_no_static_element_interactions -->
 										<div
-											class="min-h-[60px] p-1 flex flex-col cursor-pointer hover:bg-primary/5 transition-colors {inMonth ? 'bg-base-100' : 'bg-base-200/50'} {isWeekend && inMonth ? 'bg-base-200/30' : ''}"
+											class="min-h-[60px] p-1 pt-1.5 pb-3 flex flex-col cursor-pointer hover:bg-primary/5 transition-colors {inMonth && !isWeekend ? 'bg-primary/[0.03]' : ''} {inMonth && isWeekend ? 'bg-base-200/30' : ''} {!inMonth ? 'bg-base-200/50' : ''}"
 											onclick={() => { if (inMonth) openDayDialog(key); }}
 											title="Click to add absence on {key}"
 										>
-											<div class="flex items-center justify-between mb-0.5">
+											<div class="flex items-center justify-between mb-1.5">
 												<span class="text-[10px] font-medium leading-none {isToday ? 'bg-primary text-primary-content rounded-full w-5 h-5 flex items-center justify-center' : ''} {inMonth ? 'text-base-content' : 'text-base-content/25'} {isWeekend && inMonth ? 'text-base-content/40' : ''}">
 													{date.getDate()}
 												</span>
@@ -1985,7 +1975,7 @@
 													{h.name}
 												</div>
 											{/each}
-											<div class="flex flex-col {weekLanes.length > 5 ? 'max-h-[80px] overflow-y-auto' : ''}">
+											<div class="flex flex-col gap-[2px] mt-1 min-h-[48px]">
 												{#each weekLanes as lane}
 													{@const entry = getLaneEntry(key, lane, spanMap)}
 													{#if entry}

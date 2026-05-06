@@ -348,17 +348,17 @@ public static class DbSeeder
         foreach (var d in new[] { 8, 9, 10, 11, 12, 15, 16, 17, 18, 19 })
             juneAbsences.Add(new() { UserId = extraUserEntities[2].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Mountain hiking" });
 
-        // Jonas Wolf: June 1-5 (1 week, overlaps with Lisa)
-        foreach (var d in new[] { 1, 2, 3, 4, 5 })
+        // Jonas Wolf: June 1-5 + June 8-9 (Mon-Tue, then gap, starts again)
+        foreach (var d in new[] { 1, 2, 3, 4, 5, 8, 9 })
             juneAbsences.Add(new() { UserId = extraUserEntities[3].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "City break" });
 
-        // Laura Becker: June 15-26 (2 weeks, overlaps with Sarah)
-        foreach (var d in new[] { 15, 16, 17, 18, 19, 22, 23, 24, 25, 26 })
+        // Laura Becker: June 8-12 + June 15-26 (3 weeks, heavy overlap)
+        foreach (var d in new[] { 8, 9, 10, 11, 12, 15, 16, 17, 18, 19, 22, 23, 24, 25, 26 })
             juneAbsences.Add(new() { UserId = extraUserEntities[4].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Family vacation" });
 
-        // Niklas Hoffmann: June 3-5 + sick June 22-24
-        foreach (var d in new[] { 3, 4, 5 })
-            juneAbsences.Add(new() { UserId = extraUserEntities[5].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Long weekend" });
+        // Niklas Hoffmann: June 8-12 vacation + sick June 22-24
+        foreach (var d in new[] { 8, 9, 10, 11, 12 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[5].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Short getaway" });
         foreach (var d in new[] { 22, 23, 24 })
             juneAbsences.Add(new() { UserId = extraUserEntities[5].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.SickDay, Note = "Summer cold" });
 
@@ -366,27 +366,33 @@ public static class DbSeeder
         foreach (var d in new[] { 8, 9, 10, 11, 12 })
             juneAbsences.Add(new() { UserId = extraUserEntities[6].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Wedding" });
 
-        // David Schaefer: June 22-30 (last week+)
+        // David Schaefer: June 8-10 Mon-Wed + June 22-30
+        foreach (var d in new[] { 8, 9, 10 })
+            juneAbsences.Add(new() { UserId = extraUserEntities[7].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Quick trip" });
         foreach (var d in new[] { 22, 23, 24, 25, 26, 29, 30 })
             juneAbsences.Add(new() { UserId = extraUserEntities[7].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Summer road trip" });
 
-        // Jana Meyer: June 1-3 + June 15-17 (split vacation)
+        // Jana Meyer: June 1-3 + June 11-12 Thu-Fri
         foreach (var d in new[] { 1, 2, 3 })
             juneAbsences.Add(new() { UserId = extraUserEntities[8].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Short break" });
-        foreach (var d in new[] { 15, 16, 17 })
+        foreach (var d in new[] { 11, 12 })
             juneAbsences.Add(new() { UserId = extraUserEntities[8].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Wedding attendance" });
 
         // Lukas Hartmann: June 8-19 (2 weeks, heavy overlap week of June 8)
         foreach (var d in new[] { 8, 9, 10, 11, 12, 15, 16, 17, 18, 19 })
             juneAbsences.Add(new() { UserId = extraUserEntities[9].Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Greece holiday" });
 
-        // Anna also takes June 9-13 vacation (more overlap)
+        // Anna also takes June 9-12 vacation (more overlap)
         foreach (var d in new[] { 9, 10, 11, 12 })
             annaAbsences.Add(new() { UserId = anna.Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Summer break" });
 
-        // Tom takes June 2-6 vacation
-        foreach (var d in new[] { 2, 3, 4, 5 })
+        // Tom takes June 8-9 Mon-Tue vacation
+        foreach (var d in new[] { 8, 9 })
             tomAbsences.Add(new() { UserId = tom.Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, d), Type = AbsenceType.Vacation, Note = "Long weekend trip" });
+
+        // Max takes June 11-12 Thu-Fri vacation
+        maxAbsences.Add(new() { UserId = max.Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, 11), Type = AbsenceType.Vacation, Note = "Personal day" });
+        maxAbsences.Add(new() { UserId = max.Id, OrganizationId = org.Id, Date = new DateOnly(2026, 6, 12), Type = AbsenceType.Vacation, Note = "Personal day" });
 
         context.AbsenceDays.AddRange(juneAbsences);
         await context.SaveChangesAsync();
