@@ -142,9 +142,18 @@
 	function buildHolidayMap(holidayList: HolidayResponse[]): Map<string, HolidayResponse[]> {
 		const map = new Map<string, HolidayResponse[]>();
 		for (const h of holidayList) {
-			const key = h.date ?? '';
-			if (!map.has(key)) map.set(key, []);
-			map.get(key)!.push(h);
+			if (!h.date) continue;
+			if (h.isRecurring) {
+				// For recurring holidays, add entries for the visible calendar year
+				const monthDay = h.date.substring(5); // "MM-DD"
+				const key = `${calendarYear}-${monthDay}`;
+				if (!map.has(key)) map.set(key, []);
+				map.get(key)!.push(h);
+			} else {
+				const key = h.date;
+				if (!map.has(key)) map.set(key, []);
+				map.get(key)!.push(h);
+			}
 		}
 		return map;
 	}
