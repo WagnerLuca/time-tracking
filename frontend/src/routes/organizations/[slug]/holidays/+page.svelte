@@ -214,12 +214,11 @@
 					</div>
 				{/if}
 
-				{@const filtered = filteredHolidays()}
-				{#if filtered.length === 0}
+				{#if filteredHolidays().length === 0}
 					<p class="text-base-content/40 text-sm">No holidays for {selectedYear}.{#if !canEdit} Holidays are managed by organization admins.{/if}</p>
 				{:else}
 					<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-						{#each filtered as h}
+						{#each filteredHolidays() as h}
 							<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0">
 								{#if editingHolidayId === h.id && canEdit}
 									<div class="flex gap-3 items-end flex-wrap w-full">
