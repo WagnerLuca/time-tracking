@@ -39,14 +39,14 @@ public class RequestsController : OrganizationBaseController
         return ToCreatedResponse(await _service.CreateRequestAsync(slug, userId.Value, request));
     }
 
-    /// <summary>List requests for an organization with optional filters (admin only).</summary>
+    /// <summary>List requests for an organization with optional filters (admin or group admin).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="type">Filter by request type.</param>
     /// <param name="status">Filter by request status.</param>
     /// <param name="limit">Max items per page (default 50, max 200).</param>
     /// <param name="offset">Number of items to skip.</param>
     [HttpGet("{slug}/requests")]
-    [RequireOrgRole(OrganizationRole.Admin)]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(PaginatedResponse<OrgRequestResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRequests(
         string slug, [FromQuery] RequestType? type, [FromQuery] RequestStatus? status,
@@ -57,11 +57,11 @@ public class RequestsController : OrganizationBaseController
         return ToResponse(await _service.GetRequestsAsync(slug, userId.Value, type, status, limit, offset));
     }
 
-    /// <summary>Accept or decline a pending request (admin only).</summary>
+    /// <summary>Accept or decline a pending request (admin or group admin).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="id">Request ID.</param>
     [HttpPut("{slug}/requests/{id}")]
-    [RequireOrgRole(OrganizationRole.Admin)]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(OrgRequestResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> RespondToRequest(
         string slug, int id, [FromBody] RespondToOrgRequestRequest request)

@@ -240,6 +240,9 @@
 												<span class="font-semibold text-xs text-primary">{formatRequestType(req.type)}</span>
 												<span class="text-sm font-medium">{req.userFirstName} {req.userLastName}</span>
 												<span class="text-xs text-base-content/50">{req.organizationName}</span>
+												{#if req.groupName}
+													<span class="text-xs text-base-content/50">via <span class="font-medium">{req.groupName}</span></span>
+												{/if}
 												{#if req.message}
 													<span class="text-xs text-base-content/40 italic truncate">"{req.message}"</span>
 												{/if}
@@ -298,6 +301,13 @@
 					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
 						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Organization</span>
 						<span class="text-sm font-medium text-right">{detailReq.organizationName}</span>
+					</div>
+				{/if}
+
+				{#if detailReq.groupName}
+					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
+						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Routed via Group</span>
+						<span class="text-sm font-medium text-right">{detailReq.groupName}</span>
 					</div>
 				{/if}
 

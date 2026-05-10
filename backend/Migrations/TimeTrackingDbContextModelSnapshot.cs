@@ -278,6 +278,9 @@ namespace TimeTracking.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<int?>("GroupId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Message")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -311,6 +314,8 @@ namespace TimeTracking.Api.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("GroupId");
 
                     b.HasIndex("OrganizationId");
 
@@ -790,6 +795,11 @@ namespace TimeTracking.Api.Migrations
 
             modelBuilder.Entity("TimeTracking.Api.Models.OrgRequest", b =>
                 {
+                    b.HasOne("TimeTracking.Api.Models.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
                         .WithMany()
                         .HasForeignKey("OrganizationId")
@@ -806,6 +816,8 @@ namespace TimeTracking.Api.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Group");
 
                     b.Navigation("Organization");
 

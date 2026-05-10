@@ -3131,7 +3131,7 @@
         "tags": [
           "Requests"
         ],
-        "summary": "List requests for an organization with optional filters (admin only).",
+        "summary": "List requests for an organization with optional filters (admin or group admin).",
         "parameters": [
           {
             "name": "slug",
@@ -3208,7 +3208,7 @@
         "tags": [
           "Requests"
         ],
-        "summary": "Accept or decline a pending request (admin only).",
+        "summary": "Accept or decline a pending request (admin or group admin).",
         "parameters": [
           {
             "name": "slug",
@@ -5351,6 +5351,15 @@
             "nullable": true
           },
           "respondedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "groupId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "groupName": {
             "type": "string",
             "nullable": true
           }

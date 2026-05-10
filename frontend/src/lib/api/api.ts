@@ -407,6 +407,8 @@ export interface OrgRequestResponse {
     'createdAt'?: string;
     'respondedAt'?: string | null;
     'respondedByName'?: string | null;
+    'groupId'?: number | null;
+    'groupName'?: string | null;
 }
 /**
  * Standard paginated response wrapper for list endpoints.
@@ -5874,7 +5876,7 @@ export const RequestsApiAxiosParamCreator = function (configuration?: Configurat
         },
         /**
          * 
-         * @summary List requests for an organization with optional filters (admin only).
+         * @summary List requests for an organization with optional filters (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {RequestType} [type] Filter by request type.
          * @param {RequestStatus} [status] Filter by request status.
@@ -5932,7 +5934,7 @@ export const RequestsApiAxiosParamCreator = function (configuration?: Configurat
         },
         /**
          * 
-         * @summary Accept or decline a pending request (admin only).
+         * @summary Accept or decline a pending request (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {number} id Request ID.
          * @param {RespondToOrgRequestRequest} [respondToOrgRequestRequest] 
@@ -6128,7 +6130,7 @@ export const RequestsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary List requests for an organization with optional filters (admin only).
+         * @summary List requests for an organization with optional filters (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {RequestType} [type] Filter by request type.
          * @param {RequestStatus} [status] Filter by request status.
@@ -6145,7 +6147,7 @@ export const RequestsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Accept or decline a pending request (admin only).
+         * @summary Accept or decline a pending request (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {number} id Request ID.
          * @param {RespondToOrgRequestRequest} [respondToOrgRequestRequest] 
@@ -6229,7 +6231,7 @@ export const RequestsApiFactory = function (configuration?: Configuration, baseP
         },
         /**
          * 
-         * @summary List requests for an organization with optional filters (admin only).
+         * @summary List requests for an organization with optional filters (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {RequestType} [type] Filter by request type.
          * @param {RequestStatus} [status] Filter by request status.
@@ -6243,7 +6245,7 @@ export const RequestsApiFactory = function (configuration?: Configuration, baseP
         },
         /**
          * 
-         * @summary Accept or decline a pending request (admin only).
+         * @summary Accept or decline a pending request (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {number} id Request ID.
          * @param {RespondToOrgRequestRequest} [respondToOrgRequestRequest] 
@@ -6315,7 +6317,7 @@ export class RequestsApi extends BaseAPI {
 
     /**
      * 
-     * @summary List requests for an organization with optional filters (admin only).
+     * @summary List requests for an organization with optional filters (admin or group admin).
      * @param {string} slug Organization URL slug.
      * @param {RequestType} [type] Filter by request type.
      * @param {RequestStatus} [status] Filter by request status.
@@ -6330,7 +6332,7 @@ export class RequestsApi extends BaseAPI {
 
     /**
      * 
-     * @summary Accept or decline a pending request (admin only).
+     * @summary Accept or decline a pending request (admin or group admin).
      * @param {string} slug Organization URL slug.
      * @param {number} id Request ID.
      * @param {RespondToOrgRequestRequest} [respondToOrgRequestRequest] 

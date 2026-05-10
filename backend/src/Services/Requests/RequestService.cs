@@ -104,14 +104,17 @@ public class RequestService : IRequestService
             Message = request.Message,
             RelatedEntityId = request.RelatedEntityId,
             RequestData = request.RequestData,
-            Status = RequestStatus.Pending
+            Status = RequestStatus.Pending,
+            GroupId = await ResolveRoutingGroupIdAsync(userId, org.Id, request.Type)
         };
 
         _context.OrgRequests.Add(orgRequest);
         await _context.SaveChangesAsync();
-        _logger.LogInformation("Request {RequestId} of type {Type} created by user {UserId} for org {OrgSlug}", orgRequest.Id, orgRequest.Type, userId, slug);
+        _logger.LogInformation("Request {RequestId} of type {Type} created by user {UserId} for org {OrgSlug} (group {GroupId})", orgRequest.Id, orgRequest.Type, userId, slug, orgRequest.GroupId);
 
         orgRequest.User = user;
+        if (orgRequest.GroupId.HasValue)
+            orgRequest.Group = await _context.Groups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == orgRequest.GroupId.Value);
         return ServiceResult.Ok(MapToResponse(orgRequest, org.Name, org.Slug));
     }
 
@@ -123,7 +126,10 @@ public class RequestService : IRequestService
             return ServiceResult.NotFound<PaginatedResponse<OrgRequestResponse>>("Organization not found");
 
         var callerRole = await GetRoleAsync(callerUserId, org.Id);
-        if (callerRole == null || callerRole < OrganizationRole.Admin)
+        var isOrgAdmin = callerRole != null && callerRole >= OrganizationRole.Admin;
+        var adminGroupIds = !isOrgAdmin ? await GetAdminGroupIdsAsync(callerUserId, org.Id) : new List<int>();
+
+        if (!isOrgAdmin && adminGroupIds.Count == 0)
             return ServiceResult.Forbidden<PaginatedResponse<OrgRequestResponse>>();
 
         (limit, offset) = PaginationDefaults.Normalize(limit, offset);
@@ -132,7 +138,12 @@ public class RequestService : IRequestService
             .AsNoTracking()
             .Include(r => r.User)
             .Include(r => r.RespondedByUser)
+            .Include(r => r.Group)
             .Where(r => r.OrganizationId == org.Id);
+
+        // Group Admins can only see requests routed to their groups
+        if (!isOrgAdmin)
+            query = query.Where(r => r.GroupId.HasValue && adminGroupIds.Contains(r.GroupId.Value));
 
         if (type.HasValue)   query = query.Where(r => r.Type == type.Value);
         if (status.HasValue) query = query.Where(r => r.Status == status.Value);
@@ -161,13 +172,30 @@ public class RequestService : IRequestService
         if (org == null)
             return ServiceResult.NotFound<OrgRequestResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
-        if (callerRole == null || callerRole < OrganizationRole.Admin)
-            return ServiceResult.Forbidden<OrgRequestResponse>();
-
         var orgRequest = await _context.OrgRequests
             .Include(r => r.User)
+            .Include(r => r.Group)
             .FirstOrDefaultAsync(r => r.Id == requestId && r.OrganizationId == org.Id);
+
+        if (orgRequest == null)
+            return ServiceResult.NotFound<OrgRequestResponse>("Request not found.");
+
+        // Authorization: Org Admin can always respond; Group Admin can respond to group-routed requests
+        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var isOrgAdmin = callerRole != null && callerRole >= OrganizationRole.Admin;
+
+        if (!isOrgAdmin)
+        {
+            if (!orgRequest.GroupId.HasValue)
+                return ServiceResult.Forbidden<OrgRequestResponse>();
+
+            var isGroupAdmin = await _context.GroupMembers
+                .AnyAsync(gm => gm.GroupId == orgRequest.GroupId.Value
+                             && gm.UserId == callerUserId
+                             && gm.Role == GroupRole.Admin);
+            if (!isGroupAdmin)
+                return ServiceResult.Forbidden<OrgRequestResponse>();
+        }
 
         if (orgRequest == null)
             return ServiceResult.NotFound<OrgRequestResponse>("Request not found.");
@@ -208,6 +236,7 @@ public class RequestService : IRequestService
             .AsNoTracking()
             .Include(r => r.Organization)
             .Include(r => r.RespondedByUser)
+            .Include(r => r.Group)
             .Where(r => r.UserId == userId);
 
         if (type.HasValue)
@@ -242,12 +271,19 @@ public class RequestService : IRequestService
 
     public async Task<ServiceResult<AdminNotificationResponse>> GetAdminNotificationsAsync(int userId)
     {
+        // Org-level admin: sees all pending requests for their orgs
         var adminOrgIds = await _context.UserOrganizations
             .Where(uo => uo.UserId == userId && uo.Role >= OrganizationRole.Admin)
             .Select(uo => uo.OrganizationId)
             .ToListAsync();
 
-        if (adminOrgIds.Count == 0)
+        // Group-level admin: sees pending requests routed to their groups
+        var groupAdminGroupIds = await _context.GroupMembers
+            .Where(gm => gm.UserId == userId && gm.Role == GroupRole.Admin)
+            .Select(gm => gm.GroupId)
+            .ToListAsync();
+
+        if (adminOrgIds.Count == 0 && groupAdminGroupIds.Count == 0)
             return ServiceResult.Ok(new AdminNotificationResponse
             {
                 PendingRequests = 0,
@@ -258,7 +294,10 @@ public class RequestService : IRequestService
             .AsNoTracking()
             .Include(r => r.User)
             .Include(r => r.Organization)
-            .Where(r => adminOrgIds.Contains(r.OrganizationId) && r.Status == RequestStatus.Pending)
+            .Include(r => r.Group)
+            .Where(r => r.Status == RequestStatus.Pending
+                     && (adminOrgIds.Contains(r.OrganizationId)
+                         || (r.GroupId.HasValue && groupAdminGroupIds.Contains(r.GroupId.Value))))
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
 
@@ -277,6 +316,7 @@ public class RequestService : IRequestService
             .Include(r => r.User)
             .Include(r => r.Organization)
             .Include(r => r.RespondedByUser)
+            .Include(r => r.Group)
             .Where(r => r.UserId == userId
                      && r.Status != RequestStatus.Pending
                      && r.UserNotifiedAt == null)
@@ -524,7 +564,9 @@ public class RequestService : IRequestService
             CreatedAt = r.CreatedAt,
             RespondedAt = r.RespondedAt,
             RespondedByName = responderName
-                ?? (r.RespondedByUser != null ? $"{r.RespondedByUser.FirstName} {r.RespondedByUser.LastName}" : null)
+                ?? (r.RespondedByUser != null ? $"{r.RespondedByUser.FirstName} {r.RespondedByUser.LastName}" : null),
+            GroupId = r.GroupId,
+            GroupName = r.Group?.Name
         };
     }
 
@@ -540,5 +582,70 @@ public class RequestService : IRequestService
             .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
                                     && uo.UserId == userId);
         return membership?.Role;
+    }
+
+    /// <summary>
+    /// Determines which group (if any) a request should be routed to for approval.
+    /// Returns the first group where the user is a member AND a Group Admin has the
+    /// relevant approval capability enabled.
+    /// </summary>
+    private async Task<int?> ResolveRoutingGroupIdAsync(int userId, int orgId, RequestType requestType)
+    {
+        // Join requests are always handled at the org level
+        if (requestType == RequestType.JoinOrganization)
+            return null;
+
+        // Find all groups the user belongs to in this org that have a Group Admin
+        // with the relevant approval capability
+        var userGroups = await _context.GroupMembers
+            .Include(gm => gm.Group)
+            .Where(gm => gm.UserId == userId
+                      && gm.Group.OrganizationId == orgId
+                      && gm.Group.IsActive)
+            .Select(gm => gm.Group)
+            .ToListAsync();
+
+        foreach (var group in userGroups)
+        {
+            var hasCapability = requestType switch
+            {
+                RequestType.EditPastEntry => group.GroupAdminCanApproveTimeEdits == true,
+                RequestType.EditPause => group.GroupAdminCanApproveTimeEdits == true,
+                RequestType.CsvImport => group.GroupAdminCanApproveTimeEdits == true,
+                RequestType.SetInitialOvertime => group.GroupAdminCanApproveTimeEdits == true,
+                RequestType.WorkScheduleChange => group.GroupAdminCanApproveScheduleChanges == true,
+                _ => false
+            };
+
+            if (hasCapability)
+            {
+                // Verify the group actually has at least one Group Admin
+                var hasGroupAdmin = await _context.GroupMembers
+                    .AnyAsync(gm => gm.GroupId == group.Id && gm.Role == GroupRole.Admin);
+                if (hasGroupAdmin)
+                    return group.Id;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the IDs of groups where the user is a Group Admin within the given org,
+    /// filtered to only groups that have at least one approval capability enabled.
+    /// </summary>
+    private async Task<List<int>> GetAdminGroupIdsAsync(int userId, int orgId)
+    {
+        return await _context.GroupMembers
+            .Include(gm => gm.Group)
+            .Where(gm => gm.UserId == userId
+                      && gm.Role == GroupRole.Admin
+                      && gm.Group.OrganizationId == orgId
+                      && gm.Group.IsActive
+                      && (gm.Group.GroupAdminCanApproveTimeEdits == true
+                       || gm.Group.GroupAdminCanApproveScheduleChanges == true
+                       || gm.Group.GroupAdminCanApproveAbsences == true))
+            .Select(gm => gm.GroupId)
+            .ToListAsync();
     }
 }

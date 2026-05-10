@@ -207,6 +207,11 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.RespondedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(e => e.Group)
+                .WithMany()
+                .HasForeignKey(e => e.GroupId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Configure Holiday entity

@@ -23,6 +23,8 @@ public record OrgRequestResponse
     public DateTime CreatedAt { get; init; }
     public DateTime? RespondedAt { get; init; }
     public string? RespondedByName { get; init; }
+    public int? GroupId { get; init; }
+    public string? GroupName { get; init; }
 }
 
 /// <summary>Request payload for creating a new organization request.</summary>

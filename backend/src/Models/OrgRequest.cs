@@ -50,6 +50,12 @@ public class OrgRequest
     /// </summary>
     public DateTime? UserNotifiedAt { get; set; }
     
+    /// <summary>
+    /// Optional group this request is routed through for approval.
+    /// When set, Group Admins of this group can approve/decline the request.
+    /// </summary>
+    public int? GroupId { get; set; }
+    
     // Navigation properties
     [JsonIgnore]
     public User User { get; set; } = null!;
@@ -59,4 +65,7 @@ public class OrgRequest
     
     [JsonIgnore]
     public User? RespondedByUser { get; set; }
+    
+    [JsonIgnore]
+    public Group? Group { get; set; }
 }
