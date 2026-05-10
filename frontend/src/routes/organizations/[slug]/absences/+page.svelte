@@ -403,11 +403,9 @@
 		<div class="flex items-center gap-3 justify-center py-12 text-base-content/40"><span class="loading loading-spinner loading-sm"></span><span>Loading...</span></div>
 	{:else if error}
 		<div class="alert alert-error">{error}</div>
-	{:else if !canEdit}
-		<div class="alert alert-error">You need Admin or Owner role to access this page.</div>
 	{:else if org}
 		<h1 class="text-2xl font-bold text-base-content mb-1">Absences</h1>
-		<p class="text-base-content/50 text-sm mb-6 leading-relaxed">Calendar overview of absences and vacation days across all members.</p>
+		<p class="text-base-content/50 text-sm mb-6 leading-relaxed">{canEdit ? 'Calendar overview of absences and vacation days across all members.' : 'Calendar overview of absences visible to you.'}</p>
 
 		<!-- Calendar Navigation -->
 		{@const spanMap = buildSpanMap(absences)}
@@ -451,9 +449,9 @@
 							<!-- svelte-ignore a11y_click_events_have_key_events -->
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
-								class="min-h-[60px] p-1 pt-1.5 pb-3 flex flex-col cursor-pointer hover:bg-primary/5 transition-colors {inMonth && !isWeekend ? 'bg-primary/[0.03]' : ''} {inMonth && isWeekend ? 'bg-base-200/30' : ''} {!inMonth ? 'bg-base-200/50' : ''}"
-								onclick={() => { if (inMonth) openDayDialog(key); }}
-								title="Click to add absence on {key}"
+							class="min-h-[60px] p-1 pt-1.5 pb-3 flex flex-col {canEdit ? 'cursor-pointer hover:bg-primary/5' : ''} transition-colors {inMonth && !isWeekend ? 'bg-primary/[0.03]' : ''} {inMonth && isWeekend ? 'bg-base-200/30' : ''} {!inMonth ? 'bg-base-200/50' : ''}"
+							onclick={() => { if (canEdit && inMonth) openDayDialog(key); }}
+							title={canEdit ? `Click to add absence on ${key}` : ''}
 							>
 								<div class="flex items-center justify-between mb-1.5">
 									<span class="text-[10px] font-medium leading-none {isToday ? 'bg-primary text-primary-content rounded-full w-5 h-5 flex items-center justify-center' : ''} {inMonth ? 'text-base-content' : 'text-base-content/25'} {isWeekend && inMonth ? 'text-base-content/40' : ''}">
@@ -475,6 +473,7 @@
 										{@const entry = getLaneEntry(key, lane, spanMap)}
 										{#if entry}
 											<!-- svelte-ignore a11y_click_events_have_key_events -->
+											{#if canEdit}
 											<a
 												href="/organizations/{orgSlug}/members/{entry.span.userId}"
 												onclick={(e) => e.stopPropagation()}
@@ -489,6 +488,20 @@
 													&nbsp;
 												{/if}
 											</a>
+											{:else}
+											<div
+												class="h-[16px] flex items-center text-[9px] leading-none px-1 border truncate {userSpanBg(entry.span.userId, entry.span.type)} {userSpanText(entry.span.userId, entry.span.type)} {entry.position === 'start' ? 'rounded-l border-r-0 -mr-1' : entry.position === 'end' ? 'rounded-r border-l-0 -ml-1' : entry.position === 'single' ? 'rounded' : 'border-x-0 -mx-1'}"
+												title="{entry.span.userFirstName} {entry.span.userLastName} — {absenceTypeLabel(entry.span.type)}{entry.span.days > 1 ? ` (${entry.span.days} days)` : ''}{entry.span.isHalfDay ? ' (½)' : ''}{entry.span.note ? ': ' + entry.span.note : ''}"
+											>
+												{#if entry.position === 'start' || entry.position === 'single'}
+													{entry.span.userFirstName}{#if entry.span.days > 1}&nbsp;→{/if}{#if entry.span.isHalfDay && entry.position === 'single'}&nbsp;½{/if}
+												{:else if entry.position === 'end'}
+													→&nbsp;{entry.span.userFirstName}
+												{:else}
+													&nbsp;
+												{/if}
+											</div>
+											{/if}
 										{:else}
 											<div class="h-[16px]"></div>
 										{/if}
@@ -510,8 +523,8 @@
 			</div>
 		</section>
 
-		<!-- Day-click Add Absence Dialog -->
-		{#if showDayDialog}
+		<!-- Day-click Add Absence Dialog (admin only) -->
+		{#if canEdit && showDayDialog}
 			{@const dayAbsences = absences.filter(a => a.date === dayDialogDate)}
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -599,7 +612,8 @@
 			</div>
 		{/if}
 
-		<!-- Vacation Days Summary -->
+		<!-- Vacation Days Summary (admin only) -->
+		{#if canEdit}
 		<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
 			<h2 class="text-xl font-bold text-base-content mb-4">Vacation Days Balance</h2>
 			{#if (org.members ?? []).filter(m => (m.vacationDaysPerYear ?? 0) > 0).length === 0}
@@ -632,6 +646,7 @@
 				</div>
 			{/if}
 		</section>
+		{/if}
 
 		<!-- Absence List -->
 		<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
@@ -642,12 +657,14 @@
 						<option value={y}>{y}</option>
 					{/each}
 				</select>
+				{#if canEdit}
 				<select bind:value={adminAbsenceFilter} class="select select-bordered select-sm">
 					<option value={null}>All members</option>
 					{#each (org?.members ?? []) as m}
 						<option value={m.id}>{m.firstName} {m.lastName}</option>
 					{/each}
 				</select>
+				{/if}
 				<select bind:value={panelTypeFilter} class="select select-bordered select-sm">
 					<option value="all">All types</option>
 					<option value="Vacation">Vacation</option>
@@ -674,12 +691,21 @@
 								: `${span.startDate} → ${span.endDate}`}
 							<div class="flex items-center gap-3 p-2.5 bg-base-100 rounded-lg border border-base-300 text-sm">
 								<span class="text-base-content/50 font-mono shrink-0 min-w-[180px]">{dateLabel}</span>
+								{#if canEdit}
 								<a href="/organizations/{orgSlug}/members/{span.userId}" class="flex items-center gap-1.5 font-medium link link-hover min-w-[130px]">
 									<div class="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-[10px] font-semibold shrink-0">
 										{span.userFirstName[0]?.toUpperCase() ?? ''}{span.userLastName[0]?.toUpperCase() ?? ''}
 									</div>
 									{span.userFirstName} {span.userLastName}
 								</a>
+								{:else}
+								<span class="flex items-center gap-1.5 font-medium min-w-[130px]">
+									<div class="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-[10px] font-semibold shrink-0">
+										{span.userFirstName[0]?.toUpperCase() ?? ''}{span.userLastName[0]?.toUpperCase() ?? ''}
+									</div>
+									{span.userFirstName} {span.userLastName}
+								</span>
+								{/if}
 								<span class="badge badge-sm {absenceColor(span.type)}">
 									{absenceTypeLabel(span.type)}
 								</span>
