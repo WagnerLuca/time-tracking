@@ -113,4 +113,37 @@ public class GroupController : OrganizationBaseController
         if (userId == null) return Unauthorized();
         return ToResponse(await _service.RemoveMemberAsync(slug, groupId, targetUserId, userId.Value));
     }
+
+    /// <summary>Get group permission overrides.</summary>
+    [HttpGet("{slug}/groups/{groupId}/permissions")]
+    [RequireOrgRole]
+    [ProducesResponseType(typeof(GroupPermissionsResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPermissions(string slug, int groupId)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.GetPermissionsAsync(slug, groupId, userId.Value));
+    }
+
+    /// <summary>Update group permission overrides (admin only).</summary>
+    [HttpPut("{slug}/groups/{groupId}/permissions")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(typeof(GroupPermissionsResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdatePermissions(string slug, int groupId, [FromBody] UpdateGroupPermissionsRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.UpdatePermissionsAsync(slug, groupId, userId.Value, request));
+    }
+
+    /// <summary>Get effective permissions for the current user (resolves org + group overrides).</summary>
+    [HttpGet("{slug}/effective-permissions")]
+    [RequireOrgRole]
+    [ProducesResponseType(typeof(EffectivePermissionsResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetEffectivePermissions(string slug)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.GetEffectivePermissionsAsync(slug, userId.Value));
+    }
 }

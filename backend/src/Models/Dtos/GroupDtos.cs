@@ -51,3 +51,56 @@ public record AddGroupMemberRequest(
 public record UpdateGroupMemberRoleRequest(
     string Role
 );
+
+public record GroupPermissionsResponse(
+    int GroupId,
+    string GroupName,
+    // Permission overrides (null = inherited from org)
+    string? EditPastEntriesMode,
+    string? EditPauseMode,
+    string? CsvImportMode,
+    string? WorkScheduleChangeMode,
+    string? InitialOvertimeMode,
+    string? VacationVisibility,
+    string? SickDayVisibility,
+    // Group Admin capability flags
+    bool? GroupAdminCanApproveAbsences,
+    bool? GroupAdminCanApproveTimeEdits,
+    bool? GroupAdminCanApproveScheduleChanges,
+    bool? GroupAdminCanManageMembers,
+    bool? GroupAdminCanViewAllTimeEntries,
+    bool? GroupAdminCanExportData
+);
+
+public record UpdateGroupPermissionsRequest(
+    RuleMode? EditPastEntriesMode,
+    RuleMode? EditPauseMode,
+    RuleMode? CsvImportMode,
+    RuleMode? WorkScheduleChangeMode,
+    RuleMode? InitialOvertimeMode,
+    VisibilityMode? VacationVisibility,
+    VisibilityMode? SickDayVisibility,
+    bool? GroupAdminCanApproveAbsences,
+    bool? GroupAdminCanApproveTimeEdits,
+    bool? GroupAdminCanApproveScheduleChanges,
+    bool? GroupAdminCanManageMembers,
+    bool? GroupAdminCanViewAllTimeEntries,
+    bool? GroupAdminCanExportData
+);
+
+// Resolved effective permissions for a user (combining org + group)
+public record EffectivePermissionsResponse(
+    string EditPastEntriesMode,
+    string EditPauseMode,
+    string CsvImportMode,
+    string WorkScheduleChangeMode,
+    string InitialOvertimeMode,
+    string VacationVisibility,
+    string SickDayVisibility,
+    bool CanApproveAbsences,
+    bool CanApproveTimeEdits,
+    bool CanApproveScheduleChanges,
+    bool CanManageGroupMembers,
+    bool CanViewAllTimeEntries,
+    bool CanExportData
+);

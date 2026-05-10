@@ -1590,6 +1590,161 @@
         }
       }
     },
+    "/api/v1/organizations/{slug}/groups/{groupId}/permissions": {
+      "get": {
+        "tags": [
+          "Group"
+        ],
+        "summary": "Get group permission overrides.",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupPermissionsResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupPermissionsResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupPermissionsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Group"
+        ],
+        "summary": "Update group permission overrides (admin only).",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupPermissionsRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupPermissionsRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupPermissionsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupPermissionsResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupPermissionsResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupPermissionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{slug}/effective-permissions": {
+      "get": {
+        "tags": [
+          "Group"
+        ],
+        "summary": "Get effective permissions for the current user (resolves org + group overrides).",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectivePermissionsResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectivePermissionsResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectivePermissionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organizations/{slug}/holidays": {
       "get": {
         "tags": [
@@ -4595,6 +4750,58 @@
         "additionalProperties": false,
         "description": "Request payload for creating a work schedule."
       },
+      "EffectivePermissionsResponse": {
+        "type": "object",
+        "properties": {
+          "editPastEntriesMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "editPauseMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "csvImportMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "workScheduleChangeMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "initialOvertimeMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "vacationVisibility": {
+            "type": "string",
+            "nullable": true
+          },
+          "sickDayVisibility": {
+            "type": "string",
+            "nullable": true
+          },
+          "canApproveAbsences": {
+            "type": "boolean"
+          },
+          "canApproveTimeEdits": {
+            "type": "boolean"
+          },
+          "canApproveScheduleChanges": {
+            "type": "boolean"
+          },
+          "canManageGroupMembers": {
+            "type": "boolean"
+          },
+          "canViewAllTimeEntries": {
+            "type": "boolean"
+          },
+          "canExportData": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "ExportRequest": {
         "required": [
           "type"
@@ -4702,6 +4909,72 @@
           "joinedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "GroupPermissionsResponse": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "groupName": {
+            "type": "string",
+            "nullable": true
+          },
+          "editPastEntriesMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "editPauseMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "csvImportMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "workScheduleChangeMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "initialOvertimeMode": {
+            "type": "string",
+            "nullable": true
+          },
+          "vacationVisibility": {
+            "type": "string",
+            "nullable": true
+          },
+          "sickDayVisibility": {
+            "type": "string",
+            "nullable": true
+          },
+          "groupAdminCanApproveAbsences": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "groupAdminCanApproveTimeEdits": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "groupAdminCanApproveScheduleChanges": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "groupAdminCanManageMembers": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "groupAdminCanViewAllTimeEntries": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "groupAdminCanExportData": {
+            "type": "boolean",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -5813,6 +6086,57 @@
         "properties": {
           "role": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateGroupPermissionsRequest": {
+        "type": "object",
+        "properties": {
+          "editPastEntriesMode": {
+            "$ref": "#/components/schemas/RuleMode"
+          },
+          "editPauseMode": {
+            "$ref": "#/components/schemas/RuleMode"
+          },
+          "csvImportMode": {
+            "$ref": "#/components/schemas/RuleMode"
+          },
+          "workScheduleChangeMode": {
+            "$ref": "#/components/schemas/RuleMode"
+          },
+          "initialOvertimeMode": {
+            "$ref": "#/components/schemas/RuleMode"
+          },
+          "vacationVisibility": {
+            "$ref": "#/components/schemas/VisibilityMode"
+          },
+          "sickDayVisibility": {
+            "$ref": "#/components/schemas/VisibilityMode"
+          },
+          "groupAdminCanApproveAbsences": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "groupAdminCanApproveTimeEdits": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "groupAdminCanApproveScheduleChanges": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "groupAdminCanManageMembers": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "groupAdminCanViewAllTimeEntries": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "groupAdminCanExportData": {
+            "type": "boolean",
             "nullable": true
           }
         },

@@ -12,4 +12,7 @@ public interface IGroupService
     Task<ServiceResult<GroupMemberResponse>> AddMemberAsync(string slug, int groupId, int callerUserId, AddGroupMemberRequest request);
     Task<ServiceResult<GroupMemberResponse>> UpdateMemberRoleAsync(string slug, int groupId, int targetUserId, int callerUserId, UpdateGroupMemberRoleRequest request);
     Task<ServiceResult> RemoveMemberAsync(string slug, int groupId, int targetUserId, int callerUserId);
+    Task<ServiceResult<GroupPermissionsResponse>> GetPermissionsAsync(string slug, int groupId, int callerUserId);
+    Task<ServiceResult<GroupPermissionsResponse>> UpdatePermissionsAsync(string slug, int groupId, int callerUserId, UpdateGroupPermissionsRequest request);
+    Task<ServiceResult<EffectivePermissionsResponse>> GetEffectivePermissionsAsync(string slug, int callerUserId);
 }

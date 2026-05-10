@@ -206,6 +206,21 @@ export interface CreateWorkScheduleRequest {
     'targetThu'?: number | null;
     'targetFri'?: number | null;
 }
+export interface EffectivePermissionsResponse {
+    'editPastEntriesMode'?: string | null;
+    'editPauseMode'?: string | null;
+    'csvImportMode'?: string | null;
+    'workScheduleChangeMode'?: string | null;
+    'initialOvertimeMode'?: string | null;
+    'vacationVisibility'?: string | null;
+    'sickDayVisibility'?: string | null;
+    'canApproveAbsences'?: boolean;
+    'canApproveTimeEdits'?: boolean;
+    'canApproveScheduleChanges'?: boolean;
+    'canManageGroupMembers'?: boolean;
+    'canViewAllTimeEntries'?: boolean;
+    'canExportData'?: boolean;
+}
 /**
  * Request payload for exporting time entries or daily reports.
  */
@@ -248,6 +263,23 @@ export interface GroupMemberResponse {
     'profileImageUrl'?: string | null;
     'role'?: string | null;
     'joinedAt'?: string;
+}
+export interface GroupPermissionsResponse {
+    'groupId'?: number;
+    'groupName'?: string | null;
+    'editPastEntriesMode'?: string | null;
+    'editPauseMode'?: string | null;
+    'csvImportMode'?: string | null;
+    'workScheduleChangeMode'?: string | null;
+    'initialOvertimeMode'?: string | null;
+    'vacationVisibility'?: string | null;
+    'sickDayVisibility'?: string | null;
+    'groupAdminCanApproveAbsences'?: boolean | null;
+    'groupAdminCanApproveTimeEdits'?: boolean | null;
+    'groupAdminCanApproveScheduleChanges'?: boolean | null;
+    'groupAdminCanManageMembers'?: boolean | null;
+    'groupAdminCanViewAllTimeEntries'?: boolean | null;
+    'groupAdminCanExportData'?: boolean | null;
 }
 export interface GroupResponse {
     'id'?: number;
@@ -743,6 +775,23 @@ export interface TwoFactorVerifyRequest {
 export interface UpdateGroupMemberRoleRequest {
     'role'?: string | null;
 }
+export interface UpdateGroupPermissionsRequest {
+    'editPastEntriesMode'?: RuleMode;
+    'editPauseMode'?: RuleMode;
+    'csvImportMode'?: RuleMode;
+    'workScheduleChangeMode'?: RuleMode;
+    'initialOvertimeMode'?: RuleMode;
+    'vacationVisibility'?: VisibilityMode;
+    'sickDayVisibility'?: VisibilityMode;
+    'groupAdminCanApproveAbsences'?: boolean | null;
+    'groupAdminCanApproveTimeEdits'?: boolean | null;
+    'groupAdminCanApproveScheduleChanges'?: boolean | null;
+    'groupAdminCanManageMembers'?: boolean | null;
+    'groupAdminCanViewAllTimeEntries'?: boolean | null;
+    'groupAdminCanExportData'?: boolean | null;
+}
+
+
 export interface UpdateGroupRequest {
     'name'?: string | null;
     'description'?: string | null;
@@ -2461,6 +2510,44 @@ export const GroupApiAxiosParamCreator = function (configuration?: Configuration
     return {
         /**
          * 
+         * @summary Get effective permissions for the current user (resolves org + group overrides).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugEffectivePermissionsGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugEffectivePermissionsGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/effective-permissions`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary List all groups in an organization.
          * @param {string} slug 
          * @param {*} [options] Override http request option.
@@ -2725,6 +2812,94 @@ export const GroupApiAxiosParamCreator = function (configuration?: Configuration
         },
         /**
          * 
+         * @summary Get group permission overrides.
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdPermissionsGet: async (slug: string, groupId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdPermissionsGet', 'slug', slug)
+            // verify required parameter 'groupId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdPermissionsGet', 'groupId', groupId)
+            const localVarPath = `/api/v1/organizations/{slug}/groups/{groupId}/permissions`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"groupId"}}`, encodeURIComponent(String(groupId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Update group permission overrides (admin only).
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {UpdateGroupPermissionsRequest} [updateGroupPermissionsRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdPermissionsPut: async (slug: string, groupId: number, updateGroupPermissionsRequest?: UpdateGroupPermissionsRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdPermissionsPut', 'slug', slug)
+            // verify required parameter 'groupId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdPermissionsPut', 'groupId', groupId)
+            const localVarPath = `/api/v1/organizations/{slug}/groups/{groupId}/permissions`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"groupId"}}`, encodeURIComponent(String(groupId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updateGroupPermissionsRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Update a group (admin only).
          * @param {string} slug 
          * @param {number} groupId 
@@ -2822,6 +2997,19 @@ export const GroupApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
+         * @summary Get effective permissions for the current user (resolves org + group overrides).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugEffectivePermissionsGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<EffectivePermissionsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugEffectivePermissionsGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugEffectivePermissionsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary List all groups in an organization.
          * @param {string} slug 
          * @param {*} [options] Override http request option.
@@ -2909,6 +3097,35 @@ export const GroupApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Get group permission overrides.
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(slug: string, groupId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<GroupPermissionsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(slug, groupId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Update group permission overrides (admin only).
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {UpdateGroupPermissionsRequest} [updateGroupPermissionsRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(slug: string, groupId: number, updateGroupPermissionsRequest?: UpdateGroupPermissionsRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<GroupPermissionsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(slug, groupId, updateGroupPermissionsRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Update a group (admin only).
          * @param {string} slug 
          * @param {number} groupId 
@@ -2945,6 +3162,16 @@ export const GroupApiFp = function(configuration?: Configuration) {
 export const GroupApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
     const localVarFp = GroupApiFp(configuration)
     return {
+        /**
+         * 
+         * @summary Get effective permissions for the current user (resolves org + group overrides).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugEffectivePermissionsGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<EffectivePermissionsResponse> {
+            return localVarFp.apiV1OrganizationsSlugEffectivePermissionsGet(slug, options).then((request) => request(axios, basePath));
+        },
         /**
          * 
          * @summary List all groups in an organization.
@@ -3016,6 +3243,29 @@ export const GroupApiFactory = function (configuration?: Configuration, basePath
         },
         /**
          * 
+         * @summary Get group permission overrides.
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(slug: string, groupId: number, options?: RawAxiosRequestConfig): AxiosPromise<GroupPermissionsResponse> {
+            return localVarFp.apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(slug, groupId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Update group permission overrides (admin only).
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {UpdateGroupPermissionsRequest} [updateGroupPermissionsRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(slug: string, groupId: number, updateGroupPermissionsRequest?: UpdateGroupPermissionsRequest, options?: RawAxiosRequestConfig): AxiosPromise<GroupPermissionsResponse> {
+            return localVarFp.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(slug, groupId, updateGroupPermissionsRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Update a group (admin only).
          * @param {string} slug 
          * @param {number} groupId 
@@ -3044,6 +3294,17 @@ export const GroupApiFactory = function (configuration?: Configuration, basePath
  * GroupApi - object-oriented interface
  */
 export class GroupApi extends BaseAPI {
+    /**
+     * 
+     * @summary Get effective permissions for the current user (resolves org + group overrides).
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugEffectivePermissionsGet(slug: string, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugEffectivePermissionsGet(slug, options).then((request) => request(this.axios, this.basePath));
+    }
+
     /**
      * 
      * @summary List all groups in an organization.
@@ -3117,6 +3378,31 @@ export class GroupApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch(slug: string, groupId: number, targetUserId: number, updateGroupMemberRoleRequest?: UpdateGroupMemberRoleRequest, options?: RawAxiosRequestConfig) {
         return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch(slug, groupId, targetUserId, updateGroupMemberRoleRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Get group permission overrides.
+     * @param {string} slug 
+     * @param {number} groupId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(slug: string, groupId: number, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(slug, groupId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Update group permission overrides (admin only).
+     * @param {string} slug 
+     * @param {number} groupId 
+     * @param {UpdateGroupPermissionsRequest} [updateGroupPermissionsRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(slug: string, groupId: number, updateGroupPermissionsRequest?: UpdateGroupPermissionsRequest, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(slug, groupId, updateGroupPermissionsRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

@@ -4,10 +4,12 @@
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { groupApi, organizationsApi } from '$lib/apiClient';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import { ruleModeLabel, ruleModeButtonClass, parseRuleMode, visibilityModeLabel, visibilityModeButtonClass, parseVisibilityMode } from '$lib/utils/orgRules';
 	import type {
 		GroupResponse,
 		GroupDetailResponse,
 		GroupMemberResponse,
+		GroupPermissionsResponse,
 		OrganizationDetailResponse
 	} from '$lib/api';
 
@@ -50,6 +52,12 @@
 	// Org members for the add dropdown
 	let orgMembers = $state<Array<{ id: number; firstName: string; lastName: string; email: string }>>([]);
 
+	// Permissions
+	let permissions = $state<GroupPermissionsResponse | null>(null);
+	let permissionsSaving = $state(false);
+	let permissionsError = $state('');
+	let detailTab = $state<'members' | 'permissions'>('members');
+
 	// Color presets
 	const colorPresets = [
 		'#6366f1', '#8b5cf6', '#ec4899', '#ef4444',
@@ -86,9 +94,12 @@
 		selectedGroupLoading = true;
 		editingGroup = false;
 		showAddMember = false;
+		detailTab = 'members';
+		permissions = null;
 		try {
 			const { data } = await groupApi.apiV1OrganizationsSlugGroupsGroupIdGet(orgSlug, groupId);
 			selectedGroup = data;
+			if (isAdmin) loadPermissions(groupId);
 		} catch (err) {
 			error = extractErrorMessage(err, 'Failed to load group details.');
 		} finally {
@@ -235,6 +246,123 @@
 	function getInitials(first?: string, last?: string): string {
 		return ((first?.[0] ?? '') + (last?.[0] ?? '')).toUpperCase() || '?';
 	}
+
+	// Permission settings definitions
+	const permRuleSettings = [
+		{ key: 'editPastEntriesMode', label: 'Edit Past Entries', description: 'Can group members edit their own past time entries?' },
+		{ key: 'editPauseMode', label: 'Edit Pause', description: 'Can group members edit pause durations?' },
+		{ key: 'csvImportMode', label: 'CSV Import', description: 'Can group members import time entries via CSV?' },
+		{ key: 'workScheduleChangeMode', label: 'Work Schedule Changes', description: 'Can members change their own work schedule?' },
+		{ key: 'initialOvertimeMode', label: 'Initial Overtime', description: 'Can members set their initial overtime balance?' },
+	];
+
+	const permVisibilitySettings = [
+		{ key: 'vacationVisibility', label: 'Vacation Visibility', description: 'Who can see vacation absences?' },
+		{ key: 'sickDayVisibility', label: 'Sick Day Visibility', description: 'Who can see sick day absences?' },
+	];
+
+	const permAdminFlags = [
+		{ key: 'groupAdminCanApproveAbsences', label: 'Approve Absences', description: 'Group Admins can approve/reject absence requests' },
+		{ key: 'groupAdminCanApproveTimeEdits', label: 'Approve Time Edits', description: 'Group Admins can approve time entry edit requests' },
+		{ key: 'groupAdminCanApproveScheduleChanges', label: 'Approve Schedule Changes', description: 'Group Admins can approve schedule change requests' },
+		{ key: 'groupAdminCanManageMembers', label: 'Manage Members', description: 'Group Admins can add/remove members from their group' },
+		{ key: 'groupAdminCanViewAllTimeEntries', label: 'View All Time Entries', description: 'Group Admins can see all time entries of group members' },
+		{ key: 'groupAdminCanExportData', label: 'Export Data', description: 'Group Admins can export data for their group' },
+	];
+
+	async function loadPermissions(groupId: number) {
+		try {
+			const { data } = await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(orgSlug, groupId);
+			permissions = data;
+		} catch {
+			permissions = null;
+		}
+	}
+
+	async function cyclePermRuleMode(key: string) {
+		if (!selectedGroup?.id || !permissions) return;
+		permissionsSaving = true;
+		permissionsError = '';
+		try {
+			const current = parseRuleMode((permissions as Record<string, any>)[key]);
+			// Cycle: null(inherit) -> 0(Disabled) -> 1(RequiresApproval) -> 2(Allowed) -> null(inherit)
+			let next: number | null;
+			if ((permissions as Record<string, any>)[key] == null) {
+				next = 0; // Start at Disabled
+			} else if (current >= 2) {
+				next = null as any; // Back to inherit
+			} else {
+				next = current + 1;
+			}
+			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, selectedGroup.id, { [key]: next } as any);
+			await loadPermissions(selectedGroup.id);
+		} catch (err) {
+			permissionsError = extractErrorMessage(err, 'Failed to update permission.');
+		} finally {
+			permissionsSaving = false;
+		}
+	}
+
+	async function cyclePermVisibilityMode(key: string) {
+		if (!selectedGroup?.id || !permissions) return;
+		permissionsSaving = true;
+		permissionsError = '';
+		try {
+			const current = parseVisibilityMode((permissions as Record<string, any>)[key]);
+			let next: number | null;
+			if ((permissions as Record<string, any>)[key] == null) {
+				next = 0;
+			} else if (current >= 2) {
+				next = null as any;
+			} else {
+				next = current + 1;
+			}
+			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, selectedGroup.id, { [key]: next } as any);
+			await loadPermissions(selectedGroup.id);
+		} catch (err) {
+			permissionsError = extractErrorMessage(err, 'Failed to update permission.');
+		} finally {
+			permissionsSaving = false;
+		}
+	}
+
+	async function togglePermAdminFlag(key: string) {
+		if (!selectedGroup?.id || !permissions) return;
+		permissionsSaving = true;
+		permissionsError = '';
+		try {
+			const current = (permissions as Record<string, any>)[key];
+			const next = current === true ? false : current === false ? null : true;
+			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, selectedGroup.id, { [key]: next } as any);
+			await loadPermissions(selectedGroup.id);
+		} catch (err) {
+			permissionsError = extractErrorMessage(err, 'Failed to update permission.');
+		} finally {
+			permissionsSaving = false;
+		}
+	}
+
+	function permLabel(value: any, type: 'rule' | 'visibility'): string {
+		if (value == null) return 'Inherit';
+		return type === 'rule' ? ruleModeLabel(value) : visibilityModeLabel(value);
+	}
+
+	function permButtonClass(value: any, type: 'rule' | 'visibility'): string {
+		if (value == null) return 'btn-ghost border-base-300';
+		return type === 'rule' ? ruleModeButtonClass(value) : visibilityModeButtonClass(value);
+	}
+
+	function flagLabel(value: any): string {
+		if (value === true) return 'Enabled';
+		if (value === false) return 'Disabled';
+		return 'Inherit';
+	}
+
+	function flagClass(value: any): string {
+		if (value === true) return 'btn-success';
+		if (value === false) return 'btn-error';
+		return 'btn-ghost border-base-300';
+	}
 </script>
 
 <svelte:head>
@@ -376,90 +504,173 @@
 													</div>
 												</div>
 											</div>
-										{:else if isAdmin || selectedGroup.members?.some(m => m.role === 'Admin')}
+										{:else if isAdmin}
 											<div class="flex items-center gap-2 mb-4">
-												{#if isAdmin}
-													<button class="btn btn-ghost btn-sm" onclick={startEdit}>Edit</button>
-													<button class="btn btn-ghost btn-sm text-error" onclick={deleteGroup}>Delete</button>
-												{/if}
+												<button class="btn btn-ghost btn-sm" onclick={startEdit}>Edit</button>
+												<button class="btn btn-ghost btn-sm text-error" onclick={deleteGroup}>Delete</button>
 											</div>
 										{/if}
 
-										<!-- Members section -->
-										<div class="flex items-center justify-between mb-3">
-											<h3 class="text-sm font-semibold text-base-content/70">Members ({selectedGroup.members?.length ?? 0})</h3>
-											{#if isAdmin || group.isGroupAdmin}
-												<button class="btn btn-ghost btn-xs" onclick={openAddMember}>
-													+ Add Member
-												</button>
-											{/if}
-										</div>
+										<!-- Tab switcher (Members / Permissions) -->
+										{#if isAdmin}
+											<div class="tabs tabs-bordered mb-4">
+												<button class="tab {detailTab === 'members' ? 'tab-active' : ''}" onclick={() => (detailTab = 'members')}>Members</button>
+												<button class="tab {detailTab === 'permissions' ? 'tab-active' : ''}" onclick={() => (detailTab = 'permissions')}>Permissions</button>
+											</div>
+										{/if}
 
-										<!-- Add member form -->
-										{#if showAddMember}
-											<div class="bg-base-200/50 p-3 rounded-lg border border-base-300 mb-3">
-												{#if addMemberError}
-													<div class="alert alert-error mb-2 text-sm">{addMemberError}</div>
-												{/if}
-												<form onsubmit={addMember} class="flex gap-2 items-end">
-													<div class="form-control flex-1">
-														<label for="addMemberId" class="label text-xs">Select Member</label>
-														<select id="addMemberId" class="select select-bordered select-sm w-full" bind:value={addMemberUserId} disabled={addingMember}>
-															<option value={null}>-- Select a member --</option>
-															{#each availableMembers() as m}
-																<option value={m.id}>{m.firstName} {m.lastName} ({m.email})</option>
-															{/each}
-														</select>
-													</div>
-													<button type="submit" class="btn btn-primary btn-sm" disabled={addingMember || !addMemberUserId}>
-														{addingMember ? 'Adding...' : 'Add'}
+										{#if detailTab === 'members'}
+											<!-- Members section -->
+											<div class="flex items-center justify-between mb-3">
+												<h3 class="text-sm font-semibold text-base-content/70">Members ({selectedGroup.members?.length ?? 0})</h3>
+												{#if isAdmin || group.isGroupAdmin}
+													<button class="btn btn-ghost btn-xs" onclick={openAddMember}>
+														+ Add Member
 													</button>
-													<button type="button" class="btn btn-ghost btn-sm" onclick={() => (showAddMember = false)}>Cancel</button>
-												</form>
+												{/if}
 											</div>
-										{/if}
 
-										<!-- Member list -->
-										{#if (selectedGroup.members?.length ?? 0) === 0}
-											<p class="text-base-content/40 text-sm">No members in this group.</p>
-										{:else}
-											<div class="space-y-1">
-												{#each selectedGroup.members ?? [] as member}
-													<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-base-200/50 transition-colors">
-														{#if member.profileImageUrl}
-															<img src={member.profileImageUrl} alt="" class="w-8 h-8 rounded-full object-cover" />
-														{:else}
-															<div class="w-8 h-8 rounded-full bg-base-300 flex items-center justify-center text-xs font-medium text-base-content/60">
-																{getInitials(member.firstName, member.lastName)}
-															</div>
-														{/if}
-														<div class="flex-1 min-w-0">
-															<div class="text-sm font-medium text-base-content">{member.firstName} {member.lastName}</div>
-															<div class="text-xs text-base-content/50">{member.email}</div>
+											<!-- Add member form -->
+											{#if showAddMember}
+												<div class="bg-base-200/50 p-3 rounded-lg border border-base-300 mb-3">
+													{#if addMemberError}
+														<div class="alert alert-error mb-2 text-sm">{addMemberError}</div>
+													{/if}
+													<form onsubmit={addMember} class="flex gap-2 items-end">
+														<div class="form-control flex-1">
+															<label for="addMemberId" class="label text-xs">Select Member</label>
+															<select id="addMemberId" class="select select-bordered select-sm w-full" bind:value={addMemberUserId} disabled={addingMember}>
+																<option value={null}>-- Select a member --</option>
+																{#each availableMembers() as m}
+																	<option value={m.id}>{m.firstName} {m.lastName} ({m.email})</option>
+																{/each}
+															</select>
 														</div>
-														{#if member.role === 'Admin'}
-															<span class="badge badge-xs badge-primary">Admin</span>
-														{/if}
-														{#if isAdmin}
-															<div class="flex items-center gap-1">
-																<button
-																	class="btn btn-ghost btn-xs"
-																	title={member.role === 'Admin' ? 'Demote to Member' : 'Promote to Admin'}
-																	onclick={() => toggleMemberRole(member)}
-																>
-																	{member.role === 'Admin' ? 'Demote' : 'Promote'}
-																</button>
-																<button
-																	class="btn btn-ghost btn-xs text-error"
-																	title="Remove from group"
-																	onclick={() => removeMember(member.userId!)}
-																>
-																	&times;
-																</button>
+														<button type="submit" class="btn btn-primary btn-sm" disabled={addingMember || !addMemberUserId}>
+															{addingMember ? 'Adding...' : 'Add'}
+														</button>
+														<button type="button" class="btn btn-ghost btn-sm" onclick={() => (showAddMember = false)}>Cancel</button>
+													</form>
+												</div>
+											{/if}
+
+											<!-- Member list -->
+											{#if (selectedGroup.members?.length ?? 0) === 0}
+												<p class="text-base-content/40 text-sm">No members in this group.</p>
+											{:else}
+												<div class="space-y-1">
+													{#each selectedGroup.members ?? [] as member}
+														<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-base-200/50 transition-colors">
+															{#if member.profileImageUrl}
+																<img src={member.profileImageUrl} alt="" class="w-8 h-8 rounded-full object-cover" />
+															{:else}
+																<div class="w-8 h-8 rounded-full bg-base-300 flex items-center justify-center text-xs font-medium text-base-content/60">
+																	{getInitials(member.firstName, member.lastName)}
+																</div>
+															{/if}
+															<div class="flex-1 min-w-0">
+																<div class="text-sm font-medium text-base-content">{member.firstName} {member.lastName}</div>
+																<div class="text-xs text-base-content/50">{member.email}</div>
 															</div>
-														{/if}
+															{#if member.role === 'Admin'}
+																<span class="badge badge-xs badge-primary">Admin</span>
+															{/if}
+															{#if isAdmin}
+																<div class="flex items-center gap-1">
+																	<button
+																		class="btn btn-ghost btn-xs"
+																		title={member.role === 'Admin' ? 'Demote to Member' : 'Promote to Admin'}
+																		onclick={() => toggleMemberRole(member)}
+																	>
+																		{member.role === 'Admin' ? 'Demote' : 'Promote'}
+																	</button>
+																	<button
+																		class="btn btn-ghost btn-xs text-error"
+																		title="Remove from group"
+																		onclick={() => removeMember(member.userId!)}
+																	>
+																		&times;
+																	</button>
+																</div>
+															{/if}
+														</div>
+													{/each}
+												</div>
+											{/if}
+										{:else if detailTab === 'permissions' && isAdmin && permissions}
+											<!-- Permissions section -->
+											{#if permissionsError}
+												<div class="alert alert-error mb-3 text-sm">{permissionsError}</div>
+											{/if}
+											<p class="text-xs text-base-content/50 mb-4">Override organization defaults for this group. "Inherit" uses the org-level setting.</p>
+
+											<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+												<!-- Rule mode overrides -->
+												<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">
+													<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Rules</span>
+												</div>
+												{#each permRuleSettings as rs}
+													{@const value = (permissions as Record<string, any>)[rs.key]}
+													<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0">
+														<div>
+															<div class="text-sm font-medium text-base-content">{rs.label}</div>
+															<div class="text-xs text-base-content/50">{rs.description}</div>
+														</div>
+														<button
+															class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {permButtonClass(value, 'rule')}"
+															onclick={() => cyclePermRuleMode(rs.key)}
+															disabled={permissionsSaving}
+														>
+															{permLabel(value, 'rule')}
+														</button>
 													</div>
 												{/each}
+
+												<!-- Visibility overrides -->
+												<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">
+													<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Visibility</span>
+												</div>
+												{#each permVisibilitySettings as vs}
+													{@const value = (permissions as Record<string, any>)[vs.key]}
+													<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0">
+														<div>
+															<div class="text-sm font-medium text-base-content">{vs.label}</div>
+															<div class="text-xs text-base-content/50">{vs.description}</div>
+														</div>
+														<button
+															class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {permButtonClass(value, 'visibility')}"
+															onclick={() => cyclePermVisibilityMode(vs.key)}
+															disabled={permissionsSaving}
+														>
+															{permLabel(value, 'visibility')}
+														</button>
+													</div>
+												{/each}
+
+												<!-- Group Admin capability flags -->
+												<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">
+													<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Group Admin Capabilities</span>
+												</div>
+												{#each permAdminFlags as flag}
+													{@const value = (permissions as Record<string, any>)[flag.key]}
+													<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0">
+														<div>
+															<div class="text-sm font-medium text-base-content">{flag.label}</div>
+															<div class="text-xs text-base-content/50">{flag.description}</div>
+														</div>
+														<button
+															class="btn btn-sm min-w-[100px] font-semibold whitespace-nowrap {flagClass(value)}"
+															onclick={() => togglePermAdminFlag(flag.key)}
+															disabled={permissionsSaving}
+														>
+															{flagLabel(value)}
+														</button>
+													</div>
+												{/each}
+											</div>
+										{:else if detailTab === 'permissions' && isAdmin && !permissions}
+											<div class="flex items-center gap-2 justify-center py-4 text-base-content/40">
+												<span class="loading loading-spinner loading-xs"></span><span class="text-sm">Loading permissions...</span>
 											</div>
 										{/if}
 									{/if}

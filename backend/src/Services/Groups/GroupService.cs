@@ -265,4 +265,139 @@ public class GroupService : IGroupService
 
         return ServiceResult.Ok();
     }
+
+    // ── Permissions ──────────────────────────────────────────────────────────
+
+    private static GroupPermissionsResponse ToPermissionsResponse(Group group) => new(
+        group.Id,
+        group.Name,
+        group.EditPastEntriesMode?.ToString(),
+        group.EditPauseMode?.ToString(),
+        group.CsvImportMode?.ToString(),
+        group.WorkScheduleChangeMode?.ToString(),
+        group.InitialOvertimeMode?.ToString(),
+        group.VacationVisibility?.ToString(),
+        group.SickDayVisibility?.ToString(),
+        group.GroupAdminCanApproveAbsences,
+        group.GroupAdminCanApproveTimeEdits,
+        group.GroupAdminCanApproveScheduleChanges,
+        group.GroupAdminCanManageMembers,
+        group.GroupAdminCanViewAllTimeEntries,
+        group.GroupAdminCanExportData
+    );
+
+    public async Task<ServiceResult<GroupPermissionsResponse>> GetPermissionsAsync(string slug, int groupId, int callerUserId)
+    {
+        var (org, membership) = await ResolveOrgMemberAsync(slug, callerUserId);
+        if (org is null) return ServiceResult.NotFound<GroupPermissionsResponse>("Organization not found.");
+        if (membership is null) return ServiceResult.Forbidden<GroupPermissionsResponse>("You are not a member of this organization.");
+
+        var group = await _context.Groups
+            .FirstOrDefaultAsync(g => g.Id == groupId && g.OrganizationId == org.Id);
+        if (group is null) return ServiceResult.NotFound<GroupPermissionsResponse>("Group not found.");
+
+        return ServiceResult.Ok(ToPermissionsResponse(group));
+    }
+
+    public async Task<ServiceResult<GroupPermissionsResponse>> UpdatePermissionsAsync(string slug, int groupId, int callerUserId, UpdateGroupPermissionsRequest request)
+    {
+        var (org, membership) = await ResolveOrgMemberAsync(slug, callerUserId);
+        if (org is null) return ServiceResult.NotFound<GroupPermissionsResponse>("Organization not found.");
+        if (membership is null || membership.Role < OrganizationRole.Admin)
+            return ServiceResult.Forbidden<GroupPermissionsResponse>("Only org admins can update group permissions.");
+
+        var group = await _context.Groups
+            .FirstOrDefaultAsync(g => g.Id == groupId && g.OrganizationId == org.Id);
+        if (group is null) return ServiceResult.NotFound<GroupPermissionsResponse>("Group not found.");
+
+        // Apply nullable partial updates
+        if (request.EditPastEntriesMode.HasValue) group.EditPastEntriesMode = request.EditPastEntriesMode;
+        if (request.EditPauseMode.HasValue) group.EditPauseMode = request.EditPauseMode;
+        if (request.CsvImportMode.HasValue) group.CsvImportMode = request.CsvImportMode;
+        if (request.WorkScheduleChangeMode.HasValue) group.WorkScheduleChangeMode = request.WorkScheduleChangeMode;
+        if (request.InitialOvertimeMode.HasValue) group.InitialOvertimeMode = request.InitialOvertimeMode;
+        if (request.VacationVisibility.HasValue) group.VacationVisibility = request.VacationVisibility;
+        if (request.SickDayVisibility.HasValue) group.SickDayVisibility = request.SickDayVisibility;
+        if (request.GroupAdminCanApproveAbsences.HasValue) group.GroupAdminCanApproveAbsences = request.GroupAdminCanApproveAbsences;
+        if (request.GroupAdminCanApproveTimeEdits.HasValue) group.GroupAdminCanApproveTimeEdits = request.GroupAdminCanApproveTimeEdits;
+        if (request.GroupAdminCanApproveScheduleChanges.HasValue) group.GroupAdminCanApproveScheduleChanges = request.GroupAdminCanApproveScheduleChanges;
+        if (request.GroupAdminCanManageMembers.HasValue) group.GroupAdminCanManageMembers = request.GroupAdminCanManageMembers;
+        if (request.GroupAdminCanViewAllTimeEntries.HasValue) group.GroupAdminCanViewAllTimeEntries = request.GroupAdminCanViewAllTimeEntries;
+        if (request.GroupAdminCanExportData.HasValue) group.GroupAdminCanExportData = request.GroupAdminCanExportData;
+
+        group.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Group {GroupId} permissions updated in org {Slug} by user {UserId}", groupId, slug, callerUserId);
+
+        return ServiceResult.Ok(ToPermissionsResponse(group));
+    }
+
+    public async Task<ServiceResult<EffectivePermissionsResponse>> GetEffectivePermissionsAsync(string slug, int callerUserId)
+    {
+        var (org, membership) = await ResolveOrgMemberAsync(slug, callerUserId);
+        if (org is null) return ServiceResult.NotFound<EffectivePermissionsResponse>("Organization not found.");
+        if (membership is null) return ServiceResult.Forbidden<EffectivePermissionsResponse>("You are not a member of this organization.");
+
+        var isOrgAdmin = membership.Role >= OrganizationRole.Admin;
+
+        // Get all groups this user belongs to
+        var userGroups = await _context.Groups
+            .Where(g => g.OrganizationId == org.Id && g.Members.Any(m => m.UserId == callerUserId))
+            .ToListAsync();
+
+        var isGroupAdmin = userGroups.Any(g =>
+            _context.GroupMembers.Any(gm => gm.GroupId == g.Id && gm.UserId == callerUserId && gm.Role == GroupRole.Admin));
+
+        // Resolve permissions: most permissive group override wins
+        var editPastEntries = ResolveRuleMode(org.EditPastEntriesMode, userGroups, g => g.EditPastEntriesMode);
+        var editPause = ResolveRuleMode(org.EditPauseMode, userGroups, g => g.EditPauseMode);
+        var csvImport = ResolveRuleMode(org.CsvImportMode, userGroups, g => g.CsvImportMode);
+        var workScheduleChange = ResolveRuleMode(org.WorkScheduleChangeMode, userGroups, g => g.WorkScheduleChangeMode);
+        var initialOvertime = ResolveRuleMode(org.InitialOvertimeMode, userGroups, g => g.InitialOvertimeMode);
+        var vacationVis = ResolveVisibilityMode(org.VacationVisibility, userGroups, g => g.VacationVisibility);
+        var sickDayVis = ResolveVisibilityMode(org.SickDayVisibility, userGroups, g => g.SickDayVisibility);
+
+        // Group Admin capabilities (only apply if user is a group admin in any group)
+        bool canApproveAbsences = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanApproveAbsences == true));
+        bool canApproveTimeEdits = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanApproveTimeEdits == true));
+        bool canApproveScheduleChanges = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanApproveScheduleChanges == true));
+        bool canManageGroupMembers = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanManageMembers == true));
+        bool canViewAllTimeEntries = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanViewAllTimeEntries == true));
+        bool canExportData = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanExportData == true));
+
+        return ServiceResult.Ok(new EffectivePermissionsResponse(
+            editPastEntries.ToString(),
+            editPause.ToString(),
+            csvImport.ToString(),
+            workScheduleChange.ToString(),
+            initialOvertime.ToString(),
+            vacationVis.ToString(),
+            sickDayVis.ToString(),
+            canApproveAbsences,
+            canApproveTimeEdits,
+            canApproveScheduleChanges,
+            canManageGroupMembers,
+            canViewAllTimeEntries,
+            canExportData
+        ));
+    }
+
+    // Most permissive RuleMode wins (Allowed > RequiresApproval > Disabled)
+    private static RuleMode ResolveRuleMode(RuleMode orgDefault, List<Group> userGroups, Func<Group, RuleMode?> selector)
+    {
+        var overrides = userGroups.Select(selector).Where(v => v.HasValue).Select(v => v!.Value).ToList();
+        if (overrides.Count == 0) return orgDefault;
+        var mostPermissive = overrides.Max();
+        return mostPermissive > orgDefault ? mostPermissive : orgDefault;
+    }
+
+    // Most permissive VisibilityMode wins (AllMembers > AdminOnly > Private)
+    private static VisibilityMode ResolveVisibilityMode(VisibilityMode orgDefault, List<Group> userGroups, Func<Group, VisibilityMode?> selector)
+    {
+        var overrides = userGroups.Select(selector).Where(v => v.HasValue).Select(v => v!.Value).ToList();
+        if (overrides.Count == 0) return orgDefault;
+        var mostPermissive = overrides.Max();
+        return mostPermissive > orgDefault ? mostPermissive : orgDefault;
+    }
 }
