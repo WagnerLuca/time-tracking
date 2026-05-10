@@ -45,7 +45,7 @@
 			members = data;
 		} catch (err) {
 			if (getErrorStatus(err) === 403) {
-				error = 'You need Admin or Owner role to view this page.';
+				error = 'You do not have permission to view time entries. An admin or group setting must grant visibility.';
 			} else {
 				error = extractErrorMessage(err, 'Failed to load time overview.');
 			}
