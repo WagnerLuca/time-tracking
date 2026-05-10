@@ -1,34 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { groupApi } from '$lib/apiClient';
-	import type { EffectivePermissionsResponse } from '$lib/api';
 
 	let { children } = $props();
 
 	const slug = $derived($page.params.slug ?? '');
-	const role = $derived(orgContext.selectedOrg?.role);
-	const isAdmin = $derived(role === 'Owner' || role === 'Admin');
 	const currentPath = $derived($page.url.pathname);
-
-	// Effective permissions for visibility checks
-	let effectivePerms = $state<EffectivePermissionsResponse | null>(null);
-
-	const showAbsences = $derived(
-		isAdmin ||
-		(effectivePerms != null && (
-			effectivePerms.vacationVisibility === 'AllMembers' ||
-			effectivePerms.sickDayVisibility === 'AllMembers'
-		))
-	);
-
-	const showTimeOverview = $derived(
-		isAdmin ||
-		(effectivePerms != null && (
-			(effectivePerms.timeEntryVisibility != null && effectivePerms.timeEntryVisibility !== 'Private') ||
-			effectivePerms.canViewAllTimeEntries === true
-		))
-	);
 
 	// Hide tabs on nested routes like /members/[id]
 	const showTabs = $derived(
@@ -37,8 +13,7 @@
 		currentPath === `/organizations/${slug}/groups` ||
 		currentPath === `/organizations/${slug}/absences` ||
 		currentPath === `/organizations/${slug}/holidays` ||
-		currentPath === `/organizations/${slug}/settings` ||
-		currentPath === `/organizations/${slug}/time-overview`
+		currentPath === `/organizations/${slug}/settings`
 	);
 
 	function tabClass(path: string) {
@@ -46,23 +21,6 @@
 		const fullPath = path ? `${base}/${path}` : base;
 		const active = path ? currentPath === fullPath : currentPath === base;
 		return `tab ${active ? 'tab-active' : ''}`;
-	}
-
-	let lastSlug = $state('');
-	$effect(() => {
-		if (slug && slug !== lastSlug) {
-			lastSlug = slug;
-			loadEffectivePermissions();
-		}
-	});
-
-	async function loadEffectivePermissions() {
-		try {
-			const { data } = await groupApi.apiV1OrganizationsSlugEffectivePermissionsGet(slug);
-			effectivePerms = data;
-		} catch {
-			effectivePerms = null;
-		}
 	}
 </script>
 
@@ -83,18 +41,10 @@
 				<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
 				Groups
 			</a>
-			{#if showAbsences}
-				<a href="/organizations/{slug}/absences" class={tabClass('absences')}>
-					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
-					Absences
-				</a>
-			{/if}
-			{#if showTimeOverview}
-				<a href="/organizations/{slug}/time-overview" class={tabClass('time-overview')}>
-					<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
-					Time Overview
-				</a>
-			{/if}
+			<a href="/organizations/{slug}/absences" class={tabClass('absences')}>
+				<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
+				Absences
+			</a>
 			<a href="/organizations/{slug}/holidays" class={tabClass('holidays')}>
 				<svg class="w-4.5 h-4.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z"/></svg>
 				Holidays

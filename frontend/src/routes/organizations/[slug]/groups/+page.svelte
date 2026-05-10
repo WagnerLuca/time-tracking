@@ -570,7 +570,11 @@
 																</div>
 															{/if}
 															<div class="flex-1 min-w-0">
-																<div class="text-sm font-medium text-base-content">{member.firstName} {member.lastName}</div>
+																{#if isAdmin}
+																	<a href="/organizations/{orgSlug}/members/{member.userId}" class="text-sm font-medium link link-hover text-base-content">{member.firstName} {member.lastName}</a>
+																{:else}
+																	<div class="text-sm font-medium text-base-content">{member.firstName} {member.lastName}</div>
+																{/if}
 																<div class="text-xs text-base-content/50">{member.email}</div>
 															</div>
 															{#if member.role === 'Admin'}
