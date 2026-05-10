@@ -540,8 +540,26 @@ public class OrganizationService : IOrganizationService
             return ServiceResult.NotFound<List<MemberTimeOverviewResponse>>("Organization not found");
 
         var callerRole = await GetRoleAsync(callerUserId, org.Id);
-        if (callerRole == null || callerRole < OrganizationRole.Admin || !org.MemberTimeEntryVisibility)
+        if (callerRole == null)
             return ServiceResult.Forbidden<List<MemberTimeOverviewResponse>>();
+
+        var isOrgAdmin = callerRole >= OrganizationRole.Admin;
+
+        // Determine which members the caller can see
+        List<int>? visibleMemberIds = null;
+        if (isOrgAdmin && org.MemberTimeEntryVisibility)
+        {
+            // Org admin with visibility enabled → sees all
+            visibleMemberIds = null; // null = all
+        }
+        else
+        {
+            // Check Group Admin with CanViewAllTimeEntries
+            var groupMemberIds = await GetGroupAdminVisibleMemberIdsAsync(callerUserId, org.Id);
+            if (groupMemberIds.Count == 0)
+                return ServiceResult.Forbidden<List<MemberTimeOverviewResponse>>();
+            visibleMemberIds = groupMemberIds;
+        }
 
         var now = DateTime.UtcNow;
         var dayOfWeek = (int)now.DayOfWeek;
@@ -554,6 +572,9 @@ public class OrganizationService : IOrganizationService
             .Where(uo => uo.OrganizationId == org.Id)
             .Include(uo => uo.User)
             .ToListAsync();
+
+        if (visibleMemberIds != null)
+            members = members.Where(m => visibleMemberIds.Contains(m.UserId)).ToList();
 
         var memberIds = members.Select(m => m.UserId).ToList();
 
@@ -612,8 +633,22 @@ public class OrganizationService : IOrganizationService
             return ServiceResult.NotFound<PaginatedResponse<object>>("Organization not found");
 
         var callerRole = await GetRoleAsync(callerUserId, org.Id);
-        if (callerRole == null || callerRole < OrganizationRole.Admin || !org.MemberTimeEntryVisibility)
+        if (callerRole == null)
             return ServiceResult.Forbidden<PaginatedResponse<object>>();
+
+        var isOrgAdmin = callerRole >= OrganizationRole.Admin;
+
+        if (isOrgAdmin && org.MemberTimeEntryVisibility)
+        {
+            // Org admin with visibility → allowed for any member
+        }
+        else
+        {
+            // Check Group Admin can view this specific member
+            var groupMemberIds = await GetGroupAdminVisibleMemberIdsAsync(callerUserId, org.Id);
+            if (!groupMemberIds.Contains(userId))
+                return ServiceResult.Forbidden<PaginatedResponse<object>>();
+        }
 
         var memberExists = await _context.UserOrganizations
             .AsNoTracking()
@@ -740,5 +775,33 @@ public class OrganizationService : IOrganizationService
             .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
                                     && uo.UserId == userId);
         return membership?.Role;
+    }
+
+    /// <summary>
+    /// Returns the set of user IDs that a Group Admin can view time entries for,
+    /// based on groups where they are Admin and CanViewAllTimeEntries is enabled.
+    /// </summary>
+    private async Task<List<int>> GetGroupAdminVisibleMemberIdsAsync(int callerUserId, int orgId)
+    {
+        // Find groups in this org where the caller is a Group Admin AND CanViewAllTimeEntries is true
+        var adminGroupIds = await _context.GroupMembers
+            .Include(gm => gm.Group)
+            .Where(gm => gm.UserId == callerUserId
+                      && gm.Role == GroupRole.Admin
+                      && gm.Group.OrganizationId == orgId
+                      && gm.Group.IsActive
+                      && gm.Group.GroupAdminCanViewAllTimeEntries == true)
+            .Select(gm => gm.GroupId)
+            .ToListAsync();
+
+        if (adminGroupIds.Count == 0)
+            return new List<int>();
+
+        // Get all member user IDs from those groups
+        return await _context.GroupMembers
+            .Where(gm => adminGroupIds.Contains(gm.GroupId))
+            .Select(gm => gm.UserId)
+            .Distinct()
+            .ToListAsync();
     }
 }

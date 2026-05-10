@@ -28,7 +28,7 @@
 	let myRole = $derived(org?.members?.find(m => m.id === auth.user?.id)?.role ?? null);
 	let canEdit = $derived(myRole === 'Owner' || myRole === 'Admin');
 	let isSelf = $derived(auth.user?.id === memberId);
-	let canViewTime = $derived(isSelf || (canEdit && (org?.memberTimeEntryVisibility ?? false)));
+	let canViewTime = $derived(isSelf || (canEdit && (org?.memberTimeEntryVisibility ?? false)) || overview !== null);
 
 	// Time overview
 	let weekOffset = $state(0);

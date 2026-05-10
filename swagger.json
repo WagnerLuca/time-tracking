@@ -2600,7 +2600,7 @@
         "tags": [
           "Organizations"
         ],
-        "summary": "Get time tracking overview for all members (admin only).",
+        "summary": "Get time tracking overview for visible members (admin or group admin).",
         "parameters": [
           {
             "name": "slug",
@@ -2668,7 +2668,7 @@
         "tags": [
           "Organizations"
         ],
-        "summary": "Get time entries for a specific member (admin only).",
+        "summary": "Get time entries for a specific member (admin or group admin).",
         "parameters": [
           {
             "name": "slug",

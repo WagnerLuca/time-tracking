@@ -4460,7 +4460,7 @@ export const OrganizationsApiAxiosParamCreator = function (configuration?: Confi
         },
         /**
          * 
-         * @summary Get time entries for a specific member (admin only).
+         * @summary Get time entries for a specific member (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID whose entries to retrieve.
          * @param {string} [from] Start of date range filter.
@@ -4832,7 +4832,7 @@ export const OrganizationsApiAxiosParamCreator = function (configuration?: Confi
         },
         /**
          * 
-         * @summary Get time tracking overview for all members (admin only).
+         * @summary Get time tracking overview for visible members (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {string} [from] Start of date range filter.
          * @param {string} [to] End of date range filter.
@@ -4958,7 +4958,7 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Get time entries for a specific member (admin only).
+         * @summary Get time entries for a specific member (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID whose entries to retrieve.
          * @param {string} [from] Start of date range filter.
@@ -5077,7 +5077,7 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Get time tracking overview for all members (admin only).
+         * @summary Get time tracking overview for visible members (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {string} [from] Start of date range filter.
          * @param {string} [to] End of date range filter.
@@ -5151,7 +5151,7 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
         },
         /**
          * 
-         * @summary Get time entries for a specific member (admin only).
+         * @summary Get time entries for a specific member (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID whose entries to retrieve.
          * @param {string} [from] Start of date range filter.
@@ -5246,7 +5246,7 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
         },
         /**
          * 
-         * @summary Get time tracking overview for all members (admin only).
+         * @summary Get time tracking overview for visible members (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {string} [from] Start of date range filter.
          * @param {string} [to] End of date range filter.
@@ -5320,7 +5320,7 @@ export class OrganizationsApi extends BaseAPI {
 
     /**
      * 
-     * @summary Get time entries for a specific member (admin only).
+     * @summary Get time entries for a specific member (admin or group admin).
      * @param {string} slug Organization URL slug.
      * @param {number} memberId Member ID whose entries to retrieve.
      * @param {string} [from] Start of date range filter.
@@ -5423,7 +5423,7 @@ export class OrganizationsApi extends BaseAPI {
 
     /**
      * 
-     * @summary Get time tracking overview for all members (admin only).
+     * @summary Get time tracking overview for visible members (admin or group admin).
      * @param {string} slug Organization URL slug.
      * @param {string} [from] Start of date range filter.
      * @param {string} [to] End of date range filter.

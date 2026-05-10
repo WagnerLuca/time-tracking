@@ -141,12 +141,12 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.UpdateSettingsAsync(slug, userId.Value, request));
     }
 
-    /// <summary>Get time tracking overview for all members (admin only).</summary>
+    /// <summary>Get time tracking overview for visible members (admin or group admin).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="from">Start of date range filter.</param>
     /// <param name="to">End of date range filter.</param>
     [HttpGet("{slug}/time-overview")]
-    [RequireOrgRole(OrganizationRole.Admin)]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(List<MemberTimeOverviewResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTimeOverview(
         string slug, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
@@ -156,7 +156,7 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.GetTimeOverviewAsync(slug, userId.Value, from, to));
     }
 
-    /// <summary>Get time entries for a specific member (admin only).</summary>
+    /// <summary>Get time entries for a specific member (admin or group admin).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="memberId">Member ID whose entries to retrieve.</param>
     /// <param name="from">Start of date range filter.</param>
@@ -164,7 +164,7 @@ public class OrganizationsController : OrganizationBaseController
     /// <param name="limit">Max items per page (default 50, max 200).</param>
     /// <param name="offset">Number of items to skip.</param>
     [HttpGet("{slug}/member-entries/{memberId}")]
-    [RequireOrgRole(OrganizationRole.Admin)]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(PaginatedResponse<TimeEntryResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMemberEntries(
         string slug, int memberId,

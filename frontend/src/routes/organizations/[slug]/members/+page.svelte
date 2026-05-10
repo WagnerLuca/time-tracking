@@ -68,7 +68,7 @@
 	}
 
 	async function loadTeamOverview() {
-		if (teamOverviewLoaded || !canEdit || !org?.memberTimeEntryVisibility) return;
+		if (teamOverviewLoaded) return;
 		teamOverviewLoading = true;
 		try {
 			const now = new Date();
@@ -212,7 +212,7 @@
 									{/if}
 								</div>
 								<div class="text-sm text-base-content/40 mt-0.5">{member.email}</div>
-								{#if canEdit && org.memberTimeEntryVisibility && overview}
+								{#if teamOverviewLoaded && overview}
 									<div class="flex gap-3 mt-1.5 flex-wrap">
 										<span class="flex items-center gap-1 text-xs text-base-content/50" title="Tracked this week">
 											<svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5 opacity-60"><path d="M8 3.5a.5.5 0 00-1 0V8a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 7.71V3.5z"/><path d="M8 16A8 8 0 108 0a8 8 0 000 16zm7-8A7 7 0 111 8a7 7 0 0114 0z"/></svg>
