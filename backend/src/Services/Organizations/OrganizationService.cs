@@ -555,10 +555,13 @@ public class OrganizationService : IOrganizationService
         else
         {
             // Check Group Admin with CanViewAllTimeEntries
-            var groupMemberIds = await GetGroupAdminVisibleMemberIdsAsync(callerUserId, org.Id);
-            if (groupMemberIds.Count == 0)
+            var groupAdminMemberIds = await GetGroupAdminVisibleMemberIdsAsync(callerUserId, org.Id);
+            // Check regular group members with group-level TimeEntryVisibility = AllMembers
+            var groupMemberIds = await GetGroupMemberTimeEntryVisibleUserIdsAsync(callerUserId, org.Id);
+            var combined = groupAdminMemberIds.Union(groupMemberIds).Distinct().ToList();
+            if (combined.Count == 0)
                 return ServiceResult.Forbidden<List<MemberTimeOverviewResponse>>();
-            visibleMemberIds = groupMemberIds;
+            visibleMemberIds = combined;
         }
 
         var now = DateTime.UtcNow;
@@ -645,8 +648,10 @@ public class OrganizationService : IOrganizationService
         else
         {
             // Check Group Admin can view this specific member
-            var groupMemberIds = await GetGroupAdminVisibleMemberIdsAsync(callerUserId, org.Id);
-            if (!groupMemberIds.Contains(userId))
+            var groupAdminMemberIds = await GetGroupAdminVisibleMemberIdsAsync(callerUserId, org.Id);
+            // Check regular group member with group-level TimeEntryVisibility = AllMembers
+            var groupMemberIds = await GetGroupMemberTimeEntryVisibleUserIdsAsync(callerUserId, org.Id);
+            if (!groupAdminMemberIds.Contains(userId) && !groupMemberIds.Contains(userId))
                 return ServiceResult.Forbidden<PaginatedResponse<object>>();
         }
 
@@ -800,6 +805,30 @@ public class OrganizationService : IOrganizationService
         // Get all member user IDs from those groups
         return await _context.GroupMembers
             .Where(gm => adminGroupIds.Contains(gm.GroupId))
+            .Select(gm => gm.UserId)
+            .Distinct()
+            .ToListAsync();
+    }
+
+    /// <summary>
+    /// Returns user IDs from groups where the caller is a member and group-level TimeEntryVisibility = AllMembers.
+    /// </summary>
+    private async Task<List<int>> GetGroupMemberTimeEntryVisibleUserIdsAsync(int callerUserId, int orgId)
+    {
+        var groupIds = await _context.GroupMembers
+            .Include(gm => gm.Group)
+            .Where(gm => gm.UserId == callerUserId
+                      && gm.Group.OrganizationId == orgId
+                      && gm.Group.IsActive
+                      && gm.Group.TimeEntryVisibility == VisibilityMode.AllMembers)
+            .Select(gm => gm.GroupId)
+            .ToListAsync();
+
+        if (groupIds.Count == 0)
+            return new List<int>();
+
+        return await _context.GroupMembers
+            .Where(gm => groupIds.Contains(gm.GroupId))
             .Select(gm => gm.UserId)
             .Distinct()
             .ToListAsync();

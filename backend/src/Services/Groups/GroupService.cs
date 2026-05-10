@@ -278,6 +278,7 @@ public class GroupService : IGroupService
         group.InitialOvertimeMode?.ToString(),
         group.VacationVisibility?.ToString(),
         group.SickDayVisibility?.ToString(),
+        group.TimeEntryVisibility?.ToString(),
         group.GroupAdminCanApproveAbsences,
         group.GroupAdminCanApproveTimeEdits,
         group.GroupAdminCanApproveScheduleChanges,
@@ -318,6 +319,7 @@ public class GroupService : IGroupService
         if (request.InitialOvertimeMode.HasValue) group.InitialOvertimeMode = request.InitialOvertimeMode;
         if (request.VacationVisibility.HasValue) group.VacationVisibility = request.VacationVisibility;
         if (request.SickDayVisibility.HasValue) group.SickDayVisibility = request.SickDayVisibility;
+        if (request.TimeEntryVisibility.HasValue) group.TimeEntryVisibility = request.TimeEntryVisibility;
         if (request.GroupAdminCanApproveAbsences.HasValue) group.GroupAdminCanApproveAbsences = request.GroupAdminCanApproveAbsences;
         if (request.GroupAdminCanApproveTimeEdits.HasValue) group.GroupAdminCanApproveTimeEdits = request.GroupAdminCanApproveTimeEdits;
         if (request.GroupAdminCanApproveScheduleChanges.HasValue) group.GroupAdminCanApproveScheduleChanges = request.GroupAdminCanApproveScheduleChanges;
@@ -357,6 +359,9 @@ public class GroupService : IGroupService
         var initialOvertime = ResolveRuleMode(org.InitialOvertimeMode, userGroups, g => g.InitialOvertimeMode);
         var vacationVis = ResolveVisibilityMode(org.VacationVisibility, userGroups, g => g.VacationVisibility);
         var sickDayVis = ResolveVisibilityMode(org.SickDayVisibility, userGroups, g => g.SickDayVisibility);
+        var timeEntryVis = ResolveVisibilityMode(
+            org.MemberTimeEntryVisibility ? VisibilityMode.AdminOnly : VisibilityMode.Private,
+            userGroups, g => g.TimeEntryVisibility);
 
         // Group Admin capabilities (only apply if user is a group admin in any group)
         bool canApproveAbsences = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanApproveAbsences == true));
@@ -374,6 +379,7 @@ public class GroupService : IGroupService
             initialOvertime.ToString(),
             vacationVis.ToString(),
             sickDayVis.ToString(),
+            timeEntryVis.ToString(),
             canApproveAbsences,
             canApproveTimeEdits,
             canApproveScheduleChanges,

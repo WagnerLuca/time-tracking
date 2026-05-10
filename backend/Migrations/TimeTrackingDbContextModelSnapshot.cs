@@ -129,6 +129,9 @@ namespace TimeTracking.Api.Migrations
                     b.Property<int?>("SickDayVisibility")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("TimeEntryVisibility")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")

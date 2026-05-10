@@ -28,6 +28,7 @@ public class Group
     public RuleMode? InitialOvertimeMode { get; set; }
     public VisibilityMode? VacationVisibility { get; set; }
     public VisibilityMode? SickDayVisibility { get; set; }
+    public VisibilityMode? TimeEntryVisibility { get; set; }
 
     // Group Admin capability flags (null = false / disabled)
     public bool? GroupAdminCanApproveAbsences { get; set; }

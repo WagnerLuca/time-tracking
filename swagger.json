@@ -4781,6 +4781,10 @@
             "type": "string",
             "nullable": true
           },
+          "timeEntryVisibility": {
+            "type": "string",
+            "nullable": true
+          },
           "canApproveAbsences": {
             "type": "boolean"
           },
@@ -4949,6 +4953,10 @@
             "nullable": true
           },
           "sickDayVisibility": {
+            "type": "string",
+            "nullable": true
+          },
+          "timeEntryVisibility": {
             "type": "string",
             "nullable": true
           },
@@ -6122,6 +6130,9 @@
             "$ref": "#/components/schemas/VisibilityMode"
           },
           "sickDayVisibility": {
+            "$ref": "#/components/schemas/VisibilityMode"
+          },
+          "timeEntryVisibility": {
             "$ref": "#/components/schemas/VisibilityMode"
           },
           "groupAdminCanApproveAbsences": {

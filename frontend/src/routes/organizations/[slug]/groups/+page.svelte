@@ -259,6 +259,7 @@
 	const permVisibilitySettings = [
 		{ key: 'vacationVisibility', label: 'Vacation Visibility', description: 'Who can see vacation absences?' },
 		{ key: 'sickDayVisibility', label: 'Sick Day Visibility', description: 'Who can see sick day absences?' },
+		{ key: 'timeEntryVisibility', label: 'Time Entry Visibility', description: 'Who can see time entries of group members?' },
 	];
 
 	const permAdminFlags = [

@@ -214,6 +214,7 @@ export interface EffectivePermissionsResponse {
     'initialOvertimeMode'?: string | null;
     'vacationVisibility'?: string | null;
     'sickDayVisibility'?: string | null;
+    'timeEntryVisibility'?: string | null;
     'canApproveAbsences'?: boolean;
     'canApproveTimeEdits'?: boolean;
     'canApproveScheduleChanges'?: boolean;
@@ -274,6 +275,7 @@ export interface GroupPermissionsResponse {
     'initialOvertimeMode'?: string | null;
     'vacationVisibility'?: string | null;
     'sickDayVisibility'?: string | null;
+    'timeEntryVisibility'?: string | null;
     'groupAdminCanApproveAbsences'?: boolean | null;
     'groupAdminCanApproveTimeEdits'?: boolean | null;
     'groupAdminCanApproveScheduleChanges'?: boolean | null;
@@ -785,6 +787,7 @@ export interface UpdateGroupPermissionsRequest {
     'initialOvertimeMode'?: RuleMode;
     'vacationVisibility'?: VisibilityMode;
     'sickDayVisibility'?: VisibilityMode;
+    'timeEntryVisibility'?: VisibilityMode;
     'groupAdminCanApproveAbsences'?: boolean | null;
     'groupAdminCanApproveTimeEdits'?: boolean | null;
     'groupAdminCanApproveScheduleChanges'?: boolean | null;

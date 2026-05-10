@@ -63,6 +63,7 @@ public record GroupPermissionsResponse(
     string? InitialOvertimeMode,
     string? VacationVisibility,
     string? SickDayVisibility,
+    string? TimeEntryVisibility,
     // Group Admin capability flags
     bool? GroupAdminCanApproveAbsences,
     bool? GroupAdminCanApproveTimeEdits,
@@ -80,6 +81,7 @@ public record UpdateGroupPermissionsRequest(
     RuleMode? InitialOvertimeMode,
     VisibilityMode? VacationVisibility,
     VisibilityMode? SickDayVisibility,
+    VisibilityMode? TimeEntryVisibility,
     bool? GroupAdminCanApproveAbsences,
     bool? GroupAdminCanApproveTimeEdits,
     bool? GroupAdminCanApproveScheduleChanges,
@@ -97,6 +99,7 @@ public record EffectivePermissionsResponse(
     string InitialOvertimeMode,
     string VacationVisibility,
     string SickDayVisibility,
+    string TimeEntryVisibility,
     bool CanApproveAbsences,
     bool CanApproveTimeEdits,
     bool CanApproveScheduleChanges,
