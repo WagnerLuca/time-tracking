@@ -156,6 +156,7 @@ builder.Services.AddScoped<IHolidayService, HolidayService>();
 builder.Services.AddScoped<IAbsenceDayService, AbsenceDayService>();
 builder.Services.AddScoped<IWorkScheduleService, WorkScheduleService>();
 builder.Services.AddScoped<IPauseRuleService, PauseRuleService>();
+builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddHostedService<RefreshTokenCleanupService>();
 
 // Add Entity Framework - PostgreSQL or InMemory

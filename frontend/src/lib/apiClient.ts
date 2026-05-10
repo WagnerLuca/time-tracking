@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { env } from '$env/dynamic/public';
-import { Configuration, AbsenceDayApi, AuthApi, ExportImportApi, HolidayApi, NotificationsApi, OrganizationsApi, PauseRulesApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
+import { Configuration, AbsenceDayApi, AuthApi, ExportImportApi, GroupApi, HolidayApi, NotificationsApi, OrganizationsApi, PauseRulesApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
 
 // Detect base URL: browser uses current hostname, SSR uses Docker service name
 const getApiBaseUrl = (): string => {
@@ -68,6 +68,7 @@ export const requestsApi = new RequestsApi(config, undefined, axiosInstance);
 export const timeTrackingApi = new TimeTrackingApi(config, undefined, axiosInstance);
 export const exportImportApi = new ExportImportApi(config, undefined, axiosInstance);
 export const workScheduleApi = new WorkScheduleApi(config, undefined, axiosInstance);
+export const groupApi = new GroupApi(config, undefined, axiosInstance);
 
 // Type for the polymorphic 2FA-required login response (not in generated types
 // because the login endpoint declares LoginResponse as its return type).

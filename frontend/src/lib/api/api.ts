@@ -72,6 +72,10 @@ export const AbsenceType = {
 export type AbsenceType = typeof AbsenceType[keyof typeof AbsenceType];
 
 
+export interface AddGroupMemberRequest {
+    'userId'?: number;
+    'role'?: string | null;
+}
 /**
  * Request payload for adding a user to an organization.
  */
@@ -131,6 +135,11 @@ export interface CreateAbsenceDayRequest {
 }
 
 
+export interface CreateGroupRequest {
+    'name'?: string | null;
+    'description'?: string | null;
+    'color'?: string | null;
+}
 /**
  * Request payload for creating a holiday.
  */
@@ -221,6 +230,34 @@ export interface ExportRequest {
      * Columns to include in the export. If empty/null, all columns are included.
      */
     'columns'?: Array<string> | null;
+}
+export interface GroupDetailResponse {
+    'id'?: number;
+    'organizationId'?: number;
+    'name'?: string | null;
+    'description'?: string | null;
+    'color'?: string | null;
+    'createdAt'?: string;
+    'members'?: Array<GroupMemberResponse> | null;
+}
+export interface GroupMemberResponse {
+    'userId'?: number;
+    'firstName'?: string | null;
+    'lastName'?: string | null;
+    'email'?: string | null;
+    'profileImageUrl'?: string | null;
+    'role'?: string | null;
+    'joinedAt'?: string;
+}
+export interface GroupResponse {
+    'id'?: number;
+    'organizationId'?: number;
+    'name'?: string | null;
+    'description'?: string | null;
+    'color'?: string | null;
+    'createdAt'?: string;
+    'memberCount'?: number;
+    'isGroupAdmin'?: boolean;
 }
 /**
  * Organization holiday entry.
@@ -702,6 +739,14 @@ export interface TwoFactorVerifyRequest {
      * 6-digit TOTP code from authenticator app, or a backup code.
      */
     'code': string;
+}
+export interface UpdateGroupMemberRoleRequest {
+    'role'?: string | null;
+}
+export interface UpdateGroupRequest {
+    'name'?: string | null;
+    'description'?: string | null;
+    'color'?: string | null;
 }
 /**
  * Request payload for updating a holiday.
@@ -2404,6 +2449,699 @@ export class ExportImportApi extends BaseAPI {
      */
     public apiV1ExportImportImportPreviewPost(orgSlug?: string, file?: File, options?: RawAxiosRequestConfig) {
         return ExportImportApiFp(this.configuration).apiV1ExportImportImportPreviewPost(orgSlug, file, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * GroupApi - axios parameter creator
+ */
+export const GroupApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary List all groups in an organization.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/groups`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Delete a group (admin only).
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdDelete: async (slug: string, groupId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdDelete', 'slug', slug)
+            // verify required parameter 'groupId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdDelete', 'groupId', groupId)
+            const localVarPath = `/api/v1/organizations/{slug}/groups/{groupId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"groupId"}}`, encodeURIComponent(String(groupId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Get group details including members.
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdGet: async (slug: string, groupId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdGet', 'slug', slug)
+            // verify required parameter 'groupId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdGet', 'groupId', groupId)
+            const localVarPath = `/api/v1/organizations/{slug}/groups/{groupId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"groupId"}}`, encodeURIComponent(String(groupId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Add a member to a group.
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {AddGroupMemberRequest} [addGroupMemberRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdMembersPost: async (slug: string, groupId: number, addGroupMemberRequest?: AddGroupMemberRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdMembersPost', 'slug', slug)
+            // verify required parameter 'groupId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdMembersPost', 'groupId', groupId)
+            const localVarPath = `/api/v1/organizations/{slug}/groups/{groupId}/members`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"groupId"}}`, encodeURIComponent(String(groupId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(addGroupMemberRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Remove a member from a group.
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {number} targetUserId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete: async (slug: string, groupId: number, targetUserId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete', 'slug', slug)
+            // verify required parameter 'groupId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete', 'groupId', groupId)
+            // verify required parameter 'targetUserId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete', 'targetUserId', targetUserId)
+            const localVarPath = `/api/v1/organizations/{slug}/groups/{groupId}/members/{targetUserId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"groupId"}}`, encodeURIComponent(String(groupId)))
+                .replace(`{${"targetUserId"}}`, encodeURIComponent(String(targetUserId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Update a group member\'s role (org admin only).
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {number} targetUserId 
+         * @param {UpdateGroupMemberRoleRequest} [updateGroupMemberRoleRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch: async (slug: string, groupId: number, targetUserId: number, updateGroupMemberRoleRequest?: UpdateGroupMemberRoleRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch', 'slug', slug)
+            // verify required parameter 'groupId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch', 'groupId', groupId)
+            // verify required parameter 'targetUserId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch', 'targetUserId', targetUserId)
+            const localVarPath = `/api/v1/organizations/{slug}/groups/{groupId}/members/{targetUserId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"groupId"}}`, encodeURIComponent(String(groupId)))
+                .replace(`{${"targetUserId"}}`, encodeURIComponent(String(targetUserId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PATCH', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updateGroupMemberRoleRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Update a group (admin only).
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {UpdateGroupRequest} [updateGroupRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdPut: async (slug: string, groupId: number, updateGroupRequest?: UpdateGroupRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdPut', 'slug', slug)
+            // verify required parameter 'groupId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsGroupIdPut', 'groupId', groupId)
+            const localVarPath = `/api/v1/organizations/{slug}/groups/{groupId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"groupId"}}`, encodeURIComponent(String(groupId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updateGroupRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Create a new group (admin only).
+         * @param {string} slug 
+         * @param {CreateGroupRequest} [createGroupRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsPost: async (slug: string, createGroupRequest?: CreateGroupRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsPost', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/groups`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createGroupRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * GroupApi - functional programming interface
+ */
+export const GroupApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = GroupApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary List all groups in an organization.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugGroupsGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<GroupResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Delete a group (admin only).
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugGroupsGroupIdDelete(slug: string, groupId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsGroupIdDelete(slug, groupId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsGroupIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Get group details including members.
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugGroupsGroupIdGet(slug: string, groupId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<GroupDetailResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsGroupIdGet(slug, groupId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsGroupIdGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Add a member to a group.
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {AddGroupMemberRequest} [addGroupMemberRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugGroupsGroupIdMembersPost(slug: string, groupId: number, addGroupMemberRequest?: AddGroupMemberRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<GroupMemberResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsGroupIdMembersPost(slug, groupId, addGroupMemberRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsGroupIdMembersPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Remove a member from a group.
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {number} targetUserId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete(slug: string, groupId: number, targetUserId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete(slug, groupId, targetUserId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Update a group member\'s role (org admin only).
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {number} targetUserId 
+         * @param {UpdateGroupMemberRoleRequest} [updateGroupMemberRoleRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch(slug: string, groupId: number, targetUserId: number, updateGroupMemberRoleRequest?: UpdateGroupMemberRoleRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<GroupMemberResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch(slug, groupId, targetUserId, updateGroupMemberRoleRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Update a group (admin only).
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {UpdateGroupRequest} [updateGroupRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugGroupsGroupIdPut(slug: string, groupId: number, updateGroupRequest?: UpdateGroupRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<GroupDetailResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsGroupIdPut(slug, groupId, updateGroupRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsGroupIdPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Create a new group (admin only).
+         * @param {string} slug 
+         * @param {CreateGroupRequest} [createGroupRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugGroupsPost(slug: string, createGroupRequest?: CreateGroupRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<GroupDetailResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsPost(slug, createGroupRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * GroupApi - factory interface
+ */
+export const GroupApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = GroupApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary List all groups in an organization.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<Array<GroupResponse>> {
+            return localVarFp.apiV1OrganizationsSlugGroupsGet(slug, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Delete a group (admin only).
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdDelete(slug: string, groupId: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugGroupsGroupIdDelete(slug, groupId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Get group details including members.
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdGet(slug: string, groupId: number, options?: RawAxiosRequestConfig): AxiosPromise<GroupDetailResponse> {
+            return localVarFp.apiV1OrganizationsSlugGroupsGroupIdGet(slug, groupId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Add a member to a group.
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {AddGroupMemberRequest} [addGroupMemberRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdMembersPost(slug: string, groupId: number, addGroupMemberRequest?: AddGroupMemberRequest, options?: RawAxiosRequestConfig): AxiosPromise<GroupMemberResponse> {
+            return localVarFp.apiV1OrganizationsSlugGroupsGroupIdMembersPost(slug, groupId, addGroupMemberRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Remove a member from a group.
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {number} targetUserId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete(slug: string, groupId: number, targetUserId: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete(slug, groupId, targetUserId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Update a group member\'s role (org admin only).
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {number} targetUserId 
+         * @param {UpdateGroupMemberRoleRequest} [updateGroupMemberRoleRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch(slug: string, groupId: number, targetUserId: number, updateGroupMemberRoleRequest?: UpdateGroupMemberRoleRequest, options?: RawAxiosRequestConfig): AxiosPromise<GroupMemberResponse> {
+            return localVarFp.apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch(slug, groupId, targetUserId, updateGroupMemberRoleRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Update a group (admin only).
+         * @param {string} slug 
+         * @param {number} groupId 
+         * @param {UpdateGroupRequest} [updateGroupRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsGroupIdPut(slug: string, groupId: number, updateGroupRequest?: UpdateGroupRequest, options?: RawAxiosRequestConfig): AxiosPromise<GroupDetailResponse> {
+            return localVarFp.apiV1OrganizationsSlugGroupsGroupIdPut(slug, groupId, updateGroupRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Create a new group (admin only).
+         * @param {string} slug 
+         * @param {CreateGroupRequest} [createGroupRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsPost(slug: string, createGroupRequest?: CreateGroupRequest, options?: RawAxiosRequestConfig): AxiosPromise<GroupDetailResponse> {
+            return localVarFp.apiV1OrganizationsSlugGroupsPost(slug, createGroupRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * GroupApi - object-oriented interface
+ */
+export class GroupApi extends BaseAPI {
+    /**
+     * 
+     * @summary List all groups in an organization.
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugGroupsGet(slug: string, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGet(slug, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Delete a group (admin only).
+     * @param {string} slug 
+     * @param {number} groupId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugGroupsGroupIdDelete(slug: string, groupId: number, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGroupIdDelete(slug, groupId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Get group details including members.
+     * @param {string} slug 
+     * @param {number} groupId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugGroupsGroupIdGet(slug: string, groupId: number, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGroupIdGet(slug, groupId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Add a member to a group.
+     * @param {string} slug 
+     * @param {number} groupId 
+     * @param {AddGroupMemberRequest} [addGroupMemberRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugGroupsGroupIdMembersPost(slug: string, groupId: number, addGroupMemberRequest?: AddGroupMemberRequest, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGroupIdMembersPost(slug, groupId, addGroupMemberRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Remove a member from a group.
+     * @param {string} slug 
+     * @param {number} groupId 
+     * @param {number} targetUserId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete(slug: string, groupId: number, targetUserId: number, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete(slug, groupId, targetUserId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Update a group member\'s role (org admin only).
+     * @param {string} slug 
+     * @param {number} groupId 
+     * @param {number} targetUserId 
+     * @param {UpdateGroupMemberRoleRequest} [updateGroupMemberRoleRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch(slug: string, groupId: number, targetUserId: number, updateGroupMemberRoleRequest?: UpdateGroupMemberRoleRequest, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch(slug, groupId, targetUserId, updateGroupMemberRoleRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Update a group (admin only).
+     * @param {string} slug 
+     * @param {number} groupId 
+     * @param {UpdateGroupRequest} [updateGroupRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugGroupsGroupIdPut(slug: string, groupId: number, updateGroupRequest?: UpdateGroupRequest, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGroupIdPut(slug, groupId, updateGroupRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Create a new group (admin only).
+     * @param {string} slug 
+     * @param {CreateGroupRequest} [createGroupRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugGroupsPost(slug: string, createGroupRequest?: CreateGroupRequest, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsPost(slug, createGroupRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

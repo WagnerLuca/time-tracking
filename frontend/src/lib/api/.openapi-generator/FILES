@@ -8,6 +8,7 @@ docs/AbsenceDayApi.md
 docs/AbsenceDayResponse.md
 docs/AbsenceDayResponsePaginatedResponse.md
 docs/AbsenceType.md
+docs/AddGroupMemberRequest.md
 docs/AddMemberRequest.md
 docs/AdminCreateAbsenceDayRequest.md
 docs/AdminNotificationResponse.md
@@ -15,6 +16,7 @@ docs/AuthApi.md
 docs/AuthResponse.md
 docs/ChangePasswordRequest.md
 docs/CreateAbsenceDayRequest.md
+docs/CreateGroupRequest.md
 docs/CreateHolidayRequest.md
 docs/CreateOrgRequestRequest.md
 docs/CreateOrganizationRequest.md
@@ -22,6 +24,10 @@ docs/CreatePauseRuleRequest.md
 docs/CreateWorkScheduleRequest.md
 docs/ExportImportApi.md
 docs/ExportRequest.md
+docs/GroupApi.md
+docs/GroupDetailResponse.md
+docs/GroupMemberResponse.md
+docs/GroupResponse.md
 docs/HolidayApi.md
 docs/HolidayResponse.md
 docs/ImportEntryRequest.md
@@ -63,6 +69,8 @@ docs/TwoFactorConfirmRequest.md
 docs/TwoFactorConfirmResponse.md
 docs/TwoFactorSetupResponse.md
 docs/TwoFactorVerifyRequest.md
+docs/UpdateGroupMemberRoleRequest.md
+docs/UpdateGroupRequest.md
 docs/UpdateHolidayRequest.md
 docs/UpdateMemberRoleRequest.md
 docs/UpdateOrganizationRequest.md

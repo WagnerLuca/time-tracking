@@ -488,10 +488,44 @@ public static class DbSeeder
 
         await context.SaveChangesAsync();
 
+        // ── Groups ────────────────────────────────────────────────────
+        // extraUserEntities: [0]=Lisa, [1]=Felix, [2]=Sarah, [3]=Jonas, [4]=Laura,
+        //                    [5]=Niklas, [6]=Marie, [7]=David, [8]=Jana, [9]=Lukas
+        var backendGroup = new Group { OrganizationId = org.Id, Name = "Backend", Description = "Backend engineering team", Color = "#6366f1" };
+        var frontendGroup = new Group { OrganizationId = org.Id, Name = "Frontend", Description = "Frontend & UI team", Color = "#f59e0b" };
+        var devOpsGroup = new Group { OrganizationId = org.Id, Name = "DevOps", Description = "Infrastructure and deployment team", Color = "#10b981" };
+
+        context.Groups.AddRange(backendGroup, frontendGroup, devOpsGroup);
+        await context.SaveChangesAsync();
+
+        context.GroupMembers.AddRange(
+            // Backend: Max (admin), Tom, Felix, Jonas, David
+            new GroupMember { GroupId = backendGroup.Id, UserId = max.Id, Role = GroupRole.Admin },
+            new GroupMember { GroupId = backendGroup.Id, UserId = tom.Id, Role = GroupRole.Member },
+            new GroupMember { GroupId = backendGroup.Id, UserId = extraUserEntities[1].Id, Role = GroupRole.Member }, // Felix
+            new GroupMember { GroupId = backendGroup.Id, UserId = extraUserEntities[3].Id, Role = GroupRole.Member }, // Jonas
+            new GroupMember { GroupId = backendGroup.Id, UserId = extraUserEntities[7].Id, Role = GroupRole.Member }, // David
+
+            // Frontend: Anna (admin), Lisa, Sarah, Laura, Marie, Jana
+            new GroupMember { GroupId = frontendGroup.Id, UserId = anna.Id, Role = GroupRole.Admin },
+            new GroupMember { GroupId = frontendGroup.Id, UserId = extraUserEntities[0].Id, Role = GroupRole.Member }, // Lisa
+            new GroupMember { GroupId = frontendGroup.Id, UserId = extraUserEntities[2].Id, Role = GroupRole.Member }, // Sarah
+            new GroupMember { GroupId = frontendGroup.Id, UserId = extraUserEntities[4].Id, Role = GroupRole.Member }, // Laura
+            new GroupMember { GroupId = frontendGroup.Id, UserId = extraUserEntities[6].Id, Role = GroupRole.Member }, // Marie
+            new GroupMember { GroupId = frontendGroup.Id, UserId = extraUserEntities[8].Id, Role = GroupRole.Member }, // Jana
+
+            // DevOps: Niklas (admin), Lukas, Tom (cross-team)
+            new GroupMember { GroupId = devOpsGroup.Id, UserId = extraUserEntities[5].Id, Role = GroupRole.Admin }, // Niklas
+            new GroupMember { GroupId = devOpsGroup.Id, UserId = extraUserEntities[9].Id, Role = GroupRole.Member }, // Lukas
+            new GroupMember { GroupId = devOpsGroup.Id, UserId = tom.Id, Role = GroupRole.Member }
+        );
+        await context.SaveChangesAsync();
+
         Console.WriteLine("✅ Database seeded successfully!");
         Console.WriteLine($"   - {context.Users.Count()} users");
         Console.WriteLine($"   - {context.Organizations.Count()} organizations");
         Console.WriteLine($"   - {context.UserOrganizations.Count()} memberships");
+        Console.WriteLine($"   - {context.Groups.Count()} groups");
         Console.WriteLine($"   - {context.Holidays.Count()} holidays");
         Console.WriteLine($"   - {context.AbsenceDays.Count()} absence days");
         Console.WriteLine($"   - {context.TimeEntries.Count()} time entries");
