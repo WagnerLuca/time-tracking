@@ -251,6 +251,7 @@
 		{ key: 'csvImportMode', label: 'CSV Import', description: 'Can group members import time entries via CSV?' },
 		{ key: 'workScheduleChangeMode', label: 'Work Schedule Changes', description: 'Can members change their own work schedule?' },
 		{ key: 'initialOvertimeMode', label: 'Initial Overtime', description: 'Can members set their initial overtime balance?' },
+		{ key: 'absenceSelfServiceMode', label: 'Absences & Vacation', description: 'Can group members add their own absences directly, or must they request approval?' },
 	];
 
 	const permVisibilitySettings = [
