@@ -420,6 +420,15 @@ export interface LoginResponse {
     'user': UserInfo;
 }
 /**
+ * A group a member belongs to, for tag display (e.g. \"Frontend Admin\").
+ */
+export interface MemberGroupResponse {
+    'groupId'?: number;
+    'name': string | null;
+    'color'?: string | null;
+    'isGroupAdmin'?: boolean;
+}
+/**
  * Per-member time tracking statistics for the admin overview.
  */
 export interface MemberTimeOverviewResponse {
@@ -521,6 +530,10 @@ export interface OrganizationMemberResponse {
     'role': string | null;
     'joinedAt'?: string;
     'initialOvertimeHours'?: number;
+    /**
+     * Groups this member belongs to within the organization.
+     */
+    'groups'?: Array<MemberGroupResponse> | null;
     'vacationDaysPerYear'?: number;
     'vacationDaysUsed'?: number;
     /**

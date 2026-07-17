@@ -159,6 +159,25 @@ public class OrganizationService : IOrganizationService
                     Planned = g.Where(a => a.Date > today).Sum(a => a.IsHalfDay ? 0.5 : 1.0)
                 });
 
+        // Group memberships for tag display (e.g. "Frontend Admin")
+        var memberGroups = await _context.GroupMembers.AsNoTracking()
+            .Where(gm => gm.Group.OrganizationId == organization.Id && gm.Group.IsActive)
+            .Select(gm => new
+            {
+                gm.UserId,
+                Group = new MemberGroupResponse
+                {
+                    GroupId = gm.GroupId,
+                    Name = gm.Group.Name,
+                    Color = gm.Group.Color,
+                    IsGroupAdmin = gm.Role == GroupRole.Admin
+                }
+            })
+            .ToListAsync();
+        var groupsByUser = memberGroups
+            .GroupBy(g => g.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Group).OrderBy(x => x.Name).ToList());
+
         var membersWithVacation = organization.Members.Select(m =>
         {
             var usage = usageByUser.GetValueOrDefault(m.Id);
@@ -170,7 +189,8 @@ public class OrganizationService : IOrganizationService
                 VacationDaysUsed = used,
                 VacationDaysTaken = taken,
                 VacationDaysPlanned = planned,
-                VacationDaysRemaining = Math.Max(0, m.VacationDaysPerYear - used)
+                VacationDaysRemaining = Math.Max(0, m.VacationDaysPerYear - used),
+                Groups = groupsByUser.GetValueOrDefault(m.Id) ?? new List<MemberGroupResponse>()
             };
         }).ToList();
 

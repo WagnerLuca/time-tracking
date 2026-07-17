@@ -40,6 +40,7 @@ docs/ImportPreviewRow.md
 docs/ImportResultResponse.md
 docs/LoginRequest.md
 docs/LoginResponse.md
+docs/MemberGroupResponse.md
 docs/MemberTimeOverviewResponse.md
 docs/NotificationsApi.md
 docs/OrgRequestResponse.md

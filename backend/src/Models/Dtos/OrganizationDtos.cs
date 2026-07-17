@@ -44,6 +44,15 @@ public record OrganizationDetailResponse
     public List<PauseRuleResponse>? PauseRules { get; init; }
 }
 
+/// <summary>A group a member belongs to, for tag display (e.g. "Frontend Admin").</summary>
+public record MemberGroupResponse
+{
+    public int GroupId { get; init; }
+    public required string Name { get; init; }
+    public string? Color { get; init; }
+    public bool IsGroupAdmin { get; init; }
+}
+
 /// <summary>Organization member profile and role.</summary>
 public record OrganizationMemberResponse
 {
@@ -55,6 +64,8 @@ public record OrganizationMemberResponse
     public required string Role { get; init; }
     public DateTime JoinedAt { get; init; }
     public double InitialOvertimeHours { get; init; }
+    /// <summary>Groups this member belongs to within the organization.</summary>
+    public List<MemberGroupResponse> Groups { get; init; } = new();
     public double VacationDaysPerYear { get; init; }
     public double VacationDaysUsed { get; init; }
     /// <summary>Vacation days already taken this year (date &lt;= today).</summary>
