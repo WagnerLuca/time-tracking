@@ -75,6 +75,38 @@ export function ruleModeButtonClass(mode: string | null | undefined): string {
 	return 'btn-success';
 }
 
+// ── Segmented-control option sets (all options visible, click to select) ──
+
+export interface ModeOption {
+	value: number | null;
+	label: string;
+	activeClass: string;
+	hint?: string;
+}
+
+export const ruleModeOptions: ModeOption[] = [
+	{ value: 0, label: 'Disabled', activeClass: 'btn-neutral', hint: 'Feature is off for members' },
+	{ value: 1, label: 'Approval', activeClass: 'btn-warning', hint: 'Members must request; an admin approves' },
+	{ value: 2, label: 'Allowed', activeClass: 'btn-success', hint: 'Members can do this themselves' }
+];
+
+export const joinPolicyOptions: ModeOption[] = [
+	{ value: 0, label: 'Admin Only', activeClass: 'btn-neutral', hint: 'Only admins can add members' },
+	{ value: 1, label: 'Approval', activeClass: 'btn-warning', hint: 'Join requests need admin approval' },
+	{ value: 2, label: 'Open', activeClass: 'btn-success', hint: 'Anyone can join freely' }
+];
+
+export const visibilityModeOptions: ModeOption[] = [
+	{ value: 0, label: 'Private', activeClass: 'btn-neutral', hint: 'Members only see their own data' },
+	{ value: 1, label: 'Admins', activeClass: 'btn-warning', hint: 'Admins can see all members' },
+	{ value: 2, label: 'Everyone', activeClass: 'btn-success', hint: 'All members see each other' }
+];
+
+/** Prepends an Inherit option for group-level overrides (null = inherit from org). */
+export function withInherit(options: ModeOption[]): ModeOption[] {
+	return [{ value: null, label: 'Inherit', activeClass: 'btn-info', hint: 'Use the organization default' }, ...options];
+}
+
 // ── Data-driven settings definitions ──
 
 export interface RuleSetting {

@@ -5,7 +5,8 @@
 	import { groupApi, organizationsApi } from '$lib/apiClient';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { getInitials } from '$lib/utils/formatters';
-	import { ruleModeLabel, ruleModeButtonClass, parseRuleMode, visibilityModeLabel, visibilityModeButtonClass, parseVisibilityMode } from '$lib/utils/orgRules';
+	import ModeSelector from '$lib/components/ModeSelector.svelte';
+	import { parseRuleMode, parseVisibilityMode, ruleModeOptions, visibilityModeOptions, withInherit } from '$lib/utils/orgRules';
 	import type {
 		GroupResponse,
 		GroupDetailResponse,
@@ -278,22 +279,14 @@
 		}
 	}
 
-	async function cyclePermRuleMode(key: string) {
-		if (!selectedGroup?.id || !permissions) return;
+	async function setPermValue(key: string, value: number | boolean | null) {
+		if (!selectedGroup?.id) return;
 		permissionsSaving = true;
 		permissionsError = '';
 		try {
-			const current = parseRuleMode((permissions as Record<string, any>)[key]);
-			// Cycle: null(inherit) -> 0(Disabled) -> 1(RequiresApproval) -> 2(Allowed) -> null(inherit)
-			let next: number | null;
-			if ((permissions as Record<string, any>)[key] == null) {
-				next = 0; // Start at Disabled
-			} else if (current >= 2) {
-				next = null as any; // Back to inherit
-			} else {
-				next = current + 1;
-			}
-			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, selectedGroup.id, { [key]: next } as any);
+			// "Inherit" (null) is transmitted as -1; the backend clears the override
+			const payload = value === null ? -1 : value;
+			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, selectedGroup.id, { [key]: payload } as any);
 			await loadPermissions(selectedGroup.id);
 		} catch (err) {
 			permissionsError = extractErrorMessage(err, 'Failed to update permission.');
@@ -302,66 +295,6 @@
 		}
 	}
 
-	async function cyclePermVisibilityMode(key: string) {
-		if (!selectedGroup?.id || !permissions) return;
-		permissionsSaving = true;
-		permissionsError = '';
-		try {
-			const current = parseVisibilityMode((permissions as Record<string, any>)[key]);
-			let next: number | null;
-			if ((permissions as Record<string, any>)[key] == null) {
-				next = 0;
-			} else if (current >= 2) {
-				next = null as any;
-			} else {
-				next = current + 1;
-			}
-			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, selectedGroup.id, { [key]: next } as any);
-			await loadPermissions(selectedGroup.id);
-		} catch (err) {
-			permissionsError = extractErrorMessage(err, 'Failed to update permission.');
-		} finally {
-			permissionsSaving = false;
-		}
-	}
-
-	async function togglePermAdminFlag(key: string) {
-		if (!selectedGroup?.id || !permissions) return;
-		permissionsSaving = true;
-		permissionsError = '';
-		try {
-			const current = (permissions as Record<string, any>)[key];
-			const next = current === true ? false : current === false ? null : true;
-			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, selectedGroup.id, { [key]: next } as any);
-			await loadPermissions(selectedGroup.id);
-		} catch (err) {
-			permissionsError = extractErrorMessage(err, 'Failed to update permission.');
-		} finally {
-			permissionsSaving = false;
-		}
-	}
-
-	function permLabel(value: any, type: 'rule' | 'visibility'): string {
-		if (value == null) return 'Inherit';
-		return type === 'rule' ? ruleModeLabel(value) : visibilityModeLabel(value);
-	}
-
-	function permButtonClass(value: any, type: 'rule' | 'visibility'): string {
-		if (value == null) return 'btn-ghost border-base-300';
-		return type === 'rule' ? ruleModeButtonClass(value) : visibilityModeButtonClass(value);
-	}
-
-	function flagLabel(value: any): string {
-		if (value === true) return 'Enabled';
-		if (value === false) return 'Disabled';
-		return 'Inherit';
-	}
-
-	function flagClass(value: any): string {
-		if (value === true) return 'btn-success';
-		if (value === false) return 'btn-error';
-		return 'btn-ghost border-base-300';
-	}
 </script>
 
 <svelte:head>
@@ -614,18 +547,18 @@
 												</div>
 												{#each permRuleSettings as rs}
 													{@const value = (permissions as Record<string, any>)[rs.key]}
-													<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0">
+													<div class="flex items-center justify-between gap-3 p-3 border-b border-base-200 last:border-b-0 flex-wrap">
 														<div>
 															<div class="text-sm font-medium text-base-content">{rs.label}</div>
 															<div class="text-xs text-base-content/50">{rs.description}</div>
 														</div>
-														<button
-															class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {permButtonClass(value, 'rule')}"
-															onclick={() => cyclePermRuleMode(rs.key)}
+														<ModeSelector
+															options={withInherit(ruleModeOptions)}
+															value={value == null ? null : parseRuleMode(value)}
+															onselect={(v) => setPermValue(rs.key, v as number | null)}
 															disabled={permissionsSaving}
-														>
-															{permLabel(value, 'rule')}
-														</button>
+															size="xs"
+														/>
 													</div>
 												{/each}
 
@@ -635,18 +568,18 @@
 												</div>
 												{#each permVisibilitySettings as vs}
 													{@const value = (permissions as Record<string, any>)[vs.key]}
-													<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0">
+													<div class="flex items-center justify-between gap-3 p-3 border-b border-base-200 last:border-b-0 flex-wrap">
 														<div>
 															<div class="text-sm font-medium text-base-content">{vs.label}</div>
 															<div class="text-xs text-base-content/50">{vs.description}</div>
 														</div>
-														<button
-															class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {permButtonClass(value, 'visibility')}"
-															onclick={() => cyclePermVisibilityMode(vs.key)}
+														<ModeSelector
+															options={withInherit(visibilityModeOptions)}
+															value={value == null ? null : parseVisibilityMode(value)}
+															onselect={(v) => setPermValue(vs.key, v as number | null)}
 															disabled={permissionsSaving}
-														>
-															{permLabel(value, 'visibility')}
-														</button>
+															size="xs"
+														/>
 													</div>
 												{/each}
 
@@ -656,18 +589,21 @@
 												</div>
 												{#each permAdminFlags as flag}
 													{@const value = (permissions as Record<string, any>)[flag.key]}
-													<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0">
+													<div class="flex items-center justify-between gap-3 p-3 border-b border-base-200 last:border-b-0 flex-wrap">
 														<div>
 															<div class="text-sm font-medium text-base-content">{flag.label}</div>
 															<div class="text-xs text-base-content/50">{flag.description}</div>
 														</div>
-														<button
-															class="btn btn-sm min-w-[100px] font-semibold whitespace-nowrap {flagClass(value)}"
-															onclick={() => togglePermAdminFlag(flag.key)}
+														<ModeSelector
+															options={[
+																{ value: 0, label: 'Disabled', activeClass: 'btn-neutral' },
+																{ value: 1, label: 'Enabled', activeClass: 'btn-success' }
+															]}
+															value={value === true ? 1 : 0}
+															onselect={(v) => setPermValue(flag.key, v === 1)}
 															disabled={permissionsSaving}
-														>
-															{flagLabel(value)}
-														</button>
+															size="xs"
+														/>
 													</div>
 												{/each}
 											</div>

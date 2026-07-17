@@ -312,16 +312,17 @@ public class GroupService : IGroupService
             .FirstOrDefaultAsync(g => g.Id == groupId && g.OrganizationId == org.Id);
         if (group is null) return ServiceResult.NotFound<GroupPermissionsResponse>("Group not found.");
 
-        // Apply nullable partial updates
-        if (request.EditPastEntriesMode.HasValue) group.EditPastEntriesMode = request.EditPastEntriesMode;
-        if (request.EditPauseMode.HasValue) group.EditPauseMode = request.EditPauseMode;
-        if (request.CsvImportMode.HasValue) group.CsvImportMode = request.CsvImportMode;
-        if (request.WorkScheduleChangeMode.HasValue) group.WorkScheduleChangeMode = request.WorkScheduleChangeMode;
-        if (request.InitialOvertimeMode.HasValue) group.InitialOvertimeMode = request.InitialOvertimeMode;
-        if (request.AbsenceSelfServiceMode.HasValue) group.AbsenceSelfServiceMode = request.AbsenceSelfServiceMode;
-        if (request.VacationVisibility.HasValue) group.VacationVisibility = request.VacationVisibility;
-        if (request.SickDayVisibility.HasValue) group.SickDayVisibility = request.SickDayVisibility;
-        if (request.TimeEntryVisibility.HasValue) group.TimeEntryVisibility = request.TimeEntryVisibility;
+        // Apply nullable partial updates.
+        // A negative value (e.g. -1) clears the override back to "inherit from org".
+        if (request.EditPastEntriesMode.HasValue) group.EditPastEntriesMode = NormalizeOverride(request.EditPastEntriesMode);
+        if (request.EditPauseMode.HasValue) group.EditPauseMode = NormalizeOverride(request.EditPauseMode);
+        if (request.CsvImportMode.HasValue) group.CsvImportMode = NormalizeOverride(request.CsvImportMode);
+        if (request.WorkScheduleChangeMode.HasValue) group.WorkScheduleChangeMode = NormalizeOverride(request.WorkScheduleChangeMode);
+        if (request.InitialOvertimeMode.HasValue) group.InitialOvertimeMode = NormalizeOverride(request.InitialOvertimeMode);
+        if (request.AbsenceSelfServiceMode.HasValue) group.AbsenceSelfServiceMode = NormalizeOverride(request.AbsenceSelfServiceMode);
+        if (request.VacationVisibility.HasValue) group.VacationVisibility = NormalizeOverride(request.VacationVisibility);
+        if (request.SickDayVisibility.HasValue) group.SickDayVisibility = NormalizeOverride(request.SickDayVisibility);
+        if (request.TimeEntryVisibility.HasValue) group.TimeEntryVisibility = NormalizeOverride(request.TimeEntryVisibility);
         if (request.GroupAdminCanApproveAbsences.HasValue) group.GroupAdminCanApproveAbsences = request.GroupAdminCanApproveAbsences;
         if (request.GroupAdminCanApproveTimeEdits.HasValue) group.GroupAdminCanApproveTimeEdits = request.GroupAdminCanApproveTimeEdits;
         if (request.GroupAdminCanApproveScheduleChanges.HasValue) group.GroupAdminCanApproveScheduleChanges = request.GroupAdminCanApproveScheduleChanges;
@@ -404,6 +405,10 @@ public class GroupService : IGroupService
             canExportData
         ));
     }
+
+    /// <summary>Maps negative enum values (sent by the UI as "Inherit") to null (no override).</summary>
+    private static T? NormalizeOverride<T>(T? value) where T : struct, Enum
+        => value.HasValue && Convert.ToInt32(value.Value) < 0 ? null : value;
 
     // Most permissive RuleMode wins (Allowed > RequiresApproval > Disabled)
     private static RuleMode ResolveRuleMode(RuleMode orgDefault, List<Group> userGroups, Func<Group, RuleMode?> selector)

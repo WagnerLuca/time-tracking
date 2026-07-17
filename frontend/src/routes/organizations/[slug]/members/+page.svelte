@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { auth } from '$lib/stores/auth.svelte';
+	import GroupTags from '$lib/components/GroupTags.svelte';
 	import { organizationsApi } from '$lib/apiClient';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import type {
@@ -205,11 +206,12 @@
 								{(member.firstName?.[0] ?? '').toUpperCase()}{(member.lastName?.[0] ?? '').toUpperCase()}
 							</div>
 							<div class="flex-1 min-w-0">
-								<div class="font-semibold text-base-content text-[0.9375rem] flex items-center gap-1.5">
+								<div class="font-semibold text-base-content text-[0.9375rem] flex items-center gap-1.5 flex-wrap">
 									{member.firstName} {member.lastName}
 									{#if member.id === auth.user?.id}
 										<span class="badge badge-info badge-xs font-semibold">You</span>
 									{/if}
+									<GroupTags groups={member.groups} />
 								</div>
 								<div class="text-sm text-base-content/40 mt-0.5">{member.email}</div>
 								{#if teamOverviewLoaded && overview}

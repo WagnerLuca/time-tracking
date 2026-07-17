@@ -2,14 +2,16 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { organizationsApi, pauseRulesApi, requestsApi, absenceDayApi } from '$lib/apiClient';
+	import { organizationsApi, pauseRulesApi, requestsApi, absenceDayApi, groupApi } from '$lib/apiClient';
 	import { formatRequestType, formatTimeAgo, statusBadgeClass, parseRequestData } from '$lib/utils/formatters';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import {
 		parseRuleMode, ruleModeLabel, joinPolicyLabel, ruleModeButtonClass,
 		ruleSettings, toggleSettings,
-		visibilitySettings, parseVisibilityMode, visibilityModeLabel, visibilityModeButtonClass
+		visibilitySettings, parseVisibilityMode, visibilityModeLabel, visibilityModeButtonClass,
+		ruleModeOptions, joinPolicyOptions, visibilityModeOptions, withInherit
 	} from '$lib/utils/orgRules';
+	import ModeSelector from '$lib/components/ModeSelector.svelte';
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationSettingsRequest,
@@ -20,6 +22,8 @@
 		OrgRequestResponse,
 		AbsenceTypeDefinitionResponse,
 		AbsenceCreditMode,
+		GroupResponse,
+		GroupPermissionsResponse,
 	} from '$lib/api';
 
 	let org = $state<OrganizationDetailResponse | null>(null);
@@ -70,6 +74,7 @@
 			org = data;
 			loadRequestHistory();
 			loadAbsenceTypes();
+			loadPermGroups();
 		} catch (err) {
 			if (getErrorStatus(err) === 404) { error = 'Organization not found.'; }
 			else { error = 'Failed to load organization.'; }
@@ -180,35 +185,116 @@
 		return 2;
 	}
 
+	// ── Unified permissions overview (org defaults x group overrides) ──
+	interface GroupPermsColumn { group: GroupResponse; perms: GroupPermissionsResponse }
+	let permGroups = $state<GroupPermsColumn[]>([]);
+	let permGroupsLoading = $state(false);
+	let permMatrixError = $state('');
+
+	const matrixRuleRows = [
+		{ key: 'editPastEntriesMode', label: 'Edit past entries' },
+		{ key: 'editPauseMode', label: 'Edit pause' },
+		{ key: 'initialOvertimeMode', label: 'Initial overtime' },
+		{ key: 'workScheduleChangeMode', label: 'Schedule periods' },
+		{ key: 'csvImportMode', label: 'CSV import' },
+		{ key: 'absenceSelfServiceMode', label: 'Absences & vacation' }
+	];
+	const matrixVisibilityRows = [
+		{ key: 'vacationVisibility', label: 'Vacation visibility' },
+		{ key: 'sickDayVisibility', label: 'Sick day visibility' },
+		{ key: 'timeEntryVisibility', label: 'Time entry visibility' }
+	];
+	const matrixCapabilityRows = [
+		{ key: 'groupAdminCanApproveAbsences', label: 'Approve absences' },
+		{ key: 'groupAdminCanApproveTimeEdits', label: 'Approve time edits' },
+		{ key: 'groupAdminCanApproveScheduleChanges', label: 'Approve schedule changes' },
+		{ key: 'groupAdminCanManageMembers', label: 'Manage members' },
+		{ key: 'groupAdminCanViewAllTimeEntries', label: 'View all time entries' },
+		{ key: 'groupAdminCanExportData', label: 'Export data' }
+	];
+
+	async function loadPermGroups() {
+		permGroupsLoading = true;
+		try {
+			const { data: groups } = await groupApi.apiV1OrganizationsSlugGroupsGet(orgSlug);
+			const columns = await Promise.all(
+				(groups as GroupResponse[]).map(async (group) => {
+					const { data: perms } = await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(orgSlug, group.id!);
+					return { group, perms };
+				})
+			);
+			permGroups = columns.sort((a, b) => (a.group.name ?? '').localeCompare(b.group.name ?? ''));
+		} catch { permGroups = []; }
+		permGroupsLoading = false;
+	}
+
+	/** Cycles an org-level mode (3 states) from the matrix. */
+	async function cycleOrgMatrixCell(key: string, isVisibility: boolean) {
+		if (!org) return;
+		if (key === 'timeEntryVisibility') {
+			// Org level is a boolean (admins may see member time)
+			await toggleSetting('memberTimeEntryVisibility');
+			return;
+		}
+		const current = isVisibility
+			? parseVisibilityMode((org as Record<string, any>)[key])
+			: parseRuleMode((org as Record<string, any>)[key]);
+		await setSetting(key, (current + 1) % 3);
+	}
+
+	/** Cycles a group override: Inherit -> Disabled/Private -> Approval/Admins -> Allowed/Everyone -> Inherit. */
+	async function cycleGroupMatrixCell(col: GroupPermsColumn, key: string, isVisibility: boolean) {
+		const raw = (col.perms as Record<string, any>)[key];
+		let next: number;
+		if (raw == null) next = 0;
+		else {
+			const current = isVisibility ? parseVisibilityMode(raw) : parseRuleMode(raw);
+			next = current >= 2 ? -1 : current + 1; // -1 = back to inherit
+		}
+		await saveGroupPerm(col, key, next);
+	}
+
+	async function toggleGroupCapability(col: GroupPermsColumn, key: string) {
+		const current = (col.perms as Record<string, any>)[key] === true;
+		await saveGroupPerm(col, key, !current);
+	}
+
+	async function saveGroupPerm(col: GroupPermsColumn, key: string, value: number | boolean) {
+		permMatrixError = '';
+		try {
+			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, col.group.id!, { [key]: value } as any);
+			const { data } = await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(orgSlug, col.group.id!);
+			col.perms = data;
+			permGroups = [...permGroups];
+		} catch (err) {
+			permMatrixError = extractErrorMessage(err, 'Failed to update permission.');
+		}
+	}
+
+	/** Badge classes for a mode value in the matrix. */
+	function matrixBadge(mode: string | null | undefined, isVisibility: boolean): { label: string; cls: string } {
+		if (mode == null) return { label: '—', cls: 'badge-ghost' };
+		if (isVisibility) {
+			if (mode === 'Private') return { label: 'Private', cls: 'badge-neutral' };
+			if (mode === 'AdminOnly') return { label: 'Admins', cls: 'badge-warning' };
+			return { label: 'Everyone', cls: 'badge-success' };
+		}
+		if (mode === 'Disabled') return { label: 'Disabled', cls: 'badge-neutral' };
+		if (mode === 'RequiresApproval') return { label: 'Approval', cls: 'badge-warning' };
+		return { label: 'Allowed', cls: 'badge-success' };
+	}
+
 	function filteredRequests(): OrgRequestResponse[] {
 		if (requestHistoryFilter === 'all') return requestHistory;
 		return requestHistory.filter(r => r.status === requestHistoryFilter);
 	}
 
-	async function cycleSetting(key: string) {
+	async function setSetting(key: string, value: number) {
 		if (!org) return;
 		settingsSaving = true;
 		settingsError = '';
 		try {
-			const current = parseRuleMode((org as Record<string, any>)[key]);
-			const next = ((current + 1) % 3) as RuleMode;
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { [key]: next } as UpdateOrganizationSettingsRequest);
-			await reloadOrg();
-		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to update setting.');
-		} finally {
-			settingsSaving = false;
-		}
-	}
-
-	async function cycleVisibilitySetting(key: string) {
-		if (!org) return;
-		settingsSaving = true;
-		settingsError = '';
-		try {
-			const current = parseVisibilityMode((org as Record<string, any>)[key]);
-			const next = ((current + 1) % 3) as VisibilityMode;
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { [key]: next } as UpdateOrganizationSettingsRequest);
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { [key]: value } as UpdateOrganizationSettingsRequest);
 			await reloadOrg();
 		} catch (err) {
 			settingsError = extractErrorMessage(err, 'Failed to update setting.');
@@ -348,40 +434,37 @@
 						</div>
 					{/each}
 
-					<!-- Rule mode settings (tri-state cycle) -->
+					<!-- Rule mode settings (segmented: click an option) -->
 					{#each ruleSettings as rs}
 						{@const mode = (org as Record<string, any>)[rs.key] as string | null}
-						{@const label = rs.labelFn ? rs.labelFn(mode) : ruleModeLabel(mode)}
-						<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
+						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
 							<div class="setting-info">
 								<div class="font-semibold text-base-content mb-0.5">{rs.label}</div>
 								<div class="text-sm text-base-content/60 max-w-[400px]">{rs.description}</div>
 							</div>
-							<button
-								class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {ruleModeButtonClass(mode)}"
-								onclick={() => cycleSetting(rs.key)}
+							<ModeSelector
+								options={rs.key === 'joinPolicy' ? joinPolicyOptions : ruleModeOptions}
+								value={parseRuleMode(mode)}
+								onselect={(v) => setSetting(rs.key, v as number)}
 								disabled={settingsSaving}
-							>
-								{label}
-							</button>
+							/>
 						</div>
 					{/each}
 
 					<!-- Visibility settings -->
 					{#each visibilitySettings as vs}
 						{@const mode = (org as Record<string, any>)[vs.key] as string | null}
-						<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
+						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
 							<div class="setting-info">
 								<div class="font-semibold text-base-content mb-0.5">{vs.label}</div>
 								<div class="text-sm text-base-content/60 max-w-[400px]">{vs.description}</div>
 							</div>
-							<button
-								class="btn btn-sm min-w-[130px] font-semibold whitespace-nowrap {visibilityModeButtonClass(mode)}"
-								onclick={() => cycleVisibilitySetting(vs.key)}
+							<ModeSelector
+								options={visibilityModeOptions}
+								value={parseVisibilityMode(mode)}
+								onselect={(v) => setSetting(vs.key, v as number)}
 								disabled={settingsSaving}
-							>
-								{visibilityModeLabel(mode)}
-							</button>
+							/>
 						</div>
 					{/each}
 				</div>
@@ -497,6 +580,117 @@
 								</div>
 							{/each}
 						</div>
+					{/if}
+				</div>
+
+				<!-- Unified Permissions Overview -->
+				<div class="mt-6">
+					<div class="flex items-center justify-between mb-1">
+						<h3 class="text-base font-bold text-base-content/70 m-0">Permissions Overview</h3>
+						<a href="/organizations/{orgSlug}/groups" class="btn btn-ghost btn-xs">Open groups →</a>
+					</div>
+					<p class="text-sm text-base-content/50 mb-3">
+						Organization defaults and per-group overrides in one place. Click a cell to change it —
+						group cells cycle <span class="italic">Inherit → Disabled → Approval → Allowed</span>.
+					</p>
+					{#if permMatrixError}
+						<div class="alert alert-error text-sm mb-3">{permMatrixError}</div>
+					{/if}
+					{#if permGroupsLoading}
+						<p class="text-base-content/40 text-sm">Loading groups...</p>
+					{:else}
+						<div class="overflow-x-auto bg-base-100 border border-base-300 rounded-xl">
+							<table class="table table-sm">
+								<thead>
+									<tr>
+										<th class="bg-base-200/50 text-xs">Permission</th>
+										<th class="bg-base-200/50 text-center text-xs">Organization</th>
+										{#each permGroups as col}
+											<th class="bg-base-200/50 text-center text-xs">
+												<span class="inline-flex items-center gap-1.5">
+													<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background: {col.group.color ?? '#888'}"></span>
+													{col.group.name}
+												</span>
+											</th>
+										{/each}
+									</tr>
+								</thead>
+								<tbody>
+									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/40 bg-base-200/30 py-1">Rules — what members may do</td></tr>
+									{#each matrixRuleRows as row}
+										<tr>
+											<td class="font-medium text-sm whitespace-nowrap">{row.label}</td>
+											<td class="text-center">
+												<button class="badge badge-sm cursor-pointer {matrixBadge((org as Record<string, any>)[row.key], false).cls}" title="Organization default — click to change" onclick={() => cycleOrgMatrixCell(row.key, false)} disabled={settingsSaving}>
+													{matrixBadge((org as Record<string, any>)[row.key], false).label}
+												</button>
+											</td>
+											{#each permGroups as col}
+												<td class="text-center">
+													{#if (col.perms as Record<string, any>)[row.key] == null}
+														<button class="badge badge-sm badge-ghost opacity-60 cursor-pointer" title="Inherits the org default — click to override" onclick={() => cycleGroupMatrixCell(col, row.key, false)}>
+															↳ {matrixBadge((org as Record<string, any>)[row.key], false).label}
+														</button>
+													{:else}
+														<button class="badge badge-sm cursor-pointer {matrixBadge((col.perms as Record<string, any>)[row.key], false).cls}" title="Group override — click to change (cycles back to Inherit)" onclick={() => cycleGroupMatrixCell(col, row.key, false)}>
+															{matrixBadge((col.perms as Record<string, any>)[row.key], false).label}
+														</button>
+													{/if}
+												</td>
+											{/each}
+										</tr>
+									{/each}
+
+									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/40 bg-base-200/30 py-1">Visibility — who sees members' data</td></tr>
+									{#each matrixVisibilityRows as row}
+										{@const orgMode = row.key === 'timeEntryVisibility' ? (org.memberTimeEntryVisibility ? 'AdminOnly' : 'Private') : (org as Record<string, any>)[row.key]}
+										<tr>
+											<td class="font-medium text-sm whitespace-nowrap">{row.label}</td>
+											<td class="text-center">
+												<button class="badge badge-sm cursor-pointer {matrixBadge(orgMode, true).cls}" title="Organization default — click to change" onclick={() => cycleOrgMatrixCell(row.key, true)} disabled={settingsSaving}>
+													{matrixBadge(orgMode, true).label}
+												</button>
+											</td>
+											{#each permGroups as col}
+												<td class="text-center">
+													{#if (col.perms as Record<string, any>)[row.key] == null}
+														<button class="badge badge-sm badge-ghost opacity-60 cursor-pointer" title="Inherits the org default — click to override" onclick={() => cycleGroupMatrixCell(col, row.key, true)}>
+															↳ {matrixBadge(orgMode, true).label}
+														</button>
+													{:else}
+														<button class="badge badge-sm cursor-pointer {matrixBadge((col.perms as Record<string, any>)[row.key], true).cls}" title="Group override — click to change (cycles back to Inherit)" onclick={() => cycleGroupMatrixCell(col, row.key, true)}>
+															{matrixBadge((col.perms as Record<string, any>)[row.key], true).label}
+														</button>
+													{/if}
+												</td>
+											{/each}
+										</tr>
+									{/each}
+
+									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/40 bg-base-200/30 py-1">Group admin capabilities — what group admins may approve/see</td></tr>
+									{#each matrixCapabilityRows as row}
+										<tr>
+											<td class="font-medium text-sm whitespace-nowrap">{row.label}</td>
+											<td class="text-center text-xs text-base-content/40" title="Organization admins can always do this">always</td>
+											{#each permGroups as col}
+												<td class="text-center">
+													<button
+														class="badge badge-sm cursor-pointer {(col.perms as Record<string, any>)[row.key] === true ? 'badge-success' : 'badge-ghost opacity-60'}"
+														title="Click to toggle for this group's admins"
+														onclick={() => toggleGroupCapability(col, row.key)}
+													>
+														{(col.perms as Record<string, any>)[row.key] === true ? '✓ enabled' : 'off'}
+													</button>
+												</td>
+											{/each}
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+						{#if permGroups.length === 0}
+							<p class="text-base-content/40 text-sm mt-2">No groups yet — create groups to set per-team overrides.</p>
+						{/if}
 					{/if}
 				</div>
 

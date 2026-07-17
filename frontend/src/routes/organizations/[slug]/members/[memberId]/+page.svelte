@@ -7,6 +7,7 @@
 	import { formatHoursDecimal, formatDateFull, absenceTypeLabel, absenceTypeBadge, getInitials } from '$lib/utils/formatters';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import MemberCalendar from '$lib/components/MemberCalendar.svelte';
+	import GroupTags from '$lib/components/GroupTags.svelte';
 	import type {
 		OrganizationDetailResponse,
 		OrganizationMemberResponse,
@@ -405,6 +406,7 @@
 				<p class="text-base-content/60 text-sm mt-0.5 mb-2">{member.email}</p>
 				<div class="flex items-center gap-2.5 flex-wrap">
 					<span class="badge badge-sm uppercase tracking-wide {member.role === 'Owner' ? 'badge-warning' : member.role === 'Admin' ? 'badge-info' : 'badge-ghost'}">{member.role}</span>
+					<GroupTags groups={member.groups} size="sm" />
 					{#if member.joinedAt}
 						<span class="text-base-content/40 text-xs">Joined {formatDateFull(member.joinedAt)}</span>
 					{/if}
