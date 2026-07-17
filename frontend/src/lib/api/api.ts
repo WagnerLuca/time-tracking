@@ -478,6 +478,14 @@ export interface OrganizationMemberResponse {
     'initialOvertimeHours'?: number;
     'vacationDaysPerYear'?: number;
     'vacationDaysUsed'?: number;
+    /**
+     * Vacation days already taken this year (date <= today).
+     */
+    'vacationDaysTaken'?: number;
+    /**
+     * Vacation days planned for the rest of this year (date > today).
+     */
+    'vacationDaysPlanned'?: number;
     'vacationDaysRemaining'?: number;
 }
 /**
