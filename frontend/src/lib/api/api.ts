@@ -24,6 +24,19 @@ import type { RequestArgs } from './base';
 import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError, operationServerMap } from './base';
 
 /**
+ * How a custom absence type affects the day\'s expected working hours.
+ */
+
+export const AbsenceCreditMode = {
+    NUMBER_0: 0,
+    NUMBER_1: 1,
+    NUMBER_2: 2
+} as const;
+
+export type AbsenceCreditMode = typeof AbsenceCreditMode[keyof typeof AbsenceCreditMode];
+
+
+/**
  * Absence day entry (sick day, vacation, etc.).
  */
 export interface AbsenceDayResponse {
@@ -36,6 +49,14 @@ export interface AbsenceDayResponse {
     'note'?: string | null;
     'userFirstName'?: string | null;
     'userLastName'?: string | null;
+    'customTypeId'?: number | null;
+    'customTypeName'?: string | null;
+    'customTypeColor'?: string | null;
+    'creditMode'?: string | null;
+    'createdAt'?: string;
+    'createdByUserId'?: number | null;
+    'createdByName'?: string | null;
+    'createdViaRequestId'?: number | null;
 }
 /**
  * Standard paginated response wrapper for list endpoints.
@@ -72,6 +93,19 @@ export const AbsenceType = {
 export type AbsenceType = typeof AbsenceType[keyof typeof AbsenceType];
 
 
+/**
+ * Org-defined custom absence type (e.g. \"Business Trip\").
+ */
+export interface AbsenceTypeDefinitionResponse {
+    'id'?: number;
+    'organizationId'?: number;
+    'name': string | null;
+    'color'?: string | null;
+    'creditMode': string | null;
+    'countsAsVacation'?: boolean;
+    'isActive'?: boolean;
+    'createdAt'?: string;
+}
 export interface AddGroupMemberRequest {
     'userId'?: number;
     'role'?: string | null;
@@ -93,6 +127,10 @@ export interface AdminCreateAbsenceDayRequest {
     'date'?: string;
     'type'?: AbsenceType;
     'isHalfDay'?: boolean;
+    /**
+     * Optional org-defined custom absence type.
+     */
+    'customTypeId'?: number | null;
     'note'?: string | null;
 }
 
@@ -131,6 +169,10 @@ export interface CreateAbsenceDayRequest {
     'date'?: string;
     'type'?: AbsenceType;
     'isHalfDay'?: boolean;
+    /**
+     * Optional org-defined custom absence type.
+     */
+    'customTypeId'?: number | null;
     'note'?: string | null;
 }
 
@@ -212,6 +254,7 @@ export interface EffectivePermissionsResponse {
     'csvImportMode'?: string | null;
     'workScheduleChangeMode'?: string | null;
     'initialOvertimeMode'?: string | null;
+    'absenceSelfServiceMode'?: string | null;
     'vacationVisibility'?: string | null;
     'sickDayVisibility'?: string | null;
     'timeEntryVisibility'?: string | null;
@@ -273,6 +316,7 @@ export interface GroupPermissionsResponse {
     'csvImportMode'?: string | null;
     'workScheduleChangeMode'?: string | null;
     'initialOvertimeMode'?: string | null;
+    'absenceSelfServiceMode'?: string | null;
     'vacationVisibility'?: string | null;
     'sickDayVisibility'?: string | null;
     'timeEntryVisibility'?: string | null;
@@ -456,6 +500,7 @@ export interface OrganizationDetailResponse {
     'memberTimeEntryVisibility'?: boolean;
     'require2fa'?: boolean;
     'csvImportMode': string | null;
+    'absenceSelfServiceMode'?: string | null;
     'vacationVisibility': string | null;
     'sickDayVisibility': string | null;
     'defaultVacationDays'?: number;
@@ -616,7 +661,8 @@ export const RequestType = {
     NUMBER_2: 2,
     NUMBER_3: 3,
     NUMBER_4: 4,
-    NUMBER_5: 5
+    NUMBER_5: 5,
+    NUMBER_6: 6
 } as const;
 
 export type RequestType = typeof RequestType[keyof typeof RequestType];
@@ -793,6 +839,7 @@ export interface UpdateGroupPermissionsRequest {
     'csvImportMode'?: RuleMode;
     'workScheduleChangeMode'?: RuleMode;
     'initialOvertimeMode'?: RuleMode;
+    'absenceSelfServiceMode'?: RuleMode;
     'vacationVisibility'?: VisibilityMode;
     'sickDayVisibility'?: VisibilityMode;
     'timeEntryVisibility'?: VisibilityMode;
@@ -850,6 +897,7 @@ export interface UpdateOrganizationSettingsRequest {
     'memberTimeEntryVisibility'?: boolean | null;
     'require2fa'?: boolean | null;
     'csvImportMode'?: RuleMode;
+    'absenceSelfServiceMode'?: RuleMode;
     'vacationVisibility'?: VisibilityMode;
     'sickDayVisibility'?: VisibilityMode;
     'defaultVacationDays'?: number | null;
@@ -920,6 +968,17 @@ export interface UpdateWorkScheduleRequest {
     'targetFri'?: number | null;
 }
 /**
+ * Request payload for creating/updating a custom absence type.
+ */
+export interface UpsertAbsenceTypeDefinitionRequest {
+    'name': string;
+    'color'?: string | null;
+    'creditMode'?: AbsenceCreditMode;
+    'countsAsVacation'?: boolean;
+}
+
+
+/**
  * Authenticated user profile information.
  */
 export interface UserInfo {
@@ -989,6 +1048,174 @@ export interface WorkScheduleResponse {
  */
 export const AbsenceDayApiAxiosParamCreator = function (configuration?: Configuration) {
     return {
+        /**
+         * 
+         * @summary List the organization\'s custom absence types (members only).
+         * @param {string} slug Organization URL slug.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsenceTypesGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAbsenceTypesGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/absence-types`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Create a custom absence type (admin only).
+         * @param {string} slug Organization URL slug.
+         * @param {UpsertAbsenceTypeDefinitionRequest} [upsertAbsenceTypeDefinitionRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsenceTypesPost: async (slug: string, upsertAbsenceTypeDefinitionRequest?: UpsertAbsenceTypeDefinitionRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAbsenceTypesPost', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/absence-types`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(upsertAbsenceTypeDefinitionRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Deactivate a custom absence type (admin only). Existing absences keep the type.
+         * @param {string} slug Organization URL slug.
+         * @param {number} typeId Absence type ID.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsenceTypesTypeIdDelete: async (slug: string, typeId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAbsenceTypesTypeIdDelete', 'slug', slug)
+            // verify required parameter 'typeId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAbsenceTypesTypeIdDelete', 'typeId', typeId)
+            const localVarPath = `/api/v1/organizations/{slug}/absence-types/{typeId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"typeId"}}`, encodeURIComponent(String(typeId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Update a custom absence type (admin only).
+         * @param {string} slug Organization URL slug.
+         * @param {number} typeId Absence type ID.
+         * @param {UpsertAbsenceTypeDefinitionRequest} [upsertAbsenceTypeDefinitionRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsenceTypesTypeIdPut: async (slug: string, typeId: number, upsertAbsenceTypeDefinitionRequest?: UpsertAbsenceTypeDefinitionRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAbsenceTypesTypeIdPut', 'slug', slug)
+            // verify required parameter 'typeId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAbsenceTypesTypeIdPut', 'typeId', typeId)
+            const localVarPath = `/api/v1/organizations/{slug}/absence-types/{typeId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"typeId"}}`, encodeURIComponent(String(typeId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(upsertAbsenceTypeDefinitionRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
         /**
          * 
          * @summary Create an absence day for any member (admin only).
@@ -1193,6 +1420,62 @@ export const AbsenceDayApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
+         * @summary List the organization\'s custom absence types (members only).
+         * @param {string} slug Organization URL slug.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAbsenceTypesGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<AbsenceTypeDefinitionResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAbsenceTypesGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiV1OrganizationsSlugAbsenceTypesGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Create a custom absence type (admin only).
+         * @param {string} slug Organization URL slug.
+         * @param {UpsertAbsenceTypeDefinitionRequest} [upsertAbsenceTypeDefinitionRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAbsenceTypesPost(slug: string, upsertAbsenceTypeDefinitionRequest?: UpsertAbsenceTypeDefinitionRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AbsenceTypeDefinitionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAbsenceTypesPost(slug, upsertAbsenceTypeDefinitionRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiV1OrganizationsSlugAbsenceTypesPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Deactivate a custom absence type (admin only). Existing absences keep the type.
+         * @param {string} slug Organization URL slug.
+         * @param {number} typeId Absence type ID.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAbsenceTypesTypeIdDelete(slug: string, typeId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAbsenceTypesTypeIdDelete(slug, typeId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiV1OrganizationsSlugAbsenceTypesTypeIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Update a custom absence type (admin only).
+         * @param {string} slug Organization URL slug.
+         * @param {number} typeId Absence type ID.
+         * @param {UpsertAbsenceTypeDefinitionRequest} [upsertAbsenceTypeDefinitionRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAbsenceTypesTypeIdPut(slug: string, typeId: number, upsertAbsenceTypeDefinitionRequest?: UpsertAbsenceTypeDefinitionRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AbsenceTypeDefinitionResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAbsenceTypesTypeIdPut(slug, typeId, upsertAbsenceTypeDefinitionRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiV1OrganizationsSlugAbsenceTypesTypeIdPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Create an absence day for any member (admin only).
          * @param {string} slug Organization URL slug.
          * @param {AdminCreateAbsenceDayRequest} [adminCreateAbsenceDayRequest] 
@@ -1262,6 +1545,50 @@ export const AbsenceDayApiFactory = function (configuration?: Configuration, bas
     return {
         /**
          * 
+         * @summary List the organization\'s custom absence types (members only).
+         * @param {string} slug Organization URL slug.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsenceTypesGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<Array<AbsenceTypeDefinitionResponse>> {
+            return localVarFp.apiV1OrganizationsSlugAbsenceTypesGet(slug, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Create a custom absence type (admin only).
+         * @param {string} slug Organization URL slug.
+         * @param {UpsertAbsenceTypeDefinitionRequest} [upsertAbsenceTypeDefinitionRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsenceTypesPost(slug: string, upsertAbsenceTypeDefinitionRequest?: UpsertAbsenceTypeDefinitionRequest, options?: RawAxiosRequestConfig): AxiosPromise<AbsenceTypeDefinitionResponse> {
+            return localVarFp.apiV1OrganizationsSlugAbsenceTypesPost(slug, upsertAbsenceTypeDefinitionRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Deactivate a custom absence type (admin only). Existing absences keep the type.
+         * @param {string} slug Organization URL slug.
+         * @param {number} typeId Absence type ID.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsenceTypesTypeIdDelete(slug: string, typeId: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugAbsenceTypesTypeIdDelete(slug, typeId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Update a custom absence type (admin only).
+         * @param {string} slug Organization URL slug.
+         * @param {number} typeId Absence type ID.
+         * @param {UpsertAbsenceTypeDefinitionRequest} [upsertAbsenceTypeDefinitionRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsenceTypesTypeIdPut(slug: string, typeId: number, upsertAbsenceTypeDefinitionRequest?: UpsertAbsenceTypeDefinitionRequest, options?: RawAxiosRequestConfig): AxiosPromise<AbsenceTypeDefinitionResponse> {
+            return localVarFp.apiV1OrganizationsSlugAbsenceTypesTypeIdPut(slug, typeId, upsertAbsenceTypeDefinitionRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Create an absence day for any member (admin only).
          * @param {string} slug Organization URL slug.
          * @param {AdminCreateAbsenceDayRequest} [adminCreateAbsenceDayRequest] 
@@ -1315,6 +1642,54 @@ export const AbsenceDayApiFactory = function (configuration?: Configuration, bas
  * AbsenceDayApi - object-oriented interface
  */
 export class AbsenceDayApi extends BaseAPI {
+    /**
+     * 
+     * @summary List the organization\'s custom absence types (members only).
+     * @param {string} slug Organization URL slug.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAbsenceTypesGet(slug: string, options?: RawAxiosRequestConfig) {
+        return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsenceTypesGet(slug, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Create a custom absence type (admin only).
+     * @param {string} slug Organization URL slug.
+     * @param {UpsertAbsenceTypeDefinitionRequest} [upsertAbsenceTypeDefinitionRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAbsenceTypesPost(slug: string, upsertAbsenceTypeDefinitionRequest?: UpsertAbsenceTypeDefinitionRequest, options?: RawAxiosRequestConfig) {
+        return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsenceTypesPost(slug, upsertAbsenceTypeDefinitionRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Deactivate a custom absence type (admin only). Existing absences keep the type.
+     * @param {string} slug Organization URL slug.
+     * @param {number} typeId Absence type ID.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAbsenceTypesTypeIdDelete(slug: string, typeId: number, options?: RawAxiosRequestConfig) {
+        return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsenceTypesTypeIdDelete(slug, typeId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Update a custom absence type (admin only).
+     * @param {string} slug Organization URL slug.
+     * @param {number} typeId Absence type ID.
+     * @param {UpsertAbsenceTypeDefinitionRequest} [upsertAbsenceTypeDefinitionRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAbsenceTypesTypeIdPut(slug: string, typeId: number, upsertAbsenceTypeDefinitionRequest?: UpsertAbsenceTypeDefinitionRequest, options?: RawAxiosRequestConfig) {
+        return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsenceTypesTypeIdPut(slug, typeId, upsertAbsenceTypeDefinitionRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
     /**
      * 
      * @summary Create an absence day for any member (admin only).
@@ -2999,6 +3374,48 @@ export const GroupApiAxiosParamCreator = function (configuration?: Configuration
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @summary Get effective permissions for a specific member (admin, or the member themselves).
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Target member user ID.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdEffectivePermissionsGet: async (slug: string, memberId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdEffectivePermissionsGet', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdEffectivePermissionsGet', 'memberId', memberId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/effective-permissions`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -3166,6 +3583,20 @@ export const GroupApiFp = function(configuration?: Configuration) {
             const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * 
+         * @summary Get effective permissions for a specific member (admin, or the member themselves).
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Target member user ID.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdEffectivePermissionsGet(slug: string, memberId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<EffectivePermissionsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdEffectivePermissionsGet(slug, memberId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugMembersMemberIdEffectivePermissionsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -3299,6 +3730,17 @@ export const GroupApiFactory = function (configuration?: Configuration, basePath
          */
         apiV1OrganizationsSlugGroupsPost(slug: string, createGroupRequest?: CreateGroupRequest, options?: RawAxiosRequestConfig): AxiosPromise<GroupDetailResponse> {
             return localVarFp.apiV1OrganizationsSlugGroupsPost(slug, createGroupRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Get effective permissions for a specific member (admin, or the member themselves).
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Target member user ID.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdEffectivePermissionsGet(slug: string, memberId: number, options?: RawAxiosRequestConfig): AxiosPromise<EffectivePermissionsResponse> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdEffectivePermissionsGet(slug, memberId, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -3441,6 +3883,18 @@ export class GroupApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugGroupsPost(slug: string, createGroupRequest?: CreateGroupRequest, options?: RawAxiosRequestConfig) {
         return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsPost(slug, createGroupRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Get effective permissions for a specific member (admin, or the member themselves).
+     * @param {string} slug Organization URL slug.
+     * @param {number} memberId Target member user ID.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdEffectivePermissionsGet(slug: string, memberId: number, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdEffectivePermissionsGet(slug, memberId, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
