@@ -212,7 +212,7 @@ export const visibilitySettings: VisibilitySetting[] = [
 	{
 		key: 'vacationVisibility',
 		label: 'Vacation Day Visibility',
-		description: "Control who can see members' vacation days."
+		description: "Control who can see members' vacation absences and their remaining vacation-day balance."
 	},
 	{
 		key: 'sickDayVisibility',

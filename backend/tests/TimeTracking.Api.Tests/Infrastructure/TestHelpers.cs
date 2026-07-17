@@ -171,6 +171,9 @@ public record OrganizationMemberResponseDto
     public string Role { get; init; } = "";
     public DateTime JoinedAt { get; init; }
     public double InitialOvertimeHours { get; init; }
+    public double VacationDaysPerYear { get; init; }
+    public double VacationDaysRemaining { get; init; }
+    public bool VacationVisible { get; init; }
 }
 
 public record UserOrganizationResponseDto

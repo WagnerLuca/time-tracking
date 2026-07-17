@@ -545,6 +545,10 @@ export interface OrganizationMemberResponse {
      */
     'vacationDaysPlanned'?: number;
     'vacationDaysRemaining'?: number;
+    /**
+     * Whether the caller may see this member\'s vacation balance (self, admins, or  per the effective VacationVisibility). When false, the vacation figures are zeroed.
+     */
+    'vacationVisible'?: boolean;
 }
 /**
  * Summary view of an organization.

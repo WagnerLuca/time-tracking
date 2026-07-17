@@ -567,8 +567,9 @@
 			onsaved={onAbsenceSaved}
 		/>
 
-		<!-- Vacation Days Summary (admin only) -->
-		{#if canEdit}
+		<!-- Vacation Days Summary — respects the org/group Vacation Visibility setting -->
+		{@const vacationVisibleMembers = (org.members ?? []).filter(m => m.vacationVisible && (m.vacationDaysPerYear ?? 0) > 0)}
+		{#if canEdit || vacationVisibleMembers.length > 0}
 		<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
 			<div class="flex items-center justify-between flex-wrap gap-2 mb-4">
 				<h2 class="text-xl font-bold text-base-content m-0">Vacation Days Balance</h2>
@@ -577,11 +578,10 @@
 					<span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-primary/40"></span> Planned</span>
 				</div>
 			</div>
-			{#if (org.members ?? []).filter(m => (m.vacationDaysPerYear ?? 0) > 0).length === 0}
+			{#if vacationVisibleMembers.length === 0}
 				<p class="text-base-content/40 text-sm">No members have vacation days configured.</p>
 			{:else}
-				{@const membersWithVacation = (org.members ?? [])
-					.filter(m => (m.vacationDaysPerYear ?? 0) > 0)
+				{@const membersWithVacation = vacationVisibleMembers
 					.filter(m => calendarUserFilter === null || m.id === calendarUserFilter)
 					.sort((a, b) => ((a.vacationDaysRemaining ?? 0) - (b.vacationDaysRemaining ?? 0)))}
 				{#if membersWithVacation.length === 0}

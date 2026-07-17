@@ -73,6 +73,11 @@ public record OrganizationMemberResponse
     /// <summary>Vacation days planned for the rest of this year (date &gt; today).</summary>
     public double VacationDaysPlanned { get; init; }
     public double VacationDaysRemaining { get; init; }
+    /// <summary>
+    /// Whether the caller may see this member's vacation balance (self, admins, or
+    /// per the effective VacationVisibility). When false, the vacation figures are zeroed.
+    /// </summary>
+    public bool VacationVisible { get; init; }
 }
 
 /// <summary>Lightweight org view from the user's perspective.</summary>

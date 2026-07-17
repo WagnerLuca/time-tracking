@@ -419,4 +419,46 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
             new { initialOvertimeHours = 5.0 });
         response.EnsureSuccessStatusCode();
     }
+
+    // ── Vacation balance visibility ──────────────────────────────────────
+
+    [Fact]
+    public async Task VacationBalance_RespectsVisibility()
+    {
+        var ownerClient = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(ownerClient, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        await TestHelpers.CreateOrganizationAsync(ownerClient, "Vac Vis Org", "vac-vis-org");
+        // Give the org a vacation allowance so balances are non-zero
+        await ownerClient.PutAsJsonAsync("/api/v1/Organizations/vac-vis-org/settings", new { defaultVacationDays = 30, vacationVisibility = 0 /* Private */ });
+
+        // Add a regular member
+        var memberClient = _factory.CreateClient();
+        var member = await TestHelpers.RegisterAsync(memberClient, "vacvis-member@test.com", "Password123!", "Vac", "Member");
+        TestHelpers.SetBearerToken(memberClient, member.AccessToken);
+        await ownerClient.PostAsJsonAsync("/api/v1/Organizations/vac-vis-org/members", new { userId = member.User.Id, role = 0 });
+        // Set the member's own allowance
+        await ownerClient.PutAsJsonAsync($"/api/v1/Organizations/vac-vis-org/members/{member.User.Id}/vacation-days", new { days = 30 });
+
+        // Owner (admin) always sees every member's balance
+        var ownerView = await ownerClient.GetFromJsonAsync<OrganizationDetailResponseDto>(
+            "/api/v1/Organizations/vac-vis-org", TestHelpers.JsonOptions);
+        ownerView!.Members.Should().OnlyContain(m => m.VacationVisible);
+
+        // Private: the member sees only their own balance
+        var memberView = await memberClient.GetFromJsonAsync<OrganizationDetailResponseDto>(
+            "/api/v1/Organizations/vac-vis-org", TestHelpers.JsonOptions);
+        var self = memberView!.Members.First(m => m.Id == member.User.Id);
+        var others = memberView.Members.Where(m => m.Id != member.User.Id).ToList();
+        self.VacationVisible.Should().BeTrue();
+        self.VacationDaysPerYear.Should().Be(30);
+        others.Should().OnlyContain(m => !m.VacationVisible);
+        others.Should().OnlyContain(m => m.VacationDaysPerYear == 0 && m.VacationDaysRemaining == 0);
+
+        // Switch to AllMembers: the member now sees everyone's balance
+        await ownerClient.PutAsJsonAsync("/api/v1/Organizations/vac-vis-org/settings", new { vacationVisibility = 2 /* AllMembers */ });
+        var memberView2 = await memberClient.GetFromJsonAsync<OrganizationDetailResponseDto>(
+            "/api/v1/Organizations/vac-vis-org", TestHelpers.JsonOptions);
+        memberView2!.Members.Should().OnlyContain(m => m.VacationVisible);
+        memberView2.Members.First(m => m.Id == member.User.Id).VacationDaysRemaining.Should().Be(30);
+    }
 }
