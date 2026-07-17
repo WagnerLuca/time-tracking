@@ -4,14 +4,13 @@
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { organizationsApi, workScheduleApi, absenceDayApi } from '$lib/apiClient';
-	import { formatHoursDecimal, formatWeekLabel, formatTime, formatDateShort, formatDateFull, formatDuration, absenceTypeLabel, absenceTypeBadge, getInitials } from '$lib/utils/formatters';
-	import { getWeekRange } from '$lib/utils/dateHelpers';
+	import { formatHoursDecimal, formatDateFull, absenceTypeLabel, absenceTypeBadge, getInitials } from '$lib/utils/formatters';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import MemberCalendar from '$lib/components/MemberCalendar.svelte';
 	import type {
 		OrganizationDetailResponse,
 		OrganizationMemberResponse,
 		MemberTimeOverviewResponse,
-		TimeEntryResponse,
 		WorkScheduleResponse,
 		AbsenceDayResponse,
 		AbsenceType
@@ -28,15 +27,8 @@
 	let myRole = $derived(org?.members?.find(m => m.id === auth.user?.id)?.role ?? null);
 	let canEdit = $derived(myRole === 'Owner' || myRole === 'Admin');
 	let isSelf = $derived(auth.user?.id === memberId);
-	let canViewTime = $derived(isSelf || (canEdit && (org?.memberTimeEntryVisibility ?? false)) || overview !== null);
 
 	// Time overview
-	let weekOffset = $state(0);
-	let overview = $state<MemberTimeOverviewResponse | null>(null);
-	let entries = $state<TimeEntryResponse[]>([]);
-	let overviewLoading = $state(false);
-	let entriesExpanded = $state(false);
-	let entriesLoading = $state(false);
 	let firstEntryDate = $state<Date | null>(null);
 
 	// Absences
@@ -75,6 +67,10 @@
 	let allTimeOverview = $state<MemberTimeOverviewResponse | null>(null);
 	let allTimeLoading = $state(false);
 
+	// Whether the caller may see this member's tracked time
+	// (self, admin with visibility enabled, or the overview endpoint returned data)
+	let canViewTime = $derived(isSelf || (canEdit && (org?.memberTimeEntryVisibility ?? false)) || allTimeOverview !== null);
+
 	// Initial overtime
 	let editingOvertime = $state(false);
 	let overtimeHours = $state(0);
@@ -87,8 +83,6 @@
 
 	// Action feedback
 	let actionError = $state('');
-
-	const weekRange = $derived(getWeekRange(weekOffset));
 
 	onMount(() => {
 		orgSlug = $page.params.slug ?? '';
@@ -113,30 +107,10 @@
 		loading = false;
 
 		// Load sections in parallel
-		loadOverview();
 		loadAllTimeOverview();
 		loadAbsences();
 		loadSchedule();
 		loadPeriods();
-	}
-
-	// ── Time Overview ──
-	async function loadOverview() {
-		overviewLoading = true;
-		try {
-			const from = weekRange.start.toISOString();
-			const to = weekRange.end.toISOString();
-			const { data } = await organizationsApi.apiV1OrganizationsSlugTimeOverviewGet(orgSlug, from, to);
-			overview = data.find(m => m.userId === memberId) ?? null;
-		} catch { overview = null; }
-		overviewLoading = false;
-	}
-
-	function changeWeek(dir: number) {
-		weekOffset += dir;
-		entriesExpanded = false;
-		entries = [];
-		loadOverview();
 	}
 
 	async function loadAllTimeOverview() {
@@ -171,19 +145,6 @@
 		} catch { /* ignore */ }
 
 		allTimeLoading = false;
-	}
-
-	async function toggleEntries() {
-		if (entriesExpanded) { entriesExpanded = false; entries = []; return; }
-		entriesExpanded = true;
-		entriesLoading = true;
-		try {
-			const from = weekRange.start.toISOString();
-			const to = weekRange.end.toISOString();
-			const { data } = await organizationsApi.apiV1OrganizationsSlugMemberEntriesMemberIdGet(orgSlug, memberId, from, to);
-			entries = data.items ?? [];
-		} catch { entries = []; }
-		entriesLoading = false;
 	}
 
 	// ── Absences ──
@@ -443,83 +404,18 @@
 			<div class="alert alert-error mb-4 text-sm">{actionError}</div>
 		{/if}
 
-		<!-- ═══ Time Overview ═══ -->
+		<!-- ═══ Calendar (same view as personal History) ═══ -->
 		{#if canViewTime}
 		<section class="card bg-base-100 border border-base-300 p-5 mb-5">
 			<div class="flex items-center justify-between mb-4">
 				<h2 class="text-base font-bold text-base-content flex items-center gap-2 m-0">
-					<svg class="text-base-content/60" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-					Time Overview
+					<svg class="text-base-content/60" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+					Calendar
 				</h2>
 			</div>
-
-			<div class="flex items-center justify-center gap-4 mb-4">
-				<button class="btn btn-ghost btn-sm btn-square text-lg" onclick={() => changeWeek(-1)}>&lsaquo;</button>
-				<span class="font-semibold text-[0.9375rem] text-base-content">{formatWeekLabel(weekRange)}</span>
-				<button class="btn btn-ghost btn-sm btn-square text-lg" onclick={() => changeWeek(1)} disabled={weekOffset >= 0}>&rsaquo;</button>
-			</div>
-
-			{#if overviewLoading}
-				<p class="text-base-content/40 text-sm">Loading...</p>
-			{:else if overview}
-				{@const targetMinutes = overview.weeklyWorkHours ? overview.weeklyWorkHours * 60 : 0}
-				{@const diff = (overview.netTrackedMinutes ?? 0) - targetMinutes}
-				<div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4">
-					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
-						<span class="block text-xl font-bold text-base-content">{formatHoursDecimal(overview.totalTrackedMinutes)}</span>
-						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Total Tracked</span>
-					</div>
-					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
-						<span class="block text-xl font-bold text-base-content">{formatHoursDecimal(overview.netTrackedMinutes)}</span>
-						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Net (after pauses)</span>
-					</div>
-					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
-						<span class="block text-xl font-bold text-base-content">{overview.weeklyWorkHours ? overview.weeklyWorkHours + 'h' : '-'}</span>
-						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Weekly Target</span>
-					</div>
-					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center {diff >= 0 ? 'border-success/30 bg-success/5' : 'border-error/30 bg-error/5'}">
-						<span class="block text-xl font-bold {diff >= 0 ? 'text-success' : 'text-error'}">{diff >= 0 ? '+' : ''}{formatHoursDecimal(Math.abs(diff))}</span>
-						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Overtime</span>
-					</div>
-					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
-						<span class="block text-xl font-bold text-base-content">{overview.entryCount}</span>
-						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Entries</span>
-					</div>
-				</div>
-
-				<button class="btn btn-ghost btn-xs text-primary font-medium gap-1" onclick={toggleEntries}>
-					{entriesExpanded ? 'Hide' : 'Show'} time entries
-					<svg class="[&.rotated]:rotate-180 transition-transform" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class:rotated={entriesExpanded}><path d="M6 9l6 6 6-6"/></svg>
-				</button>
-
-				{#if entriesExpanded}
-					{#if entriesLoading}
-						<p class="text-base-content/40 text-sm">Loading entries...</p>
-					{:else if entries.length === 0}
-						<p class="text-base-content/40 text-sm">No entries this week.</p>
-					{:else}
-						<div class="mt-3 flex flex-col gap-1.5">
-							{#each entries as entry}
-								<div class="flex items-center gap-3 text-sm py-1.5 px-2 bg-base-200/30 rounded-md border border-base-200">
-									<span class="text-base-content/60 min-w-[56px] text-xs">{formatDateShort(entry.startTime!)}</span>
-									<span class="text-base-content/70 min-w-[100px]">
-										{formatTime(entry.startTime!)}{entry.endTime ? ` – ${formatTime(entry.endTime)}` : ''}
-									</span>
-									<span class="text-base-content/40 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{entry.description || ''}</span>
-									<span class="font-semibold text-base-content/70 min-w-[56px] text-right">
-										{entry.isRunning ? 'Running' : formatDuration(entry.netDurationMinutes ?? entry.durationMinutes ?? 0)}
-									</span>
-									{#if (entry.pauseDurationMinutes ?? 0) > 0}
-										<span class="badge badge-warning badge-xs">-{entry.pauseDurationMinutes}m</span>
-									{/if}
-								</div>
-							{/each}
-						</div>
-					{/if}
-				{/if}
-			{:else}
-				<p class="text-base-content/40 text-sm">No time data available for this week.</p>
-			{/if}
+			{#key `${orgSlug}-${memberId}`}
+				<MemberCalendar {orgSlug} orgId={org?.id} userId={memberId} isSelf={isSelf} orgDetail={org} />
+			{/key}
 		</section>
 
 		<!-- ═══ Cumulative Summary ═══ -->

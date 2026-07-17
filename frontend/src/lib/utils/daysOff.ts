@@ -8,17 +8,13 @@ export interface DaysOffData {
 	vacationDates: Set<string>;
 	otherAbsenceDates: Set<string>;
 	halfDayAbsences: Set<string>;
+	/** Custom absence type per date: name/color/creditMode of the org-defined type. */
+	customTypeDates: Map<string, { name: string; color?: string | null; creditMode: string }>;
+	/** Dates whose custom type credits nothing (keep hours as is). */
+	customNoCreditDates: Set<string>;
+	/** Dates whose custom type tops hours up to the day target (e.g. Business Trip). */
+	customTopUpDates: Set<string>;
 }
-
-const EMPTY: DaysOffData = {
-	daysOffSet: new Set(),
-	holidayDates: new Map(),
-	halfDayHolidays: new Set(),
-	sickDayDates: new Set(),
-	vacationDates: new Set(),
-	otherAbsenceDates: new Set(),
-	halfDayAbsences: new Set()
-};
 
 export function emptyDaysOff(): DaysOffData {
 	return {
@@ -28,7 +24,10 @@ export function emptyDaysOff(): DaysOffData {
 		sickDayDates: new Set(),
 		vacationDates: new Set(),
 		otherAbsenceDates: new Set(),
-		halfDayAbsences: new Set()
+		halfDayAbsences: new Set(),
+		customTypeDates: new Map(),
+		customNoCreditDates: new Set(),
+		customTopUpDates: new Set()
 	};
 }
 
@@ -38,16 +37,14 @@ export async function loadDaysOff(orgSlug: string | null | undefined, userId?: n
 	try {
 		const [holRes, absRes] = await Promise.all([
 			holidayApi.apiV1OrganizationsSlugHolidaysGet(orgSlug),
-			absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, userId)
+			absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, userId, undefined, undefined, 200)
 		]);
 
-		const daysOffSet = new Set<string>();
-		const holidayDates = new Map<string, string>();
-		const halfDayHolidays = new Set<string>();
-		const sickDayDates = new Set<string>();
-		const vacationDates = new Set<string>();
-		const otherAbsenceDates = new Set<string>();
-		const halfDayAbsences = new Set<string>();
+		const result = emptyDaysOff();
+		const {
+			daysOffSet, holidayDates, halfDayHolidays, sickDayDates, vacationDates,
+			otherAbsenceDates, halfDayAbsences, customTypeDates, customNoCreditDates, customTopUpDates
+		} = result;
 
 		for (const h of holRes.data) {
 			if (h.date) {
@@ -59,16 +56,25 @@ export async function loadDaysOff(orgSlug: string | null | undefined, userId?: n
 
 		const absences = absRes.data.items ?? [];
 		for (const a of absences) {
-			if (a.date) {
-				daysOffSet.add(a.date);
-				if (a.type === 'SickDay') sickDayDates.add(a.date);
-				else if (a.type === 'Vacation') vacationDates.add(a.date);
-				else otherAbsenceDates.add(a.date);
-				if (a.isHalfDay) halfDayAbsences.add(a.date);
+			if (!a.date) continue;
+			daysOffSet.add(a.date);
+			if (a.type === 'SickDay') sickDayDates.add(a.date);
+			else if (a.type === 'Vacation') vacationDates.add(a.date);
+			else otherAbsenceDates.add(a.date);
+			if (a.isHalfDay) halfDayAbsences.add(a.date);
+
+			if (a.customTypeName) {
+				customTypeDates.set(a.date, {
+					name: a.customTypeName,
+					color: a.customTypeColor,
+					creditMode: a.creditMode ?? 'FullCredit'
+				});
+				if (a.creditMode === 'None') customNoCreditDates.add(a.date);
+				else if (a.creditMode === 'FillToTarget') customTopUpDates.add(a.date);
 			}
 		}
 
-		return { daysOffSet, holidayDates, halfDayHolidays, sickDayDates, vacationDates, otherAbsenceDates, halfDayAbsences };
+		return result;
 	} catch {
 		return emptyDaysOff();
 	}

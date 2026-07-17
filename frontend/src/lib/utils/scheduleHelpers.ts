@@ -104,9 +104,21 @@ function getTargetForDow(dow: number, schedule: ScheduleLike): number {
 	return targets[dow] ?? 0;
 }
 
+/** Custom-absence-type credit behaviour per date (from org-defined types). */
+export interface CustomCreditSets {
+	/** Dates whose custom type credits nothing (keep hours as is). */
+	noCredit: Set<string>;
+	/** Dates whose custom type tops hours up to the day target (e.g. Business Trip). */
+	topUp: Set<string>;
+}
+
 /**
  * Get absence credit for a specific day (minutes credited for sick/vacation/other absence days).
  * Returns the full day target if the day has a full-day absence; 50% for half-day absences; 0 otherwise.
+ *
+ * Custom absence types can change this via `customCredits`:
+ * - noCredit dates → 0 (informational marker only)
+ * - topUp dates → max(0, target - workedMinutes), so the day nets exactly the target
  */
 export function getAbsenceCredit(
 	date: Date,
@@ -117,10 +129,17 @@ export function getAbsenceCredit(
 	otherAbsenceDates: Set<string>,
 	periods: SchedulePeriodLike[] = [],
 	halfDayAbsences?: Set<string>,
-	halfDayHolidays?: Set<string>
+	halfDayHolidays?: Set<string>,
+	customCredits?: CustomCreditSets,
+	workedMinutes: number = 0
 ): number {
 	const key = dateKey(date);
 	if (sickDayDates.has(key) || vacationDates.has(key) || otherAbsenceDates.has(key)) {
+		if (customCredits?.noCredit.has(key)) return 0;
+		if (customCredits?.topUp.has(key)) {
+			const target = getDayTarget(date, schedule, holidayDates, periods, halfDayHolidays);
+			return Math.max(0, target - workedMinutes);
+		}
 		if (halfDayAbsences?.has(key)) {
 			// Use full (unreduced) target so half-day absences on half-holidays
 			// give the correct credit (e.g. 4h on an 8h day, not 2h).
@@ -195,9 +214,11 @@ export function getDayTypeLabel(
 	vacationDates: Set<string>,
 	otherAbsenceDates: Set<string>,
 	halfDayHolidays?: Set<string>,
-	halfDayAbsences?: Set<string>
+	halfDayAbsences?: Set<string>,
+	customTypeDates?: Map<string, { name: string }>
 ): string {
 	const key = typeof date === 'string' ? date : dateKey(date);
+	const otherLabel = customTypeDates?.get(key)?.name ?? 'Other Absence';
 	if (holidayDates.has(key)) {
 		const name = holidayDates.get(key) ?? 'Holiday';
 		if (halfDayHolidays?.has(key)) {
@@ -206,7 +227,7 @@ export function getDayTypeLabel(
 			let absLabel = '';
 			if (sickDayDates.has(key)) absLabel = 'Sick Day' + halfSuffix;
 			else if (vacationDates.has(key)) absLabel = 'Vacation' + halfSuffix;
-			else if (otherAbsenceDates.has(key)) absLabel = 'Other Absence' + halfSuffix;
+			else if (otherAbsenceDates.has(key)) absLabel = otherLabel + halfSuffix;
 			return absLabel ? `${name} (Half Day) / ${absLabel}` : `${name} (Half Day)`;
 		}
 		return name;
@@ -214,7 +235,7 @@ export function getDayTypeLabel(
 	const halfSuffix = halfDayAbsences?.has(key) ? ' (Half Day)' : '';
 	if (sickDayDates.has(key)) return 'Sick Day' + halfSuffix;
 	if (vacationDates.has(key)) return 'Vacation' + halfSuffix;
-	if (otherAbsenceDates.has(key)) return 'Other Absence' + halfSuffix;
+	if (otherAbsenceDates.has(key)) return otherLabel + halfSuffix;
 	return '';
 }
 

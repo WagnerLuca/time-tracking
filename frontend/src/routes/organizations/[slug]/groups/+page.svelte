@@ -4,6 +4,7 @@
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { groupApi, organizationsApi } from '$lib/apiClient';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import { getInitials } from '$lib/utils/formatters';
 	import { ruleModeLabel, ruleModeButtonClass, parseRuleMode, visibilityModeLabel, visibilityModeButtonClass, parseVisibilityMode } from '$lib/utils/orgRules';
 	import type {
 		GroupResponse,
@@ -241,10 +242,6 @@
 		} catch (err) {
 			error = extractErrorMessage(err, 'Failed to update role.');
 		}
-	}
-
-	function getInitials(first?: string, last?: string): string {
-		return ((first?.[0] ?? '') + (last?.[0] ?? '')).toUpperCase() || '?';
 	}
 
 	// Permission settings definitions
