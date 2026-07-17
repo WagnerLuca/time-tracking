@@ -145,19 +145,30 @@ public class OrganizationService : IOrganizationService
                      && a.Date >= yearStart && a.Date <= yearEnd)
             .ToListAsync();
 
+        // Split usage into taken (up to today) and planned (after today, rest of year)
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var usageByUser = vacationUsage
             .Where(a => !holidayDates.Contains(a.Date))
             .GroupBy(a => a.UserId)
             .ToDictionary(
                 g => g.Key,
-                g => g.Sum(a => a.IsHalfDay ? 0.5 : 1.0));
+                g => new
+                {
+                    Taken = g.Where(a => a.Date <= today).Sum(a => a.IsHalfDay ? 0.5 : 1.0),
+                    Planned = g.Where(a => a.Date > today).Sum(a => a.IsHalfDay ? 0.5 : 1.0)
+                });
 
         var membersWithVacation = organization.Members.Select(m =>
         {
-            var used = usageByUser.GetValueOrDefault(m.Id, 0);
+            var usage = usageByUser.GetValueOrDefault(m.Id);
+            var taken = usage?.Taken ?? 0;
+            var planned = usage?.Planned ?? 0;
+            var used = taken + planned;
             return m with
             {
                 VacationDaysUsed = used,
+                VacationDaysTaken = taken,
+                VacationDaysPlanned = planned,
                 VacationDaysRemaining = Math.Max(0, m.VacationDaysPerYear - used)
             };
         }).ToList();

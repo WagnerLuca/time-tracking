@@ -56,6 +56,10 @@ public record OrganizationMemberResponse
     public double InitialOvertimeHours { get; init; }
     public double VacationDaysPerYear { get; init; }
     public double VacationDaysUsed { get; init; }
+    /// <summary>Vacation days already taken this year (date &lt;= today).</summary>
+    public double VacationDaysTaken { get; init; }
+    /// <summary>Vacation days planned for the rest of this year (date &gt; today).</summary>
+    public double VacationDaysPlanned { get; init; }
     public double VacationDaysRemaining { get; init; }
 }
 
