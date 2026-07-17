@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { organizationsApi, pauseRulesApi, requestsApi } from '$lib/apiClient';
+	import { organizationsApi, pauseRulesApi, requestsApi, absenceDayApi } from '$lib/apiClient';
 	import { formatRequestType, formatTimeAgo, statusBadgeClass, parseRequestData } from '$lib/utils/formatters';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import {
@@ -18,6 +18,8 @@
 		RuleMode,
 		VisibilityMode,
 		OrgRequestResponse,
+		AbsenceTypeDefinitionResponse,
+		AbsenceCreditMode,
 	} from '$lib/api';
 
 	let org = $state<OrganizationDetailResponse | null>(null);
@@ -67,6 +69,7 @@
 			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			org = data;
 			loadRequestHistory();
+			loadAbsenceTypes();
 		} catch (err) {
 			if (getErrorStatus(err) === 404) { error = 'Organization not found.'; }
 			else { error = 'Failed to load organization.'; }
@@ -94,6 +97,87 @@
 		} finally {
 			requestHistoryLoading = false;
 		}
+	}
+
+	// ── Custom absence types ──
+	let absenceTypes = $state<AbsenceTypeDefinitionResponse[]>([]);
+	let showAddType = $state(false);
+	let newTypeName = $state('');
+	let newTypeColor = $state('#0ea5e9');
+	let newTypeCreditMode = $state(1);
+	let newTypeCountsAsVacation = $state(false);
+	let typeSaving = $state(false);
+	let typeError = $state('');
+
+	const creditModeOptions = [
+		{ value: 0, label: 'Keep hours as is', hint: 'Informational only — no time credit.' },
+		{ value: 1, label: 'Fill hours to target', hint: 'Tracked hours are topped up to the expected daily target (e.g. Business Trip).' },
+		{ value: 2, label: 'Credit full target', hint: 'The full daily target is credited, like vacation or sick days.' }
+	];
+
+	async function loadAbsenceTypes() {
+		try {
+			const { data } = await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesGet(orgSlug);
+			absenceTypes = data;
+		} catch { absenceTypes = []; }
+	}
+
+	async function addAbsenceType(e: Event) {
+		e.preventDefault();
+		if (!newTypeName.trim()) return;
+		typeSaving = true;
+		typeError = '';
+		try {
+			await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesPost(orgSlug, {
+				name: newTypeName.trim(),
+				color: newTypeColor,
+				creditMode: newTypeCreditMode as AbsenceCreditMode,
+				countsAsVacation: newTypeCountsAsVacation
+			});
+			newTypeName = '';
+			newTypeCountsAsVacation = false;
+			showAddType = false;
+			await loadAbsenceTypes();
+		} catch (err) {
+			typeError = extractErrorMessage(err, 'Failed to add absence type.');
+		}
+		typeSaving = false;
+	}
+
+	async function updateAbsenceType(t: AbsenceTypeDefinitionResponse, patch: Partial<{ creditMode: number; countsAsVacation: boolean }>) {
+		typeSaving = true;
+		typeError = '';
+		try {
+			await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesTypeIdPut(orgSlug, t.id!, {
+				name: t.name!,
+				color: t.color ?? undefined,
+				creditMode: (patch.creditMode ?? parseCreditMode(t.creditMode)) as AbsenceCreditMode,
+				countsAsVacation: patch.countsAsVacation ?? t.countsAsVacation ?? false
+			});
+			await loadAbsenceTypes();
+		} catch (err) {
+			typeError = extractErrorMessage(err, 'Failed to update absence type.');
+		}
+		typeSaving = false;
+	}
+
+	async function deleteAbsenceType(typeId: number) {
+		if (!confirm('Deactivate this absence type? Existing absences keep it.')) return;
+		typeSaving = true;
+		typeError = '';
+		try {
+			await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesTypeIdDelete(orgSlug, typeId);
+			await loadAbsenceTypes();
+		} catch (err) {
+			typeError = extractErrorMessage(err, 'Failed to delete absence type.');
+		}
+		typeSaving = false;
+	}
+
+	function parseCreditMode(mode: string | null | undefined): number {
+		if (mode === 'None') return 0;
+		if (mode === 'FillToTarget') return 1;
+		return 2;
 	}
 
 	function filteredRequests(): OrgRequestResponse[] {
@@ -332,6 +416,88 @@
 							<span class="text-sm text-base-content/60">days/year</span>
 						</div>
 					</div>
+				</div>
+
+				<!-- Custom Absence Types -->
+				<div class="mt-6">
+					<div class="flex items-center justify-between mb-4">
+						<div>
+							<h3 class="text-base font-bold text-base-content/70 m-0">Absence Types</h3>
+							<p class="text-sm text-base-content/50 m-0">Org-defined absence types like "Business Trip" with configurable effect on expected hours.</p>
+						</div>
+						<button class="btn btn-primary btn-sm" onclick={() => (showAddType = !showAddType)}>
+							{showAddType ? 'Cancel' : '+ Add Type'}
+						</button>
+					</div>
+
+					{#if typeError}
+						<div class="alert alert-error mb-4 text-sm">{typeError}</div>
+					{/if}
+
+					{#if showAddType}
+						<form onsubmit={addAbsenceType} class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300 flex gap-3 items-end flex-wrap">
+							<div class="flex flex-col gap-1">
+								<span class="text-xs font-medium text-base-content/60">Name</span>
+								<input type="text" class="input input-bordered input-sm w-44" placeholder="e.g. Business Trip" bind:value={newTypeName} required disabled={typeSaving} />
+							</div>
+							<div class="flex flex-col gap-1">
+								<span class="text-xs font-medium text-base-content/60">Hours handling</span>
+								<select class="select select-bordered select-sm" bind:value={newTypeCreditMode} disabled={typeSaving}>
+									{#each creditModeOptions as o}
+										<option value={o.value}>{o.label}</option>
+									{/each}
+								</select>
+							</div>
+							<div class="flex flex-col gap-1">
+								<span class="text-xs font-medium text-base-content/60">Color</span>
+								<input type="color" class="input input-bordered input-sm w-14 p-1" bind:value={newTypeColor} disabled={typeSaving} />
+							</div>
+							<label class="label cursor-pointer flex items-center gap-2 text-sm pb-1.5">
+								<input type="checkbox" class="checkbox checkbox-sm" bind:checked={newTypeCountsAsVacation} disabled={typeSaving} />
+								Counts against vacation budget
+							</label>
+							<button type="submit" class="btn btn-primary btn-sm" disabled={typeSaving}>
+								{typeSaving ? 'Adding...' : 'Add Type'}
+							</button>
+							<p class="text-xs text-base-content/40 w-full m-0">{creditModeOptions.find(o => o.value === newTypeCreditMode)?.hint}</p>
+						</form>
+					{/if}
+
+					{#if absenceTypes.length === 0}
+						<p class="text-base-content/40">No custom absence types defined. Sick Day, Vacation and Other are always available.</p>
+					{:else}
+						<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+							{#each absenceTypes as t}
+								<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0 flex-wrap gap-2">
+									<div class="flex items-center gap-2 min-w-[160px]">
+										<span class="w-3 h-3 rounded-full shrink-0" style="background: {t.color ?? '#888'}"></span>
+										<span class="font-semibold text-sm">{t.name}</span>
+										{#if t.countsAsVacation}<span class="badge badge-xs badge-info badge-outline">vacation budget</span>{/if}
+									</div>
+									<div class="flex items-center gap-2">
+										<select
+											class="select select-bordered select-xs"
+											value={parseCreditMode(t.creditMode)}
+											onchange={(e) => updateAbsenceType(t, { creditMode: parseInt((e.target as HTMLSelectElement).value) })}
+											disabled={typeSaving}
+											title={creditModeOptions.find(o => o.value === parseCreditMode(t.creditMode))?.hint}
+										>
+											{#each creditModeOptions as o}
+												<option value={o.value}>{o.label}</option>
+											{/each}
+										</select>
+										<label class="flex items-center gap-1 text-xs text-base-content/60 cursor-pointer" title="Deduct days of this type from the vacation budget">
+											<input type="checkbox" class="checkbox checkbox-xs" checked={t.countsAsVacation ?? false}
+												onchange={(e) => updateAbsenceType(t, { countsAsVacation: (e.target as HTMLInputElement).checked })}
+												disabled={typeSaving} />
+											vac. budget
+										</label>
+										<button class="btn btn-ghost btn-xs text-error" title="Deactivate type" onclick={() => deleteAbsenceType(t.id!)}>&times;</button>
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
 				</div>
 
 				<!-- Pause Rules -->

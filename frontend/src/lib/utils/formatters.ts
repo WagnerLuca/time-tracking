@@ -129,6 +129,7 @@ export function formatRequestType(type: string | null | undefined): string {
 		case 'SetInitialOvertime': return 'Set Overtime';
 		case 'WorkScheduleChange': return 'Schedule';
 		case 'CsvImport': return 'CSV Import';
+		case 'RequestAbsence': return 'Absence';
 		default: return type ?? 'Unknown';
 	}
 }
@@ -144,6 +145,7 @@ export function formatRequestTypeFull(type: string | null | undefined): string {
 		case 'SetInitialOvertime': return 'Set Initial Overtime';
 		case 'WorkScheduleChange': return 'Change Work Schedule';
 		case 'CsvImport': return 'Import CSV Time Entries';
+		case 'RequestAbsence': return 'Absence / Vacation Request';
 		default: return type ?? 'Unknown';
 	}
 }
@@ -197,6 +199,15 @@ export function parseRequestData(type: string | null | undefined, data: string |
 			return [`Pause: ${data} min`];
 		} else if (type === 'SetInitialOvertime') {
 			return [`Overtime: ${data}h`];
+		} else if (type === 'RequestAbsence') {
+			const obj = JSON.parse(data);
+			const parts: string[] = [];
+			const dates: string[] = obj.dates ?? [];
+			if (dates.length === 1) parts.push(`Date: ${dates[0]}`);
+			else if (dates.length > 1) parts.push(`${dates.length} days: ${dates[0]} → ${dates[dates.length - 1]}`);
+			parts.push(`Type: ${obj.customTypeId ? 'Custom' : absenceTypeLabel(String(obj.type ?? 1))}${obj.isHalfDay ? ' (½ day)' : ''}`);
+			if (obj.note) parts.push(`Note: ${obj.note}`);
+			return parts;
 		}
 	} catch { /* fallback */ }
 	return data ? [data] : [];

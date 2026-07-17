@@ -40,6 +40,14 @@ export function csvImportEnabled(org: OrganizationDetailResponse | null): boolea
 	return !isDisabled(org?.csvImportMode);
 }
 
+export function canAddOwnAbsences(org: OrganizationDetailResponse | null): boolean {
+	return isAllowed(org?.absenceSelfServiceMode);
+}
+
+export function canRequestAbsences(org: OrganizationDetailResponse | null): boolean {
+	return isRequiresApproval(org?.absenceSelfServiceMode);
+}
+
 // ── Settings page helpers ──
 
 export function parseRuleMode(mode: string | null | undefined): number {
@@ -113,6 +121,11 @@ export const ruleSettings: RuleSetting[] = [
 		key: 'csvImportMode',
 		label: 'CSV Import',
 		description: 'Control whether members can import time entries from CSV files.'
+	},
+	{
+		key: 'absenceSelfServiceMode',
+		label: 'Absences & Vacation',
+		description: 'Control whether members can add their own absences directly, must request approval (group/org admins), or only admins can add them.'
 	}
 ];
 

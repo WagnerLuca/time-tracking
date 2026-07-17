@@ -2,14 +2,16 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { organizationsApi, holidayApi, absenceDayApi } from '$lib/apiClient';
+	import { organizationsApi, holidayApi, absenceDayApi, groupApi, requestsApi } from '$lib/apiClient';
 	import { absenceTypeLabel } from '$lib/utils/formatters';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import type {
 		OrganizationDetailResponse,
 		HolidayResponse,
 		AbsenceDayResponse,
-		AbsenceType
+		AbsenceType,
+		AbsenceTypeDefinitionResponse,
+		EffectivePermissionsResponse
 	} from '$lib/api';
 
 	let org = $state<OrganizationDetailResponse | null>(null);
@@ -20,6 +22,14 @@
 		org?.members?.find((m) => m.id === auth.user?.id)?.role ?? null
 	);
 	let canEdit = $derived(myRole === 'Owner' || myRole === 'Admin');
+
+	// Effective absence permissions for the current user (org + group overrides)
+	let effectivePerms = $state<EffectivePermissionsResponse | null>(null);
+	let absenceTypes = $state<AbsenceTypeDefinitionResponse[]>([]);
+	let selfAbsenceMode = $derived(effectivePerms?.absenceSelfServiceMode ?? org?.absenceSelfServiceMode ?? 'Allowed');
+	let mustRequest = $derived(!canEdit && selfAbsenceMode === 'RequiresApproval');
+	let canAddSelf = $derived(!canEdit && selfAbsenceMode === 'Allowed');
+	let canOpenDayDialog = $derived(canEdit || canAddSelf || mustRequest);
 
 	// Holidays
 	let holidays = $state<HolidayResponse[]>([]);
@@ -40,11 +50,18 @@
 	let dayDialogDate = $state('');
 	let dayDialogToDate = $state('');
 	let dayDialogUserId = $state<number | null>(null);
-	let dayDialogType = $state(1);
+	let dayDialogType = $state('1'); // '0'|'1'|'2' or 'c{id}' for custom types
 	let dayDialogNote = $state('');
 	let dayDialogHalfDay = $state(false);
 	let dayDialogSaving = $state(false);
 	let dayDialogError = $state('');
+	let requestSentMessage = $state('');
+
+	/** Parses the type select value into the API shape. Custom types map to Other + customTypeId. */
+	function parseTypeSelection(value: string): { type: AbsenceType; customTypeId?: number } {
+		if (value.startsWith('c')) return { type: 2 as AbsenceType, customTypeId: parseInt(value.slice(1), 10) };
+		return { type: parseInt(value, 10) as AbsenceType };
+	}
 
 	let orgSlug = $state('');
 
@@ -61,12 +78,28 @@
 			org = data;
 			loadHolidays();
 			loadAbsences();
+			loadEffectivePermissions();
+			loadAbsenceTypes();
 		} catch (err) {
 			if (getErrorStatus(err) === 404) { error = 'Organization not found.'; }
 			else { error = 'Failed to load organization.'; }
 		} finally {
 			loading = false;
 		}
+	}
+
+	async function loadEffectivePermissions() {
+		try {
+			const { data } = await groupApi.apiV1OrganizationsSlugEffectivePermissionsGet(orgSlug);
+			effectivePerms = data;
+		} catch { effectivePerms = null; }
+	}
+
+	async function loadAbsenceTypes() {
+		try {
+			const { data } = await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesGet(orgSlug);
+			absenceTypes = data;
+		} catch { absenceTypes = []; }
 	}
 
 	async function reloadOrg() {
@@ -172,7 +205,7 @@
 		dayDialogDate = dateKey;
 		dayDialogToDate = '';
 		dayDialogUserId = canEdit ? null : (auth.user?.id ?? null);
-		dayDialogType = 1;
+		dayDialogType = '1';
 		dayDialogNote = '';
 		dayDialogHalfDay = false;
 		dayDialogError = '';
@@ -201,30 +234,52 @@
 				dayDialogSaving = false;
 				return;
 			}
-			for (const dateStr of workdays) {
-				if (canEdit && dayDialogUserId) {
-					await absenceDayApi.apiV1OrganizationsSlugAbsencesAdminPost(orgSlug, {
-						userId: dayDialogUserId,
-						date: dateStr,
-						type: dayDialogType as AbsenceType,
+			const { type, customTypeId } = parseTypeSelection(dayDialogType);
+
+			if (mustRequest) {
+				// Members under RequiresApproval submit one request for the whole range;
+				// a group admin (or org admin) approves it.
+				await requestsApi.apiV1OrganizationsSlugRequestsPost(orgSlug, {
+					type: 6 as any, // RequestAbsence
+					message: dayDialogNote || undefined,
+					requestData: JSON.stringify({
+						dates: workdays,
+						type,
+						customTypeId,
 						isHalfDay: dayDialogHalfDay,
 						note: dayDialogNote || undefined
-					});
-				} else {
-					await absenceDayApi.apiV1OrganizationsSlugAbsencesPost(orgSlug, {
-						date: dateStr,
-						type: dayDialogType as AbsenceType,
-						isHalfDay: dayDialogHalfDay,
-						note: dayDialogNote || undefined
-					});
+					})
+				});
+				requestSentMessage = `Absence request for ${workdays.length} day${workdays.length > 1 ? 's' : ''} sent for approval.`;
+				setTimeout(() => (requestSentMessage = ''), 6000);
+			} else {
+				for (const dateStr of workdays) {
+					if (canEdit && dayDialogUserId) {
+						await absenceDayApi.apiV1OrganizationsSlugAbsencesAdminPost(orgSlug, {
+							userId: dayDialogUserId,
+							date: dateStr,
+							type,
+							customTypeId,
+							isHalfDay: dayDialogHalfDay,
+							note: dayDialogNote || undefined
+						});
+					} else {
+						await absenceDayApi.apiV1OrganizationsSlugAbsencesPost(orgSlug, {
+							date: dateStr,
+							type,
+							customTypeId,
+							isHalfDay: dayDialogHalfDay,
+							note: dayDialogNote || undefined
+						});
+					}
 				}
+				absencesLoaded = false;
+				await loadAbsences();
+				await reloadOrg();
 			}
-			absencesLoaded = false;
-			await loadAbsences();
-			await reloadOrg();
 			showDayDialog = false;
 		} catch (err) {
-			dayDialogError = extractErrorMessage(err, 'Failed to add absence.');
+			dayDialogError = extractErrorMessage(err, mustRequest ? 'Failed to send request.' : 'Failed to add absence.');
 		} finally {
 			dayDialogSaving = false;
 		}
@@ -236,6 +291,7 @@
 		userFirstName: string;
 		userLastName: string;
 		type: string;
+		customTypeName: string | null;
 		startDate: string;
 		endDate: string;
 		days: number;
@@ -244,16 +300,21 @@
 		ids: number[];
 	}
 
+	/** Grouping key: custom types group separately from the plain Other type. */
+	function spanTypeKey(a: { type?: string | null; customTypeId?: number | null }): string {
+		return a.customTypeId ? `c${a.customTypeId}` : (a.type ?? '');
+	}
+
 	function buildAbsenceSpans(absenceList: AbsenceDayResponse[]): AbsenceSpan[] {
 		const sorted = [...absenceList].sort((a, b) => {
 			if ((a.userId ?? 0) !== (b.userId ?? 0)) return (a.userId ?? 0) - (b.userId ?? 0);
-			if ((a.type ?? '') !== (b.type ?? '')) return (a.type ?? '').localeCompare(b.type ?? '');
+			if (spanTypeKey(a) !== spanTypeKey(b)) return spanTypeKey(a).localeCompare(spanTypeKey(b));
 			return (a.date ?? '').localeCompare(b.date ?? '');
 		});
 		const spans: AbsenceSpan[] = [];
-		let current: AbsenceSpan | null = null;
+		let current: (AbsenceSpan & { typeKey: string }) | null = null;
 		for (const a of sorted) {
-			if (current && a.userId === current.userId && a.type === current.type) {
+			if (current && a.userId === current.userId && spanTypeKey(a) === current.typeKey) {
 				const prevDate = new Date(current.endDate + 'T00:00:00');
 				const thisDate = new Date((a.date ?? '') + 'T00:00:00');
 				const diffDays = Math.round((thisDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -270,6 +331,8 @@
 				userFirstName: a.userFirstName ?? '',
 				userLastName: a.userLastName ?? '',
 				type: a.type ?? '',
+				typeKey: spanTypeKey(a),
+				customTypeName: a.customTypeName ?? null,
 				startDate: a.date ?? '',
 				endDate: a.date ?? '',
 				days: 1,
@@ -297,8 +360,7 @@
 				map.set(span.startDate, entries);
 			} else {
 				const dates = absenceList
-					.filter(a => a.userId === span.userId && a.type === span.type &&
-						(a.date ?? '') >= span.startDate && (a.date ?? '') <= span.endDate)
+					.filter(a => span.ids.includes(a.id ?? -1))
 					.map(a => a.date ?? '')
 					.sort();
 				for (let i = 0; i < dates.length; i++) {
@@ -422,7 +484,21 @@
 		<div class="alert alert-error">{error}</div>
 	{:else if org}
 		<h1 class="text-2xl font-bold text-base-content mb-1">Absences</h1>
-		<p class="text-base-content/50 text-sm mb-6 leading-relaxed">{canEdit ? 'Calendar overview of absences and vacation days across all members.' : 'Calendar overview of absences visible to you.'}</p>
+		<p class="text-base-content/50 text-sm mb-6 leading-relaxed">
+			{#if canEdit}
+				Calendar overview of absences and vacation days across all members. Click a day to add an absence.
+			{:else if mustRequest}
+				Calendar overview of absences visible to you. Click a day to request an absence — a group or org admin approves it.
+			{:else if canAddSelf}
+				Calendar overview of absences visible to you. Click a day to add your own absence.
+			{:else}
+				Calendar overview of absences visible to you.
+			{/if}
+		</p>
+
+		{#if requestSentMessage}
+			<div class="alert alert-success text-sm py-2 px-3 mb-4">{requestSentMessage}</div>
+		{/if}
 
 		<!-- Calendar Navigation -->
 		{@const calendarAbsences = calendarUserFilter === null ? absences : absences.filter((a) => a.userId === calendarUserFilter)}
@@ -484,9 +560,9 @@
 							<!-- svelte-ignore a11y_click_events_have_key_events -->
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
-							class="min-h-[60px] p-1 pt-1.5 pb-3 flex flex-col {canEdit ? 'cursor-pointer hover:bg-primary/5' : ''} transition-colors {inMonth && !isWeekend ? 'bg-primary/[0.03]' : ''} {inMonth && isWeekend ? 'bg-base-200/30' : ''} {!inMonth ? 'bg-base-200/50' : ''}"
-							onclick={() => { if (canEdit && inMonth) openDayDialog(key); }}
-							title={canEdit ? `Click to add absence on ${key}` : ''}
+							class="min-h-[60px] p-1 pt-1.5 pb-3 flex flex-col {canOpenDayDialog ? 'cursor-pointer hover:bg-primary/5' : ''} transition-colors {inMonth && !isWeekend ? 'bg-primary/[0.03]' : ''} {inMonth && isWeekend ? 'bg-base-200/30' : ''} {!inMonth ? 'bg-base-200/50' : ''}"
+							onclick={() => { if (canOpenDayDialog && inMonth) openDayDialog(key); }}
+							title={canEdit ? `Click to add absence on ${key}` : mustRequest ? `Click to request absence on ${key}` : canAddSelf ? `Click to add your absence on ${key}` : ''}
 							>
 								<div class="flex items-center justify-between mb-1.5">
 									<span class="text-[10px] font-medium leading-none {isToday ? 'bg-primary text-primary-content rounded-full w-5 h-5 flex items-center justify-center' : ''} {inMonth ? 'text-base-content' : 'text-base-content/25'} {isWeekend && inMonth ? 'text-base-content/40' : ''}">
@@ -513,7 +589,7 @@
 												href="/organizations/{orgSlug}/members/{entry.span.userId}"
 												onclick={(e) => e.stopPropagation()}
 												class="h-[16px] flex items-center text-[9px] leading-none px-1 border truncate no-underline hover:brightness-90 transition-all cursor-pointer {userSpanBg(entry.span.userId, entry.span.type)} {userSpanText(entry.span.userId, entry.span.type)} {entry.position === 'start' ? 'rounded-l border-r-0 -mr-1' : entry.position === 'end' ? 'rounded-r border-l-0 -ml-1' : entry.position === 'single' ? 'rounded' : 'border-x-0 -mx-1'}"
-												title="{entry.span.userFirstName} {entry.span.userLastName} — {absenceTypeLabel(entry.span.type)}{entry.span.days > 1 ? ` (${entry.span.days} days)` : ''}{entry.span.isHalfDay ? ' (½)' : ''}{entry.span.note ? ': ' + entry.span.note : ''}"
+												title="{entry.span.userFirstName} {entry.span.userLastName} — {entry.span.customTypeName ?? absenceTypeLabel(entry.span.type)}{entry.span.days > 1 ? ` (${entry.span.days} days)` : ''}{entry.span.isHalfDay ? ' (½)' : ''}{entry.span.note ? ': ' + entry.span.note : ''}"
 											>
 												{#if entry.position === 'start' || entry.position === 'single'}
 													{entry.span.userFirstName}{#if entry.span.days > 1}&nbsp;→{/if}{#if entry.span.isHalfDay && entry.position === 'single'}&nbsp;½{/if}
@@ -526,7 +602,7 @@
 											{:else}
 											<div
 												class="h-[16px] flex items-center text-[9px] leading-none px-1 border truncate {userSpanBg(entry.span.userId, entry.span.type)} {userSpanText(entry.span.userId, entry.span.type)} {entry.position === 'start' ? 'rounded-l border-r-0 -mr-1' : entry.position === 'end' ? 'rounded-r border-l-0 -ml-1' : entry.position === 'single' ? 'rounded' : 'border-x-0 -mx-1'}"
-												title="{entry.span.userFirstName} {entry.span.userLastName} — {absenceTypeLabel(entry.span.type)}{entry.span.days > 1 ? ` (${entry.span.days} days)` : ''}{entry.span.isHalfDay ? ' (½)' : ''}{entry.span.note ? ': ' + entry.span.note : ''}"
+												title="{entry.span.userFirstName} {entry.span.userLastName} — {entry.span.customTypeName ?? absenceTypeLabel(entry.span.type)}{entry.span.days > 1 ? ` (${entry.span.days} days)` : ''}{entry.span.isHalfDay ? ' (½)' : ''}{entry.span.note ? ': ' + entry.span.note : ''}"
 											>
 												{#if entry.position === 'start' || entry.position === 'single'}
 													{entry.span.userFirstName}{#if entry.span.days > 1}&nbsp;→{/if}{#if entry.span.isHalfDay && entry.position === 'single'}&nbsp;½{/if}
@@ -558,8 +634,8 @@
 			</div>
 		</section>
 
-		<!-- Day-click Add Absence Dialog (admin only) -->
-		{#if canEdit && showDayDialog}
+		<!-- Day-click Add/Request Absence Dialog -->
+		{#if canOpenDayDialog && showDayDialog}
 			{@const dayAbsences = absences.filter(a => a.date === dayDialogDate)}
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -585,16 +661,21 @@
 											{(ab.userFirstName?.[0] ?? '').toUpperCase()}{(ab.userLastName?.[0] ?? '').toUpperCase()}
 										</div>
 										<span class="font-medium">{ab.userFirstName} {ab.userLastName}</span>
-										<span class="badge badge-xs {absenceColor(ab.type)}">{absenceTypeLabel(ab.type ?? '')}</span>
+										<span class="badge badge-xs {absenceColor(ab.type)}">{ab.customTypeName ?? absenceTypeLabel(ab.type ?? '')}</span>
 										{#if ab.isHalfDay}<span class="badge badge-xs badge-outline">½</span>{/if}
 										{#if ab.note}<span class="text-base-content/40 text-xs truncate">{ab.note}</span>{/if}
 									</div>
 								{/each}
 							</div>
 						</div>
-						<div class="divider my-2 text-xs text-base-content/40">Add new absence</div>
+						<div class="divider my-2 text-xs text-base-content/40">{mustRequest ? 'Request absence' : 'Add new absence'}</div>
 					{/if}
 
+					{#if mustRequest}
+						<div class="alert alert-info text-sm py-1.5 px-2.5 mb-3">
+							This will be sent as a request and needs approval by your group admin or an organization admin.
+						</div>
+					{/if}
 					{#if dayDialogError}
 						<div class="alert alert-error text-sm py-1.5 px-2.5 mb-3">{dayDialogError}</div>
 					{/if}
@@ -623,10 +704,23 @@
 						<div class="flex flex-col gap-1">
 							<span class="text-sm font-medium text-base-content/70">Type</span>
 							<select bind:value={dayDialogType} class="select select-bordered select-sm">
-								<option value={0}>Sick Day</option>
-								<option value={1}>Vacation</option>
-								<option value={2}>Other</option>
+								<option value="0">Sick Day</option>
+								<option value="1">Vacation</option>
+								<option value="2">Other</option>
+								{#each absenceTypes as t}
+									<option value={'c' + t.id}>{t.name}</option>
+								{/each}
 							</select>
+							{#if dayDialogType.startsWith('c')}
+								{@const selected = absenceTypes.find(t => 'c' + t.id === dayDialogType)}
+								{#if selected}
+									<span class="text-xs text-base-content/40">
+										{selected.creditMode === 'FillToTarget' ? 'Hours are filled up to the expected daily target.'
+										: selected.creditMode === 'FullCredit' ? 'The full daily target is credited.'
+										: 'Hours are kept as tracked — no credit.'}
+									</span>
+								{/if}
+							{/if}
 						</div>
 						<div class="flex flex-col gap-1">
 							<span class="text-sm font-medium text-base-content/70">Note (optional)</span>
@@ -639,7 +733,7 @@
 						<div class="flex justify-end gap-2 mt-2">
 							<button type="button" class="btn btn-ghost btn-sm" onclick={() => (showDayDialog = false)}>Cancel</button>
 							<button type="submit" class="btn btn-primary btn-sm" disabled={dayDialogSaving}>
-								{dayDialogSaving ? 'Adding...' : 'Add Absence'}
+								{dayDialogSaving ? (mustRequest ? 'Sending...' : 'Adding...') : mustRequest ? 'Send Request' : 'Add Absence'}
 							</button>
 						</div>
 					</form>
@@ -761,7 +855,7 @@
 								</span>
 								{/if}
 								<span class="badge badge-sm {absenceColor(span.type)}">
-									{absenceTypeLabel(span.type)}
+									{span.customTypeName ?? absenceTypeLabel(span.type)}
 								</span>
 								{#if span.days > 1}
 									<span class="badge badge-sm badge-outline">{span.days} days</span>

@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { organizationsApi, workScheduleApi, absenceDayApi } from '$lib/apiClient';
+	import { organizationsApi, workScheduleApi, absenceDayApi, groupApi } from '$lib/apiClient';
 	import { formatHoursDecimal, formatDateFull, absenceTypeLabel, absenceTypeBadge, getInitials } from '$lib/utils/formatters';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import MemberCalendar from '$lib/components/MemberCalendar.svelte';
@@ -13,7 +13,9 @@
 		MemberTimeOverviewResponse,
 		WorkScheduleResponse,
 		AbsenceDayResponse,
-		AbsenceType
+		AbsenceType,
+		AbsenceTypeDefinitionResponse,
+		EffectivePermissionsResponse
 	} from '$lib/api';
 
 	let orgSlug = $state('');
@@ -37,7 +39,11 @@
 	let showAddAbsence = $state(false);
 	let absenceFromDate = $state('');
 	let absenceToDate = $state('');
-	let absenceType = $state<number>(0);
+	let absenceType = $state<string>('0'); // '0'|'1'|'2' or 'c{id}' for custom types
+	let absenceTypes = $state<AbsenceTypeDefinitionResponse[]>([]);
+
+	// Effective permissions of this member (org + group overrides)
+	let memberPerms = $state<EffectivePermissionsResponse | null>(null);
 	let absenceNote = $state('');
 	let absenceHalfDay = $state(false);
 	let absenceSaving = $state(false);
@@ -109,8 +115,24 @@
 		// Load sections in parallel
 		loadAllTimeOverview();
 		loadAbsences();
+		loadAbsenceTypes();
+		loadMemberPerms();
 		loadSchedule();
 		loadPeriods();
+	}
+
+	async function loadAbsenceTypes() {
+		try {
+			const { data } = await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesGet(orgSlug);
+			absenceTypes = data;
+		} catch { absenceTypes = []; }
+	}
+
+	async function loadMemberPerms() {
+		try {
+			const { data } = await groupApi.apiV1OrganizationsSlugMembersMemberIdEffectivePermissionsGet(orgSlug, memberId);
+			memberPerms = data;
+		} catch { memberPerms = null; }
 	}
 
 	async function loadAllTimeOverview() {
@@ -180,12 +202,16 @@
 				return;
 			}
 			// Create one absence per workday
+			const isCustom = absenceType.startsWith('c');
+			const type = (isCustom ? 2 : parseInt(absenceType, 10)) as AbsenceType;
+			const customTypeId = isCustom ? parseInt(absenceType.slice(1), 10) : undefined;
 			for (const wd of workdays) {
 				const dateStr = `${wd.getFullYear()}-${String(wd.getMonth() + 1).padStart(2, '0')}-${String(wd.getDate()).padStart(2, '0')}`;
 				await absenceDayApi.apiV1OrganizationsSlugAbsencesAdminPost(orgSlug, {
 					userId: memberId,
 					date: dateStr,
-					type: absenceType as AbsenceType,
+					type,
+					customTypeId,
 					isHalfDay: absenceHalfDay,
 					note: absenceNote || undefined
 				});
@@ -193,7 +219,7 @@
 			showAddAbsence = false;
 			absenceFromDate = '';
 			absenceToDate = '';
-			absenceType = 0;
+			absenceType = '0';
 			absenceNote = '';
 			absenceHalfDay = false;
 			loadAbsences();
@@ -492,9 +518,12 @@
 						<input id="absence-to" type="date" bind:value={absenceToDate} class="input input-bordered input-sm" placeholder="Same day" />
 					</div>
 					<select bind:value={absenceType} class="select select-bordered select-sm">
-						<option value={0}>Sick Day</option>
-						<option value={1}>Vacation</option>
-						<option value={2}>Other</option>
+						<option value="0">Sick Day</option>
+						<option value="1">Vacation</option>
+						<option value="2">Other</option>
+						{#each absenceTypes as t}
+							<option value={'c' + t.id}>{t.name}</option>
+						{/each}
 					</select>
 					<input type="text" bind:value={absenceNote} placeholder="Note (optional)" class="input input-bordered input-sm flex-1" />
 					<label class="label cursor-pointer flex items-center gap-1.5 text-sm text-base-content/70">
@@ -528,12 +557,17 @@
 							{#each yearAbsences as absence}
 								<div class="flex items-center gap-3 py-2 px-2.5 bg-base-200/30 rounded-md border border-base-200 text-sm">
 									<span class="font-medium text-base-content/70 min-w-[100px]">{formatDateFull(absence.date!)}</span>
-									<span class="badge badge-sm {absenceTypeBadge(absence.type) === 'badge-sick' ? 'badge-error' : absenceTypeBadge(absence.type) === 'badge-vacation' ? 'badge-info' : 'badge-accent'}">{absenceTypeLabel(absence.type)}</span>
+									<span class="badge badge-sm {absenceTypeBadge(absence.type) === 'badge-sick' ? 'badge-error' : absenceTypeBadge(absence.type) === 'badge-vacation' ? 'badge-info' : 'badge-accent'}">{absence.customTypeName ?? absenceTypeLabel(absence.type)}</span>
 									{#if absence.isHalfDay}
 										<span class="badge badge-warning badge-xs">½ Day</span>
 									{/if}
 									{#if absence.note}
 										<span class="text-base-content/40 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs">{absence.note}</span>
+									{/if}
+									{#if absence.createdByName || absence.createdViaRequestId}
+										<span class="text-[10px] text-base-content/30 whitespace-nowrap" title="Audit trail">
+											{absence.createdByName ? `by ${absence.createdByName}` : ''}{absence.createdViaRequestId ? ` (request #${absence.createdViaRequestId})` : ''}
+										</span>
 									{/if}
 									{#if canEdit}
 										<button class="btn btn-ghost btn-xs text-base-content/30 hover:text-error" onclick={() => deleteAbsence(absence.id!)} title="Delete" aria-label="Delete absence">
@@ -546,6 +580,77 @@
 					</div>
 				{/each}
 			{/if}
+		</section>
+		{/if}
+
+		<!-- ═══ Permissions ═══ -->
+		{#if (canEdit || isSelf) && memberPerms}
+		{@const permRules = [
+			{ label: 'Edit past entries', mode: memberPerms.editPastEntriesMode },
+			{ label: 'Edit pause duration', mode: memberPerms.editPauseMode },
+			{ label: 'Absences & vacation', mode: memberPerms.absenceSelfServiceMode },
+			{ label: 'Change work schedule', mode: memberPerms.workScheduleChangeMode },
+			{ label: 'Set initial overtime', mode: memberPerms.initialOvertimeMode },
+			{ label: 'CSV import', mode: memberPerms.csvImportMode }
+		]}
+		{@const permCaps = [
+			{ label: 'Approve absence requests', on: memberPerms.canApproveAbsences },
+			{ label: 'Approve time edits', on: memberPerms.canApproveTimeEdits },
+			{ label: 'Approve schedule changes', on: memberPerms.canApproveScheduleChanges },
+			{ label: 'Manage group members', on: memberPerms.canManageGroupMembers },
+			{ label: 'View all time entries', on: memberPerms.canViewAllTimeEntries },
+			{ label: 'Export data', on: memberPerms.canExportData }
+		]}
+		{@const permVis = [
+			{ label: 'Vacation visibility', mode: memberPerms.vacationVisibility },
+			{ label: 'Sick day visibility', mode: memberPerms.sickDayVisibility },
+			{ label: 'Time entry visibility', mode: memberPerms.timeEntryVisibility }
+		]}
+		<section class="card bg-base-100 border border-base-300 p-5 mb-5">
+			<div class="flex items-center justify-between mb-1">
+				<h2 class="text-base font-bold text-base-content flex items-center gap-2 m-0">
+					<svg class="text-base-content/60" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+					{isSelf ? 'Your Permissions' : 'Permissions'}
+				</h2>
+				{#if canEdit}
+					<a href="/organizations/{orgSlug}/groups" class="btn btn-ghost btn-xs">Manage via groups →</a>
+				{/if}
+			</div>
+			<p class="text-xs text-base-content/50 mb-4">Effective rights resolved from organization rules and group overrides.</p>
+
+			<div class="grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
+				<div>
+					<h3 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2">Actions</h3>
+					{#each permRules as r}
+						<div class="flex items-center justify-between py-1 text-sm">
+							<span class="text-base-content/70">{r.label}</span>
+							<span class="badge badge-sm {r.mode === 'Allowed' ? 'badge-success badge-outline' : r.mode === 'RequiresApproval' ? 'badge-warning badge-outline' : 'badge-ghost'}">
+								{r.mode === 'RequiresApproval' ? 'Needs approval' : r.mode}
+							</span>
+						</div>
+					{/each}
+					<h3 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2 mt-4">Visibility</h3>
+					{#each permVis as v}
+						<div class="flex items-center justify-between py-1 text-sm">
+							<span class="text-base-content/70">{v.label}</span>
+							<span class="badge badge-sm badge-ghost">{v.mode === 'AdminOnly' ? 'Admins only' : v.mode === 'AllMembers' ? 'All members' : 'Private'}</span>
+						</div>
+					{/each}
+				</div>
+				<div>
+					<h3 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2">Approval & admin capabilities</h3>
+					{#each permCaps as c}
+						<div class="flex items-center gap-2 py-1 text-sm">
+							{#if c.on}
+								<svg class="text-success shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+							{:else}
+								<svg class="text-base-content/20 shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+							{/if}
+							<span class="{c.on ? 'text-base-content/80' : 'text-base-content/40'}">{c.label}</span>
+						</div>
+					{/each}
+				</div>
+			</div>
 		</section>
 		{/if}
 
