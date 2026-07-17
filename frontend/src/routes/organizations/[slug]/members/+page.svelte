@@ -144,6 +144,26 @@
 			addingMember = false;
 		}
 	}
+
+	// ── Group filter ──
+	let groupFilter = $state<number | 'none' | null>(null);
+
+	function getGroupOptions(): { id: number; name: string; color?: string | null }[] {
+		const seen = new Map<number, { id: number; name: string; color?: string | null }>();
+		for (const m of org?.members ?? []) {
+			for (const g of m.groups ?? []) {
+				if (g.groupId != null && !seen.has(g.groupId)) seen.set(g.groupId, { id: g.groupId, name: g.name ?? '', color: g.color });
+			}
+		}
+		return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+	}
+
+	function filteredMembers() {
+		const members = org?.members ?? [];
+		if (groupFilter === null) return members;
+		if (groupFilter === 'none') return members.filter(m => (m.groups ?? []).length === 0);
+		return members.filter(m => (m.groups ?? []).some(g => g.groupId === groupFilter));
+	}
 </script>
 
 <svelte:head>
@@ -161,13 +181,24 @@
 
 			<!-- Members -->
 			<section class="mt-4">
-				<div class="flex items-center justify-between mb-4">
-					<h2 class="text-xl text-base-content/70">Members ({(org.members ?? []).length})</h2>
-					{#if canEdit}
-						<button class="btn btn-primary btn-sm" onclick={() => { showAddMember = !showAddMember; if (showAddMember) loadUsersForDropdown(); }}>
-							{showAddMember ? 'Cancel' : '+ Add Member'}
-						</button>
-					{/if}
+				<div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+					<h2 class="text-xl text-base-content/70">Members ({filteredMembers().length}{groupFilter !== null ? ` of ${(org.members ?? []).length}` : ''})</h2>
+					<div class="flex items-center gap-2">
+						{#if getGroupOptions().length > 0}
+							<select bind:value={groupFilter} class="select select-bordered select-sm" title="Filter members by group">
+								<option value={null}>All groups</option>
+								{#each getGroupOptions() as g}
+									<option value={g.id}>{g.name}</option>
+								{/each}
+								<option value="none">No group</option>
+							</select>
+						{/if}
+						{#if canEdit}
+							<button class="btn btn-primary btn-sm" onclick={() => { showAddMember = !showAddMember; if (showAddMember) loadUsersForDropdown(); }}>
+								{showAddMember ? 'Cancel' : '+ Add Member'}
+							</button>
+						{/if}
+					</div>
 				</div>
 
 				{#if showAddMember && canEdit}
@@ -195,7 +226,7 @@
 				{/if}
 
 				<div class="flex flex-col gap-2">
-					{#each (org.members ?? []) as member}
+					{#each filteredMembers() as member}
 						{@const overview = getMemberOverview(member.id!)}
 						<a
 							class="group flex items-center gap-4 p-3.5 bg-base-100 border border-base-300 rounded-xl cursor-pointer transition-all hover:border-primary/30 hover:shadow-md hover:-translate-y-px no-underline text-base-content"

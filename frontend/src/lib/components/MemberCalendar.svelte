@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { organizationsApi, timeTrackingApi, workScheduleApi } from '$lib/apiClient';
-	import type { TimeEntryResponse, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/api';
+	import { auth } from '$lib/stores/auth.svelte';
+	import { organizationsApi, timeTrackingApi, workScheduleApi, absenceDayApi, groupApi } from '$lib/apiClient';
+	import type { TimeEntryResponse, WorkScheduleResponse, OrganizationDetailResponse, AbsenceTypeDefinitionResponse, EffectivePermissionsResponse } from '$lib/api';
 	import { formatHours, formatDelta, formatDuration, formatTime, formatDateFull, barWidth } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, getHeatColor, type CustomCreditSets } from '$lib/utils/scheduleHelpers';
@@ -11,6 +12,7 @@
 	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
 	import EntryEditForm from '$lib/components/EntryEditForm.svelte';
 	import RequestModal from '$lib/components/RequestModal.svelte';
+	import AbsenceDialog from '$lib/components/AbsenceDialog.svelte';
 
 	/**
 	 * Shared month/year calendar of a member's tracked time, absences and holidays.
@@ -61,6 +63,20 @@
 	let monthlyCumulativeBalances = $state<Map<string, number>>(new Map()); // "YYYY-MM" -> cumulative balance
 	let selectedDayKey = $state<string | null>(null);
 	let orgDetail = $state<OrganizationDetailResponse | null>(orgDetailProp);
+
+	// Day-click add-absence popup
+	let absenceTypes = $state<AbsenceTypeDefinitionResponse[]>([]);
+	let effectivePerms = $state<EffectivePermissionsResponse | null>(null);
+	let showAbsenceDialog = $state(false);
+	let absenceDialogDate = $state('');
+	let absenceMessage = $state('');
+
+	let myRole = $derived(orgDetail?.members?.find(m => m.id === auth.user?.id)?.role ?? null);
+	let isOrgAdmin = $derived(myRole === 'Owner' || myRole === 'Admin');
+	let selfAbsenceMode = $derived(effectivePerms?.absenceSelfServiceMode ?? orgDetail?.absenceSelfServiceMode ?? 'Allowed');
+	/** Admins can add for the viewed person; members can add/request for themselves. */
+	let canAddAbsence = $derived(isOrgAdmin || (isSelf && selfAbsenceMode !== 'Disabled'));
+	let mustRequest = $derived(!isOrgAdmin && isSelf && selfAbsenceMode === 'RequiresApproval');
 
 	// Shared entry editing + request logic (only exposed in the UI when isSelf)
 	const editor = createEntryEditor({
@@ -125,7 +141,9 @@
 			loadWorkSchedule(),
 			loadOrgDetail(),
 			loadDaysOff(),
-			loadSchedulePeriods()
+			loadSchedulePeriods(),
+			loadAbsenceTypes(),
+			loadEffectivePermissions()
 		]);
 		await loadCumulativeBalance();
 		if (viewMode === 'year') await loadYearEntries();
@@ -175,6 +193,30 @@
 
 	async function loadDaysOff() {
 		daysOff = await fetchDaysOff(orgSlug, userId);
+	}
+
+	async function loadAbsenceTypes() {
+		try {
+			const { data } = await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesGet(orgSlug);
+			absenceTypes = data;
+		} catch { absenceTypes = []; }
+	}
+
+	async function loadEffectivePermissions() {
+		try {
+			const { data } = await groupApi.apiV1OrganizationsSlugEffectivePermissionsGet(orgSlug);
+			effectivePerms = data;
+		} catch { effectivePerms = null; }
+	}
+
+	async function onAbsenceSaved(requestMessage?: string) {
+		if (requestMessage) {
+			absenceMessage = requestMessage;
+			setTimeout(() => (absenceMessage = ''), 6000);
+			return;
+		}
+		await Promise.all([loadDaysOff(), loadEntries()]);
+		await loadCumulativeBalance();
 	}
 
 	async function loadCumulativeBalance() {
@@ -301,10 +343,14 @@
 		selectedDayKey = `${monthPrefix}01`;
 	}
 
-	function selectDay(day: CalendarDay) {
+	function selectDay(day: CalendarDay, openDialog = true) {
 		if (!day.isCurrentMonth) return;
 		selectedDayKey = day.key;
 		editor.cancelEditEntry();
+		if (openDialog && canAddAbsence) {
+			absenceDialogDate = day.key;
+			showAbsenceDialog = true;
+		}
 	}
 
 	function isPastOrToday(date: Date): boolean {
@@ -500,6 +546,10 @@
 		</div>
 	</div>
 
+	{#if absenceMessage}
+		<div class="alert alert-success text-sm py-2 px-3 mb-4">{absenceMessage}</div>
+	{/if}
+
 	{#if loading}
 		<LoadingSpinner message="Loading..." size="sm" />
 	{:else if viewMode === 'month'}
@@ -565,7 +615,7 @@
 						<button
 							type="button"
 							class="min-h-[72px] p-1.5 border-r border-b border-base-200 [&:nth-child(7n)]:border-r-0 flex flex-col gap-0.5 relative transition-colors text-left {!day.isCurrentMonth ? 'opacity-30' : ''} {day.isWeekend ? 'bg-base-200/30' : ''} {day.isToday ? 'outline-2 outline-primary -outline-offset-2 rounded' : ''} {day.key === selectedDayKey ? 'ring-2 ring-primary/40 bg-primary/10' : ''} {day.dayType === 'holiday' ? 'bg-secondary/10' : day.dayType === 'sick' ? 'bg-error/10' : day.dayType === 'vacation' ? 'bg-accent/10' : day.dayType === 'other-absence' ? 'bg-base-content/10' : ''}"
-							title={day.dayTypeLabel || (day.workedMinutes > 0 ? `${formatHours(day.workedMinutes)} worked` : '')}
+							title={(day.dayTypeLabel || (day.workedMinutes > 0 ? `${formatHours(day.workedMinutes)} worked` : '')) + (canAddAbsence && day.isCurrentMonth ? (mustRequest ? ' — click to request absence' : ' — click to add absence') : '')}
 							onclick={() => selectDay(day)}
 							disabled={!day.isCurrentMonth}
 						>
@@ -609,7 +659,7 @@
 						<button
 							type="button"
 							class="flex items-center gap-2 py-1 px-1.5 rounded text-left transition-colors {day.isToday ? 'font-semibold' : ''} {day.key === selectedDayKey ? 'ring-2 ring-primary/30 bg-primary/10' : ''} {day.dayType === 'holiday' ? 'bg-secondary/5' : day.dayType === 'sick' ? 'bg-error/5' : day.dayType === 'vacation' ? 'bg-accent/5' : day.dayType === 'other-absence' ? 'bg-base-content/5' : ''}"
-							onclick={() => selectDay(day)}
+							onclick={() => selectDay(day, false)}
 						>
 							<span class="w-7 text-xs text-base-content/60 shrink-0">{dayName}</span>
 							<span class="w-5 text-xs text-base-content/40 shrink-0 text-right">{day.dayOfMonth}</span>
@@ -737,6 +787,18 @@
 					{/if}
 				</div>
 			{/if}
+
+			<AbsenceDialog
+				open={showAbsenceDialog}
+				{orgSlug}
+				date={absenceDialogDate}
+				fixedUserId={userId}
+				isAdmin={isOrgAdmin}
+				{mustRequest}
+				{absenceTypes}
+				onclose={() => (showAbsenceDialog = false)}
+				onsaved={onAbsenceSaved}
+			/>
 
 			{#if isSelf}
 				<RequestModal
