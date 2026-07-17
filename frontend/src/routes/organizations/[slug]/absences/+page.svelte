@@ -29,6 +29,7 @@
 	let absencesLoading = $state(false);
 	let absencesLoaded = $state(false);
 	let adminAbsenceFilter = $state<number | null>(null);
+	let calendarUserFilter = $state<number | null>(null);
 	let panelTypeFilter = $state<string>('all');
 	let calendarMonth = $state(new Date().getMonth());
 	let calendarYear = $state(new Date().getFullYear());
@@ -388,6 +389,22 @@
 		const years = [...new Set(absences.map(a => (a.date ?? '').substring(0, 4)).filter(y => y))].sort((a, b) => b.localeCompare(a));
 		return years.length > 0 ? years.map(y => parseInt(y)) : [new Date().getFullYear()];
 	}
+
+	// Users pickable in the calendar filter: all org members for admins,
+	// otherwise the distinct users visible in the loaded absences.
+	function getCalendarUserOptions(): { id: number; name: string }[] {
+		if (canEdit) {
+			return (org?.members ?? [])
+				.map((m) => ({ id: m.id ?? 0, name: `${m.firstName} ${m.lastName}` }))
+				.sort((a, b) => a.name.localeCompare(b.name));
+		}
+		const seen = new Map<number, string>();
+		for (const a of absences) {
+			const id = a.userId ?? 0;
+			if (!seen.has(id)) seen.set(id, `${a.userFirstName ?? ''} ${a.userLastName ?? ''}`.trim());
+		}
+		return [...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+	}
 </script>
 
 <svelte:head>
@@ -408,7 +425,9 @@
 		<p class="text-base-content/50 text-sm mb-6 leading-relaxed">{canEdit ? 'Calendar overview of absences and vacation days across all members.' : 'Calendar overview of absences visible to you.'}</p>
 
 		<!-- Calendar Navigation -->
-		{@const spanMap = buildSpanMap(absences)}
+		{@const calendarAbsences = calendarUserFilter === null ? absences : absences.filter((a) => a.userId === calendarUserFilter)}
+		{@const calendarUserOptions = getCalendarUserOptions()}
+		{@const spanMap = buildSpanMap(calendarAbsences)}
 		{@const holidayMap = buildHolidayMap(holidays)}
 		{@const days = calendarDays(calendarYear, calendarMonth)}
 		{@const monthLabel = new Date(calendarYear, calendarMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
@@ -429,6 +448,22 @@
 					</button>
 				</div>
 			</div>
+
+			<!-- Calendar member filter -->
+			{#if calendarUserOptions.length > 1}
+				<div class="flex items-center justify-end gap-2 mb-3">
+					<label class="text-xs text-base-content/50" for="calendar-user-filter">Show</label>
+					<select id="calendar-user-filter" bind:value={calendarUserFilter} class="select select-bordered select-sm">
+						<option value={null}>All members</option>
+						{#each calendarUserOptions as u}
+							<option value={u.id}>{u.name}{u.id === auth.user?.id ? ' (You)' : ''}</option>
+						{/each}
+					</select>
+					{#if calendarUserFilter !== null}
+						<button class="btn btn-ghost btn-xs" onclick={() => (calendarUserFilter = null)}>Clear</button>
+					{/if}
+				</div>
+			{/if}
 
 			<!-- Day-of-week headers -->
 			<div class="grid grid-cols-7 gap-px mb-px">
@@ -615,17 +650,32 @@
 		<!-- Vacation Days Summary (admin only) -->
 		{#if canEdit}
 		<section class="mt-8 bg-base-200/30 rounded-lg p-5 border border-base-300">
-			<h2 class="text-xl font-bold text-base-content mb-4">Vacation Days Balance</h2>
+			<div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+				<h2 class="text-xl font-bold text-base-content m-0">Vacation Days Balance</h2>
+				<div class="flex items-center gap-4 text-xs text-base-content/60">
+					<span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-primary"></span> Taken</span>
+					<span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-primary/40"></span> Planned</span>
+				</div>
+			</div>
 			{#if (org.members ?? []).filter(m => (m.vacationDaysPerYear ?? 0) > 0).length === 0}
 				<p class="text-base-content/40 text-sm">No members have vacation days configured.</p>
 			{:else}
-				{@const membersWithVacation = (org.members ?? []).filter(m => (m.vacationDaysPerYear ?? 0) > 0).sort((a, b) => ((a.vacationDaysRemaining ?? 0) - (b.vacationDaysRemaining ?? 0)))}
+				{@const membersWithVacation = (org.members ?? [])
+					.filter(m => (m.vacationDaysPerYear ?? 0) > 0)
+					.filter(m => calendarUserFilter === null || m.id === calendarUserFilter)
+					.sort((a, b) => ((a.vacationDaysRemaining ?? 0) - (b.vacationDaysRemaining ?? 0)))}
+				{#if membersWithVacation.length === 0}
+					<p class="text-base-content/40 text-sm">The selected member has no vacation days configured.</p>
+				{:else}
 				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 					{#each membersWithVacation as member}
 						{@const total = member.vacationDaysPerYear ?? 0}
-						{@const used = member.vacationDaysUsed ?? 0}
+						{@const taken = member.vacationDaysTaken ?? 0}
+						{@const planned = member.vacationDaysPlanned ?? 0}
 						{@const remaining = member.vacationDaysRemaining ?? total}
-						{@const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0}
+						{@const takenPct = total > 0 ? Math.min(100, (taken / total) * 100) : 0}
+						{@const plannedPct = total > 0 ? Math.min(100 - takenPct, (planned / total) * 100) : 0}
+						{@const pct = Math.round(takenPct + plannedPct)}
 						<a href="/organizations/{orgSlug}/members/{member.id}" class="flex items-start gap-3 p-3 bg-base-100 rounded-lg border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all no-underline text-base-content">
 							<div class="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">
 								{(member.firstName?.[0] ?? '').toUpperCase()}{(member.lastName?.[0] ?? '').toUpperCase()}
@@ -633,17 +683,21 @@
 							<div class="flex-1 min-w-0">
 								<div class="font-semibold text-sm truncate">{member.firstName} {member.lastName}</div>
 								<div class="flex items-center gap-2 mt-1">
-									<progress class="progress {pct >= 90 ? 'progress-error' : pct >= 70 ? 'progress-warning' : 'progress-primary'} flex-1 h-2" value={pct} max="100"></progress>
+									<div class="flex-1 h-2 bg-base-200 rounded-full overflow-hidden flex" title="{taken}d taken, {planned}d planned">
+										<div class="h-full {pct >= 90 ? 'bg-error' : pct >= 70 ? 'bg-warning' : 'bg-primary'}" style="width: {takenPct}%"></div>
+										<div class="h-full {pct >= 90 ? 'bg-error/40' : pct >= 70 ? 'bg-warning/40' : 'bg-primary/40'}" style="width: {plannedPct}%"></div>
+									</div>
 									<span class="text-xs text-base-content/50 shrink-0">{pct}%</span>
 								</div>
 								<div class="flex justify-between mt-1 text-xs text-base-content/50">
-									<span>{used}d used / {total}d</span>
+									<span>{taken}d taken{planned > 0 ? ` · ${planned}d planned` : ''} / {total}d</span>
 									<span class="font-semibold {remaining <= 2 ? 'text-error' : remaining <= 5 ? 'text-warning' : 'text-success'}">{remaining}d left</span>
 								</div>
 							</div>
 						</a>
 					{/each}
 				</div>
+				{/if}
 			{/if}
 		</section>
 		{/if}

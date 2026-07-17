@@ -560,6 +560,9 @@
 						<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
 							<span class="block text-xl font-bold text-info">{member?.vacationDaysRemaining ?? 0}/{member?.vacationDaysPerYear}</span>
 							<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Vacation Days Left</span>
+							{#if (member?.vacationDaysPlanned ?? 0) > 0}
+								<span class="block text-[10px] text-base-content/40 mt-0.5">{member?.vacationDaysPlanned}d planned</span>
+							{/if}
 						</div>
 					{/if}
 				</div>
@@ -735,27 +738,44 @@
 			{:else}
 				{@const allowed = member?.vacationDaysPerYear ?? 0}
 				{@const used = member?.vacationDaysUsed ?? 0}
+				{@const taken = member?.vacationDaysTaken ?? 0}
+				{@const planned = member?.vacationDaysPlanned ?? 0}
 				{@const remaining = member?.vacationDaysRemaining ?? 0}
 				{#if allowed > 0}
-					<div class="flex gap-6 mb-3">
+					{@const takenPct = Math.min(100, (taken / allowed) * 100)}
+					{@const plannedPct = Math.min(100 - takenPct, (planned / allowed) * 100)}
+					{@const usedRatio = used / allowed}
+					<div class="flex gap-6 mb-3 flex-wrap">
 						<div>
 							<span class="text-2xl font-bold text-base-content">{remaining}</span>
 							<span class="text-sm text-base-content/50 ml-1">remaining</span>
 						</div>
 						<div>
-							<span class="text-lg font-semibold text-base-content/60">{used}</span>
-							<span class="text-sm text-base-content/50 ml-1">used</span>
+							<span class="text-lg font-semibold text-base-content/60">{taken}</span>
+							<span class="text-sm text-base-content/50 ml-1">taken</span>
+						</div>
+						<div>
+							<span class="text-lg font-semibold text-base-content/60">{planned}</span>
+							<span class="text-sm text-base-content/50 ml-1">planned</span>
 						</div>
 						<div>
 							<span class="text-lg font-semibold text-base-content/60">{allowed}</span>
 							<span class="text-sm text-base-content/50 ml-1">total</span>
 						</div>
 					</div>
-					<div class="w-full bg-base-200 rounded-full h-2.5">
+					<div class="w-full bg-base-200 rounded-full h-2.5 overflow-hidden flex" title="{taken}d taken, {planned}d planned">
 						<div
-							class="h-2.5 rounded-full transition-all {used / allowed > 0.9 ? 'bg-error' : used / allowed > 0.7 ? 'bg-warning' : 'bg-success'}"
-							style="width: {Math.min(100, (used / allowed) * 100)}%"
+							class="h-2.5 transition-all {usedRatio > 0.9 ? 'bg-error' : usedRatio > 0.7 ? 'bg-warning' : 'bg-success'}"
+							style="width: {takenPct}%"
 						></div>
+						<div
+							class="h-2.5 transition-all {usedRatio > 0.9 ? 'bg-error/40' : usedRatio > 0.7 ? 'bg-warning/40' : 'bg-success/40'}"
+							style="width: {plannedPct}%"
+						></div>
+					</div>
+					<div class="flex gap-4 mt-2 text-xs text-base-content/50">
+						<span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm {usedRatio > 0.9 ? 'bg-error' : usedRatio > 0.7 ? 'bg-warning' : 'bg-success'}"></span> Taken ({taken}d)</span>
+						<span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm {usedRatio > 0.9 ? 'bg-error/40' : usedRatio > 0.7 ? 'bg-warning/40' : 'bg-success/40'}"></span> Planned rest of year ({planned}d)</span>
 					</div>
 				{:else}
 					<p class="text-base-content/40 text-sm">No vacation allowance set.</p>
