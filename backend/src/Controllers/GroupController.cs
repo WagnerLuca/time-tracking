@@ -146,4 +146,17 @@ public class GroupController : OrganizationBaseController
         if (userId == null) return Unauthorized();
         return ToResponse(await _service.GetEffectivePermissionsAsync(slug, userId.Value));
     }
+
+    /// <summary>Get effective permissions for a specific member (admin, or the member themselves).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Target member user ID.</param>
+    [HttpGet("{slug}/members/{memberId}/effective-permissions")]
+    [RequireOrgRole]
+    [ProducesResponseType(typeof(EffectivePermissionsResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMemberEffectivePermissions(string slug, int memberId)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.GetEffectivePermissionsAsync(slug, userId.Value, memberId));
+    }
 }

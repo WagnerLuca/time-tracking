@@ -35,6 +35,15 @@ namespace TimeTracking.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CreatedViaRequestId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CustomTypeId")
+                        .HasColumnType("integer");
+
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
@@ -56,12 +65,58 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CustomTypeId");
+
                     b.HasIndex("OrganizationId");
 
                     b.HasIndex("UserId", "OrganizationId", "Date")
                         .IsUnique();
 
                     b.ToTable("AbsenceDays");
+                });
+
+            modelBuilder.Entity("TimeTracking.Api.Models.AbsenceTypeDefinition", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Color")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("CountsAsVacation")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("CreditMode")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("AbsenceTypeDefinitions");
                 });
 
             modelBuilder.Entity("TimeTracking.Api.Models.Group", b =>
@@ -71,6 +126,9 @@ namespace TimeTracking.Api.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AbsenceSelfServiceMode")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Color")
                         .HasColumnType("text");
@@ -336,6 +394,9 @@ namespace TimeTracking.Api.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AbsenceSelfServiceMode")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("AutoPauseEnabled")
                         .HasColumnType("boolean");
@@ -720,6 +781,11 @@ namespace TimeTracking.Api.Migrations
 
             modelBuilder.Entity("TimeTracking.Api.Models.AbsenceDay", b =>
                 {
+                    b.HasOne("TimeTracking.Api.Models.AbsenceTypeDefinition", "CustomType")
+                        .WithMany()
+                        .HasForeignKey("CustomTypeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
                         .WithMany()
                         .HasForeignKey("OrganizationId")
@@ -732,9 +798,22 @@ namespace TimeTracking.Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("CustomType");
+
                     b.Navigation("Organization");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TimeTracking.Api.Models.AbsenceTypeDefinition", b =>
+                {
+                    b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
                 });
 
             modelBuilder.Entity("TimeTracking.Api.Models.Group", b =>

@@ -276,6 +276,7 @@ public class GroupService : IGroupService
         group.CsvImportMode?.ToString(),
         group.WorkScheduleChangeMode?.ToString(),
         group.InitialOvertimeMode?.ToString(),
+        group.AbsenceSelfServiceMode?.ToString(),
         group.VacationVisibility?.ToString(),
         group.SickDayVisibility?.ToString(),
         group.TimeEntryVisibility?.ToString(),
@@ -317,6 +318,7 @@ public class GroupService : IGroupService
         if (request.CsvImportMode.HasValue) group.CsvImportMode = request.CsvImportMode;
         if (request.WorkScheduleChangeMode.HasValue) group.WorkScheduleChangeMode = request.WorkScheduleChangeMode;
         if (request.InitialOvertimeMode.HasValue) group.InitialOvertimeMode = request.InitialOvertimeMode;
+        if (request.AbsenceSelfServiceMode.HasValue) group.AbsenceSelfServiceMode = request.AbsenceSelfServiceMode;
         if (request.VacationVisibility.HasValue) group.VacationVisibility = request.VacationVisibility;
         if (request.SickDayVisibility.HasValue) group.SickDayVisibility = request.SickDayVisibility;
         if (request.TimeEntryVisibility.HasValue) group.TimeEntryVisibility = request.TimeEntryVisibility;
@@ -335,21 +337,33 @@ public class GroupService : IGroupService
         return ServiceResult.Ok(ToPermissionsResponse(group));
     }
 
-    public async Task<ServiceResult<EffectivePermissionsResponse>> GetEffectivePermissionsAsync(string slug, int callerUserId)
+    public async Task<ServiceResult<EffectivePermissionsResponse>> GetEffectivePermissionsAsync(string slug, int callerUserId, int? targetUserId = null)
     {
         var (org, membership) = await ResolveOrgMemberAsync(slug, callerUserId);
         if (org is null) return ServiceResult.NotFound<EffectivePermissionsResponse>("Organization not found.");
         if (membership is null) return ServiceResult.Forbidden<EffectivePermissionsResponse>("You are not a member of this organization.");
 
-        var isOrgAdmin = membership.Role >= OrganizationRole.Admin;
+        // Resolving another member's permissions requires org admin
+        var userId = targetUserId ?? callerUserId;
+        if (userId != callerUserId && membership.Role < OrganizationRole.Admin)
+            return ServiceResult.Forbidden<EffectivePermissionsResponse>("Only org admins can view other members' permissions.");
 
-        // Get all groups this user belongs to
+        var targetMembership = userId == callerUserId
+            ? membership
+            : await _context.UserOrganizations.AsNoTracking()
+                .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
+        if (targetMembership is null)
+            return ServiceResult.NotFound<EffectivePermissionsResponse>("Member not found in this organization.");
+
+        var isOrgAdmin = targetMembership.Role >= OrganizationRole.Admin;
+
+        // Get all groups the target user belongs to
         var userGroups = await _context.Groups
-            .Where(g => g.OrganizationId == org.Id && g.Members.Any(m => m.UserId == callerUserId))
+            .Where(g => g.OrganizationId == org.Id && g.Members.Any(m => m.UserId == userId))
             .ToListAsync();
 
         var isGroupAdmin = userGroups.Any(g =>
-            _context.GroupMembers.Any(gm => gm.GroupId == g.Id && gm.UserId == callerUserId && gm.Role == GroupRole.Admin));
+            _context.GroupMembers.Any(gm => gm.GroupId == g.Id && gm.UserId == userId && gm.Role == GroupRole.Admin));
 
         // Resolve permissions: most permissive group override wins
         var editPastEntries = ResolveRuleMode(org.EditPastEntriesMode, userGroups, g => g.EditPastEntriesMode);
@@ -357,6 +371,7 @@ public class GroupService : IGroupService
         var csvImport = ResolveRuleMode(org.CsvImportMode, userGroups, g => g.CsvImportMode);
         var workScheduleChange = ResolveRuleMode(org.WorkScheduleChangeMode, userGroups, g => g.WorkScheduleChangeMode);
         var initialOvertime = ResolveRuleMode(org.InitialOvertimeMode, userGroups, g => g.InitialOvertimeMode);
+        var absenceSelfService = ResolveRuleMode(org.AbsenceSelfServiceMode, userGroups, g => g.AbsenceSelfServiceMode);
         var vacationVis = ResolveVisibilityMode(org.VacationVisibility, userGroups, g => g.VacationVisibility);
         var sickDayVis = ResolveVisibilityMode(org.SickDayVisibility, userGroups, g => g.SickDayVisibility);
         var timeEntryVis = ResolveVisibilityMode(
@@ -377,6 +392,7 @@ public class GroupService : IGroupService
             csvImport.ToString(),
             workScheduleChange.ToString(),
             initialOvertime.ToString(),
+            absenceSelfService.ToString(),
             vacationVis.ToString(),
             sickDayVis.ToString(),
             timeEntryVis.ToString(),

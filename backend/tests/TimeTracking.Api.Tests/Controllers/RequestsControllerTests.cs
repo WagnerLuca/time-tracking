@@ -238,4 +238,116 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
             $"/api/v1/organizations/wsc-test-org/requests/{req!.Id}", new { accept = true });
         acceptResponse.EnsureSuccessStatusCode();
     }
+
+    // ── Absence (vacation) requests ──────────────────────────────────────
+
+    [Fact]
+    public async Task AbsenceRequest_MemberCreates_AdminApproves_AbsencesCreated()
+    {
+        // Seed org has AbsenceSelfServiceMode = RequiresApproval
+        var memberClient = _factory.CreateClient();
+        var memberLogin = await TestHelpers.AuthenticateAsync(memberClient, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
+
+        var requestData = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            dates = new[] { "2027-03-01", "2027-03-02" },
+            type = 1, // Vacation
+            isHalfDay = false,
+            note = "Ski trip"
+        });
+
+        var createResponse = await memberClient.PostAsJsonAsync(
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/requests", new
+            {
+                type = 6, // RequestAbsence
+                message = "Vacation please",
+                requestData
+            });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var request = await createResponse.Content.ReadFromJsonAsync<OrgRequestResponseDto>(TestHelpers.JsonOptions);
+        request!.Status.Should().Be("Pending");
+        request.Type.Should().Be("RequestAbsence");
+
+        // Owner approves
+        var ownerClient = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(ownerClient, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        var respond = await ownerClient.PutAsJsonAsync(
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/requests/{request.Id}", new { accept = true });
+        respond.EnsureSuccessStatusCode();
+        var responded = await respond.Content.ReadFromJsonAsync<OrgRequestResponseDto>(TestHelpers.JsonOptions);
+        responded!.Status.Should().Be("Accepted");
+        responded.RespondedAt.Should().NotBeNull();
+
+        // The absences were created for the member (audit-linked to the request)
+        var absencesResponse = await ownerClient.GetAsync(
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences?userId={request.UserId}&from=2027-03-01&to=2027-03-02");
+        absencesResponse.EnsureSuccessStatusCode();
+        var page = await absencesResponse.Content.ReadFromJsonAsync<PaginatedResponseDto<AbsenceDayResponseDto>>(TestHelpers.JsonOptions);
+        page!.Items.Should().HaveCount(2);
+        page.Items.Should().OnlyContain(a => a.Type == "Vacation");
+    }
+
+    [Fact]
+    public async Task AbsenceRequest_FromOrgAdmin_IsAutoApproved()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        var requestData = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            dates = new[] { "2027-04-05" },
+            type = 1, // Vacation
+            isHalfDay = false
+        });
+
+        var createResponse = await client.PostAsJsonAsync(
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/requests", new
+            {
+                type = 6, // RequestAbsence
+                requestData
+            });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var request = await createResponse.Content.ReadFromJsonAsync<OrgRequestResponseDto>(TestHelpers.JsonOptions);
+        request!.Status.Should().Be("Accepted");
+        request.RespondedAt.Should().NotBeNull();
+
+        // Absence exists immediately
+        var absencesResponse = await client.GetAsync(
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences?userId={request.UserId}&from=2027-04-05&to=2027-04-05");
+        var page = await absencesResponse.Content.ReadFromJsonAsync<PaginatedResponseDto<AbsenceDayResponseDto>>(TestHelpers.JsonOptions);
+        page!.Items.Should().ContainSingle(a => a.Type == "Vacation");
+    }
+
+    [Fact]
+    public async Task AbsenceRequest_DeclinedByAdmin_CreatesNoAbsences()
+    {
+        var memberClient = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(memberClient, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
+
+        var requestData = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            dates = new[] { "2027-05-10" },
+            type = 1
+        });
+
+        var createResponse = await memberClient.PostAsJsonAsync(
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/requests", new
+            {
+                type = 6,
+                requestData
+            });
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var request = await createResponse.Content.ReadFromJsonAsync<OrgRequestResponseDto>(TestHelpers.JsonOptions);
+
+        var ownerClient = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(ownerClient, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        var respond = await ownerClient.PutAsJsonAsync(
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/requests/{request!.Id}", new { accept = false });
+        respond.EnsureSuccessStatusCode();
+
+        var absencesResponse = await ownerClient.GetAsync(
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/absences?userId={request.UserId}&from=2027-05-10&to=2027-05-10");
+        var page = await absencesResponse.Content.ReadFromJsonAsync<PaginatedResponseDto<AbsenceDayResponseDto>>(TestHelpers.JsonOptions);
+        page!.Items.Should().BeEmpty();
+    }
 }

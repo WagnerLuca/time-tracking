@@ -19,6 +19,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<OrgRequest> OrgRequests { get; set; }
     public DbSet<Holiday> Holidays { get; set; }
     public DbSet<AbsenceDay> AbsenceDays { get; set; }
+    public DbSet<AbsenceTypeDefinition> AbsenceTypeDefinitions { get; set; }
     public DbSet<WorkSchedule> WorkSchedules { get; set; }
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<Group> Groups { get; set; }
@@ -259,6 +260,35 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.CustomType)
+                .WithMany()
+                .HasForeignKey(e => e.CustomTypeId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Configure AbsenceTypeDefinition entity (org-defined custom absence types)
+        modelBuilder.Entity<AbsenceTypeDefinition>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Color).HasMaxLength(20);
+            entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
+
+            if (isInMemory)
+                entity.Property(e => e.CreatedAt).IsRequired();
+            else
+                entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasIndex(e => new { e.OrganizationId, e.Name }).IsUnique();
+
+            // Keep dependent rows hidden when the parent organization is soft-deleted.
+            entity.HasQueryFilter(e => e.Organization.IsActive);
 
             entity.HasOne(e => e.Organization)
                 .WithMany()

@@ -94,6 +94,20 @@ public record CsvImportEntry
 }
 
 /// <summary>
+/// JSON payload for RequestAbsence request data.
+/// Contains the absence days to create when the request is approved.
+/// </summary>
+public record AbsenceRequestData
+{
+    /// <summary>Dates to mark as absent (yyyy-MM-dd).</summary>
+    public List<DateOnly> Dates { get; init; } = new();
+    public AbsenceType Type { get; init; } = AbsenceType.Vacation;
+    public int? CustomTypeId { get; init; }
+    public bool IsHalfDay { get; init; }
+    public string? Note { get; init; }
+}
+
+/// <summary>
 /// JSON payload for WorkScheduleChange request data.
 /// Mirrors CreateWorkScheduleRequest so the approved schedule can be created directly.
 /// </summary>

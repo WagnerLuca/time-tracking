@@ -80,6 +80,7 @@ public class OrganizationService : IOrganizationService
                 MemberTimeEntryVisibility = o.MemberTimeEntryVisibility,
                 Require2fa = o.Require2fa,
                 CsvImportMode = o.CsvImportMode.ToString(),
+                AbsenceSelfServiceMode = o.AbsenceSelfServiceMode.ToString(),
                 VacationVisibility = o.VacationVisibility.ToString(),
                 SickDayVisibility = o.SickDayVisibility.ToString(),
                 DefaultVacationDays = o.DefaultVacationDays,
@@ -494,6 +495,7 @@ public class OrganizationService : IOrganizationService
         if (request.MemberTimeEntryVisibility.HasValue) org.MemberTimeEntryVisibility = request.MemberTimeEntryVisibility.Value;
         if (request.Require2fa.HasValue) org.Require2fa = request.Require2fa.Value;
         if (request.CsvImportMode.HasValue) org.CsvImportMode = request.CsvImportMode.Value;
+        if (request.AbsenceSelfServiceMode.HasValue) org.AbsenceSelfServiceMode = request.AbsenceSelfServiceMode.Value;
         if (request.VacationVisibility.HasValue) org.VacationVisibility = request.VacationVisibility.Value;
         if (request.SickDayVisibility.HasValue) org.SickDayVisibility = request.SickDayVisibility.Value;
         if (request.DefaultVacationDays.HasValue) org.DefaultVacationDays = request.DefaultVacationDays.Value;
@@ -535,7 +537,8 @@ public class OrganizationService : IOrganizationService
             WorkScheduleChangeMode = org.WorkScheduleChangeMode.ToString(),
             org.MemberTimeEntryVisibility,
             org.Require2fa,
-            CsvImportMode = org.CsvImportMode.ToString()
+            CsvImportMode = org.CsvImportMode.ToString(),
+            AbsenceSelfServiceMode = org.AbsenceSelfServiceMode.ToString()
         });
     }
 

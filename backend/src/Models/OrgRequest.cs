@@ -16,7 +16,9 @@ public enum RequestType
     EditPause = 2,
     SetInitialOvertime = 3,
     WorkScheduleChange = 4,
-    CsvImport = 5
+    CsvImport = 5,
+    /// <summary>Request one or more absence days (e.g. vacation) that need approval.</summary>
+    RequestAbsence = 6
 }
 
 public class OrgRequest

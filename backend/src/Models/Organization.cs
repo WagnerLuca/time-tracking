@@ -112,6 +112,14 @@ public class Organization
     /// </summary>
     public RuleMode CsvImportMode { get; set; } = RuleMode.Disabled;
     
+    /// <summary>
+    /// Controls whether members can create their own absence days (vacation, sick, ...).
+    /// Allowed = user can add absences directly.
+    /// RequiresApproval = user must submit an absence request that an admin (org or group) approves.
+    /// Disabled = only admins can add absences.
+    /// </summary>
+    public RuleMode AbsenceSelfServiceMode { get; set; } = RuleMode.Allowed;
+
     /// <summary>Controls who can see members' vacation days.</summary>
     public VisibilityMode VacationVisibility { get; set; } = VisibilityMode.Private;
     

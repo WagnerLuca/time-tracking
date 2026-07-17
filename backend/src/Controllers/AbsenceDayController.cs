@@ -83,4 +83,58 @@ public class AbsenceDayController : OrganizationBaseController
         if (callerId == null) return Unauthorized();
         return ToResponse(await _service.DeleteAbsenceAsync(slug, callerId.Value, id));
     }
+
+    // ────────────────────────────────────────────────────
+    //  Custom absence types
+    // ────────────────────────────────────────────────────
+
+    /// <summary>List the organization's custom absence types (members only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    [HttpGet("{slug}/absence-types")]
+    [RequireOrgRole]
+    [ProducesResponseType(typeof(List<AbsenceTypeDefinitionResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAbsenceTypes(string slug)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+        return ToResponse(await _service.GetAbsenceTypesAsync(slug, callerId.Value));
+    }
+
+    /// <summary>Create a custom absence type (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    [HttpPost("{slug}/absence-types")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(typeof(AbsenceTypeDefinitionResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CreateAbsenceType(string slug, [FromBody] UpsertAbsenceTypeDefinitionRequest request)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+        return ToResponse(await _service.CreateAbsenceTypeAsync(slug, callerId.Value, request));
+    }
+
+    /// <summary>Update a custom absence type (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="typeId">Absence type ID.</param>
+    [HttpPut("{slug}/absence-types/{typeId}")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(typeof(AbsenceTypeDefinitionResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateAbsenceType(string slug, int typeId, [FromBody] UpsertAbsenceTypeDefinitionRequest request)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+        return ToResponse(await _service.UpdateAbsenceTypeAsync(slug, callerId.Value, typeId, request));
+    }
+
+    /// <summary>Deactivate a custom absence type (admin only). Existing absences keep the type.</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="typeId">Absence type ID.</param>
+    [HttpDelete("{slug}/absence-types/{typeId}")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteAbsenceType(string slug, int typeId)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+        return ToResponse(await _service.DeleteAbsenceTypeAsync(slug, callerId.Value, typeId));
+    }
 }

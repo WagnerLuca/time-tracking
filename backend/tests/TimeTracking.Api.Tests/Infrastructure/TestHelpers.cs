@@ -271,6 +271,24 @@ public record AbsenceDayResponseDto
     public string? Note { get; init; }
     public string? UserFirstName { get; init; }
     public string? UserLastName { get; init; }
+    public int? CustomTypeId { get; init; }
+    public string? CustomTypeName { get; init; }
+    public string? CustomTypeColor { get; init; }
+    public string? CreditMode { get; init; }
+    public int? CreatedByUserId { get; init; }
+    public string? CreatedByName { get; init; }
+    public int? CreatedViaRequestId { get; init; }
+}
+
+public record AbsenceTypeDefinitionResponseDto
+{
+    public int Id { get; init; }
+    public int OrganizationId { get; init; }
+    public string Name { get; init; } = "";
+    public string? Color { get; init; }
+    public string CreditMode { get; init; } = "";
+    public bool CountsAsVacation { get; init; }
+    public bool IsActive { get; init; }
 }
 
 public record PauseRuleResponseDto

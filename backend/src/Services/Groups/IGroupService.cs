@@ -14,5 +14,5 @@ public interface IGroupService
     Task<ServiceResult> RemoveMemberAsync(string slug, int groupId, int targetUserId, int callerUserId);
     Task<ServiceResult<GroupPermissionsResponse>> GetPermissionsAsync(string slug, int groupId, int callerUserId);
     Task<ServiceResult<GroupPermissionsResponse>> UpdatePermissionsAsync(string slug, int groupId, int callerUserId, UpdateGroupPermissionsRequest request);
-    Task<ServiceResult<EffectivePermissionsResponse>> GetEffectivePermissionsAsync(string slug, int callerUserId);
+    Task<ServiceResult<EffectivePermissionsResponse>> GetEffectivePermissionsAsync(string slug, int callerUserId, int? targetUserId = null);
 }

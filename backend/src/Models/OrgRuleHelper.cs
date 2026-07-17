@@ -19,7 +19,22 @@ public static class OrgRuleHelper
         RequestType.WorkScheduleChange => org.WorkScheduleChangeMode,
         RequestType.JoinOrganization   => org.JoinPolicy,
         RequestType.CsvImport          => org.CsvImportMode,
+        RequestType.RequestAbsence     => org.AbsenceSelfServiceMode,
         _ => RuleMode.Allowed
+    };
+
+    /// <summary>
+    /// Maps a <see cref="RequestType"/> to the corresponding group-level override, if any.
+    /// </summary>
+    public static RuleMode? GetGroupRuleMode(Group group, RequestType action) => action switch
+    {
+        RequestType.EditPastEntry      => group.EditPastEntriesMode,
+        RequestType.EditPause          => group.EditPauseMode,
+        RequestType.SetInitialOvertime => group.InitialOvertimeMode,
+        RequestType.WorkScheduleChange => group.WorkScheduleChangeMode,
+        RequestType.CsvImport          => group.CsvImportMode,
+        RequestType.RequestAbsence     => group.AbsenceSelfServiceMode,
+        _ => null
     };
 
     /// <summary>

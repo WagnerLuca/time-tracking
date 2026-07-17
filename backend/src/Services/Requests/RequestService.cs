@@ -79,12 +79,40 @@ public class RequestService : IRequestService
             if (!isMember)
                 return ServiceResult.BadRequest<OrgRequestResponse>("You must be a member of this organization.");
 
-            var ruleMode = OrgRuleHelper.GetRuleMode(org, request.Type);
+            // Resolve the effective rule (org default + group overrides, most permissive wins)
+            var ruleMode = await EffectiveRuleResolver.ResolveAsync(_context, org, userId, request.Type);
 
             if (ruleMode == RuleMode.Disabled)
                 return ServiceResult.BadRequest<OrgRequestResponse>("This feature is disabled for this organization.");
-            if (ruleMode == RuleMode.Allowed)
+            if (ruleMode == RuleMode.Allowed && request.Type != RequestType.RequestAbsence)
                 return ServiceResult.BadRequest<OrgRequestResponse>("You can perform this action directly without a request.");
+
+            // Absence requests from users who can themselves approve absences are auto-approved.
+            // The request is still recorded for a complete audit trail.
+            if (request.Type == RequestType.RequestAbsence
+                && await EffectiveRuleResolver.CanApproveAbsencesAsync(_context, org.Id, userId))
+            {
+                var autoApproved = new OrgRequest
+                {
+                    UserId = userId,
+                    OrganizationId = org.Id,
+                    Type = RequestType.RequestAbsence,
+                    Message = request.Message,
+                    RequestData = request.RequestData,
+                    Status = RequestStatus.Accepted,
+                    RespondedAt = DateTime.UtcNow,
+                    RespondedByUserId = userId
+                };
+                _context.OrgRequests.Add(autoApproved);
+                await _context.SaveChangesAsync(); // assign Id for the audit link
+                await ApplyAcceptanceSideEffectsAsync(autoApproved, org);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Absence request {RequestId} auto-approved for approver {UserId} in org {OrgSlug}", autoApproved.Id, userId, slug);
+
+                autoApproved.User = user;
+                return ServiceResult.Ok(MapToResponse(autoApproved, org.Name, org.Slug,
+                    $"{user.FirstName} {user.LastName}"));
+            }
         }
 
         // Check for existing pending request of same type
@@ -457,6 +485,71 @@ public class RequestService : IRequestService
                     catch { /* invalid JSON — request is accepted but entries not imported */ }
                 }
                 break;
+
+            case RequestType.RequestAbsence:
+                if (orgRequest.RequestData != null)
+                {
+                    try
+                    {
+                        var absenceData = JsonSerializer.Deserialize<AbsenceRequestData>(
+                            orgRequest.RequestData,
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                        if (absenceData != null)
+                        {
+                            await ApplyAbsenceRequestAsync(orgRequest, org, absenceData);
+                        }
+                    }
+                    catch { /* invalid JSON — request is accepted but absences not created */ }
+                }
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Creates the requested absence days on approval. Dates that already have an
+    /// absence are skipped. Approver and request are recorded for the audit trail.
+    /// </summary>
+    private async Task ApplyAbsenceRequestAsync(OrgRequest orgRequest, Organization org, AbsenceRequestData data)
+    {
+        if (data.Dates.Count == 0) return;
+
+        // Validate optional custom absence type belongs to this org
+        int? customTypeId = null;
+        var type = data.Type;
+        if (data.CustomTypeId.HasValue)
+        {
+            var custom = await _context.AbsenceTypeDefinitions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == data.CustomTypeId.Value
+                                       && t.OrganizationId == org.Id && t.IsActive);
+            if (custom == null) return; // unknown type — do not create anything
+            customTypeId = custom.Id;
+            type = AbsenceType.Other;
+        }
+
+        var requestedDates = data.Dates.Distinct().ToList();
+        var existingDates = (await _context.AbsenceDays
+            .Where(a => a.OrganizationId == org.Id
+                     && a.UserId == orgRequest.UserId
+                     && requestedDates.Contains(a.Date))
+            .Select(a => a.Date)
+            .ToListAsync()).ToHashSet();
+
+        foreach (var date in requestedDates)
+        {
+            if (existingDates.Contains(date)) continue;
+            _context.AbsenceDays.Add(new AbsenceDay
+            {
+                UserId = orgRequest.UserId,
+                OrganizationId = org.Id,
+                Date = date,
+                Type = type,
+                CustomTypeId = customTypeId,
+                IsHalfDay = data.IsHalfDay,
+                Note = data.Note,
+                CreatedByUserId = orgRequest.RespondedByUserId,
+                CreatedViaRequestId = orgRequest.Id
+            });
         }
     }
 
@@ -614,6 +707,7 @@ public class RequestService : IRequestService
                 RequestType.CsvImport => group.GroupAdminCanApproveTimeEdits == true,
                 RequestType.SetInitialOvertime => group.GroupAdminCanApproveTimeEdits == true,
                 RequestType.WorkScheduleChange => group.GroupAdminCanApproveScheduleChanges == true,
+                RequestType.RequestAbsence => group.GroupAdminCanApproveAbsences == true,
                 _ => false
             };
 

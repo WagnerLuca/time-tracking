@@ -105,7 +105,9 @@ public static class DbSeeder
             InitialOvertimeMode = RuleMode.Allowed,
             JoinPolicy = RuleMode.Allowed, // open for joining
             WorkScheduleChangeMode = RuleMode.Allowed,
-            MemberTimeEntryVisibility = true
+            MemberTimeEntryVisibility = true,
+            // Members must request absences; group admins with the capability approve them
+            AbsenceSelfServiceMode = RuleMode.RequiresApproval
         };
 
         context.Organizations.Add(org);
@@ -491,9 +493,9 @@ public static class DbSeeder
         // ── Groups ────────────────────────────────────────────────────
         // extraUserEntities: [0]=Lisa, [1]=Felix, [2]=Sarah, [3]=Jonas, [4]=Laura,
         //                    [5]=Niklas, [6]=Marie, [7]=David, [8]=Jana, [9]=Lukas
-        var backendGroup = new Group { OrganizationId = org.Id, Name = "Backend", Description = "Backend engineering team", Color = "#6366f1" };
-        var frontendGroup = new Group { OrganizationId = org.Id, Name = "Frontend", Description = "Frontend & UI team", Color = "#f59e0b" };
-        var devOpsGroup = new Group { OrganizationId = org.Id, Name = "DevOps", Description = "Infrastructure and deployment team", Color = "#10b981" };
+        var backendGroup = new Group { OrganizationId = org.Id, Name = "Backend", Description = "Backend engineering team", Color = "#6366f1", GroupAdminCanApproveAbsences = true };
+        var frontendGroup = new Group { OrganizationId = org.Id, Name = "Frontend", Description = "Frontend & UI team", Color = "#f59e0b", GroupAdminCanApproveAbsences = true };
+        var devOpsGroup = new Group { OrganizationId = org.Id, Name = "DevOps", Description = "Infrastructure and deployment team", Color = "#10b981", GroupAdminCanApproveAbsences = true };
 
         context.Groups.AddRange(backendGroup, frontendGroup, devOpsGroup);
         await context.SaveChangesAsync();
@@ -518,6 +520,32 @@ public static class DbSeeder
             new GroupMember { GroupId = devOpsGroup.Id, UserId = extraUserEntities[5].Id, Role = GroupRole.Admin }, // Niklas
             new GroupMember { GroupId = devOpsGroup.Id, UserId = extraUserEntities[9].Id, Role = GroupRole.Member }, // Lukas
             new GroupMember { GroupId = devOpsGroup.Id, UserId = tom.Id, Role = GroupRole.Member }
+        );
+        await context.SaveChangesAsync();
+
+        // ── Custom absence types ──────────────────────────────────────
+        context.AbsenceTypeDefinitions.AddRange(
+            new AbsenceTypeDefinition
+            {
+                OrganizationId = org.Id,
+                Name = "Business Trip",
+                Color = "#0ea5e9",
+                CreditMode = AbsenceCreditMode.FillToTarget
+            },
+            new AbsenceTypeDefinition
+            {
+                OrganizationId = org.Id,
+                Name = "Training",
+                Color = "#8b5cf6",
+                CreditMode = AbsenceCreditMode.FullCredit
+            },
+            new AbsenceTypeDefinition
+            {
+                OrganizationId = org.Id,
+                Name = "Unpaid Leave",
+                Color = "#64748b",
+                CreditMode = AbsenceCreditMode.None
+            }
         );
         await context.SaveChangesAsync();
 

@@ -26,6 +26,7 @@ public class Group
     public RuleMode? CsvImportMode { get; set; }
     public RuleMode? WorkScheduleChangeMode { get; set; }
     public RuleMode? InitialOvertimeMode { get; set; }
+    public RuleMode? AbsenceSelfServiceMode { get; set; }
     public VisibilityMode? VacationVisibility { get; set; }
     public VisibilityMode? SickDayVisibility { get; set; }
     public VisibilityMode? TimeEntryVisibility { get; set; }

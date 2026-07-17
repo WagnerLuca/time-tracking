@@ -34,6 +34,7 @@ public record OrganizationDetailResponse
     public bool MemberTimeEntryVisibility { get; init; }
     public bool Require2fa { get; init; }
     public required string CsvImportMode { get; init; }
+    public string AbsenceSelfServiceMode { get; init; } = "Allowed";
     public required string VacationVisibility { get; init; }
     public required string SickDayVisibility { get; init; }
     public double DefaultVacationDays { get; init; }
@@ -142,6 +143,7 @@ public record UpdateOrganizationSettingsRequest
     public bool? MemberTimeEntryVisibility { get; init; }
     public bool? Require2fa { get; init; }
     public RuleMode? CsvImportMode { get; init; }
+    public RuleMode? AbsenceSelfServiceMode { get; init; }
     public VisibilityMode? VacationVisibility { get; init; }
     public VisibilityMode? SickDayVisibility { get; init; }
     public double? DefaultVacationDays { get; init; }
@@ -299,6 +301,18 @@ public record AbsenceDayResponse
     public string? Note { get; init; }
     public string? UserFirstName { get; init; }
     public string? UserLastName { get; init; }
+
+    // Custom org-defined absence type (when Type == Other and CustomTypeId set)
+    public int? CustomTypeId { get; init; }
+    public string? CustomTypeName { get; init; }
+    public string? CustomTypeColor { get; init; }
+    public string? CreditMode { get; init; }
+
+    // Audit trail
+    public DateTime CreatedAt { get; init; }
+    public int? CreatedByUserId { get; init; }
+    public string? CreatedByName { get; init; }
+    public int? CreatedViaRequestId { get; init; }
 }
 
 /// <summary>Request payload for creating a personal absence day.</summary>
@@ -307,6 +321,9 @@ public record CreateAbsenceDayRequest
     public DateOnly Date { get; init; }
     public AbsenceType Type { get; init; } = AbsenceType.SickDay;
     public bool IsHalfDay { get; init; }
+
+    /// <summary>Optional org-defined custom absence type.</summary>
+    public int? CustomTypeId { get; init; }
 
     [MaxLength(500)]
     public string? Note { get; init; }
@@ -320,8 +337,37 @@ public record AdminCreateAbsenceDayRequest
     public AbsenceType Type { get; init; } = AbsenceType.SickDay;
     public bool IsHalfDay { get; init; }
 
+    /// <summary>Optional org-defined custom absence type.</summary>
+    public int? CustomTypeId { get; init; }
+
     [MaxLength(500)]
     public string? Note { get; init; }
+}
+
+/// <summary>Org-defined custom absence type (e.g. "Business Trip").</summary>
+public record AbsenceTypeDefinitionResponse
+{
+    public int Id { get; init; }
+    public int OrganizationId { get; init; }
+    public required string Name { get; init; }
+    public string? Color { get; init; }
+    public required string CreditMode { get; init; }
+    public bool CountsAsVacation { get; init; }
+    public bool IsActive { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+
+/// <summary>Request payload for creating/updating a custom absence type.</summary>
+public record UpsertAbsenceTypeDefinitionRequest
+{
+    [Required, MaxLength(100)]
+    public required string Name { get; init; }
+
+    [MaxLength(20)]
+    public string? Color { get; init; }
+
+    public AbsenceCreditMode CreditMode { get; init; } = AbsenceCreditMode.FillToTarget;
+    public bool CountsAsVacation { get; init; }
 }
 
 
