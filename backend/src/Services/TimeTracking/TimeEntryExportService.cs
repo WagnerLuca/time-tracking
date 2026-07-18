@@ -123,137 +123,39 @@ public class TimeEntryExportService : ITimeEntryExportService
         var dateFrom = DateOnly.FromDateTime(rangeFrom);
         var dateTo = DateOnly.FromDateTime(rangeTo);
 
-        var timeEntries = await _context.TimeEntries.AsNoTracking()
-            .Where(e => e.UserId == userId && e.OrganizationId == org.Id && !e.IsRunning
-                     && e.StartTime >= rangeFrom && e.StartTime <= rangeTo.AddDays(1))
-            .OrderBy(e => e.StartTime)
-            .ToListAsync();
-
-        var workSchedules = await _context.WorkSchedules.AsNoTracking()
-            .Where(ws => ws.UserId == userId && ws.OrganizationId == org.Id)
-            .OrderBy(ws => ws.ValidFrom)
-            .ToListAsync();
-
-        var holidays = await _context.Holidays.AsNoTracking()
-            .Where(h => h.OrganizationId == org.Id
-                     && ((h.Date >= dateFrom && h.Date <= dateTo) || h.IsRecurring))
-            .ToListAsync();
-
-        var absences = await _context.AbsenceDays.AsNoTracking()
-            .Where(a => a.UserId == userId && a.OrganizationId == org.Id
-                     && a.Date >= dateFrom && a.Date <= dateTo)
-            .ToListAsync();
-
-        var entriesByDate = timeEntries
-            .GroupBy(e => DateOnly.FromDateTime(e.StartTime))
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        var holidaysByDate = new Dictionary<DateOnly, Holiday>();
-        foreach (var h in holidays)
-        {
-            if (h.IsRecurring)
-            {
-                for (var year = dateFrom.Year; year <= dateTo.Year; year++)
-                {
-                    var recurringDate = new DateOnly(year, h.Date.Month, h.Date.Day);
-                    if (recurringDate >= dateFrom && recurringDate <= dateTo)
-                        holidaysByDate.TryAdd(recurringDate, h);
-                }
-            }
-            else
-            {
-                holidaysByDate.TryAdd(h.Date, h);
-            }
-        }
-
-        var absencesByDate = absences.ToDictionary(a => a.Date, a => a);
+        var rows = await DailyReportAggregator.BuildAsync(
+            _context, userId, org.Id, dateFrom, dateTo, membership.InitialOvertimeHours);
 
         var columns = ResolveColumns(request.Columns, AllDailyColumns);
         var sb = new StringBuilder();
         sb.AppendLine(string.Join(",", columns.Select(FormatColumnHeader)));
 
-        var cumulativeOvertime = membership.InitialOvertimeHours;
-        var currentDate = dateFrom;
-
-        while (currentDate <= dateTo)
+        foreach (var row in rows)
         {
-            var dayOfWeek = currentDate.DayOfWeek;
-            var targetHours = GetTargetHours(workSchedules, currentDate);
-            var dayEntries = entriesByDate.GetValueOrDefault(currentDate) ?? [];
-
-            var grossMinutes = dayEntries.Sum(e => e.EndTime.HasValue
-                ? (e.EndTime.Value - e.StartTime).TotalMinutes : 0);
-            var pauseMinutes = dayEntries.Sum(e => e.PauseDurationMinutes);
-            var netMinutes = Math.Max(0, grossMinutes - pauseMinutes);
-            var netHours = netMinutes / 60.0;
-
-            var isHoliday = holidaysByDate.TryGetValue(currentDate, out var holiday);
-            var isAbsence = absencesByDate.TryGetValue(currentDate, out var absence);
-
-            // Compute effective target by subtracting holiday and absence credits
-            var holidayCredit = isHoliday ? (holiday!.IsHalfDay ? targetHours / 2.0 : targetHours) : 0;
-            var absenceCredit = isAbsence ? (absence!.IsHalfDay ? targetHours / 2.0 : targetHours) : 0;
-            double effectiveTarget = Math.Max(0, targetHours - holidayCredit - absenceCredit);
-            string status;
-
-            if (isHoliday && isAbsence)
-            {
-                status = absence!.Type switch
-                {
-                    AbsenceType.SickDay => "Sick",
-                    AbsenceType.Vacation => "Vacation",
-                    _ => "Absent"
-                };
-            }
-            else if (isHoliday) { status = holiday!.IsHalfDay ? "Half Holiday" : "Holiday"; }
-            else if (isAbsence)
-            {
-                status = absence!.Type switch
-                {
-                    AbsenceType.SickDay => "Sick",
-                    AbsenceType.Vacation => "Vacation",
-                    _ => "Absent"
-                };
-            }
-            else if (dayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) { status = "Weekend"; }
-            else if (targetHours == 0) { status = "Day Off"; }
-            else if (dayEntries.Count > 0) { status = "Worked"; }
-            else { status = "Missing"; }
-
-            var overtime = netHours - effectiveTarget;
-            cumulativeOvertime += overtime;
-
-            var entrySummary = dayEntries.Count > 0
-                ? string.Join(" | ", dayEntries.Select(e =>
-                    $"{e.StartTime:HH:mm}-{e.EndTime?.ToString("HH:mm") ?? "?"}" +
-                    (string.IsNullOrEmpty(e.Description) ? "" : $" ({e.Description})")))
-                : "";
-
             var values = new List<string>();
             foreach (var col in columns)
             {
                 values.Add(col switch
                 {
-                    "Date" => currentDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    "DayOfWeek" => dayOfWeek.ToString()[..3],
-                    "TargetHours" => effectiveTarget.ToString("F2", CultureInfo.InvariantCulture),
-                    "WorkedHours" => (grossMinutes / 60.0).ToString("F2", CultureInfo.InvariantCulture),
-                    "Pause" => pauseMinutes.ToString(CultureInfo.InvariantCulture),
-                    "NetWorkedHours" => netHours.ToString("F2", CultureInfo.InvariantCulture),
-                    "Overtime" => overtime.ToString("+0.00;-0.00;0.00", CultureInfo.InvariantCulture),
-                    "CumulativeOvertime" => cumulativeOvertime.ToString("+0.00;-0.00;0.00", CultureInfo.InvariantCulture),
-                    "Status" => status,
-                    "HolidayName" => EscapeCsv(isHoliday ? holiday!.Name : ""),
-                    "AbsenceType" => isAbsence ? absence!.Type.ToString() : "",
-                    "AbsenceNote" => EscapeCsv(isAbsence ? absence!.Note ?? "" : ""),
-                    "Description" => EscapeCsv(entrySummary),
+                    "Date" => row.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    "DayOfWeek" => row.DayOfWeek.ToString()[..3],
+                    "TargetHours" => row.TargetHours.ToString("F2", CultureInfo.InvariantCulture),
+                    "WorkedHours" => row.WorkedHours.ToString("F2", CultureInfo.InvariantCulture),
+                    "Pause" => row.PauseMinutes.ToString(CultureInfo.InvariantCulture),
+                    "NetWorkedHours" => row.NetWorkedHours.ToString("F2", CultureInfo.InvariantCulture),
+                    "Overtime" => row.Overtime.ToString("+0.00;-0.00;0.00", CultureInfo.InvariantCulture),
+                    "CumulativeOvertime" => row.CumulativeOvertime.ToString("+0.00;-0.00;0.00", CultureInfo.InvariantCulture),
+                    "Status" => row.Status,
+                    "HolidayName" => EscapeCsv(row.HolidayName ?? ""),
+                    "AbsenceType" => row.AbsenceType?.ToString() ?? "",
+                    "AbsenceNote" => EscapeCsv(row.AbsenceNote ?? ""),
+                    "Description" => EscapeCsv(row.EntrySummary),
                     "Organization" => EscapeCsv(org.Name),
                     _ => ""
                 });
             }
 
             sb.AppendLine(string.Join(",", values));
-            currentDate = currentDate.AddDays(1);
         }
 
         _logger.LogInformation("Daily report CSV for user {UserId} in org {OrgSlug}: {From} to {To}",

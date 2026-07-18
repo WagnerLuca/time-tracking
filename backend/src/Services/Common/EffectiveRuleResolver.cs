@@ -61,4 +61,39 @@ public static class EffectiveRuleResolver
                          && gm.Group.IsActive
                          && gm.Group.GroupAdminCanApproveAbsences == true);
     }
+
+    /// <summary>
+    /// True when the caller may export/print reports for the given target member:
+    /// the member themselves, an org Admin/Owner, or a Group Admin of a shared
+    /// group that has the export-data capability enabled.
+    /// </summary>
+    public static async Task<bool> CanExportDataForMemberAsync(
+        TimeTrackingDbContext context, int orgId, int callerUserId, int targetUserId)
+    {
+        if (callerUserId == targetUserId) return true;
+
+        var callerRole = await context.UserOrganizations
+            .AsNoTracking()
+            .Where(uo => uo.OrganizationId == orgId && uo.UserId == callerUserId)
+            .Select(uo => (OrganizationRole?)uo.Role)
+            .FirstOrDefaultAsync();
+
+        if (callerRole >= OrganizationRole.Admin) return true;
+
+        var callerAdminGroupIds = await context.GroupMembers
+            .AsNoTracking()
+            .Where(gm => gm.UserId == callerUserId
+                      && gm.Role == GroupRole.Admin
+                      && gm.Group.OrganizationId == orgId
+                      && gm.Group.IsActive
+                      && gm.Group.GroupAdminCanExportData == true)
+            .Select(gm => gm.GroupId)
+            .ToListAsync();
+
+        if (callerAdminGroupIds.Count == 0) return false;
+
+        return await context.GroupMembers
+            .AsNoTracking()
+            .AnyAsync(gm => gm.UserId == targetUserId && callerAdminGroupIds.Contains(gm.GroupId));
+    }
 }

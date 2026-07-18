@@ -17,6 +17,10 @@ using TimeTracking.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// QuestPDF is used for generating monthly/yearly member PDF reports.
+// Community license: free for organizations with < $1M USD annual gross revenue.
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 // Configure Serilog from appsettings.json
 // Sinks are config-driven: to add Grafana Loki later, just install
 // Serilog.Sinks.Grafana.Loki and add a "Loki" section under Serilog:WriteTo.
@@ -157,6 +161,7 @@ builder.Services.AddScoped<IAbsenceDayService, AbsenceDayService>();
 builder.Services.AddScoped<IWorkScheduleService, WorkScheduleService>();
 builder.Services.AddScoped<IPauseRuleService, PauseRuleService>();
 builder.Services.AddScoped<IGroupService, GroupService>();
+builder.Services.AddScoped<IPdfReportService, PdfReportService>();
 builder.Services.AddHostedService<RefreshTokenCleanupService>();
 
 // Add Entity Framework - PostgreSQL or InMemory
