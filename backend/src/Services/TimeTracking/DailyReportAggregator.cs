@@ -35,6 +35,12 @@ public static class DailyReportAggregator
         TimeTrackingDbContext context, int userId, int orgId,
         DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours)
     {
+        // Only count days up to today — future days haven't happened yet and
+        // would otherwise show as artificial "Missing" time with a misleading target.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (dateTo > today) dateTo = today;
+        if (dateFrom > dateTo) return [];
+
         var rangeFromUtc = dateFrom.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var rangeToUtc = dateTo.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1);
 

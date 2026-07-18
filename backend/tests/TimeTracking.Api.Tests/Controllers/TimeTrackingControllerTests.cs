@@ -507,4 +507,61 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
         });
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
+
+    [Fact]
+    public async Task ExportDailyReport_RangeExtendingIntoFuture_ExcludesFutureDays()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var rangeFrom = today.AddDays(-3);
+        var rangeTo = today.AddDays(10); // extends well past today
+
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily",
+            organizationSlug = TestHelpers.SeedOrgSlug,
+            from = $"{rangeFrom:yyyy-MM-dd}T00:00:00Z",
+            to = $"{rangeTo:yyyy-MM-dd}T00:00:00Z"
+        });
+        response.EnsureSuccessStatusCode();
+
+        var csv = await response.Content.ReadAsStringAsync();
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+        // Only rows from rangeFrom through today (inclusive) should be present —
+        // none of the future days up to rangeTo.
+        var expectedRows = today.DayNumber - rangeFrom.DayNumber + 1;
+        lines.Length.Should().Be(1 + expectedRows); // header + expected rows
+
+        csv.Should().Contain(today.ToString("yyyy-MM-dd"));
+        var firstFutureDay = today.AddDays(1);
+        csv.Should().NotContain(firstFutureDay.ToString("yyyy-MM-dd"));
+        csv.Should().NotContain(rangeTo.ToString("yyyy-MM-dd"));
+    }
+
+    [Fact]
+    public async Task ExportDailyReport_RangeEntirelyInFuture_ReturnsOnlyHeader()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var rangeFrom = today.AddDays(5);
+        var rangeTo = today.AddDays(15);
+
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily",
+            organizationSlug = TestHelpers.SeedOrgSlug,
+            from = $"{rangeFrom:yyyy-MM-dd}T00:00:00Z",
+            to = $"{rangeTo:yyyy-MM-dd}T00:00:00Z"
+        });
+        response.EnsureSuccessStatusCode();
+
+        var csv = await response.Content.ReadAsStringAsync();
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        lines.Length.Should().Be(1); // header only — nothing to report for a fully future period
+    }
 }

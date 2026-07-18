@@ -40,8 +40,11 @@ public class PdfReportService : IPdfReportService
         var rows = await DailyReportAggregator.BuildAsync(
             _context, targetUserId, context.Org!.Id, dateFrom, dateTo, context.Membership!.InitialOvertimeHours);
 
+        var overallCumulative = await GetOverallCumulativeOvertimeAsync(
+            _context, targetUserId, context.Org.Id, context.Membership.InitialOvertimeHours, dateTo);
+
         var period = $"{MonthNames[month - 1]} {year}";
-        var bytes = RenderMonthlyPdf(context.Org.Name, context.TargetUser!, period, rows);
+        var bytes = RenderMonthlyPdf(context.Org.Name, context.TargetUser!, period, rows, overallCumulative);
 
         _logger.LogInformation(
             "Monthly PDF report generated for user {TargetUserId} in org {OrgSlug} ({Year}-{Month}) by user {CallerId}",
@@ -80,7 +83,10 @@ public class PdfReportService : IPdfReportService
             ))
             .ToList();
 
-        var bytes = RenderYearlyPdf(context.Org.Name, context.TargetUser!, year, monthSummaries);
+        var overallCumulative = await GetOverallCumulativeOvertimeAsync(
+            _context, targetUserId, context.Org.Id, context.Membership!.InitialOvertimeHours, dateTo);
+
+        var bytes = RenderYearlyPdf(context.Org.Name, context.TargetUser!, year, monthSummaries, overallCumulative);
 
         _logger.LogInformation(
             "Yearly PDF report generated for user {TargetUserId} in org {OrgSlug} ({Year}) by user {CallerId}",
@@ -117,17 +123,40 @@ public class PdfReportService : IPdfReportService
         return new ReportContext(org, membership, membership.User, null, null);
     }
 
+    /// <summary>
+    /// Computes the true all-time cumulative overtime balance as of <paramref name="asOfDate"/>,
+    /// seeded once from the member's initial overtime hours at their very first tracked entry
+    /// (never reset per report period, unlike the period-scoped running total in the daily table).
+    /// Internally clamped to "today" by <see cref="DailyReportAggregator.BuildAsync"/>.
+    /// </summary>
+    private static async Task<double> GetOverallCumulativeOvertimeAsync(
+        TimeTrackingDbContext context, int userId, int orgId, double initialOvertimeHours, DateOnly asOfDate)
+    {
+        var firstEntry = await context.TimeEntries.AsNoTracking()
+            .Where(e => e.UserId == userId && e.OrganizationId == orgId && !e.IsRunning)
+            .OrderBy(e => e.StartTime)
+            .Select(e => (DateTime?)e.StartTime)
+            .FirstOrDefaultAsync();
+
+        if (firstEntry == null) return initialOvertimeHours;
+
+        var loopFrom = DateOnly.FromDateTime(firstEntry.Value);
+        if (loopFrom > asOfDate) return initialOvertimeHours;
+
+        var rows = await DailyReportAggregator.BuildAsync(context, userId, orgId, loopFrom, asOfDate, initialOvertimeHours);
+        return rows.Count > 0 ? rows[^1].CumulativeOvertime : initialOvertimeHours;
+    }
+
     // ────────────────────────────────────────────────────
     //  PDF rendering
     // ────────────────────────────────────────────────────
 
-    private static byte[] RenderMonthlyPdf(string orgName, User member, string period, List<DailyReportRow> rows)
+    private static byte[] RenderMonthlyPdf(string orgName, User member, string period, List<DailyReportRow> rows, double overallCumulative)
     {
         var totalTarget = rows.Sum(r => r.TargetHours);
-        var totalWorked = rows.Sum(r => r.WorkedHours);
         var totalNet = rows.Sum(r => r.NetWorkedHours);
         var totalOvertime = rows.Sum(r => r.Overtime);
-        var cumulativeAtEnd = rows.Count > 0 ? rows[^1].CumulativeOvertime : 0;
+        var periodCumulativeAtEnd = rows.Count > 0 ? rows[^1].CumulativeOvertime : 0;
         var vacationDays = rows.Count(r => r.AbsenceType == AbsenceType.Vacation);
         var sickDays = rows.Count(r => r.AbsenceType == AbsenceType.SickDay);
         var holidayDays = rows.Count(r => r.HolidayName != null);
@@ -150,7 +179,10 @@ public class PdfReportService : IPdfReportService
                         ("Target", FormatHours(totalTarget)),
                         ("Worked (net)", FormatHours(totalNet)),
                         ("Balance", FormatSigned(totalOvertime)),
-                        ("Cumulative", FormatSigned(cumulativeAtEnd)),
+                        ("Month Cumulative", FormatSigned(periodCumulativeAtEnd)),
+                        ("Overall Cumulative", FormatSigned(overallCumulative))
+                    ]));
+                    column.Item().Element(c => ComposeSummaryCards(c, [
                         ("Vacation", $"{vacationDays}d"),
                         ("Sick", $"{sickDays}d"),
                         ("Holidays", $"{holidayDays}d")
@@ -164,12 +196,12 @@ public class PdfReportService : IPdfReportService
         }).GeneratePdf();
     }
 
-    private static byte[] RenderYearlyPdf(string orgName, User member, int year, List<MonthSummary> months)
+    private static byte[] RenderYearlyPdf(string orgName, User member, int year, List<MonthSummary> months, double overallCumulative)
     {
         var totalTarget = months.Sum(m => m.TargetHours);
         var totalNet = months.Sum(m => m.NetWorkedHours);
         var totalOvertime = months.Sum(m => m.Overtime);
-        var cumulativeAtEnd = months.Count > 0 ? months[^1].CumulativeOvertimeAtEnd : 0;
+        var periodCumulativeAtEnd = months.Count > 0 ? months[^1].CumulativeOvertimeAtEnd : 0;
         var vacationDays = months.Sum(m => m.VacationDays);
         var sickDays = months.Sum(m => m.SickDays);
         var holidayDays = months.Sum(m => m.HolidayDays);
@@ -192,7 +224,10 @@ public class PdfReportService : IPdfReportService
                         ("Target", FormatHours(totalTarget)),
                         ("Worked (net)", FormatHours(totalNet)),
                         ("Year Balance", FormatSigned(totalOvertime)),
-                        ("Cumulative", FormatSigned(cumulativeAtEnd)),
+                        ("Year Cumulative", FormatSigned(periodCumulativeAtEnd)),
+                        ("Overall Cumulative", FormatSigned(overallCumulative))
+                    ]));
+                    column.Item().Element(c => ComposeSummaryCards(c, [
                         ("Vacation", $"{vacationDays}d"),
                         ("Sick", $"{sickDays}d"),
                         ("Holidays", $"{holidayDays}d")

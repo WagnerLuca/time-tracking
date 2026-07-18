@@ -448,7 +448,11 @@
 	}
 
 	function computeMonthStats(days: CalendarDay[]) {
-		const currentDays = days.filter(d => d.isCurrentMonth);
+		// Only count days up to today — future days haven't happened yet and
+		// would otherwise inflate "Missing"/target figures for days not yet elapsed.
+		const today = new Date();
+		today.setHours(23, 59, 59, 999);
+		const currentDays = days.filter(d => d.isCurrentMonth && d.date <= today);
 		const totalWorked = currentDays.reduce((s, d) => s + d.workedMinutes, 0);
 		const totalCredits = currentDays.reduce((s, d) => s + d.creditedMinutes, 0);
 		const totalTarget = currentDays.reduce((s, d) => s + d.targetMinutes, 0);
@@ -477,6 +481,10 @@
 	}
 
 	function buildYearMonths(year: number, entries: TimeEntryResponse[]): YearMonth[] {
+		// Only count days up to today — future months/days haven't happened yet.
+		const today = new Date();
+		today.setHours(23, 59, 59, 999);
+
 		// Per-day worked minutes (needed for top-up credits)
 		const dailyWorked = new Map<string, number>();
 		for (const entry of entries) {
@@ -494,7 +502,7 @@
 			// Count work days, holidays, sick days, vacation days
 			let workDays = 0, holidays = 0, sickDays = 0, vacationDays = 0, targetMinutes = 0, absenceCredits = 0;
 			const cursor = new Date(firstDay);
-			while (cursor <= lastDay) {
+			while (cursor <= lastDay && cursor <= today) {
 				const key = dateKey(cursor);
 				const dt = getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays);
 				if (dt === 'holiday') holidays++;
@@ -509,12 +517,12 @@
 				cursor.setDate(cursor.getDate() + 1);
 			}
 
-			// Sum entries for this month
+			// Sum entries for this month (up to today)
 			let workedMinutes = 0, entryCount = 0;
 			for (const entry of entries) {
 				if (entry.isRunning || !entry.startTime) continue;
 				const d = new Date(entry.startTime);
-				if (d.getMonth() === m && d.getFullYear() === year) {
+				if (d.getMonth() === m && d.getFullYear() === year && d <= today) {
 					workedMinutes += entry.netDurationMinutes ?? entry.durationMinutes ?? 0;
 					entryCount++;
 				}

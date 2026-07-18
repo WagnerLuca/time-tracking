@@ -35,6 +35,26 @@ public class ReportsControllerTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     [Fact]
+    public async Task MonthlyReport_CurrentMonth_ExtendingIntoFuture_StillReturnsPdf()
+    {
+        // The requested month includes days after "today" — the underlying
+        // aggregator clamps to today, so this must still succeed with a valid PDF
+        // (not blow up on an inverted or empty date range for a month just starting).
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
+        var ownId = await GetOwnUserIdAsync(client);
+        var now = DateTime.UtcNow;
+
+        var response = await client.GetAsync(
+            $"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/members/{ownId}/reports/monthly?year={now.Year}&month={now.Month}");
+
+        response.EnsureSuccessStatusCode();
+        response.Content.Headers.ContentType!.MediaType.Should().Be("application/pdf");
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        bytes.Length.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
     public async Task YearlyReport_Self_ReturnsPdf()
     {
         var client = _factory.CreateClient();
