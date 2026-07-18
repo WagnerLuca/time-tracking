@@ -12,6 +12,14 @@ public record ExportRequest
     /// <summary>Organization slug to filter by. Null for all organizations.</summary>
     public string? OrganizationSlug { get; init; }
 
+    /// <summary>
+    /// Optional member to export data for, instead of the caller. Requires
+    /// <see cref="OrganizationSlug"/> to be set and the caller to have export
+    /// permission for that member (self, org Admin/Owner, or a Group Admin of a
+    /// shared group with the export-data capability).
+    /// </summary>
+    public int? TargetUserId { get; init; }
+
     /// <summary>Start of date range (inclusive).</summary>
     public DateTime? From { get; init; }
 

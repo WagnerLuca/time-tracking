@@ -278,6 +278,10 @@ export interface ExportRequest {
      */
     'organizationSlug'?: string | null;
     /**
+     * Optional member to export data for, instead of the caller. Requires  TimeTracking.Api.Models.Dtos.ExportRequest.OrganizationSlug to be set and the caller to have export  permission for that member (self, org Admin/Owner, or a Group Admin of a  shared group with the export-data capability).
+     */
+    'targetUserId'?: number | null;
+    /**
      * Start of date range (inclusive).
      */
     'from'?: string | null;

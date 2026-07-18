@@ -37,11 +37,8 @@ public class PdfReportService : IPdfReportService
         var dateFrom = new DateOnly(year, month, 1);
         var dateTo = dateFrom.AddMonths(1).AddDays(-1);
 
-        var rows = await DailyReportAggregator.BuildAsync(
+        var (rows, overallCumulative) = await BuildDisplayRowsAsync(
             _context, targetUserId, context.Org!.Id, dateFrom, dateTo, context.Membership!.InitialOvertimeHours);
-
-        var overallCumulative = await GetOverallCumulativeOvertimeAsync(
-            _context, targetUserId, context.Org.Id, context.Membership.InitialOvertimeHours, dateTo);
 
         var period = $"{MonthNames[month - 1]} {year}";
         var bytes = RenderMonthlyPdf(context.Org.Name, context.TargetUser!, period, rows, overallCumulative);
@@ -62,7 +59,7 @@ public class PdfReportService : IPdfReportService
         var dateFrom = new DateOnly(year, 1, 1);
         var dateTo = new DateOnly(year, 12, 31);
 
-        var rows = await DailyReportAggregator.BuildAsync(
+        var (rows, overallCumulative) = await BuildDisplayRowsAsync(
             _context, targetUserId, context.Org!.Id, dateFrom, dateTo, context.Membership!.InitialOvertimeHours);
 
         var monthSummaries = rows
@@ -82,9 +79,6 @@ public class PdfReportService : IPdfReportService
                 HolidayDays: g.Count(r => r.HolidayName != null)
             ))
             .ToList();
-
-        var overallCumulative = await GetOverallCumulativeOvertimeAsync(
-            _context, targetUserId, context.Org.Id, context.Membership!.InitialOvertimeHours, dateTo);
 
         var bytes = RenderYearlyPdf(context.Org.Name, context.TargetUser!, year, monthSummaries, overallCumulative);
 
@@ -124,13 +118,16 @@ public class PdfReportService : IPdfReportService
     }
 
     /// <summary>
-    /// Computes the true all-time cumulative overtime balance as of <paramref name="asOfDate"/>,
-    /// seeded once from the member's initial overtime hours at their very first tracked entry
-    /// (never reset per report period, unlike the period-scoped running total in the daily table).
-    /// Internally clamped to "today" by <see cref="DailyReportAggregator.BuildAsync"/>.
+    /// Builds the report's display rows (clipped to [dateFrom, dateTo]) whose
+    /// <see cref="DailyReportRow.CumulativeOvertime"/> reflects the member's true,
+    /// never-reset running balance since their very first tracked entry — not just
+    /// a total reset at the start of the requested period. Also returns that overall
+    /// balance as of the end of the period (or "today" if the period is still ongoing,
+    /// since <see cref="DailyReportAggregator.BuildAsync"/> clamps internally).
     /// </summary>
-    private static async Task<double> GetOverallCumulativeOvertimeAsync(
-        TimeTrackingDbContext context, int userId, int orgId, double initialOvertimeHours, DateOnly asOfDate)
+    private static async Task<(List<DailyReportRow> Rows, double OverallCumulative)> BuildDisplayRowsAsync(
+        TimeTrackingDbContext context, int userId, int orgId,
+        DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours)
     {
         var firstEntry = await context.TimeEntries.AsNoTracking()
             .Where(e => e.UserId == userId && e.OrganizationId == orgId && !e.IsRunning)
@@ -138,13 +135,18 @@ public class PdfReportService : IPdfReportService
             .Select(e => (DateTime?)e.StartTime)
             .FirstOrDefaultAsync();
 
-        if (firstEntry == null) return initialOvertimeHours;
+        var loopFrom = dateFrom;
+        if (firstEntry != null)
+        {
+            var firstEntryDate = DateOnly.FromDateTime(firstEntry.Value);
+            if (firstEntryDate < loopFrom) loopFrom = firstEntryDate;
+        }
 
-        var loopFrom = DateOnly.FromDateTime(firstEntry.Value);
-        if (loopFrom > asOfDate) return initialOvertimeHours;
+        var allRows = await DailyReportAggregator.BuildAsync(context, userId, orgId, loopFrom, dateTo, initialOvertimeHours);
+        var displayRows = allRows.Where(r => r.Date >= dateFrom).ToList();
+        var overallCumulative = allRows.Count > 0 ? allRows[^1].CumulativeOvertime : initialOvertimeHours;
 
-        var rows = await DailyReportAggregator.BuildAsync(context, userId, orgId, loopFrom, asOfDate, initialOvertimeHours);
-        return rows.Count > 0 ? rows[^1].CumulativeOvertime : initialOvertimeHours;
+        return (displayRows, overallCumulative);
     }
 
     // ────────────────────────────────────────────────────
@@ -156,7 +158,6 @@ public class PdfReportService : IPdfReportService
         var totalTarget = rows.Sum(r => r.TargetHours);
         var totalNet = rows.Sum(r => r.NetWorkedHours);
         var totalOvertime = rows.Sum(r => r.Overtime);
-        var periodCumulativeAtEnd = rows.Count > 0 ? rows[^1].CumulativeOvertime : 0;
         var vacationDays = rows.Count(r => r.AbsenceType == AbsenceType.Vacation);
         var sickDays = rows.Count(r => r.AbsenceType == AbsenceType.SickDay);
         var holidayDays = rows.Count(r => r.HolidayName != null);
@@ -179,7 +180,6 @@ public class PdfReportService : IPdfReportService
                         ("Target", FormatHours(totalTarget)),
                         ("Worked (net)", FormatHours(totalNet)),
                         ("Balance", FormatSigned(totalOvertime)),
-                        ("Month Cumulative", FormatSigned(periodCumulativeAtEnd)),
                         ("Overall Cumulative", FormatSigned(overallCumulative))
                     ]));
                     column.Item().Element(c => ComposeSummaryCards(c, [
@@ -201,7 +201,6 @@ public class PdfReportService : IPdfReportService
         var totalTarget = months.Sum(m => m.TargetHours);
         var totalNet = months.Sum(m => m.NetWorkedHours);
         var totalOvertime = months.Sum(m => m.Overtime);
-        var periodCumulativeAtEnd = months.Count > 0 ? months[^1].CumulativeOvertimeAtEnd : 0;
         var vacationDays = months.Sum(m => m.VacationDays);
         var sickDays = months.Sum(m => m.SickDays);
         var holidayDays = months.Sum(m => m.HolidayDays);
@@ -224,7 +223,6 @@ public class PdfReportService : IPdfReportService
                         ("Target", FormatHours(totalTarget)),
                         ("Worked (net)", FormatHours(totalNet)),
                         ("Year Balance", FormatSigned(totalOvertime)),
-                        ("Year Cumulative", FormatSigned(periodCumulativeAtEnd)),
                         ("Overall Cumulative", FormatSigned(overallCumulative))
                     ]));
                     column.Item().Element(c => ComposeSummaryCards(c, [

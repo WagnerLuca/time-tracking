@@ -564,4 +564,129 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
         var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         lines.Length.Should().Be(1); // header only — nothing to report for a fully future period
     }
+
+    // ── Export for another member (GroupAdminCanExportData / org admin) ─────
+
+    [Fact]
+    public async Task ExportEntries_ForOtherMember_AsOrgAdmin_Succeeds()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        var detail = await client.GetFromJsonAsync<OrganizationDetailResponseDto>(
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
+        var tom = detail!.Members.First(m => m.Email == TestHelpers.SeedMemberEmail);
+
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "entries",
+            organizationSlug = TestHelpers.SeedOrgSlug,
+            targetUserId = tom.Id
+        });
+        response.EnsureSuccessStatusCode();
+        response.Content.Headers.ContentType!.MediaType.Should().Be("text/csv");
+    }
+
+    [Fact]
+    public async Task ExportEntries_ForOtherMember_WithoutOrgSlug_ReturnsBadRequest()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        var detail = await client.GetFromJsonAsync<OrganizationDetailResponseDto>(
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
+        var tom = detail!.Members.First(m => m.Email == TestHelpers.SeedMemberEmail);
+
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "entries",
+            targetUserId = tom.Id
+            // organizationSlug intentionally omitted — permission can't be resolved without an org
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task ExportEntries_ForOtherMember_AsRegularMember_ReturnsForbidden()
+    {
+        var ownerClient = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(ownerClient, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        var detail = await ownerClient.GetFromJsonAsync<OrganizationDetailResponseDto>(
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
+        var owner = detail!.Members.First(m => m.Email == TestHelpers.SeedOwnerEmail);
+
+        var memberClient = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(memberClient, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
+
+        var response = await memberClient.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "entries",
+            organizationSlug = TestHelpers.SeedOrgSlug,
+            targetUserId = owner.Id
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task ExportDailyReport_ForOtherMember_AsOrgAdmin_Succeeds()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+
+        var detail = await client.GetFromJsonAsync<OrganizationDetailResponseDto>(
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
+        var tom = detail!.Members.First(m => m.Email == TestHelpers.SeedMemberEmail);
+
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily",
+            organizationSlug = TestHelpers.SeedOrgSlug,
+            targetUserId = tom.Id
+        });
+        response.EnsureSuccessStatusCode();
+        response.Content.Headers.ContentType!.MediaType.Should().Be("text/csv");
+    }
+
+    [Fact]
+    public async Task ExportDailyReport_ForOtherMember_AsRegularMember_ReturnsForbidden()
+    {
+        var ownerClient = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(ownerClient, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        var detail = await ownerClient.GetFromJsonAsync<OrganizationDetailResponseDto>(
+            $"/api/v1/Organizations/{TestHelpers.SeedOrgSlug}", TestHelpers.JsonOptions);
+        var owner = detail!.Members.First(m => m.Email == TestHelpers.SeedOwnerEmail);
+
+        var memberClient = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(memberClient, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
+
+        var response = await memberClient.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily",
+            organizationSlug = TestHelpers.SeedOrgSlug,
+            targetUserId = owner.Id
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task ExportEntries_TargetUserIdEqualsCaller_TreatedAsSelf()
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
+        var ownId = await GetOwnUserIdAsync(client);
+
+        var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "entries",
+            targetUserId = ownId
+            // no organizationSlug — allowed because target == caller, no permission check needed
+        });
+        response.EnsureSuccessStatusCode();
+    }
+
+    private static async Task<int> GetOwnUserIdAsync(HttpClient client)
+    {
+        var me = await client.GetFromJsonAsync<UserInfoDto>("/api/v1/Auth/me", TestHelpers.JsonOptions);
+        return me!.Id;
+    }
 }

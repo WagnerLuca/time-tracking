@@ -38,8 +38,11 @@ public class TimeEntryExportService : ITimeEntryExportService
         _logger = logger;
     }
 
-    public async Task<ServiceResult<byte[]>> ExportEntriesCsvAsync(int userId, ExportRequest request)
+    public async Task<ServiceResult<byte[]>> ExportEntriesCsvAsync(int callerUserId, ExportRequest request)
     {
+        var (userId, error) = await ResolveEffectiveUserIdAsync(callerUserId, request);
+        if (error != null) return ServiceResult.Fail<byte[]>(error.Value.Type, error.Value.Message);
+
         var query = _context.TimeEntries
             .AsNoTracking()
             .Include(e => e.Organization)
@@ -102,10 +105,13 @@ public class TimeEntryExportService : ITimeEntryExportService
         return ServiceResult.Ok(Encoding.UTF8.GetBytes(sb.ToString()));
     }
 
-    public async Task<ServiceResult<byte[]>> ExportDailyReportCsvAsync(int userId, ExportRequest request)
+    public async Task<ServiceResult<byte[]>> ExportDailyReportCsvAsync(int callerUserId, ExportRequest request)
     {
         if (string.IsNullOrEmpty(request.OrganizationSlug))
             return ServiceResult.BadRequest<byte[]>("Organization slug is required for daily report export.");
+
+        var (userId, error) = await ResolveEffectiveUserIdAsync(callerUserId, request);
+        if (error != null) return ServiceResult.Fail<byte[]>(error.Value.Type, error.Value.Message);
 
         var org = await _context.Organizations.AsNoTracking()
             .FirstOrDefaultAsync(o => o.Slug == request.OrganizationSlug);
@@ -339,6 +345,39 @@ public class TimeEntryExportService : ITimeEntryExportService
     }
 
     // â”€â”€ Private helpers â”€â”€
+
+        /// <summary>
+    /// Resolves which user's data to export: the caller themselves by default, or
+    /// <see cref="ExportRequest.TargetUserId"/> when set and the caller has export
+    /// permission for that member (self, org Admin/Owner, or a Group Admin of a
+    /// shared group with the export-data capability). Requires an organization slug
+    /// whenever a different target is requested, since permissions are org-scoped.
+    /// </summary>
+    private async Task<(int UserId, (ServiceErrorType Type, string Message)? Error)> ResolveEffectiveUserIdAsync(
+        int callerUserId, ExportRequest request)
+    {
+        if (!request.TargetUserId.HasValue || request.TargetUserId.Value == callerUserId)
+            return (callerUserId, null);
+
+        if (string.IsNullOrEmpty(request.OrganizationSlug))
+            return (callerUserId, (ServiceErrorType.BadRequest, "Organization slug is required to export another member's data."));
+
+        var org = await _context.Organizations.AsNoTracking()
+            .FirstOrDefaultAsync(o => o.Slug == request.OrganizationSlug);
+        if (org == null)
+            return (callerUserId, (ServiceErrorType.NotFound, "Organization not found."));
+
+        var isMember = await _context.UserOrganizations.AsNoTracking()
+            .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == request.TargetUserId.Value);
+        if (!isMember)
+            return (callerUserId, (ServiceErrorType.NotFound, "Member not found in this organization."));
+
+        var allowed = await EffectiveRuleResolver.CanExportDataForMemberAsync(_context, org.Id, callerUserId, request.TargetUserId.Value);
+        if (!allowed)
+            return (callerUserId, (ServiceErrorType.Forbidden, "You do not have permission to export this member's data."));
+
+        return (request.TargetUserId.Value, null);
+    }
 
     private static List<string> ResolveColumns(List<string>? requested, string[] available)
     {
