@@ -1,6 +1,7 @@
 <script lang="ts">
+	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { exportImportApi, organizationsApi, requestsApi } from '$lib/apiClient';
+	import { exportImportApi, organizationsApi, requestsApi, reportsApi } from '$lib/apiClient';
 	import type {
 		ExportRequest,
 		OrganizationDetailResponse,
@@ -12,10 +13,21 @@
 	import { csvImportEnabled, canImportCsv, isAllowed, isDisabled, isRequiresApproval } from '$lib/utils/orgRules';
 
 	// ── Tab state ──
-	let activeTab = $state<'export' | 'import'>('export');
+	let activeTab = $state<'export' | 'import' | 'report'>('export');
 
-	// ── Org detail (for import rule check) ──
+	// ── Org detail (for import rule check + member list) ──
 	let orgDetail = $state<OrganizationDetailResponse | null>(null);
+
+	// ── Target member (export/report for someone else) ──
+	let targetUserId = $state<number | null>(null); // null = self
+	let myMember = $derived(orgDetail?.members?.find((m) => m.id === auth.user?.id) ?? null);
+	let isOrgAdmin = $derived(myMember?.role === 'Owner' || myMember?.role === 'Admin');
+	let isAnyGroupAdmin = $derived((myMember?.groups ?? []).some((g) => g.isGroupAdmin));
+	/** Whether the UI should offer a member picker at all. The backend is the
+	 * final authority — a group admin without the specific export capability
+	 * for a given member's group will still get a clear 403 if they try. */
+	let canExportOthers = $derived(isOrgAdmin || isAnyGroupAdmin);
+	let exportableMembers = $derived((orgDetail?.members ?? []).filter((m) => m.id !== auth.user?.id));
 
 	$effect(() => {
 		const slug = orgContext.selectedOrgSlug;
@@ -130,17 +142,23 @@
 				exportType === 'entries'
 					? [...selectedEntryColumns]
 					: [...selectedDailyColumns];
+			// Exporting for someone else always needs an org (permission is org-scoped),
+			// same as the daily summary type.
+			const forceOrgScope = exportType === 'daily' || targetUserId !== null;
 			const orgSlug =
-				exportScope === 'org' ? (orgContext.selectedOrgSlug ?? undefined) : undefined;
+				(forceOrgScope || exportScope === 'org') ? (orgContext.selectedOrgSlug ?? undefined) : undefined;
 
-			if (exportType === 'daily' && !orgSlug) {
-				exportError = 'Daily report requires an organization. Please select one.';
+			if (forceOrgScope && !orgSlug) {
+				exportError = targetUserId !== null
+					? 'Exporting for another member requires an organization. Please select one.'
+					: 'Daily report requires an organization. Please select one.';
 				return;
 			}
 
 			const request: ExportRequest = {
 				type: exportType,
 				organizationSlug: orgSlug,
+				targetUserId: targetUserId ?? undefined,
 				from: from ? new Date(from).toISOString() : undefined,
 				to: to ? new Date(to).toISOString() : undefined,
 				columns
@@ -155,7 +173,8 @@
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
-			const label = exportType === 'daily' ? `daily-report-${orgSlug}` : 'time-entries';
+			const targetSuffix = targetUserId !== null ? `-member${targetUserId}` : '';
+			const label = exportType === 'daily' ? `daily-report-${orgSlug}${targetSuffix}` : `time-entries${targetSuffix}`;
 			a.download = `${label}-${new Date().toISOString().split('T')[0]}.csv`;
 			a.click();
 			URL.revokeObjectURL(url);
@@ -275,6 +294,61 @@
 		}
 	}
 
+	// ── PDF Report state ──
+	const now = new Date();
+	let reportMonth = $state(now.getMonth() + 1); // 1-12
+	let reportMonthYear = $state(now.getFullYear());
+	let reportYear = $state(now.getFullYear());
+	let monthlyReportDownloading = $state(false);
+	let yearlyReportDownloading = $state(false);
+	let reportError = $state('');
+
+	function downloadBlob(data: BlobPart, filename: string) {
+		const blob = new Blob([data], { type: 'application/pdf' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+
+	async function downloadMonthlyReport() {
+		const orgSlug = orgContext.selectedOrgSlug;
+		const memberId = targetUserId ?? auth.user?.id;
+		if (!orgSlug || !memberId) { reportError = 'Select an organization first.'; return; }
+
+		monthlyReportDownloading = true;
+		reportError = '';
+		try {
+			const response = await reportsApi.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(
+				orgSlug, memberId, reportMonthYear, reportMonth, { responseType: 'blob' }
+			);
+			downloadBlob(response.data as unknown as BlobPart, `time-report-${orgSlug}-${reportMonthYear}-${String(reportMonth).padStart(2, '0')}.pdf`);
+		} catch (e) {
+			reportError = extractErrorMessage(e, 'Failed to generate monthly report.');
+		}
+		monthlyReportDownloading = false;
+	}
+
+	async function downloadYearlyReport() {
+		const orgSlug = orgContext.selectedOrgSlug;
+		const memberId = targetUserId ?? auth.user?.id;
+		if (!orgSlug || !memberId) { reportError = 'Select an organization first.'; return; }
+
+		yearlyReportDownloading = true;
+		reportError = '';
+		try {
+			const response = await reportsApi.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(
+				orgSlug, memberId, reportYear, { responseType: 'blob' }
+			);
+			downloadBlob(response.data as unknown as BlobPart, `time-report-${orgSlug}-${reportYear}.pdf`);
+		} catch (e) {
+			reportError = extractErrorMessage(e, 'Failed to generate yearly report.');
+		}
+		yearlyReportDownloading = false;
+	}
+
 	// Derived helpers
 	let availableColumns = $derived(exportType === 'entries' ? entryColumns : dailyColumns);
 	let activeColumnSet = $derived(
@@ -367,11 +441,45 @@
 		>
 			Import
 		</button>
+		<button
+			class="rounded-md px-4 py-1.5 text-sm font-medium transition-colors {activeTab === 'report'
+				? 'bg-base-100 text-base-content shadow-sm'
+				: 'text-base-content/60 hover:text-base-content'}"
+			onclick={() => (activeTab = 'report')}
+		>
+			PDF Report
+		</button>
 	</div>
+
+	<!-- Shared "exporting for" member picker (visible on Export and PDF Report tabs) -->
+	{#snippet memberSelector()}
+		{#if canExportOthers}
+			<div class="card bg-base-100 border border-base-300 shadow-sm">
+				<div class="card-body p-5 space-y-2">
+					<h2 class="text-base font-semibold">Exporting For</h2>
+					<select class="select select-bordered select-sm w-full sm:w-72" bind:value={targetUserId}>
+						<option value={null}>Myself</option>
+						{#each exportableMembers as m}
+							<option value={m.id}>{m.firstName} {m.lastName}</option>
+						{/each}
+					</select>
+					{#if targetUserId !== null}
+						<p class="text-xs text-base-content/40">
+							Scoped to {orgContext.selectedOrg?.name ?? 'the current organization'}. Requires export
+							permission for this member — org admins always have it; group admins need the
+							export-data capability enabled for a shared group.
+						</p>
+					{/if}
+				</div>
+			</div>
+		{/if}
+	{/snippet}
 
 	<!-- ═══════════ EXPORT TAB ═══════════ -->
 	{#if activeTab === 'export'}
 		<div class="space-y-5">
+			{@render memberSelector()}
+
 			<!-- Export Type -->
 			<div class="card bg-base-100 border border-base-300 shadow-sm">
 				<div class="card-body p-5 space-y-4">
@@ -416,13 +524,15 @@
 								id="exportScope"
 								class="select select-bordered select-sm w-full"
 								bind:value={exportScope}
-								disabled={exportType === 'daily'}
+								disabled={exportType === 'daily' || targetUserId !== null}
 							>
 								<option value="org">Current Organization ({orgContext.selectedOrg?.name ?? 'none'})</option>
 								<option value="all">All Organizations</option>
 							</select>
 							{#if exportType === 'daily'}
 								<p class="text-xs text-base-content/40 mt-1">Daily summary always uses current org.</p>
+							{:else if targetUserId !== null}
+								<p class="text-xs text-base-content/40 mt-1">Exporting for another member always uses the current org.</p>
 							{/if}
 						</div>
 
@@ -733,6 +843,66 @@
 				{/if}
 				{#if requestSuccess}
 					<div class="alert alert-success text-sm">{requestMessage}</div>
+				{/if}
+			{/if}
+		</div>
+	{/if}
+
+	<!-- ═══════════ PDF REPORT TAB ═══════════ -->
+	{#if activeTab === 'report'}
+		<div class="space-y-5">
+			{@render memberSelector()}
+
+			{#if !orgContext.selectedOrg}
+				<div class="alert alert-warning text-sm">
+					Please select an organization to generate a PDF report.
+				</div>
+			{:else}
+				<div class="card bg-base-100 border border-base-300 shadow-sm">
+					<div class="card-body p-5 space-y-3">
+						<h2 class="text-base font-semibold">Monthly Report</h2>
+						<p class="text-sm text-base-content/60">
+							Day-by-day working hours, target, overtime and status for one calendar month.
+						</p>
+						<div class="flex items-center gap-2 flex-wrap">
+							<select class="select select-bordered select-sm" bind:value={reportMonth} aria-label="Report month">
+								{#each Array.from({ length: 12 }, (_, i) => i + 1) as m}
+									<option value={m}>{new Date(2000, m - 1).toLocaleDateString('en-US', { month: 'long' })}</option>
+								{/each}
+							</select>
+							<input type="number" class="input input-bordered input-sm w-24" bind:value={reportMonthYear} min="2000" max="2100" aria-label="Report year" />
+							<button class="btn btn-primary btn-sm" onclick={downloadMonthlyReport} disabled={monthlyReportDownloading}>
+								{#if monthlyReportDownloading}
+									<span class="loading loading-spinner loading-xs"></span> Generating...
+								{:else}
+									Download PDF
+								{/if}
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="card bg-base-100 border border-base-300 shadow-sm">
+					<div class="card-body p-5 space-y-3">
+						<h2 class="text-base font-semibold">Yearly Report</h2>
+						<p class="text-sm text-base-content/60">
+							Month-by-month summary for one calendar year, with running overall cumulative overtime.
+						</p>
+						<div class="flex items-center gap-2 flex-wrap">
+							<input type="number" class="input input-bordered input-sm w-24" bind:value={reportYear} min="2000" max="2100" aria-label="Report year" />
+							<button class="btn btn-primary btn-sm" onclick={downloadYearlyReport} disabled={yearlyReportDownloading}>
+								{#if yearlyReportDownloading}
+									<span class="loading loading-spinner loading-xs"></span> Generating...
+								{:else}
+									Download PDF
+								{/if}
+							</button>
+						</div>
+					</div>
+				</div>
+
+				{#if reportError}
+					<div class="alert alert-error text-sm">{reportError}</div>
 				{/if}
 			{/if}
 		</div>
