@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { organizationsApi, workScheduleApi, absenceDayApi, groupApi } from '$lib/apiClient';
+	import { organizationsApi, workScheduleApi, absenceDayApi, groupApi, reportsApi } from '$lib/apiClient';
 	import { formatHoursDecimal, formatDateFull, absenceTypeLabel, absenceTypeBadge, getInitials } from '$lib/utils/formatters';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import MemberCalendar from '$lib/components/MemberCalendar.svelte';
@@ -90,6 +90,60 @@
 
 	// Action feedback
 	let actionError = $state('');
+
+	// ── PDF Reports ──
+	const now = new Date();
+	let reportMonth = $state(now.getMonth() + 1); // 1-12
+	let reportMonthYear = $state(now.getFullYear());
+	let reportYear = $state(now.getFullYear());
+	let monthlyReportDownloading = $state(false);
+	let yearlyReportDownloading = $state(false);
+	let reportError = $state('');
+
+	// Caller's own group-admin memberships (used to surface the report section
+	// for group admins with export capability; the backend is the source of truth).
+	let callerMember = $derived(org?.members?.find(m => m.id === auth.user?.id) ?? null);
+	let callerAdminGroupIds = $derived(new Set((callerMember?.groups ?? []).filter(g => g.isGroupAdmin).map(g => g.groupId)));
+	let sharesAdminGroupWithMember = $derived((member?.groups ?? []).some(g => callerAdminGroupIds.has(g.groupId)));
+	let canGenerateReport = $derived(isSelf || canEdit || sharesAdminGroupWithMember);
+
+	function downloadBlob(data: BlobPart, filename: string) {
+		const blob = new Blob([data], { type: 'application/pdf' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+
+	async function downloadMonthlyReport() {
+		monthlyReportDownloading = true;
+		reportError = '';
+		try {
+			const response = await reportsApi.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(
+				orgSlug, memberId, reportMonthYear, reportMonth, { responseType: 'blob' }
+			);
+			downloadBlob(response.data as unknown as BlobPart, `time-report-${orgSlug}-${reportMonthYear}-${String(reportMonth).padStart(2, '0')}.pdf`);
+		} catch (e) {
+			reportError = extractErrorMessage(e, 'Failed to generate monthly report.');
+		}
+		monthlyReportDownloading = false;
+	}
+
+	async function downloadYearlyReport() {
+		yearlyReportDownloading = true;
+		reportError = '';
+		try {
+			const response = await reportsApi.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(
+				orgSlug, memberId, reportYear, { responseType: 'blob' }
+			);
+			downloadBlob(response.data as unknown as BlobPart, `time-report-${orgSlug}-${reportYear}.pdf`);
+		} catch (e) {
+			reportError = extractErrorMessage(e, 'Failed to generate yearly report.');
+		}
+		yearlyReportDownloading = false;
+	}
 
 	onMount(() => {
 		orgSlug = $page.params.slug ?? '';
@@ -493,6 +547,60 @@
 			{:else}
 				<p class="text-base-content/40 text-sm">No cumulative data available.</p>
 			{/if}
+		</section>
+		{/if}
+
+		<!-- ═══ Reports ═══ -->
+		{#if canGenerateReport}
+		<section class="card bg-base-100 border border-base-300 p-5 mb-5">
+			<div class="flex items-center justify-between mb-4">
+				<h2 class="text-base font-bold text-base-content flex items-center gap-2 m-0">
+					<svg class="text-base-content/60" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+					Reports
+				</h2>
+			</div>
+			<p class="text-xs text-base-content/50 mb-4">Printable PDF working-hours reports for {isSelf ? 'you' : `${member.firstName} ${member.lastName}`} — day-by-day for a month, or month-by-month for a year.</p>
+
+			{#if reportError}
+				<div class="alert alert-error text-sm mb-3 py-2 px-3">{reportError}</div>
+			{/if}
+
+			<div class="grid gap-4 sm:grid-cols-2">
+				<!-- Monthly report -->
+				<div class="bg-base-200/40 border border-base-300 rounded-lg p-3.5">
+					<div class="font-semibold text-sm mb-2.5">Monthly Report</div>
+					<div class="flex items-center gap-2 flex-wrap">
+						<select class="select select-bordered select-sm" bind:value={reportMonth} aria-label="Report month">
+							{#each Array.from({ length: 12 }, (_, i) => i + 1) as m}
+								<option value={m}>{new Date(2000, m - 1).toLocaleDateString('en-US', { month: 'long' })}</option>
+							{/each}
+						</select>
+						<input type="number" class="input input-bordered input-sm w-24" bind:value={reportMonthYear} min="2000" max="2100" aria-label="Report year" />
+						<button class="btn btn-primary btn-sm" onclick={downloadMonthlyReport} disabled={monthlyReportDownloading}>
+							{#if monthlyReportDownloading}
+								<span class="loading loading-spinner loading-xs"></span> Generating...
+							{:else}
+								Download PDF
+							{/if}
+						</button>
+					</div>
+				</div>
+
+				<!-- Yearly report -->
+				<div class="bg-base-200/40 border border-base-300 rounded-lg p-3.5">
+					<div class="font-semibold text-sm mb-2.5">Yearly Report</div>
+					<div class="flex items-center gap-2 flex-wrap">
+						<input type="number" class="input input-bordered input-sm w-24" bind:value={reportYear} min="2000" max="2100" aria-label="Report year" />
+						<button class="btn btn-primary btn-sm" onclick={downloadYearlyReport} disabled={yearlyReportDownloading}>
+							{#if yearlyReportDownloading}
+								<span class="loading loading-spinner loading-xs"></span> Generating...
+							{:else}
+								Download PDF
+							{/if}
+						</button>
+					</div>
+				</div>
+			</div>
 		</section>
 		{/if}
 

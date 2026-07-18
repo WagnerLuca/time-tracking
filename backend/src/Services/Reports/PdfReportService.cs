@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -362,9 +363,9 @@ public class PdfReportService : IPdfReportService
         return row.EntrySummary;
     }
 
-    private static string FormatHours(double hours) => $"{hours:F2}h";
+    private static string FormatHours(double hours) => $"{hours.ToString("F2", CultureInfo.InvariantCulture)}h";
 
-    private static string FormatSigned(double hours) => $"{hours:+0.00;-0.00;0.00}h";
+    private static string FormatSigned(double hours) => $"{hours.ToString("+0.00;-0.00;0.00", CultureInfo.InvariantCulture)}h";
 
     private record MonthSummary(
         int Month, double TargetHours, double WorkedHours, double NetWorkedHours,

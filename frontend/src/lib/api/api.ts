@@ -6269,6 +6269,221 @@ export class PauseRulesApi extends BaseAPI {
 
 
 /**
+ * ReportsApi - axios parameter creator
+ */
+export const ReportsApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary Downloads a day-by-day PDF report for one calendar month.  Allowed for the member themselves, org Admins/Owners, or a Group Admin with export capability.
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Target member user ID.
+         * @param {number} [year] Report year.
+         * @param {number} [month] Report month (1-12).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet: async (slug: string, memberId: number, year?: number, month?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet', 'memberId', memberId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/reports/monthly`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (year !== undefined) {
+                localVarQueryParameter['year'] = year;
+            }
+
+            if (month !== undefined) {
+                localVarQueryParameter['month'] = month;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Downloads a month-by-month PDF summary report for one calendar year.  Allowed for the member themselves, org Admins/Owners, or a Group Admin with export capability.
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Target member user ID.
+         * @param {number} [year] Report year.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet: async (slug: string, memberId: number, year?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet', 'memberId', memberId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/reports/yearly`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (year !== undefined) {
+                localVarQueryParameter['year'] = year;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * ReportsApi - functional programming interface
+ */
+export const ReportsApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = ReportsApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Downloads a day-by-day PDF report for one calendar month.  Allowed for the member themselves, org Admins/Owners, or a Group Admin with export capability.
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Target member user ID.
+         * @param {number} [year] Report year.
+         * @param {number} [month] Report month (1-12).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug: string, memberId: number, year?: number, month?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug, memberId, year, month, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ReportsApi.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Downloads a month-by-month PDF summary report for one calendar year.  Allowed for the member themselves, org Admins/Owners, or a Group Admin with export capability.
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Target member user ID.
+         * @param {number} [year] Report year.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug: string, memberId: number, year?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug, memberId, year, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ReportsApi.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * ReportsApi - factory interface
+ */
+export const ReportsApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = ReportsApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Downloads a day-by-day PDF report for one calendar month.  Allowed for the member themselves, org Admins/Owners, or a Group Admin with export capability.
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Target member user ID.
+         * @param {number} [year] Report year.
+         * @param {number} [month] Report month (1-12).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug: string, memberId: number, year?: number, month?: number, options?: RawAxiosRequestConfig): AxiosPromise<File> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug, memberId, year, month, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Downloads a month-by-month PDF summary report for one calendar year.  Allowed for the member themselves, org Admins/Owners, or a Group Admin with export capability.
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Target member user ID.
+         * @param {number} [year] Report year.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug: string, memberId: number, year?: number, options?: RawAxiosRequestConfig): AxiosPromise<File> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug, memberId, year, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * ReportsApi - object-oriented interface
+ */
+export class ReportsApi extends BaseAPI {
+    /**
+     * 
+     * @summary Downloads a day-by-day PDF report for one calendar month.  Allowed for the member themselves, org Admins/Owners, or a Group Admin with export capability.
+     * @param {string} slug Organization URL slug.
+     * @param {number} memberId Target member user ID.
+     * @param {number} [year] Report year.
+     * @param {number} [month] Report month (1-12).
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug: string, memberId: number, year?: number, month?: number, options?: RawAxiosRequestConfig) {
+        return ReportsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug, memberId, year, month, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Downloads a month-by-month PDF summary report for one calendar year.  Allowed for the member themselves, org Admins/Owners, or a Group Admin with export capability.
+     * @param {string} slug Organization URL slug.
+     * @param {number} memberId Target member user ID.
+     * @param {number} [year] Report year.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug: string, memberId: number, year?: number, options?: RawAxiosRequestConfig) {
+        return ReportsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug, memberId, year, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
  * RequestsApi - axios parameter creator
  */
 export const RequestsApiAxiosParamCreator = function (configuration?: Configuration) {
