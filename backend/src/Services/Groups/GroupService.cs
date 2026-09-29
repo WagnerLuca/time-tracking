@@ -27,6 +27,10 @@ public class GroupService : IGroupService
         return (org, membership);
     }
 
+    private static bool CanGroupAdminManage(Group group, int userId) =>
+        group.GroupAdminCanManageMembers == true
+        && group.Members.Any(m => m.UserId == userId && m.Role == GroupRole.Admin);
+
     private static GroupMemberResponse ToMemberResponse(GroupMember gm) => new(
         gm.UserId,
         gm.User.FirstName,
@@ -74,7 +78,8 @@ public class GroupService : IGroupService
                 g.Color,
                 g.CreatedAt,
                 g.Members.Count,
-                IsGroupAdmin: myMembership?.Role == GroupRole.Admin
+                IsGroupAdmin: myMembership?.Role == GroupRole.Admin,
+                GroupAdminCanManageMembers: g.GroupAdminCanManageMembers == true
             );
         }).ToList();
 
@@ -181,11 +186,10 @@ public class GroupService : IGroupService
 
         if (group is null) return ServiceResult.NotFound<GroupMemberResponse>("Group not found.");
 
-        // Only org admins or group admins can add members
+        // Org admins, or group admins when the group allows them to manage members
         var isOrgAdmin = callerMembership?.Role >= OrganizationRole.Admin;
-        var isGroupAdmin = group.Members.Any(m => m.UserId == callerUserId && m.Role == GroupRole.Admin);
-        if (!isOrgAdmin && !isGroupAdmin)
-            return ServiceResult.Forbidden<GroupMemberResponse>("Only org admins or group admins can add members.");
+        if (!isOrgAdmin && !CanGroupAdminManage(group, callerUserId))
+            return ServiceResult.Forbidden<GroupMemberResponse>("Only org admins, or group admins with member management rights, can add members.");
 
         // Target user must be an org member
         var targetMembership = await _context.UserOrganizations
@@ -198,6 +202,10 @@ public class GroupService : IGroupService
 
         if (!Enum.TryParse<GroupRole>(request.Role, ignoreCase: true, out var role))
             role = GroupRole.Member;
+
+        // Granting the group admin role stays with org admins, like UpdateMemberRoleAsync
+        if (role == GroupRole.Admin && !isOrgAdmin)
+            return ServiceResult.Forbidden<GroupMemberResponse>("Only org admins can add group admins.");
 
         var groupMember = new GroupMember
         {
@@ -251,11 +259,13 @@ public class GroupService : IGroupService
         if (group is null) return ServiceResult.NotFound("Group not found.");
 
         var isOrgAdmin = callerMembership?.Role >= OrganizationRole.Admin;
-        var isGroupAdmin = group.Members.Any(m => m.UserId == callerUserId && m.Role == GroupRole.Admin);
         var isSelf = callerUserId == targetUserId;
+        // Group admins may remove regular members only, and only with member management rights
+        var targetIsGroupAdmin = group.Members.Any(m => m.UserId == targetUserId && m.Role == GroupRole.Admin);
+        var groupAdminMayRemove = CanGroupAdminManage(group, callerUserId) && !targetIsGroupAdmin;
 
-        if (!isOrgAdmin && !isGroupAdmin && !isSelf)
-            return ServiceResult.Forbidden("Only org admins, group admins, or the member themselves can remove a member.");
+        if (!isOrgAdmin && !groupAdminMayRemove && !isSelf)
+            return ServiceResult.Forbidden("Only org admins, group admins with member management rights, or the member themselves can remove a member.");
 
         var groupMember = group.Members.FirstOrDefault(m => m.UserId == targetUserId);
         if (groupMember is null) return ServiceResult.NotFound("Member not found in group.");

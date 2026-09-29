@@ -8,7 +8,9 @@ public record GroupResponse(
     string? Color,
     DateTime CreatedAt,
     int MemberCount,
-    bool IsGroupAdmin
+    bool IsGroupAdmin,
+    /// <summary>Whether group admins of this group may add/remove regular members.</summary>
+    bool GroupAdminCanManageMembers
 );
 
 public record GroupDetailResponse(

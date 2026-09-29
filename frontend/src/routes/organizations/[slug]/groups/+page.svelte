@@ -455,7 +455,7 @@
 											<!-- Members section -->
 											<div class="flex items-center justify-between mb-3">
 												<h3 class="text-sm font-semibold text-base-content/70">Members ({selectedGroup.members?.length ?? 0})</h3>
-												{#if isAdmin || group.isGroupAdmin}
+												{#if isAdmin || (group.isGroupAdmin && group.groupAdminCanManageMembers)}
 													<button class="btn btn-ghost btn-xs" onclick={openAddMember}>
 														+ Add Member
 													</button>

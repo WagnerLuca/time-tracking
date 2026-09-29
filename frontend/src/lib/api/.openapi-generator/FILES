@@ -33,6 +33,7 @@ docs/GroupMemberResponse.md
 docs/GroupPermissionsResponse.md
 docs/GroupResponse.md
 docs/HolidayApi.md
+docs/HolidayPresetResponse.md
 docs/HolidayResponse.md
 docs/ImportEntryRequest.md
 docs/ImportPreviewResponse.md
@@ -40,8 +41,13 @@ docs/ImportPreviewRow.md
 docs/ImportResultResponse.md
 docs/LoginRequest.md
 docs/LoginResponse.md
+docs/MarkedSeenResponse.md
 docs/MemberGroupResponse.md
+docs/MemberInitialOvertimeResponse.md
 docs/MemberTimeOverviewResponse.md
+docs/MemberVacationDaysResponse.md
+docs/NotificationResponse.md
+docs/NotificationResponsePaginatedResponse.md
 docs/NotificationsApi.md
 docs/OrgRequestResponse.md
 docs/OrgRequestResponsePaginatedResponse.md
@@ -50,6 +56,7 @@ docs/OrganizationMemberResponse.md
 docs/OrganizationResponse.md
 docs/OrganizationResponsePaginatedResponse.md
 docs/OrganizationRole.md
+docs/OrganizationSettingsResponse.md
 docs/OrganizationsApi.md
 docs/PauseRuleResponse.md
 docs/PauseRulesApi.md
@@ -75,6 +82,7 @@ docs/TwoFactorConfirmRequest.md
 docs/TwoFactorConfirmResponse.md
 docs/TwoFactorSetupResponse.md
 docs/TwoFactorVerifyRequest.md
+docs/UnreadCountResponse.md
 docs/UpdateGroupMemberRoleRequest.md
 docs/UpdateGroupPermissionsRequest.md
 docs/UpdateGroupRequest.md

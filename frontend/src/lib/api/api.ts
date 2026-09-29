@@ -340,6 +340,14 @@ export interface GroupResponse {
     'createdAt'?: string;
     'memberCount'?: number;
     'isGroupAdmin'?: boolean;
+    'groupAdminCanManageMembers'?: boolean;
+}
+/**
+ * A country whose public holidays can be imported.
+ */
+export interface HolidayPresetResponse {
+    'key': string | null;
+    'name': string | null;
 }
 /**
  * Organization holiday entry.
@@ -424,6 +432,12 @@ export interface LoginResponse {
     'user': UserInfo;
 }
 /**
+ * Number of request notifications marked as seen.
+ */
+export interface MarkedSeenResponse {
+    'marked'?: number;
+}
+/**
  * A group a member belongs to, for tag display (e.g. \"Frontend Admin\").
  */
 export interface MemberGroupResponse {
@@ -431,6 +445,13 @@ export interface MemberGroupResponse {
     'name': string | null;
     'color'?: string | null;
     'isGroupAdmin'?: boolean;
+}
+/**
+ * A member\'s initial overtime after it was set.
+ */
+export interface MemberInitialOvertimeResponse {
+    'userId'?: number;
+    'initialOvertimeHours'?: number;
 }
 /**
  * Per-member time tracking statistics for the admin overview.
@@ -445,6 +466,50 @@ export interface MemberTimeOverviewResponse {
     'totalTrackedMinutes'?: number;
     'netTrackedMinutes'?: number;
     'entryCount'?: number;
+}
+/**
+ * A member\'s vacation day allowance after it was set.
+ */
+export interface MemberVacationDaysResponse {
+    'userId'?: number;
+    'vacationDaysPerYear'?: number;
+}
+/**
+ * An in-app notification for the current user.
+ */
+export interface NotificationResponse {
+    'id'?: number;
+    'title': string | null;
+    'message': string | null;
+    'type': string | null;
+    'isRead'?: boolean;
+    'createdAt'?: string;
+    'organizationId'?: number | null;
+}
+/**
+ * Standard paginated response wrapper for list endpoints.
+ */
+export interface NotificationResponsePaginatedResponse {
+    /**
+     * The items on the current page.
+     */
+    'items': Array<NotificationResponse> | null;
+    /**
+     * Total number of items matching the query (across all pages).
+     */
+    'totalCount': number;
+    /**
+     * Maximum number of items per page.
+     */
+    'limit': number;
+    /**
+     * Number of items skipped (0-based offset).
+     */
+    'offset': number;
+    /**
+     * Whether more items exist beyond the current page.
+     */
+    'hasMore'?: boolean;
 }
 /**
  * Response representing an organization request (join, edit entry, etc.).
@@ -603,6 +668,21 @@ export const OrganizationRole = {
 export type OrganizationRole = typeof OrganizationRole[keyof typeof OrganizationRole];
 
 
+/**
+ * Organization settings after an update (rule modes as their string names).
+ */
+export interface OrganizationSettingsResponse {
+    'autoPauseEnabled'?: boolean;
+    'editPastEntriesMode': string | null;
+    'editPauseMode': string | null;
+    'initialOvertimeMode': string | null;
+    'joinPolicy': string | null;
+    'workScheduleChangeMode': string | null;
+    'memberTimeEntryVisibility'?: boolean;
+    'require2fa'?: boolean;
+    'csvImportMode': string | null;
+    'absenceSelfServiceMode': string | null;
+}
 /**
  * Automatic pause rule (deduct X minutes after Y hours worked).
  */
@@ -850,6 +930,12 @@ export interface TwoFactorVerifyRequest {
      * 6-digit TOTP code from authenticator app, or a backup code.
      */
     'code': string;
+}
+/**
+ * Number of unread notifications.
+ */
+export interface UnreadCountResponse {
+    'count'?: number;
 }
 export interface UpdateGroupMemberRoleRequest {
     'role'?: string | null;
@@ -1993,7 +2079,7 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
         },
         /**
          * 
-         * @summary Login with email and password
+         * @summary Login with email and password. Returns a TimeTracking.Api.Models.Dtos.TwoFactorRequiredResponse instead when 2FA is enabled.
          * @param {LoginRequest} [loginRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -2302,7 +2388,7 @@ export const AuthApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Login with email and password
+         * @summary Login with email and password. Returns a TimeTracking.Api.Models.Dtos.TwoFactorRequiredResponse instead when 2FA is enabled.
          * @param {LoginRequest} [loginRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -2446,7 +2532,7 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
         },
         /**
          * 
-         * @summary Login with email and password
+         * @summary Login with email and password. Returns a TimeTracking.Api.Models.Dtos.TwoFactorRequiredResponse instead when 2FA is enabled.
          * @param {LoginRequest} [loginRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -2576,7 +2662,7 @@ export class AuthApi extends BaseAPI {
 
     /**
      * 
-     * @summary Login with email and password
+     * @summary Login with email and password. Returns a TimeTracking.Api.Models.Dtos.TwoFactorRequiredResponse instead when 2FA is enabled.
      * @param {LoginRequest} [loginRequest] 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -4191,7 +4277,7 @@ export const HolidayApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1OrganizationsHolidayPresetsGet(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+        async apiV1OrganizationsHolidayPresetsGet(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<HolidayPresetResponse>>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsHolidayPresetsGet(options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiV1OrganizationsHolidayPresetsGet']?.[localVarOperationServerIndex]?.url;
@@ -4283,7 +4369,7 @@ export const HolidayApiFactory = function (configuration?: Configuration, basePa
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsHolidayPresetsGet(options?: RawAxiosRequestConfig): AxiosPromise<void> {
+        apiV1OrganizationsHolidayPresetsGet(options?: RawAxiosRequestConfig): AxiosPromise<Array<HolidayPresetResponse>> {
             return localVarFp.apiV1OrganizationsHolidayPresetsGet(options).then((request) => request(axios, basePath));
         },
         /**
@@ -4601,7 +4687,7 @@ export const NotificationsApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1NotificationsGet(unreadOnly?: boolean, limit?: number, offset?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+        async apiV1NotificationsGet(unreadOnly?: boolean, limit?: number, offset?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<NotificationResponsePaginatedResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1NotificationsGet(unreadOnly, limit, offset, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['NotificationsApi.apiV1NotificationsGet']?.[localVarOperationServerIndex]?.url;
@@ -4638,7 +4724,7 @@ export const NotificationsApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1NotificationsUnreadCountGet(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+        async apiV1NotificationsUnreadCountGet(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<UnreadCountResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1NotificationsUnreadCountGet(options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['NotificationsApi.apiV1NotificationsUnreadCountGet']?.[localVarOperationServerIndex]?.url;
@@ -4662,7 +4748,7 @@ export const NotificationsApiFactory = function (configuration?: Configuration, 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1NotificationsGet(unreadOnly?: boolean, limit?: number, offset?: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+        apiV1NotificationsGet(unreadOnly?: boolean, limit?: number, offset?: number, options?: RawAxiosRequestConfig): AxiosPromise<NotificationResponsePaginatedResponse> {
             return localVarFp.apiV1NotificationsGet(unreadOnly, limit, offset, options).then((request) => request(axios, basePath));
         },
         /**
@@ -4690,7 +4776,7 @@ export const NotificationsApiFactory = function (configuration?: Configuration, 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1NotificationsUnreadCountGet(options?: RawAxiosRequestConfig): AxiosPromise<void> {
+        apiV1NotificationsUnreadCountGet(options?: RawAxiosRequestConfig): AxiosPromise<UnreadCountResponse> {
             return localVarFp.apiV1NotificationsUnreadCountGet(options).then((request) => request(axios, basePath));
         },
     };
@@ -5483,7 +5569,7 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1OrganizationsSlugMembersMemberIdInitialOvertimePut(slug: string, memberId: number, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+        async apiV1OrganizationsSlugMembersMemberIdInitialOvertimePut(slug: string, memberId: number, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MemberInitialOvertimeResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdInitialOvertimePut(slug, memberId, setInitialOvertimeRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['OrganizationsApi.apiV1OrganizationsSlugMembersMemberIdInitialOvertimePut']?.[localVarOperationServerIndex]?.url;
@@ -5513,7 +5599,7 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug: string, memberId: number, setVacationDaysRequest?: SetVacationDaysRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+        async apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug: string, memberId: number, setVacationDaysRequest?: SetVacationDaysRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MemberVacationDaysResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug, memberId, setVacationDaysRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['OrganizationsApi.apiV1OrganizationsSlugMembersMemberIdVacationDaysPut']?.[localVarOperationServerIndex]?.url;
@@ -5555,7 +5641,7 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1OrganizationsSlugSettingsPut(slug: string, updateOrganizationSettingsRequest?: UpdateOrganizationSettingsRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+        async apiV1OrganizationsSlugSettingsPut(slug: string, updateOrganizationSettingsRequest?: UpdateOrganizationSettingsRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OrganizationSettingsResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugSettingsPut(slug, updateOrganizationSettingsRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['OrganizationsApi.apiV1OrganizationsSlugSettingsPut']?.[localVarOperationServerIndex]?.url;
@@ -5670,7 +5756,7 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugMembersMemberIdInitialOvertimePut(slug: string, memberId: number, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+        apiV1OrganizationsSlugMembersMemberIdInitialOvertimePut(slug: string, memberId: number, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options?: RawAxiosRequestConfig): AxiosPromise<MemberInitialOvertimeResponse> {
             return localVarFp.apiV1OrganizationsSlugMembersMemberIdInitialOvertimePut(slug, memberId, setInitialOvertimeRequest, options).then((request) => request(axios, basePath));
         },
         /**
@@ -5694,7 +5780,7 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug: string, memberId: number, setVacationDaysRequest?: SetVacationDaysRequest, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+        apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug: string, memberId: number, setVacationDaysRequest?: SetVacationDaysRequest, options?: RawAxiosRequestConfig): AxiosPromise<MemberVacationDaysResponse> {
             return localVarFp.apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug, memberId, setVacationDaysRequest, options).then((request) => request(axios, basePath));
         },
         /**
@@ -5727,7 +5813,7 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugSettingsPut(slug: string, updateOrganizationSettingsRequest?: UpdateOrganizationSettingsRequest, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+        apiV1OrganizationsSlugSettingsPut(slug: string, updateOrganizationSettingsRequest?: UpdateOrganizationSettingsRequest, options?: RawAxiosRequestConfig): AxiosPromise<OrganizationSettingsResponse> {
             return localVarFp.apiV1OrganizationsSlugSettingsPut(slug, updateOrganizationSettingsRequest, options).then((request) => request(axios, basePath));
         },
         /**
@@ -6894,7 +6980,7 @@ export const RequestsApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1OrganizationsUserNotificationsMarkSeenPost(requestBody?: Array<number>, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+        async apiV1OrganizationsUserNotificationsMarkSeenPost(requestBody?: Array<number>, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MarkedSeenResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsUserNotificationsMarkSeenPost(requestBody, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['RequestsApi.apiV1OrganizationsUserNotificationsMarkSeenPost']?.[localVarOperationServerIndex]?.url;
@@ -6983,7 +7069,7 @@ export const RequestsApiFactory = function (configuration?: Configuration, baseP
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsUserNotificationsMarkSeenPost(requestBody?: Array<number>, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+        apiV1OrganizationsUserNotificationsMarkSeenPost(requestBody?: Array<number>, options?: RawAxiosRequestConfig): AxiosPromise<MarkedSeenResponse> {
             return localVarFp.apiV1OrganizationsUserNotificationsMarkSeenPost(requestBody, options).then((request) => request(axios, basePath));
         },
     };
@@ -8172,7 +8258,7 @@ export const WorkScheduleApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1OrganizationsSlugInitialOvertimePut(slug: string, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+        async apiV1OrganizationsSlugInitialOvertimePut(slug: string, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MemberInitialOvertimeResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugInitialOvertimePut(slug, setInitialOvertimeRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['WorkScheduleApi.apiV1OrganizationsSlugInitialOvertimePut']?.[localVarOperationServerIndex]?.url;
@@ -8338,7 +8424,7 @@ export const WorkScheduleApiFactory = function (configuration?: Configuration, b
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugInitialOvertimePut(slug: string, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+        apiV1OrganizationsSlugInitialOvertimePut(slug: string, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options?: RawAxiosRequestConfig): AxiosPromise<MemberInitialOvertimeResponse> {
             return localVarFp.apiV1OrganizationsSlugInitialOvertimePut(slug, setInitialOvertimeRequest, options).then((request) => request(axios, basePath));
         },
         /**
