@@ -133,7 +133,7 @@ public class OrganizationsController : OrganizationBaseController
     /// <param name="slug">Organization URL slug.</param>
     [HttpPut("{slug}/settings")]
     [RequireOrgRole(OrganizationRole.Admin)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(OrganizationSettingsResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateSettings(string slug, [FromBody] UpdateOrganizationSettingsRequest request)
     {
         var userId = GetCurrentUserId();
@@ -181,7 +181,7 @@ public class OrganizationsController : OrganizationBaseController
     /// <param name="memberId">Member ID to update.</param>
     [HttpPut("{slug}/members/{memberId}/initial-overtime")]
     [RequireOrgRole(OrganizationRole.Admin)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MemberInitialOvertimeResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> SetMemberInitialOvertime(
         string slug, int memberId, [FromBody] SetInitialOvertimeRequest request)
     {
@@ -195,7 +195,7 @@ public class OrganizationsController : OrganizationBaseController
     /// <param name="memberId">Member ID to update.</param>
     [HttpPut("{slug}/members/{memberId}/vacation-days")]
     [RequireOrgRole(OrganizationRole.Admin)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MemberVacationDaysResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> SetMemberVacationDays(
         string slug, int memberId, [FromBody] SetVacationDaysRequest request)
     {

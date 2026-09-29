@@ -99,7 +99,7 @@ public class WorkScheduleController : OrganizationBaseController
     /// <param name="slug">Organization URL slug.</param>
     [HttpPut("{slug}/initial-overtime")]
     [RequireOrgRole]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MemberInitialOvertimeResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateMyInitialOvertime(
         string slug, [FromBody] SetInitialOvertimeRequest request)
     {

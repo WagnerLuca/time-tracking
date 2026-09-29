@@ -109,7 +109,7 @@ public class RequestsController : OrganizationBaseController
     /// <summary>Mark request notifications as seen.</summary>
     /// <param name="requestIds">Optional list of specific request IDs to mark. If null, marks all.</param>
     [HttpPost("user-notifications/mark-seen")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MarkedSeenResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> MarkNotificationsSeen([FromBody] List<int>? requestIds = null)
     {
         var userId = GetCurrentUserId();

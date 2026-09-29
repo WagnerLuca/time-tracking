@@ -13,7 +13,7 @@ public interface IWorkScheduleService
     Task<ServiceResult<WorkScheduleResponse>> CreateMyWorkScheduleAsync(string slug, int userId, CreateWorkScheduleRequest request);
     Task<ServiceResult<WorkScheduleResponse>> UpdateMyWorkScheduleAsync(string slug, int userId, int scheduleId, UpdateWorkScheduleRequest request);
     Task<ServiceResult> DeleteMyWorkScheduleAsync(string slug, int userId, int scheduleId);
-    Task<ServiceResult<object>> UpdateMyInitialOvertimeAsync(string slug, int userId, SetInitialOvertimeRequest request);
+    Task<ServiceResult<MemberInitialOvertimeResponse>> UpdateMyInitialOvertimeAsync(string slug, int userId, SetInitialOvertimeRequest request);
 
     // ── Admin-managed ──
     Task<ServiceResult<WorkScheduleResponse>> GetMemberWorkScheduleAsync(string slug, int callerUserId, int memberId);

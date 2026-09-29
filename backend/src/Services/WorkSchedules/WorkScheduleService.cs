@@ -129,27 +129,27 @@ public class WorkScheduleService : IWorkScheduleService
         return ServiceResult.Ok();
     }
 
-    public async Task<ServiceResult<object>> UpdateMyInitialOvertimeAsync(
+    public async Task<ServiceResult<MemberInitialOvertimeResponse>> UpdateMyInitialOvertimeAsync(
         string slug, int userId, SetInitialOvertimeRequest request)
     {
         var org = await GetOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound<object>("Organization not found");
+            return ServiceResult.NotFound<MemberInitialOvertimeResponse>("Organization not found");
 
         var membership = await GetMembershipAsync(userId, org.Id);
         if (membership == null)
-            return ServiceResult.NotFound<object>("You are not a member of this organization.");
+            return ServiceResult.NotFound<MemberInitialOvertimeResponse>("You are not a member of this organization.");
 
         if (org.InitialOvertimeMode == RuleMode.Disabled)
-            return ServiceResult.BadRequest<object>("Initial overtime is disabled for this organization.");
+            return ServiceResult.BadRequest<MemberInitialOvertimeResponse>("Initial overtime is disabled for this organization.");
         if (org.InitialOvertimeMode == RuleMode.RequiresApproval)
-            return ServiceResult.BadRequest<object>("Initial overtime requires admin approval. Please submit a request.");
+            return ServiceResult.BadRequest<MemberInitialOvertimeResponse>("Initial overtime requires admin approval. Please submit a request.");
 
         membership.InitialOvertimeHours = request.InitialOvertimeHours;
         await _context.SaveChangesAsync();
         _logger.LogInformation("Self initial overtime set to {Hours}h by user {UserId} in org {OrgSlug}", request.InitialOvertimeHours, userId, slug);
 
-        return ServiceResult.Ok<object>(new { initialOvertimeHours = membership.InitialOvertimeHours });
+        return ServiceResult.Ok(new MemberInitialOvertimeResponse { UserId = userId, InitialOvertimeHours = membership.InitialOvertimeHours });
     }
 
     // ────────────────────────────────────────────────────

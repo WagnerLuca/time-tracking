@@ -555,16 +555,16 @@ public class OrganizationService : IOrganizationService
     //  Settings
     // ────────────────────────────────────────────────────
 
-    public async Task<ServiceResult<object>> UpdateSettingsAsync(
+    public async Task<ServiceResult<OrganizationSettingsResponse>> UpdateSettingsAsync(
         string slug, int callerUserId, UpdateOrganizationSettingsRequest request)
     {
         var org = await GetOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound<object>("Organization not found");
+            return ServiceResult.NotFound<OrganizationSettingsResponse>("Organization not found");
 
         var callerRole = await GetRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
-            return ServiceResult.Forbidden<object>();
+            return ServiceResult.Forbidden<OrganizationSettingsResponse>();
 
         if (request.AutoPauseEnabled.HasValue)   org.AutoPauseEnabled = request.AutoPauseEnabled.Value;
         if (request.EditPastEntriesMode.HasValue) org.EditPastEntriesMode = request.EditPastEntriesMode.Value;
@@ -607,16 +607,16 @@ public class OrganizationService : IOrganizationService
             await _context.SaveChangesAsync();
         }
 
-        return ServiceResult.Ok<object>(new
+        return ServiceResult.Ok(new OrganizationSettingsResponse
         {
-            org.AutoPauseEnabled,
+            AutoPauseEnabled = org.AutoPauseEnabled,
             EditPastEntriesMode = org.EditPastEntriesMode.ToString(),
             EditPauseMode = org.EditPauseMode.ToString(),
             InitialOvertimeMode = org.InitialOvertimeMode.ToString(),
             JoinPolicy = org.JoinPolicy.ToString(),
             WorkScheduleChangeMode = org.WorkScheduleChangeMode.ToString(),
-            org.MemberTimeEntryVisibility,
-            org.Require2fa,
+            MemberTimeEntryVisibility = org.MemberTimeEntryVisibility,
+            Require2fa = org.Require2fa,
             CsvImportMode = org.CsvImportMode.ToString(),
             AbsenceSelfServiceMode = org.AbsenceSelfServiceMode.ToString()
         });
@@ -722,16 +722,16 @@ public class OrganizationService : IOrganizationService
         return ServiceResult.Ok(result);
     }
 
-    public async Task<ServiceResult<PaginatedResponse<object>>> GetMemberEntriesAsync(
+    public async Task<ServiceResult<PaginatedResponse<TimeEntryResponse>>> GetMemberEntriesAsync(
         string slug, int callerUserId, int userId, DateTime? from, DateTime? to, int limit, int offset)
     {
         var org = await GetOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound<PaginatedResponse<object>>("Organization not found");
+            return ServiceResult.NotFound<PaginatedResponse<TimeEntryResponse>>("Organization not found");
 
         var callerRole = await GetRoleAsync(callerUserId, org.Id);
         if (callerRole == null)
-            return ServiceResult.Forbidden<PaginatedResponse<object>>();
+            return ServiceResult.Forbidden<PaginatedResponse<TimeEntryResponse>>();
 
         var isOrgAdmin = callerRole >= OrganizationRole.Admin;
 
@@ -746,14 +746,14 @@ public class OrganizationService : IOrganizationService
             // Check regular group member with group-level TimeEntryVisibility = AllMembers
             var groupMemberIds = await GetGroupMemberTimeEntryVisibleUserIdsAsync(callerUserId, org.Id);
             if (!groupAdminMemberIds.Contains(userId) && !groupMemberIds.Contains(userId))
-                return ServiceResult.Forbidden<PaginatedResponse<object>>();
+                return ServiceResult.Forbidden<PaginatedResponse<TimeEntryResponse>>();
         }
 
         var memberExists = await _context.UserOrganizations
             .AsNoTracking()
             .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
         if (!memberExists)
-            return ServiceResult.NotFound<PaginatedResponse<object>>("Member not found in this organization.");
+            return ServiceResult.NotFound<PaginatedResponse<TimeEntryResponse>>("Member not found in this organization.");
 
         (limit, offset) = PaginationDefaults.Normalize(limit, offset);
 
@@ -775,27 +775,27 @@ public class OrganizationService : IOrganizationService
             .OrderByDescending(te => te.StartTime)
             .Skip(offset)
             .Take(limit)
-            .Select(te => (object)new
+            .Select(te => new TimeEntryResponse
             {
-                te.Id,
-                te.UserId,
-                te.OrganizationId,
-                te.Description,
-                te.StartTime,
-                te.EndTime,
-                te.IsRunning,
+                Id = te.Id,
+                UserId = te.UserId,
+                OrganizationId = te.OrganizationId,
+                Description = te.Description,
+                StartTime = te.StartTime,
+                EndTime = te.EndTime,
+                IsRunning = te.IsRunning,
                 DurationMinutes = te.EndTime.HasValue
                     ? Math.Round((te.EndTime.Value - te.StartTime).TotalMinutes, 1)
                     : (double?)null,
-                te.PauseDurationMinutes,
+                PauseDurationMinutes = te.PauseDurationMinutes,
                 NetDurationMinutes = te.EndTime.HasValue
                     ? Math.Round((te.EndTime.Value - te.StartTime).TotalMinutes - te.PauseDurationMinutes, 1)
                     : (double?)null,
-                te.CreatedAt
+                CreatedAt = te.CreatedAt
             })
             .ToListAsync();
 
-        return ServiceResult.Ok(new PaginatedResponse<object>
+        return ServiceResult.Ok(new PaginatedResponse<TimeEntryResponse>
         {
             Items = entries,
             TotalCount = totalCount,
@@ -808,47 +808,47 @@ public class OrganizationService : IOrganizationService
     //  Initial overtime (admin)
     // ────────────────────────────────────────────────────
 
-    public async Task<ServiceResult<object>> SetMemberInitialOvertimeAsync(
+    public async Task<ServiceResult<MemberInitialOvertimeResponse>> SetMemberInitialOvertimeAsync(
         string slug, int callerUserId, int userId, SetInitialOvertimeRequest request)
     {
         var org = await GetOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound<object>("Organization not found");
+            return ServiceResult.NotFound<MemberInitialOvertimeResponse>("Organization not found");
 
         var callerRole = await GetRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
-            return ServiceResult.Forbidden<object>();
+            return ServiceResult.Forbidden<MemberInitialOvertimeResponse>();
 
         var membership = await _context.UserOrganizations
             .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
 
         if (membership == null)
-            return ServiceResult.NotFound<object>("Member not found in this organization.");
+            return ServiceResult.NotFound<MemberInitialOvertimeResponse>("Member not found in this organization.");
 
         membership.InitialOvertimeHours = request.InitialOvertimeHours;
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Initial overtime set to {Hours}h for user {UserId} in org {OrgId} by user {CallerId}", request.InitialOvertimeHours, userId, org.Id, callerUserId);
 
-        return ServiceResult.Ok<object>(new { userId, InitialOvertimeHours = membership.InitialOvertimeHours });
+        return ServiceResult.Ok(new MemberInitialOvertimeResponse { UserId = userId, InitialOvertimeHours = membership.InitialOvertimeHours });
     }
 
-    public async Task<ServiceResult<object>> SetMemberVacationDaysAsync(
+    public async Task<ServiceResult<MemberVacationDaysResponse>> SetMemberVacationDaysAsync(
         string slug, int callerUserId, int userId, SetVacationDaysRequest request)
     {
         var org = await GetOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound<object>("Organization not found");
+            return ServiceResult.NotFound<MemberVacationDaysResponse>("Organization not found");
 
         var callerRole = await GetRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
-            return ServiceResult.Forbidden<object>();
+            return ServiceResult.Forbidden<MemberVacationDaysResponse>();
 
         var membership = await _context.UserOrganizations
             .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
 
         if (membership == null)
-            return ServiceResult.NotFound<object>("Member not found in this organization.");
+            return ServiceResult.NotFound<MemberVacationDaysResponse>("Member not found in this organization.");
 
         membership.VacationDaysPerYear = request.Days;
         await _context.SaveChangesAsync();
@@ -856,7 +856,7 @@ public class OrganizationService : IOrganizationService
         _logger.LogInformation("Vacation days set to {Days} for user {UserId} in org {OrgId} by user {CallerId}",
             request.Days, userId, org.Id, callerUserId);
 
-        return ServiceResult.Ok<object>(new { userId, VacationDaysPerYear = membership.VacationDaysPerYear });
+        return ServiceResult.Ok(new MemberVacationDaysResponse { UserId = userId, VacationDaysPerYear = membership.VacationDaysPerYear });
     }
 
     // ────────────────────────────────────────────────────

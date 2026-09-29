@@ -21,15 +21,15 @@ public interface IOrganizationService
     Task<ServiceResult> RemoveMemberAsync(string slug, int callerUserId, int userId);
 
     // ── Settings ──
-    Task<ServiceResult<object>> UpdateSettingsAsync(string slug, int callerUserId, UpdateOrganizationSettingsRequest request);
+    Task<ServiceResult<OrganizationSettingsResponse>> UpdateSettingsAsync(string slug, int callerUserId, UpdateOrganizationSettingsRequest request);
 
     // ── Time overview (admin) ──
     Task<ServiceResult<List<MemberTimeOverviewResponse>>> GetTimeOverviewAsync(string slug, int callerUserId, DateTime? from, DateTime? to);
-    Task<ServiceResult<PaginatedResponse<object>>> GetMemberEntriesAsync(string slug, int callerUserId, int userId, DateTime? from, DateTime? to, int limit, int offset);
+    Task<ServiceResult<PaginatedResponse<TimeEntryResponse>>> GetMemberEntriesAsync(string slug, int callerUserId, int userId, DateTime? from, DateTime? to, int limit, int offset);
 
     // ── Initial overtime (admin) ──
-    Task<ServiceResult<object>> SetMemberInitialOvertimeAsync(string slug, int callerUserId, int userId, SetInitialOvertimeRequest request);
+    Task<ServiceResult<MemberInitialOvertimeResponse>> SetMemberInitialOvertimeAsync(string slug, int callerUserId, int userId, SetInitialOvertimeRequest request);
 
     // ── Vacation days (admin) ──
-    Task<ServiceResult<object>> SetMemberVacationDaysAsync(string slug, int callerUserId, int userId, SetVacationDaysRequest request);
+    Task<ServiceResult<MemberVacationDaysResponse>> SetMemberVacationDaysAsync(string slug, int callerUserId, int userId, SetVacationDaysRequest request);
 }

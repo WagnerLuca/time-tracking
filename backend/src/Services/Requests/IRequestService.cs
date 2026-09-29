@@ -14,5 +14,5 @@ public interface IRequestService
     Task<ServiceResult<PaginatedResponse<OrgRequestResponse>>> GetMyRequestsAsync(int userId, RequestType? type, int limit, int offset);
     Task<ServiceResult<AdminNotificationResponse>> GetAdminNotificationsAsync(int userId);
     Task<ServiceResult<UserNotificationResponse>> GetUserNotificationsAsync(int userId);
-    Task<ServiceResult<object>> MarkNotificationsSeenAsync(int userId, List<int>? requestIds);
+    Task<ServiceResult<MarkedSeenResponse>> MarkNotificationsSeenAsync(int userId, List<int>? requestIds);
 }

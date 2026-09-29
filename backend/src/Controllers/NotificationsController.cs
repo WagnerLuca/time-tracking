@@ -31,7 +31,7 @@ public class NotificationsController : OrganizationBaseController
     /// <param name="limit">Max items per page (default 50, max 200).</param>
     /// <param name="offset">Number of items to skip.</param>
     [HttpGet]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PaginatedResponse<NotificationResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetNotifications(
         [FromQuery] bool unreadOnly = false,
         [FromQuery] int limit = 50, [FromQuery] int offset = 0)
@@ -43,7 +43,7 @@ public class NotificationsController : OrganizationBaseController
 
     /// <summary>Get the number of unread notifications.</summary>
     [HttpGet("unread-count")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(UnreadCountResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetUnreadCount()
     {
         var userId = GetCurrentUserId();

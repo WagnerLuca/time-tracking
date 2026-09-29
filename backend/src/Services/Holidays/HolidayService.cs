@@ -173,14 +173,14 @@ public class HolidayService : IHolidayService
         return ServiceResult.Ok(added);
     }
 
-    public List<object> GetAvailablePresets()
+    public List<HolidayPresetResponse> GetAvailablePresets()
     {
-        return new List<object>
-        {
-            new { Key = "de", Name = "Germany" },
-            new { Key = "at", Name = "Austria" },
-            new { Key = "ch", Name = "Switzerland" }
-        };
+        return
+        [
+            new() { Key = "de", Name = "Germany" },
+            new() { Key = "at", Name = "Austria" },
+            new() { Key = "ch", Name = "Switzerland" }
+        ];
     }
 
     // ────────────────────────────────────────────────────

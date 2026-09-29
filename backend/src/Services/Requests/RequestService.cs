@@ -359,7 +359,7 @@ public class RequestService : IRequestService
         });
     }
 
-    public async Task<ServiceResult<object>> MarkNotificationsSeenAsync(int userId, List<int>? requestIds)
+    public async Task<ServiceResult<MarkedSeenResponse>> MarkNotificationsSeenAsync(int userId, List<int>? requestIds)
     {
         var query = _context.OrgRequests
             .Where(r => r.UserId == userId
@@ -374,7 +374,7 @@ public class RequestService : IRequestService
             req.UserNotifiedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
-        return ServiceResult.Ok<object>(new { marked = requests.Count });
+        return ServiceResult.Ok(new MarkedSeenResponse { Marked = requests.Count });
     }
 
     // ────────────────────────────────────────────────────

@@ -165,84 +165,6 @@ public record UpdateOrganizationSettingsRequest
     public double? DefaultVacationDays { get; init; }
 }
 
-/// <summary>Automatic pause rule (deduct X minutes after Y hours worked).</summary>
-public record PauseRuleResponse
-{
-    public int Id { get; init; }
-    public int OrganizationId { get; init; }
-    public double MinHours { get; init; }
-    public int PauseMinutes { get; init; }
-}
-
-/// <summary>Request payload for creating a pause rule.</summary>
-public record CreatePauseRuleRequest
-{
-    /// <summary>Minimum hours worked before this rule triggers.</summary>
-    [Range(0.01, 24.0)]
-    public double MinHours { get; init; }
-
-    /// <summary>Pause minutes to deduct.</summary>
-    [Range(1, 480)]
-    public int PauseMinutes { get; init; }
-}
-
-/// <summary>Request payload for updating a pause rule.</summary>
-public record UpdatePauseRuleRequest
-{
-    [Range(0.01, 24.0)]
-    public double MinHours { get; init; }
-
-    [Range(1, 480)]
-    public int PauseMinutes { get; init; }
-}
-
-/// <summary>Work schedule defining target hours per weekday.</summary>
-public record WorkScheduleResponse
-{
-    public int Id { get; init; }
-    public int UserId { get; init; }
-    public int OrganizationId { get; init; }
-    public DateOnly ValidFrom { get; init; }
-    public DateOnly? ValidTo { get; init; }
-    public double? WeeklyWorkHours { get; init; }
-    public double TargetMon { get; init; }
-    public double TargetTue { get; init; }
-    public double TargetWed { get; init; }
-    public double TargetThu { get; init; }
-    public double TargetFri { get; init; }
-    public double InitialOvertimeHours { get; init; }
-    public required string InitialOvertimeMode { get; init; }
-    public required string WorkScheduleChangeMode { get; init; }
-}
-
-/// <summary>Request payload for creating a work schedule.</summary>
-public record CreateWorkScheduleRequest
-{
-    public DateOnly ValidFrom { get; init; }
-    public DateOnly? ValidTo { get; init; }
-    public double? WeeklyWorkHours { get; init; }
-    public bool DistributeEvenly { get; init; } = true;
-    public double? TargetMon { get; init; }
-    public double? TargetTue { get; init; }
-    public double? TargetWed { get; init; }
-    public double? TargetThu { get; init; }
-    public double? TargetFri { get; init; }
-}
-
-/// <summary>Request payload for updating a work schedule.</summary>
-public record UpdateWorkScheduleRequest
-{
-    public DateOnly? ValidFrom { get; init; }
-    public DateOnly? ValidTo { get; init; }
-    public double? WeeklyWorkHours { get; init; }
-    public bool DistributeEvenly { get; init; } = true;
-    public double? TargetMon { get; init; }
-    public double? TargetTue { get; init; }
-    public double? TargetWed { get; init; }
-    public double? TargetThu { get; init; }
-    public double? TargetFri { get; init; }
-}
-
 /// <summary>Per-member time tracking statistics for the admin overview.</summary>
 public record MemberTimeOverviewResponse
 {
@@ -270,120 +192,31 @@ public record SetVacationDaysRequest
     public double Days { get; init; }
 }
 
-/// <summary>Organization holiday entry.</summary>
-public record HolidayResponse
+/// <summary>Organization settings after an update (rule modes as their string names).</summary>
+public record OrganizationSettingsResponse
 {
-    public int Id { get; init; }
-    public int OrganizationId { get; init; }
-    public DateOnly Date { get; init; }
-    public required string Name { get; init; }
-    public bool IsRecurring { get; init; }
-    public bool IsHalfDay { get; init; }
+    public bool AutoPauseEnabled { get; init; }
+    public required string EditPastEntriesMode { get; init; }
+    public required string EditPauseMode { get; init; }
+    public required string InitialOvertimeMode { get; init; }
+    public required string JoinPolicy { get; init; }
+    public required string WorkScheduleChangeMode { get; init; }
+    public bool MemberTimeEntryVisibility { get; init; }
+    public bool Require2fa { get; init; }
+    public required string CsvImportMode { get; init; }
+    public required string AbsenceSelfServiceMode { get; init; }
 }
 
-/// <summary>Request payload for creating a holiday.</summary>
-public record CreateHolidayRequest
-{
-    public DateOnly Date { get; init; }
-
-    [Required, MaxLength(200)]
-    public required string Name { get; init; }
-
-    public bool IsRecurring { get; init; }
-    public bool IsHalfDay { get; init; }
-}
-
-/// <summary>Request payload for updating a holiday.</summary>
-public record UpdateHolidayRequest
-{
-    public DateOnly? Date { get; init; }
-
-    [MaxLength(200)]
-    public string? Name { get; init; }
-
-    public bool? IsRecurring { get; init; }
-    public bool? IsHalfDay { get; init; }
-}
-
-/// <summary>Absence day entry (sick day, vacation, etc.).</summary>
-public record AbsenceDayResponse
-{
-    public int Id { get; init; }
-    public int UserId { get; init; }
-    public int OrganizationId { get; init; }
-    public DateOnly Date { get; init; }
-    public required string Type { get; init; }
-    public bool IsHalfDay { get; init; }
-    public string? Note { get; init; }
-    public string? UserFirstName { get; init; }
-    public string? UserLastName { get; init; }
-
-    // Custom org-defined absence type (when Type == Other and CustomTypeId set)
-    public int? CustomTypeId { get; init; }
-    public string? CustomTypeName { get; init; }
-    public string? CustomTypeColor { get; init; }
-    public string? CreditMode { get; init; }
-
-    // Audit trail
-    public DateTime CreatedAt { get; init; }
-    public int? CreatedByUserId { get; init; }
-    public string? CreatedByName { get; init; }
-    public int? CreatedViaRequestId { get; init; }
-}
-
-/// <summary>Request payload for creating a personal absence day.</summary>
-public record CreateAbsenceDayRequest
-{
-    public DateOnly Date { get; init; }
-    public AbsenceType Type { get; init; } = AbsenceType.SickDay;
-    public bool IsHalfDay { get; init; }
-
-    /// <summary>Optional org-defined custom absence type.</summary>
-    public int? CustomTypeId { get; init; }
-
-    [MaxLength(500)]
-    public string? Note { get; init; }
-}
-
-/// <summary>Request payload for an admin to create an absence day for any member.</summary>
-public record AdminCreateAbsenceDayRequest
+/// <summary>A member's initial overtime after it was set.</summary>
+public record MemberInitialOvertimeResponse
 {
     public int UserId { get; init; }
-    public DateOnly Date { get; init; }
-    public AbsenceType Type { get; init; } = AbsenceType.SickDay;
-    public bool IsHalfDay { get; init; }
-
-    /// <summary>Optional org-defined custom absence type.</summary>
-    public int? CustomTypeId { get; init; }
-
-    [MaxLength(500)]
-    public string? Note { get; init; }
+    public double InitialOvertimeHours { get; init; }
 }
 
-/// <summary>Org-defined custom absence type (e.g. "Business Trip").</summary>
-public record AbsenceTypeDefinitionResponse
+/// <summary>A member's vacation day allowance after it was set.</summary>
+public record MemberVacationDaysResponse
 {
-    public int Id { get; init; }
-    public int OrganizationId { get; init; }
-    public required string Name { get; init; }
-    public string? Color { get; init; }
-    public required string CreditMode { get; init; }
-    public bool CountsAsVacation { get; init; }
-    public bool IsActive { get; init; }
-    public DateTime CreatedAt { get; init; }
+    public int UserId { get; init; }
+    public double VacationDaysPerYear { get; init; }
 }
-
-/// <summary>Request payload for creating/updating a custom absence type.</summary>
-public record UpsertAbsenceTypeDefinitionRequest
-{
-    [Required, MaxLength(100)]
-    public required string Name { get; init; }
-
-    [MaxLength(20)]
-    public string? Color { get; init; }
-
-    public AbsenceCreditMode CreditMode { get; init; } = AbsenceCreditMode.FillToTarget;
-    public bool CountsAsVacation { get; init; }
-}
-
-

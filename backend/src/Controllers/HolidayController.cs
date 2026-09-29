@@ -95,7 +95,7 @@ public class HolidayController : OrganizationBaseController
 
     /// <summary>List available holiday preset codes.</summary>
     [HttpGet("holiday-presets")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(List<HolidayPresetResponse>), StatusCodes.Status200OK)]
     public IActionResult GetAvailablePresets()
     {
         return Ok(_service.GetAvailablePresets());

@@ -7,8 +7,8 @@ namespace TimeTracking.Api.Services;
 /// </summary>
 public interface INotificationService
 {
-    Task<ServiceResult<PaginatedResponse<object>>> GetNotificationsAsync(int userId, bool unreadOnly, int limit, int offset);
-    Task<ServiceResult<object>> GetUnreadCountAsync(int userId);
+    Task<ServiceResult<PaginatedResponse<NotificationResponse>>> GetNotificationsAsync(int userId, bool unreadOnly, int limit, int offset);
+    Task<ServiceResult<UnreadCountResponse>> GetUnreadCountAsync(int userId);
     Task<ServiceResult> MarkAsReadAsync(int userId, int notificationId);
     Task<ServiceResult> MarkAllAsReadAsync(int userId);
 }
