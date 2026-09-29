@@ -24,6 +24,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<Group> Groups { get; set; }
     public DbSet<GroupMember> GroupMembers { get; set; }
+    public DbSet<ApiKey> ApiKeys { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -84,6 +85,10 @@ public class TimeTrackingDbContext : DbContext
             
             // Create unique index on UserId and OrganizationId combination
             entity.HasIndex(e => new { e.UserId, e.OrganizationId }).IsUnique();
+
+            // A badge identifies one member per organization (NULLs are not unique-checked)
+            entity.Property(e => e.BadgeId).HasMaxLength(100);
+            entity.HasIndex(e => new { e.OrganizationId, e.BadgeId }).IsUnique();
 
             // Global query filter: automatically exclude soft-deleted memberships
             entity.HasQueryFilter(e => e.IsActive);
@@ -402,6 +407,23 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure ApiKey entity (organization terminal keys)
+        modelBuilder.Entity<ApiKey>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.KeyPrefix).IsRequired().HasMaxLength(16);
+            entity.Property(e => e.KeyHash).IsRequired().HasMaxLength(64);
+            entity.HasIndex(e => e.KeyHash).IsUnique();
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasQueryFilter(e => e.Organization.IsActive);
         });
     }
 }

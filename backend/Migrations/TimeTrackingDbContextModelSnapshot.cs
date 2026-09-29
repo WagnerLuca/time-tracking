@@ -119,6 +119,51 @@ namespace TimeTracking.Api.Migrations
                     b.ToTable("AbsenceTypeDefinitions");
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.ApiKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("KeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("KeyPrefix")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("KeyHash")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId");
+
+                    b.ToTable("ApiKeys");
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.Group", b =>
                 {
                     b.Property<int>("Id")
@@ -691,6 +736,10 @@ namespace TimeTracking.Api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("BadgeId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<double>("InitialOvertimeHours")
                         .HasColumnType("double precision");
 
@@ -718,7 +767,8 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrganizationId");
+                    b.HasIndex("OrganizationId", "BadgeId")
+                        .IsUnique();
 
                     b.HasIndex("UserId", "OrganizationId")
                         .IsUnique();
@@ -806,6 +856,17 @@ namespace TimeTracking.Api.Migrations
                 });
 
             modelBuilder.Entity("TimeTracking.Api.Models.AbsenceTypeDefinition", b =>
+                {
+                    b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("TimeTracking.Api.Models.ApiKey", b =>
                 {
                     b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
                         .WithMany()

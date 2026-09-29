@@ -26,6 +26,8 @@ public class UserOrganization
     
     // Number of vacation days this member is entitled to per year
     public double VacationDaysPerYear { get; set; }
+    /// <summary>RFID/badge identifier used by terminals to punch this member in/out (unique per organization).</summary>
+    public string? BadgeId { get; set; }
     
     // Navigation properties
     [JsonIgnore]

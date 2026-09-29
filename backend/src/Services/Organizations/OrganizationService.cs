@@ -97,7 +97,8 @@ public class OrganizationService : IOrganizationService
                         Role = uo.Role.ToString(),
                         JoinedAt = uo.JoinedAt,
                         InitialOvertimeHours = uo.InitialOvertimeHours,
-                        VacationDaysPerYear = uo.VacationDaysPerYear
+                        VacationDaysPerYear = uo.VacationDaysPerYear,
+                        BadgeId = uo.BadgeId
                     })
                     .ToList(),
                 PauseRules = o.PauseRules
@@ -180,6 +181,7 @@ public class OrganizationService : IOrganizationService
 
         // Determine whose vacation balance the caller may see (self, admins, effective VacationVisibility)
         var vacationVisibleIds = await GetVacationVisibleUserIdsAsync(callerUserId!.Value, organization.Id);
+        var callerIsAdmin = await GetRoleAsync(callerUserId.Value, organization.Id) >= OrganizationRole.Admin;
 
         var membersWithVacation = organization.Members.Select(m =>
         {
@@ -196,6 +198,7 @@ public class OrganizationService : IOrganizationService
                 VacationDaysTaken = visible ? taken : 0,
                 VacationDaysPlanned = visible ? planned : 0,
                 VacationDaysRemaining = visible ? Math.Max(0, m.VacationDaysPerYear - used) : 0,
+                BadgeId = callerIsAdmin ? m.BadgeId : null,
                 Groups = groupsByUser.GetValueOrDefault(m.Id) ?? new List<MemberGroupResponse>()
             };
         }).ToList();

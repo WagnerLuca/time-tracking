@@ -12,6 +12,7 @@
 		ruleModeOptions, joinPolicyOptions, visibilityModeOptions, withInherit
 	} from '$lib/utils/orgRules';
 	import ModeSelector from '$lib/components/ModeSelector.svelte';
+	import ApiKeysPanel from '$lib/components/ApiKeysPanel.svelte';
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationSettingsRequest,
@@ -773,6 +774,8 @@
 					</div>
 				{/if}
 			</section>
+
+			<ApiKeysPanel {orgSlug} />
 
 <!-- Request History -->
 			<section class="mt-8">

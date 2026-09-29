@@ -78,6 +78,8 @@ public record OrganizationMemberResponse
     /// per the effective VacationVisibility). When false, the vacation figures are zeroed.
     /// </summary>
     public bool VacationVisible { get; init; }
+    /// <summary>Terminal badge ID; only filled in for org admins.</summary>
+    public string? BadgeId { get; init; }
 }
 
 /// <summary>Lightweight org view from the user's perspective.</summary>

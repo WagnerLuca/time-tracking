@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
-	import { organizationsApi, workScheduleApi, absenceDayApi, groupApi, reportsApi } from '$lib/apiClient';
+	import { organizationsApi, workScheduleApi, absenceDayApi, groupApi, reportsApi, apiKeysApi } from '$lib/apiClient';
 	import { formatHoursDecimal, formatDateFull, absenceTypeLabel, absenceTypeBadge, getInitials } from '$lib/utils/formatters';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import MemberCalendar from '$lib/components/MemberCalendar.svelte';
@@ -85,6 +85,9 @@
 
 	// Vacation days
 	let editingVacation = $state(false);
+	let editingBadge = $state(false);
+	let badgeId = $state('');
+	let badgeSaving = $state(false);
 	let vacationDays = $state(0);
 	let vacationSaving = $state(false);
 
@@ -406,6 +409,19 @@
 			actionError = extractErrorMessage(e, 'Failed to update vacation days.');
 		}
 		vacationSaving = false;
+	}
+
+	// ── Terminal Badge ──
+	async function saveBadge() {
+		badgeSaving = true;
+		try {
+			await apiKeysApi.apiV1OrganizationsSlugMembersMemberIdBadgePut(orgSlug, memberId, { badgeId: badgeId.trim() || null });
+			editingBadge = false;
+			loadAll();
+		} catch (e) {
+			actionError = extractErrorMessage(e, 'Failed to update badge.');
+		}
+		badgeSaving = false;
 	}
 
 	// ── Member Management ──
@@ -893,6 +909,28 @@
 				{/if}
 			{/if}
 		</section>
+
+		<!-- ═══ Terminal Badge ═══ -->
+		{#if canEdit}
+			<section class="card bg-base-100 border border-base-300 p-5 mb-5">
+				<div class="flex items-center justify-between mb-2">
+					<h2 class="text-base font-bold text-base-content m-0">Terminal Badge</h2>
+					{#if !editingBadge}
+						<button class="btn btn-ghost btn-sm" onclick={() => { badgeId = member?.badgeId ?? ''; editingBadge = true; }}>Edit</button>
+					{/if}
+				</div>
+				{#if editingBadge}
+					<div class="flex items-center gap-2 flex-wrap">
+						<input bind:value={badgeId} maxlength="100" placeholder="RFID tag / badge ID" class="input input-bordered input-sm font-mono" />
+						<button class="btn btn-primary btn-sm" onclick={saveBadge} disabled={badgeSaving}>{badgeSaving ? 'Saving...' : 'Save'}</button>
+						<button class="btn btn-ghost btn-sm" onclick={() => editingBadge = false}>Cancel</button>
+					</div>
+				{:else}
+					<p class="text-base-content font-mono">{member?.badgeId ?? '—'}</p>
+				{/if}
+				<p class="text-base-content/40 mt-2" style="font-size: 0.75rem;">Scanning this badge at a terminal starts or stops this member's timer. Terminal keys are managed in the organization settings.</p>
+			</section>
+		{/if}
 
 		<!-- ═══ Schedule Periods ═══ -->
 		<section class="card bg-base-100 border border-base-300 p-5 mb-5">

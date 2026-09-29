@@ -14,16 +14,20 @@ docs/AddGroupMemberRequest.md
 docs/AddMemberRequest.md
 docs/AdminCreateAbsenceDayRequest.md
 docs/AdminNotificationResponse.md
+docs/ApiKeyResponse.md
+docs/ApiKeysApi.md
 docs/AuthApi.md
 docs/AuthResponse.md
 docs/ChangePasswordRequest.md
 docs/CreateAbsenceDayRequest.md
+docs/CreateApiKeyRequest.md
 docs/CreateGroupRequest.md
 docs/CreateHolidayRequest.md
 docs/CreateOrgRequestRequest.md
 docs/CreateOrganizationRequest.md
 docs/CreatePauseRuleRequest.md
 docs/CreateWorkScheduleRequest.md
+docs/CreatedApiKeyResponse.md
 docs/EffectivePermissionsResponse.md
 docs/ExportImportApi.md
 docs/ExportRequest.md
@@ -61,6 +65,8 @@ docs/OrganizationsApi.md
 docs/PauseRuleResponse.md
 docs/PauseRulesApi.md
 docs/ProblemDetails.md
+docs/PunchRequest.md
+docs/PunchResponse.md
 docs/RefreshTokenRequest.md
 docs/RefreshTokenResponse.md
 docs/RegisterRequest.md
@@ -70,6 +76,7 @@ docs/RequestType.md
 docs/RequestsApi.md
 docs/RespondToOrgRequestRequest.md
 docs/RuleMode.md
+docs/SetBadgeRequest.md
 docs/SetInitialOvertimeRequest.md
 docs/SetVacationDaysRequest.md
 docs/StartTimeEntryRequest.md

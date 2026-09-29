@@ -143,6 +143,16 @@ export interface AdminNotificationResponse {
     'requests': Array<OrgRequestResponse> | null;
 }
 /**
+ * An organization API key (terminal key); never includes the secret.
+ */
+export interface ApiKeyResponse {
+    'id'?: number;
+    'name': string | null;
+    'keyPrefix': string | null;
+    'createdAt'?: string;
+    'lastUsedAt'?: string | null;
+}
+/**
  * Generic success/failure response for auth operations.
  */
 export interface AuthResponse {
@@ -177,6 +187,12 @@ export interface CreateAbsenceDayRequest {
 }
 
 
+/**
+ * Request payload for creating an organization API key.
+ */
+export interface CreateApiKeyRequest {
+    'name': string;
+}
 export interface CreateGroupRequest {
     'name'?: string | null;
     'description'?: string | null;
@@ -247,6 +263,17 @@ export interface CreateWorkScheduleRequest {
     'targetWed'?: number | null;
     'targetThu'?: number | null;
     'targetFri'?: number | null;
+}
+/**
+ * Returned once when a key is created — the only time the plaintext key is visible.
+ */
+export interface CreatedApiKeyResponse {
+    'id'?: number;
+    'name': string | null;
+    'keyPrefix': string | null;
+    'createdAt'?: string;
+    'lastUsedAt'?: string | null;
+    'key': string | null;
 }
 export interface EffectivePermissionsResponse {
     'editPastEntriesMode'?: string | null;
@@ -618,6 +645,10 @@ export interface OrganizationMemberResponse {
      * Whether the caller may see this member\'s vacation balance (self, admins, or  per the effective VacationVisibility). When false, the vacation figures are zeroed.
      */
     'vacationVisible'?: boolean;
+    /**
+     * Terminal badge ID; only filled in for org admins.
+     */
+    'badgeId'?: string | null;
 }
 /**
  * Summary view of an organization.
@@ -700,6 +731,24 @@ export interface ProblemDetails {
     'status'?: number | null;
     'detail'?: string | null;
     'instance'?: string | null;
+}
+/**
+ * A badge scan from a terminal.
+ */
+export interface PunchRequest {
+    'badgeId': string;
+}
+/**
+ * Outcome of a badge scan: the member\'s timer was started or stopped.
+ */
+export interface PunchResponse {
+    /**
+     * \"Started\" or \"Stopped\".
+     */
+    'action': string | null;
+    'firstName': string | null;
+    'lastName': string | null;
+    'entry': TimeEntryResponse;
 }
 /**
  * Request containing a refresh token (used for refresh and logout).
@@ -788,6 +837,12 @@ export const RuleMode = {
 export type RuleMode = typeof RuleMode[keyof typeof RuleMode];
 
 
+/**
+ * Request payload for assigning (or clearing, with null) a member\'s badge ID.
+ */
+export interface SetBadgeRequest {
+    'badgeId'?: string | null;
+}
 /**
  * Request payload for setting a member\'s initial overtime hours.
  */
@@ -1847,6 +1902,434 @@ export class AbsenceDayApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugAbsencesPost(slug: string, createAbsenceDayRequest?: CreateAbsenceDayRequest, options?: RawAxiosRequestConfig) {
         return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsencesPost(slug, createAbsenceDayRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * ApiKeysApi - axios parameter creator
+ */
+export const ApiKeysApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary List the organization\'s API keys (admins only). Secrets are never returned.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugApiKeysGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugApiKeysGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/api-keys`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Revoke (delete) an API key (admins only).
+         * @param {string} slug 
+         * @param {number} keyId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugApiKeysKeyIdDelete: async (slug: string, keyId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugApiKeysKeyIdDelete', 'slug', slug)
+            // verify required parameter 'keyId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugApiKeysKeyIdDelete', 'keyId', keyId)
+            const localVarPath = `/api/v1/organizations/{slug}/api-keys/{keyId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"keyId"}}`, encodeURIComponent(String(keyId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Create an API key (admins only). The plaintext key is returned once, in this response only.
+         * @param {string} slug 
+         * @param {CreateApiKeyRequest} [createApiKeyRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugApiKeysPost: async (slug: string, createApiKeyRequest?: CreateApiKeyRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugApiKeysPost', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/api-keys`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createApiKeyRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Assign or clear (null) a member\'s badge ID (admins only).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {SetBadgeRequest} [setBadgeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdBadgePut: async (slug: string, memberId: number, setBadgeRequest?: SetBadgeRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdBadgePut', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdBadgePut', 'memberId', memberId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/badge`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(setBadgeRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Terminal endpoint: authenticates with an organization API key in the `X-Api-Key`  header (no user login) and toggles the badge owner\'s timer — stops it if running,  otherwise starts a new entry in the key\'s organization.
+         * @param {string} [xApiKey] 
+         * @param {PunchRequest} [punchRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1TerminalPunchPost: async (xApiKey?: string, punchRequest?: PunchRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/terminal/punch`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            if (xApiKey != null) {
+                localVarHeaderParameter['X-Api-Key'] = String(xApiKey);
+            }
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(punchRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * ApiKeysApi - functional programming interface
+ */
+export const ApiKeysApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = ApiKeysApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary List the organization\'s API keys (admins only). Secrets are never returned.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugApiKeysGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<ApiKeyResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugApiKeysGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugApiKeysGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Revoke (delete) an API key (admins only).
+         * @param {string} slug 
+         * @param {number} keyId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugApiKeysKeyIdDelete(slug: string, keyId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugApiKeysKeyIdDelete(slug, keyId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugApiKeysKeyIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Create an API key (admins only). The plaintext key is returned once, in this response only.
+         * @param {string} slug 
+         * @param {CreateApiKeyRequest} [createApiKeyRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugApiKeysPost(slug: string, createApiKeyRequest?: CreateApiKeyRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CreatedApiKeyResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugApiKeysPost(slug, createApiKeyRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugApiKeysPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Assign or clear (null) a member\'s badge ID (admins only).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {SetBadgeRequest} [setBadgeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdBadgePut(slug: string, memberId: number, setBadgeRequest?: SetBadgeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdBadgePut(slug, memberId, setBadgeRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugMembersMemberIdBadgePut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Terminal endpoint: authenticates with an organization API key in the `X-Api-Key`  header (no user login) and toggles the badge owner\'s timer — stops it if running,  otherwise starts a new entry in the key\'s organization.
+         * @param {string} [xApiKey] 
+         * @param {PunchRequest} [punchRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1TerminalPunchPost(xApiKey?: string, punchRequest?: PunchRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PunchResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1TerminalPunchPost(xApiKey, punchRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1TerminalPunchPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * ApiKeysApi - factory interface
+ */
+export const ApiKeysApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = ApiKeysApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary List the organization\'s API keys (admins only). Secrets are never returned.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugApiKeysGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<Array<ApiKeyResponse>> {
+            return localVarFp.apiV1OrganizationsSlugApiKeysGet(slug, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Revoke (delete) an API key (admins only).
+         * @param {string} slug 
+         * @param {number} keyId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugApiKeysKeyIdDelete(slug: string, keyId: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugApiKeysKeyIdDelete(slug, keyId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Create an API key (admins only). The plaintext key is returned once, in this response only.
+         * @param {string} slug 
+         * @param {CreateApiKeyRequest} [createApiKeyRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugApiKeysPost(slug: string, createApiKeyRequest?: CreateApiKeyRequest, options?: RawAxiosRequestConfig): AxiosPromise<CreatedApiKeyResponse> {
+            return localVarFp.apiV1OrganizationsSlugApiKeysPost(slug, createApiKeyRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Assign or clear (null) a member\'s badge ID (admins only).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {SetBadgeRequest} [setBadgeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdBadgePut(slug: string, memberId: number, setBadgeRequest?: SetBadgeRequest, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdBadgePut(slug, memberId, setBadgeRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Terminal endpoint: authenticates with an organization API key in the `X-Api-Key`  header (no user login) and toggles the badge owner\'s timer — stops it if running,  otherwise starts a new entry in the key\'s organization.
+         * @param {string} [xApiKey] 
+         * @param {PunchRequest} [punchRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1TerminalPunchPost(xApiKey?: string, punchRequest?: PunchRequest, options?: RawAxiosRequestConfig): AxiosPromise<PunchResponse> {
+            return localVarFp.apiV1TerminalPunchPost(xApiKey, punchRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * ApiKeysApi - object-oriented interface
+ */
+export class ApiKeysApi extends BaseAPI {
+    /**
+     * 
+     * @summary List the organization\'s API keys (admins only). Secrets are never returned.
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugApiKeysGet(slug: string, options?: RawAxiosRequestConfig) {
+        return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugApiKeysGet(slug, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Revoke (delete) an API key (admins only).
+     * @param {string} slug 
+     * @param {number} keyId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugApiKeysKeyIdDelete(slug: string, keyId: number, options?: RawAxiosRequestConfig) {
+        return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugApiKeysKeyIdDelete(slug, keyId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Create an API key (admins only). The plaintext key is returned once, in this response only.
+     * @param {string} slug 
+     * @param {CreateApiKeyRequest} [createApiKeyRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugApiKeysPost(slug: string, createApiKeyRequest?: CreateApiKeyRequest, options?: RawAxiosRequestConfig) {
+        return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugApiKeysPost(slug, createApiKeyRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Assign or clear (null) a member\'s badge ID (admins only).
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {SetBadgeRequest} [setBadgeRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdBadgePut(slug: string, memberId: number, setBadgeRequest?: SetBadgeRequest, options?: RawAxiosRequestConfig) {
+        return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdBadgePut(slug, memberId, setBadgeRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Terminal endpoint: authenticates with an organization API key in the `X-Api-Key`  header (no user login) and toggles the badge owner\'s timer — stops it if running,  otherwise starts a new entry in the key\'s organization.
+     * @param {string} [xApiKey] 
+     * @param {PunchRequest} [punchRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1TerminalPunchPost(xApiKey?: string, punchRequest?: PunchRequest, options?: RawAxiosRequestConfig) {
+        return ApiKeysApiFp(this.configuration).apiV1TerminalPunchPost(xApiKey, punchRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
