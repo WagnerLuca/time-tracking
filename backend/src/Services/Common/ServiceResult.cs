@@ -47,6 +47,7 @@ public class ServiceResult
     public static ServiceResult<T> BadRequest<T>(string message) => Fail<T>(ServiceErrorType.BadRequest, message);
     public static ServiceResult<T> Forbidden<T>(string message = "Forbidden") => Fail<T>(ServiceErrorType.Forbidden, message);
     public static ServiceResult<T> Conflict<T>(string message) => Fail<T>(ServiceErrorType.Conflict, message);
+    public static ServiceResult<T> Unauthorized<T>(string message = "Unauthorized") => Fail<T>(ServiceErrorType.Unauthorized, message);
 }
 
 /// <summary>

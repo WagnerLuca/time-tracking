@@ -404,4 +404,42 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
         me!.FirstName.Should().Be("Verified");
         me.LastName.Should().Be("User");
     }
+
+    // ── Two-Factor Authentication ────────────────────────────────────────
+
+    [Fact]
+    public async Task TwoFactor_FullFlow_LoginRequiresCode_ThenBackupCodeWorksOnce()
+    {
+        var (client, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "twofa@test.com");
+
+        var setup = await (await client.PostAsync("/api/v1/Auth/2fa/setup", null))
+            .Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        var secret = setup.GetProperty("sharedKey").GetString()!;
+        var totp = new OtpNet.Totp(OtpNet.Base32Encoding.ToBytes(secret));
+
+        var confirm = await client.PostAsJsonAsync("/api/v1/Auth/2fa/confirm", new { code = totp.ComputeTotp() });
+        confirm.EnsureSuccessStatusCode();
+        var backupCode = (await confirm.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>())
+            .GetProperty("backupCodes")[0].GetString()!;
+
+        // Password alone no longer yields tokens, only a 2FA token
+        var anon = _factory.CreateClient();
+        var login = await anon.PostAsJsonAsync("/api/v1/Auth/login", new { email = "twofa@test.com", password = "Password123!" });
+        login.StatusCode.Should().Be(HttpStatusCode.OK);
+        var challenge = await login.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        challenge.GetProperty("requiresTwoFactor").GetBoolean().Should().BeTrue();
+        challenge.TryGetProperty("accessToken", out _).Should().BeFalse();
+        var twoFactorToken = challenge.GetProperty("twoFactorToken").GetString();
+
+        var wrong = await anon.PostAsJsonAsync("/api/v1/Auth/2fa/verify", new { twoFactorToken, code = "000000x" });
+        wrong.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var ok = await anon.PostAsJsonAsync("/api/v1/Auth/2fa/verify", new { twoFactorToken, code = backupCode });
+        ok.EnsureSuccessStatusCode();
+        (await ok.Content.ReadFromJsonAsync<LoginResponseDto>(TestHelpers.JsonOptions))!
+            .AccessToken.Should().NotBeNullOrWhiteSpace();
+
+        var reused = await anon.PostAsJsonAsync("/api/v1/Auth/2fa/verify", new { twoFactorToken, code = backupCode });
+        reused.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
 }
