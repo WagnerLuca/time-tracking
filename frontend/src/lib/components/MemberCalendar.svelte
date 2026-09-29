@@ -382,6 +382,8 @@
 		creditedMinutes: number;
 		targetMinutes: number;
 		entryCount: number;
+		/** A timer on this day was auto-stopped at the business day end and still needs correcting. */
+		hasFailure: boolean;
 		dayType: string | null;
 		dayTypeLabel: string;
 		delta: number;
@@ -404,14 +406,15 @@
 		calEnd.setDate(calEnd.getDate() + endOffset);
 
 		// Build entry map
-		const entryMap = new Map<string, { minutes: number; count: number }>();
+		const entryMap = new Map<string, { minutes: number; count: number; failure: boolean }>();
 		for (const entry of entries) {
 			if (entry.isRunning || !entry.startTime) continue;
 			const d = new Date(entry.startTime);
 			const key = dateKey(d);
-			const existing = entryMap.get(key) ?? { minutes: 0, count: 0 };
+			const existing = entryMap.get(key) ?? { minutes: 0, count: 0, failure: false };
 			existing.minutes += entry.netDurationMinutes ?? entry.durationMinutes ?? 0;
 			existing.count++;
+			existing.failure ||= !!entry.isFailure;
 			entryMap.set(key, existing);
 		}
 
@@ -422,7 +425,7 @@
 			const isCurrentMonth = cursor.getMonth() === month;
 			const isToday = cursor.toDateString() === today.toDateString();
 			const isWeekend = cursor.getDay() === 0 || cursor.getDay() === 6;
-			const entryData = entryMap.get(key) ?? { minutes: 0, count: 0 };
+			const entryData = entryMap.get(key) ?? { minutes: 0, count: 0, failure: false };
 			const targetMinutes = isCurrentMonth ? getDayTarget(new Date(cursor), workSchedule, holidayDates, schedulePeriods, halfDayHolidays) : 0;
 			const absCredit = isCurrentMonth ? getAbsenceCredit(new Date(cursor), workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods, halfDayAbsences, halfDayHolidays, customCredits, entryData.minutes) : 0;
 
@@ -437,6 +440,7 @@
 				creditedMinutes: absCredit,
 				targetMinutes,
 				entryCount: entryData.count,
+				hasFailure: entryData.failure,
 				dayType: getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays),
 				dayTypeLabel: getDayTypeLabel(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays, halfDayAbsences, customTypeDates),
 				delta: entryData.minutes + absCredit - targetMinutes
@@ -628,6 +632,9 @@
 							disabled={!day.isCurrentMonth}
 						>
 							<span class="text-xs font-medium {day.isToday ? 'text-primary font-bold' : 'text-base-content/70'}">{day.dayOfMonth}</span>
+							{#if day.hasFailure}
+								<span class="absolute top-1 right-1 h-2 w-2 rounded-full bg-error" title="Timer not stopped. Needs correction"></span>
+							{/if}
 							{#if day.isCurrentMonth}
 								{#if day.workedMinutes > 0}
 									<span class="text-xs font-semibold text-base-content">{formatHours(day.workedMinutes)}</span>
@@ -770,9 +777,13 @@
 												</div>
 											</div>
 											<div class="flex items-center gap-1">
-												<span class="badge badge-outline badge-sm">
-													{formatDuration(entry.netDurationMinutes ?? entry.durationMinutes ?? undefined)}
-												</span>
+												{#if entry.isFailure}
+													<span class="badge badge-error badge-sm" title="The timer ran past the business day end and was stopped automatically. It counts as 0 until you correct the end time.">Needs correction</span>
+												{:else}
+													<span class="badge badge-outline badge-sm">
+														{formatDuration(entry.netDurationMinutes ?? entry.durationMinutes ?? undefined)}
+													</span>
+												{/if}
 												<!-- Edit / Delete buttons (own entries only) -->
 												{#if isSelf && !entry.isRunning}
 													<div class="flex gap-0.5 ml-1">

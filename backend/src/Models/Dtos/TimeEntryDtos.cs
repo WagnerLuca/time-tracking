@@ -64,5 +64,10 @@ public record TimeEntryResponse
     public int PauseDurationMinutes { get; init; }
     /// <summary>Net duration in minutes (gross minus pauses).</summary>
     public double? NetDurationMinutes { get; init; }
+    /// <summary>
+    /// Stopped automatically at the business day end; durations are null (unknown)
+    /// until the member corrects the end time.
+    /// </summary>
+    public bool IsFailure { get; init; }
     public DateTime CreatedAt { get; init; }
 }

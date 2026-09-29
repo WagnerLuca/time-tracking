@@ -130,6 +130,15 @@ public class Organization
     /// Default vacation days per year for new members.
     /// </summary>
     public double DefaultVacationDays { get; set; }
+
+    /// <summary>
+    /// Local time at which a business day ends. A timer still running then is stopped
+    /// and marked as a failure entry. 00:00 = midnight; e.g. 04:00 for late-night gastro shifts.
+    /// </summary>
+    public TimeOnly BusinessDayEnd { get; set; } = TimeOnly.MinValue;
+
+    /// <summary>IANA time zone the business day end refers to.</summary>
+    public string TimeZone { get; set; } = "Europe/Berlin";
     
     /// <summary>
     /// Timestamp of the last settings update. Used to notify members of rule changes.

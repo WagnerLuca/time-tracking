@@ -97,7 +97,10 @@ public static class DailyReportAggregator
         {
             var dayOfWeek = currentDate.DayOfWeek;
             var targetHours = GetTargetHours(workSchedules, currentDate);
-            var dayEntries = entriesByDate.GetValueOrDefault(currentDate) ?? [];
+            var allDayEntries = entriesByDate.GetValueOrDefault(currentDate) ?? [];
+            // Failure entries (auto-stopped at business day end) count as 0 until corrected
+            var dayEntries = allDayEntries.Where(e => !e.IsFailure).ToList();
+            var hasFailures = dayEntries.Count < allDayEntries.Count;
 
             var grossMinutes = dayEntries.Sum(e => e.EndTime.HasValue
                 ? (e.EndTime.Value - e.StartTime).TotalMinutes : 0);
@@ -113,7 +116,9 @@ public static class DailyReportAggregator
             var effectiveTarget = Math.Max(0, targetHours - holidayCredit - absenceCredit);
             string status;
 
-            if (isHoliday && isAbsence)
+            // An uncorrected forgotten timer is the one thing the reader must act on, so it wins
+            if (hasFailures) { status = "Needs Correction"; }
+            else if (isHoliday && isAbsence)
             {
                 status = absence!.Type switch
                 {
@@ -140,9 +145,10 @@ public static class DailyReportAggregator
             var overtime = netHours - effectiveTarget;
             cumulativeOvertime += overtime;
 
-            var entrySummary = dayEntries.Count > 0
-                ? string.Join(" | ", dayEntries.Select(e =>
+            var entrySummary = allDayEntries.Count > 0
+                ? string.Join(" | ", allDayEntries.Select(e =>
                     $"{e.StartTime:HH:mm}-{e.EndTime?.ToString("HH:mm") ?? "?"}" +
+                    (e.IsFailure ? " [not stopped, needs correction]" : "") +
                     (string.IsNullOrEmpty(e.Description) ? "" : $" ({e.Description})")))
                 : "";
 

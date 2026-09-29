@@ -446,6 +446,9 @@ namespace TimeTracking.Api.Migrations
                     b.Property<bool>("AutoPauseEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<TimeOnly>("BusinessDayEnd")
+                        .HasColumnType("time without time zone");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -501,6 +504,13 @@ namespace TimeTracking.Api.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasDefaultValue("Europe/Berlin");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -615,6 +625,9 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<DateTime?>("EndTime")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsFailure")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsRunning")
                         .ValueGeneratedOnAdd()

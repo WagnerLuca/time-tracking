@@ -137,7 +137,12 @@
 						</span>
 						<span class="text-center">{formatHoursDecimal(member.totalTrackedMinutes ?? 0)}</span>
 						<span class="text-center">{formatHoursDecimal(member.netTrackedMinutes ?? 0)}</span>
-						<span class="text-center">{member.entryCount}</span>
+						<span class="text-center">
+							{member.entryCount}
+							{#if (member.failureEntryCount ?? 0) > 0}
+								<span class="badge badge-error badge-xs ml-1" title="Timers stopped automatically at the business day end. Not counted until the member corrects them.">{member.failureEntryCount} to fix</span>
+							{/if}
+						</span>
 						<span class="text-center">
 							{#if targetMinutes > 0}
 								{#if pct >= 100}

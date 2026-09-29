@@ -164,6 +164,7 @@ builder.Services.AddScoped<IPauseRuleService, PauseRuleService>();
 builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<IPdfReportService, PdfReportService>();
 builder.Services.AddHostedService<RefreshTokenCleanupService>();
+builder.Services.AddHostedService<FailureEntryService>();
 
 // Add Entity Framework - PostgreSQL or InMemory
 var useInMemory = builder.Configuration.GetValue<bool>("UseInMemoryDatabase");

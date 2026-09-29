@@ -57,6 +57,7 @@ public class TimeTrackingDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Slug).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.TimeZone).IsRequired().HasMaxLength(64).HasDefaultValue("Europe/Berlin");
             entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
             
             if (isInMemory)

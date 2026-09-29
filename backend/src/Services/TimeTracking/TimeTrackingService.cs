@@ -110,6 +110,18 @@ public class TimeTrackingService : ITimeTrackingService
         return ServiceResult.Ok(MapToResponse(running));
     }
 
+    public async Task<ServiceResult<List<TimeEntryResponse>>> GetFailuresAsync(int userId)
+    {
+        var failures = await _context.TimeEntries
+            .AsNoTracking()
+            .Include(e => e.Organization)
+            .Where(e => e.UserId == userId && e.IsFailure)
+            .OrderByDescending(e => e.StartTime)
+            .ToListAsync();
+
+        return ServiceResult.Ok(failures.Select(MapToResponse).ToList());
+    }
+
     public async Task<ServiceResult<PaginatedResponse<TimeEntryResponse>>> GetHistoryAsync(
         int userId, int? organizationId, DateTime? from, DateTime? to, int limit, int offset)
     {
@@ -174,7 +186,11 @@ public class TimeTrackingService : ITimeTrackingService
         }
 
         if (request.StartTime.HasValue)  entry.StartTime = request.StartTime.Value;
-        if (request.EndTime.HasValue)    entry.EndTime = request.EndTime.Value;
+        if (request.EndTime.HasValue)
+        {
+            entry.EndTime = request.EndTime.Value;
+            entry.IsFailure = false;   // the member supplied the real end time
+        }
         if (request.Description != null) entry.Description = request.Description;
         if (request.OrganizationId.HasValue)
         {
@@ -275,7 +291,10 @@ public class TimeTrackingService : ITimeTrackingService
 
     private static TimeEntryResponse MapToResponse(TimeEntry entry)
     {
-        var duration = entry.EndTime.HasValue
+        // A failure entry's real duration is unknown until corrected, so it counts as nothing
+        var duration = entry.IsFailure
+            ? (double?)null
+            : entry.EndTime.HasValue
             ? (entry.EndTime.Value - entry.StartTime).TotalMinutes
             : entry.IsRunning
                 ? (DateTime.UtcNow - entry.StartTime).TotalMinutes
@@ -298,6 +317,7 @@ public class TimeTrackingService : ITimeTrackingService
             DurationMinutes = duration.HasValue ? Math.Round(duration.Value, 2) : null,
             PauseDurationMinutes = entry.PauseDurationMinutes,
             NetDurationMinutes = netDuration.HasValue ? Math.Round(netDuration.Value, 2) : null,
+            IsFailure = entry.IsFailure,
             CreatedAt = entry.CreatedAt
         };
     }

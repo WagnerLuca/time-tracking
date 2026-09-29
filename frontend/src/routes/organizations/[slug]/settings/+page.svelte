@@ -502,6 +502,57 @@
 					</div>
 				</div>
 
+				<div class="bg-base-200/50 rounded-lg p-4 mt-4 border border-base-300">
+					<div class="flex items-center justify-between gap-4 flex-wrap">
+						<div class="setting-info">
+							<div class="font-semibold text-base-content mb-0.5">Business Day End</div>
+							<div class="text-sm text-base-content/60 max-w-[400px]">A timer still running at this local time is stopped automatically and marked as a failure entry, which counts as 0 until the member corrects it. Midnight (00:00) by default; set e.g. 04:00 for late-night shifts.</div>
+						</div>
+						<div class="flex items-center gap-2 flex-wrap">
+							<input
+								type="time"
+								class="input input-bordered input-sm w-28"
+								value={org.businessDayEnd ?? '00:00'}
+								onchange={async (e) => {
+									const val = (e.target as HTMLInputElement).value;
+									if (!val || !org) return;
+									settingsSaving = true;
+									try {
+										await organizationsApi.apiV1OrganizationsSlugSettingsPut(org.slug!, { businessDayEnd: val });
+										await loadOrg();
+									} catch (err) {
+										settingsError = extractErrorMessage(err, 'Failed to update business day end.');
+									}
+									settingsSaving = false;
+								}}
+								disabled={settingsSaving}
+							/>
+							<select
+								class="select select-bordered select-sm w-52"
+								value={org.timeZone ?? 'Europe/Berlin'}
+								onchange={async (e) => {
+									const val = (e.target as HTMLSelectElement).value;
+									if (!org) return;
+									settingsSaving = true;
+									try {
+										await organizationsApi.apiV1OrganizationsSlugSettingsPut(org.slug!, { timeZone: val });
+										await loadOrg();
+									} catch (err) {
+										settingsError = extractErrorMessage(err, 'Failed to update time zone.');
+									}
+									settingsSaving = false;
+								}}
+								disabled={settingsSaving}
+								aria-label="Time zone"
+							>
+								{#each Intl.supportedValuesOf('timeZone') as tz}
+									<option value={tz}>{tz}</option>
+								{/each}
+							</select>
+						</div>
+					</div>
+				</div>
+
 				<!-- Custom Absence Types -->
 				<div class="mt-6">
 					<div class="flex items-center justify-between mb-4">

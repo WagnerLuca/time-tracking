@@ -427,7 +427,7 @@ public class RequestService : IRequestService
                             if (data != null)
                             {
                                 if (data.StartTime.HasValue) entry.StartTime = data.StartTime.Value;
-                                if (data.EndTime.HasValue)   entry.EndTime = data.EndTime.Value;
+                                if (data.EndTime.HasValue)   { entry.EndTime = data.EndTime.Value; entry.IsFailure = false; }
                                 if (data.Description != null) entry.Description = data.Description;
                                 entry.UpdatedAt = DateTime.UtcNow;
                             }

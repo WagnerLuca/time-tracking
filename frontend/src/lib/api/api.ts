@@ -493,6 +493,10 @@ export interface MemberTimeOverviewResponse {
     'totalTrackedMinutes'?: number;
     'netTrackedMinutes'?: number;
     'entryCount'?: number;
+    /**
+     * Unresolved failure entries in the period (excluded from the totals).
+     */
+    'failureEntryCount'?: number;
 }
 /**
  * A member\'s vacation day allowance after it was set.
@@ -609,6 +613,11 @@ export interface OrganizationDetailResponse {
     'vacationVisibility': string | null;
     'sickDayVisibility': string | null;
     'defaultVacationDays'?: number;
+    /**
+     * Business day end as local \"HH:mm\" in TimeTracking.Api.Models.Dtos.OrganizationDetailResponse.TimeZone.
+     */
+    'businessDayEnd'?: string | null;
+    'timeZone'?: string | null;
     'settingsUpdatedAt'?: string | null;
     'createdAt'?: string;
     'members': Array<OrganizationMemberResponse> | null;
@@ -713,6 +722,8 @@ export interface OrganizationSettingsResponse {
     'require2fa'?: boolean;
     'csvImportMode': string | null;
     'absenceSelfServiceMode': string | null;
+    'businessDayEnd': string | null;
+    'timeZone': string | null;
 }
 /**
  * Automatic pause rule (deduct X minutes after Y hours worked).
@@ -914,6 +925,10 @@ export interface TimeEntryResponse {
      * Net duration in minutes (gross minus pauses).
      */
     'netDurationMinutes'?: number | null;
+    /**
+     * Stopped automatically at the business day end; durations are null (unknown)  until the member corrects the end time.
+     */
+    'isFailure'?: boolean;
     'createdAt'?: string;
 }
 /**
@@ -1063,6 +1078,14 @@ export interface UpdateOrganizationSettingsRequest {
     'vacationVisibility'?: VisibilityMode;
     'sickDayVisibility'?: VisibilityMode;
     'defaultVacationDays'?: number | null;
+    /**
+     * Business day end as local \"HH:mm\" (e.g. \"04:00\").
+     */
+    'businessDayEnd'?: string | null;
+    /**
+     * IANA time zone id, e.g. \"Europe/Berlin\".
+     */
+    'timeZone'?: string | null;
 }
 
 
@@ -7690,6 +7713,40 @@ export const TimeTrackingApiAxiosParamCreator = function (configuration?: Config
         },
         /**
          * 
+         * @summary My failure entries: timers stopped automatically at the business day end that still need a corrected end time.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1TimeTrackingFailuresGet: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/TimeTracking/failures`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Get past time entries with optional filters and pagination.
          * @param {number} [organizationId] Filter by organization ID.
          * @param {string} [from] Start of date range.
@@ -7930,6 +7987,18 @@ export const TimeTrackingApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary My failure entries: timers stopped automatically at the business day end that still need a corrected end time.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1TimeTrackingFailuresGet(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<TimeEntryResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1TimeTrackingFailuresGet(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['TimeTrackingApi.apiV1TimeTrackingFailuresGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Get past time entries with optional filters and pagination.
          * @param {number} [organizationId] Filter by organization ID.
          * @param {string} [from] Start of date range.
@@ -8018,6 +8087,15 @@ export const TimeTrackingApiFactory = function (configuration?: Configuration, b
         },
         /**
          * 
+         * @summary My failure entries: timers stopped automatically at the business day end that still need a corrected end time.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1TimeTrackingFailuresGet(options?: RawAxiosRequestConfig): AxiosPromise<Array<TimeEntryResponse>> {
+            return localVarFp.apiV1TimeTrackingFailuresGet(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Get past time entries with optional filters and pagination.
          * @param {number} [organizationId] Filter by organization ID.
          * @param {string} [from] Start of date range.
@@ -8086,6 +8164,16 @@ export class TimeTrackingApi extends BaseAPI {
      */
     public apiV1TimeTrackingCurrentGet(options?: RawAxiosRequestConfig) {
         return TimeTrackingApiFp(this.configuration).apiV1TimeTrackingCurrentGet(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary My failure entries: timers stopped automatically at the business day end that still need a corrected end time.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1TimeTrackingFailuresGet(options?: RawAxiosRequestConfig) {
+        return TimeTrackingApiFp(this.configuration).apiV1TimeTrackingFailuresGet(options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

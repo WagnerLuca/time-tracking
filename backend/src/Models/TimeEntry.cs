@@ -24,6 +24,13 @@ public class TimeEntry
     /// Auto-deducted pause duration in minutes (based on org pause rules)
     /// </summary>
     public int PauseDurationMinutes { get; set; } = 0;
+
+    /// <summary>
+    /// Failure entry: the timer ran past the organization's business day end and was
+    /// stopped automatically (see FailureEntryService). Counts as 0 worked time until
+    /// the member corrects the end time, which clears the flag.
+    /// </summary>
+    public bool IsFailure { get; set; }
     
     public DateTime CreatedAt { get; set; }
     

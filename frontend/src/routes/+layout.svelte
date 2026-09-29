@@ -3,10 +3,10 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
+	import { goto, afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
-	import { requestsApi, organizationsApi } from '$lib/apiClient';
+	import { requestsApi, organizationsApi, timeTrackingApi } from '$lib/apiClient';
 	import type { OrgRequestResponse } from '$lib/api';
 	import { parseRequestData, formatRequestTypeFull, formatRequestType, formatTimeAgo } from '$lib/utils/formatters';
 	import { theme } from '$lib/stores/theme.svelte';
@@ -25,6 +25,23 @@
 	let userNotifCount = $state(0);
 	let userNotifRequests = $state<OrgRequestResponse[]>([]);
 	let totalNotifCount = $derived(pendingCount + userNotifCount);
+
+	// Failure entries: timers auto-stopped at the business day end that still need a real end time
+	let failureCount = $state(0);
+
+	async function loadFailures() {
+		try {
+			const { data } = await timeTrackingApi.apiV1TimeTrackingFailuresGet();
+			failureCount = data.length;
+		} catch {
+			failureCount = 0;
+		}
+	}
+
+	// Re-check after every navigation so the hint disappears once entries are corrected
+	afterNavigate(() => {
+		if (auth.isAuthenticated) loadFailures();
+	});
 
 	// 2FA enforcement: check if selected org requires 2FA but user hasn't set it up
 	let requires2faSetup = $derived(() => {
@@ -55,6 +72,7 @@
 		if (auth.isAuthenticated && auth.user) {
 			orgContext.loadOrganizations(auth.user.id);
 			loadNotifications();
+			loadFailures();
 		}
 	});
 
@@ -390,6 +408,17 @@
 				</div>
 			</div>
 		{:else}
+			{#if failureCount > 0}
+				<div role="alert" class="alert alert-error mb-6">
+					<span>
+						<strong>{failureCount === 1 ? '1 timer was' : `${failureCount} timers were`} not stopped</strong>
+						and ended automatically at the end of the business day. {failureCount === 1 ? 'It does' : 'They do'} not count toward your hours until you correct the end time.
+					</span>
+					{#if !$page.url.pathname.startsWith('/history')}
+						<a href="/history" class="btn btn-sm">Correct in History</a>
+					{/if}
+				</div>
+			{/if}
 			{@render children?.()}
 		{/if}
 	</main>

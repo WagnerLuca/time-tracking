@@ -20,7 +20,7 @@ public class TimeEntryExportService : ITimeEntryExportService
     [
         "Date", "DayOfWeek", "StartTime", "EndTime",
         "Duration", "Pause", "NetDuration",
-        "Description", "Organization"
+        "Description", "Organization", "Status"
     ];
 
     // All available columns for daily report export
@@ -73,7 +73,8 @@ public class TimeEntryExportService : ITimeEntryExportService
 
         foreach (var entry in entries)
         {
-            var durationMinutes = entry.EndTime.HasValue
+            // Failure entries have no trustworthy duration until corrected
+            var durationMinutes = entry.EndTime.HasValue && !entry.IsFailure
                 ? (entry.EndTime.Value - entry.StartTime).TotalMinutes
                 : 0;
             var netMinutes = Math.Max(0, durationMinutes - entry.PauseDurationMinutes);
@@ -92,6 +93,7 @@ public class TimeEntryExportService : ITimeEntryExportService
                     "NetDuration" => (netMinutes / 60.0).ToString("F2", CultureInfo.InvariantCulture),
                     "Description" => EscapeCsv(entry.Description ?? ""),
                     "Organization" => EscapeCsv(entry.Organization?.Name ?? ""),
+                    "Status" => entry.IsFailure ? "Needs Correction" : "",
                     _ => ""
                 });
             }

@@ -38,6 +38,9 @@ public record OrganizationDetailResponse
     public required string VacationVisibility { get; init; }
     public required string SickDayVisibility { get; init; }
     public double DefaultVacationDays { get; init; }
+    /// <summary>Business day end as local "HH:mm" in <see cref="TimeZone"/>.</summary>
+    public string BusinessDayEnd { get; init; } = "00:00";
+    public string TimeZone { get; init; } = "Europe/Berlin";
     public DateTime? SettingsUpdatedAt { get; init; }
     public DateTime CreatedAt { get; init; }
     public required List<OrganizationMemberResponse> Members { get; init; }
@@ -165,6 +168,12 @@ public record UpdateOrganizationSettingsRequest
     public VisibilityMode? VacationVisibility { get; init; }
     public VisibilityMode? SickDayVisibility { get; init; }
     public double? DefaultVacationDays { get; init; }
+    /// <summary>Business day end as local "HH:mm" (e.g. "04:00").</summary>
+    [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$", ErrorMessage = "Use HH:mm, e.g. 04:00.")]
+    public string? BusinessDayEnd { get; init; }
+    /// <summary>IANA time zone id, e.g. "Europe/Berlin".</summary>
+    [MaxLength(64)]
+    public string? TimeZone { get; init; }
 }
 
 /// <summary>Per-member time tracking statistics for the admin overview.</summary>
@@ -179,6 +188,8 @@ public record MemberTimeOverviewResponse
     public double TotalTrackedMinutes { get; init; }
     public double NetTrackedMinutes { get; init; }
     public int EntryCount { get; init; }
+    /// <summary>Unresolved failure entries in the period (excluded from the totals).</summary>
+    public int FailureEntryCount { get; init; }
 }
 
 /// <summary>Request payload for setting a member's initial overtime hours.</summary>
@@ -207,6 +218,8 @@ public record OrganizationSettingsResponse
     public bool Require2fa { get; init; }
     public required string CsvImportMode { get; init; }
     public required string AbsenceSelfServiceMode { get; init; }
+    public required string BusinessDayEnd { get; init; }
+    public required string TimeZone { get; init; }
 }
 
 /// <summary>A member's initial overtime after it was set.</summary>

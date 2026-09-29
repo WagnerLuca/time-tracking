@@ -56,6 +56,16 @@ public class TimeTrackingController : OrganizationBaseController
         return ToResponse(await _service.GetCurrentAsync(userId.Value));
     }
 
+    /// <summary>My failure entries: timers stopped automatically at the business day end that still need a corrected end time.</summary>
+    [HttpGet("failures")]
+    [ProducesResponseType(typeof(List<TimeEntryResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFailures()
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.GetFailuresAsync(userId.Value));
+    }
+
     /// <summary>Get past time entries with optional filters and pagination.</summary>
     /// <param name="organizationId">Filter by organization ID.</param>
     /// <param name="from">Start of date range.</param>

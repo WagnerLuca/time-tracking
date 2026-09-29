@@ -84,6 +84,8 @@ public class OrganizationService : IOrganizationService
                 VacationVisibility = o.VacationVisibility.ToString(),
                 SickDayVisibility = o.SickDayVisibility.ToString(),
                 DefaultVacationDays = o.DefaultVacationDays,
+                BusinessDayEnd = o.BusinessDayEnd.ToString("HH:mm"),
+                TimeZone = o.TimeZone,
                 SettingsUpdatedAt = o.SettingsUpdatedAt,
                 CreatedAt = o.CreatedAt,
                 Members = o.UserOrganizations
@@ -582,6 +584,13 @@ public class OrganizationService : IOrganizationService
         if (request.VacationVisibility.HasValue) org.VacationVisibility = request.VacationVisibility.Value;
         if (request.SickDayVisibility.HasValue) org.SickDayVisibility = request.SickDayVisibility.Value;
         if (request.DefaultVacationDays.HasValue) org.DefaultVacationDays = request.DefaultVacationDays.Value;
+        if (request.BusinessDayEnd != null) org.BusinessDayEnd = TimeOnly.ParseExact(request.BusinessDayEnd, "HH:mm");
+        if (request.TimeZone != null)
+        {
+            if (!TimeZoneInfo.TryFindSystemTimeZoneById(request.TimeZone, out _))
+                return ServiceResult.BadRequest<OrganizationSettingsResponse>($"Unknown time zone '{request.TimeZone}'.");
+            org.TimeZone = request.TimeZone;
+        }
 
         org.UpdatedAt = DateTime.UtcNow;
         org.SettingsUpdatedAt = DateTime.UtcNow;
@@ -621,7 +630,9 @@ public class OrganizationService : IOrganizationService
             MemberTimeEntryVisibility = org.MemberTimeEntryVisibility,
             Require2fa = org.Require2fa,
             CsvImportMode = org.CsvImportMode.ToString(),
-            AbsenceSelfServiceMode = org.AbsenceSelfServiceMode.ToString()
+            AbsenceSelfServiceMode = org.AbsenceSelfServiceMode.ToString(),
+            BusinessDayEnd = org.BusinessDayEnd.ToString("HH:mm"),
+            TimeZone = org.TimeZone
         });
     }
 
@@ -698,7 +709,8 @@ public class OrganizationService : IOrganizationService
 
         var result = members.Select(m =>
         {
-            var entries = timeEntries.Where(te => te.UserId == m.UserId).ToList();
+            var memberEntries = timeEntries.Where(te => te.UserId == m.UserId).ToList();
+            var entries = memberEntries.Where(te => !te.IsFailure).ToList();
             var totalMinutes = entries.Sum(e =>
                 e.EndTime.HasValue ? (e.EndTime.Value - e.StartTime).TotalMinutes : 0);
             var totalPause = entries.Sum(e => e.PauseDurationMinutes);
@@ -718,6 +730,7 @@ public class OrganizationService : IOrganizationService
                 WeeklyWorkHours = schedule?.WeeklyWorkHours,
                 TotalTrackedMinutes = Math.Round(totalMinutes, 1),
                 NetTrackedMinutes = Math.Round(totalMinutes - totalPause, 1),
+                FailureEntryCount = memberEntries.Count - entries.Count,
                 EntryCount = entries.Count
             };
         }).ToList();
@@ -787,13 +800,14 @@ public class OrganizationService : IOrganizationService
                 StartTime = te.StartTime,
                 EndTime = te.EndTime,
                 IsRunning = te.IsRunning,
-                DurationMinutes = te.EndTime.HasValue
+                DurationMinutes = te.EndTime.HasValue && !te.IsFailure
                     ? Math.Round((te.EndTime.Value - te.StartTime).TotalMinutes, 1)
                     : (double?)null,
                 PauseDurationMinutes = te.PauseDurationMinutes,
-                NetDurationMinutes = te.EndTime.HasValue
+                NetDurationMinutes = te.EndTime.HasValue && !te.IsFailure
                     ? Math.Round((te.EndTime.Value - te.StartTime).TotalMinutes - te.PauseDurationMinutes, 1)
                     : (double?)null,
+                IsFailure = te.IsFailure,
                 CreatedAt = te.CreatedAt
             })
             .ToListAsync();
