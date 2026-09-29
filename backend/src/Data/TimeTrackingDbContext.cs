@@ -149,6 +149,9 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.OrganizationId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Hide entries of soft-deleted organizations; personal entries (no org) stay visible
+            entity.HasQueryFilter(e => e.OrganizationId == null || e.Organization!.IsActive);
         });
 
         // Configure PauseRule entity

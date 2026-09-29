@@ -689,4 +689,21 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
         var me = await client.GetFromJsonAsync<UserInfoDto>("/api/v1/Auth/me", TestHelpers.JsonOptions);
         return me!.Id;
     }
+
+    [Fact]
+    public async Task History_HidesEntriesOfDeletedOrganization_KeepsPersonalOnes()
+    {
+        var (client, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "softdel@test.com");
+        var org = await TestHelpers.CreateOrganizationAsync(client, "Soon Gone", "soon-gone");
+
+        (await client.PostAsJsonAsync("/api/v1/TimeTracking/start", new { description = "org work", organizationId = org.Id })).EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync("/api/v1/TimeTracking/stop", (object?)null)).EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync("/api/v1/TimeTracking/start", new { description = "personal" })).EnsureSuccessStatusCode();
+        (await client.PostAsJsonAsync("/api/v1/TimeTracking/stop", (object?)null)).EnsureSuccessStatusCode();
+
+        (await client.DeleteAsync($"/api/v1/Organizations/{org.Slug}")).EnsureSuccessStatusCode();
+
+        var page = await client.GetFromJsonAsync<PaginatedResponseDto<TimeEntryResponseDto>>("/api/v1/TimeTracking", TestHelpers.JsonOptions);
+        page!.Items.Select(e => e.Description).Should().BeEquivalentTo(new[] { "personal" });
+    }
 }
