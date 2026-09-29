@@ -1,63 +1,34 @@
 /**
- * Theme store — persists the selected DaisyUI theme to localStorage
- * and applies it to the <html> element via data-theme attribute.
+ * Theme store — light/dark, mirroring @wagnerluca/ui's useTheme(): a `.dark`
+ * class on <html> flips the design tokens, persisted under the shared
+ * `wl-theme` key so the choice follows the visitor across Wagner Luca apps.
+ * app.html applies it before first paint.
  */
 
-const STORAGE_KEY = 'time-tracking-theme';
-
-const ALL_THEMES = [
-	'light', 'dark', 'cupcake', 'bumblebee', 'emerald', 'corporate',
-	'synthwave', 'retro', 'cyberpunk', 'valentine', 'halloween', 'garden',
-	'forest', 'aqua', 'lofi', 'pastel', 'fantasy', 'wireframe', 'black',
-	'luxury', 'dracula', 'cmyk', 'autumn', 'business', 'acid', 'lemonade',
-	'night', 'coffee', 'winter', 'dim', 'nord', 'sunset', 'caramellatte',
-	'abyss', 'silk'
-] as const;
-
-export type ThemeName = (typeof ALL_THEMES)[number];
-
-const LEGACY_THEME_ALIASES: Record<string, ThemeName> = {
-	caramelatte: 'caramellatte'
-};
-
-function normalizeTheme(rawTheme: string | null): ThemeName | null {
-	if (!rawTheme) return null;
-	if (ALL_THEMES.includes(rawTheme as ThemeName)) {
-		return rawTheme as ThemeName;
-	}
-	return LEGACY_THEME_ALIASES[rawTheme] ?? null;
-}
+const STORAGE_KEY = 'wl-theme';
 
 function createThemeStore() {
-	let current = $state<ThemeName>('light');
+	let isDark = $state(false);
+
+	function apply() {
+		document.documentElement.classList.toggle('dark', isDark);
+	}
 
 	function load() {
 		if (typeof window === 'undefined') return;
 		const saved = localStorage.getItem(STORAGE_KEY);
-		const normalized = normalizeTheme(saved);
-		if (normalized) {
-			current = normalized;
-			if (saved !== normalized) {
-				localStorage.setItem(STORAGE_KEY, normalized);
-			}
-		}
+		isDark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
 		apply();
 	}
 
-	function apply() {
-		if (typeof document === 'undefined') return;
-		document.documentElement.setAttribute('data-theme', current);
-	}
-
-	function set(theme: ThemeName) {
-		current = theme;
-		localStorage.setItem(STORAGE_KEY, theme);
+	function set(dark: boolean) {
+		isDark = dark;
+		localStorage.setItem(STORAGE_KEY, dark ? 'dark' : 'light');
 		apply();
 	}
 
 	return {
-		get current() { return current; },
-		get themes() { return ALL_THEMES; },
+		get isDark() { return isDark; },
 		load,
 		set
 	};

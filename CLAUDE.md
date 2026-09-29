@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Full-stack multi-organization time tracking app. ASP.NET Core Web API backend (`backend/`) + SvelteKit frontend (`frontend/`). Domain covers time entries, work schedules, absences (vacation/sick), holidays, approval requests, notifications, and organization/group-scoped permissions.
 
 - **Backend**: ASP.NET Core, **.NET 10** (`net10.0`), C#. (README says 9.0 — outdated; trust the `.csproj`.)
-- **Frontend**: SvelteKit + **Svelte 5 (runes)**, TypeScript, SSR via `adapter-node`, Tailwind CSS 4 + DaisyUI 5.
+- **Frontend**: SvelteKit + **Svelte 5 (runes)**, TypeScript, SSR via `adapter-node`, Tailwind CSS 4 + DaisyUI 5, styled with the Wagner Luca design system: `src/app.css` defines a single DaisyUI theme (`wagnerluca`) whose colours are `var()`s onto `@wagnerluca/ui/tokens.css` (primary = `time` accent). Light/dark is the `.dark` class on `<html>` under the shared `wl-theme` key (`theme.svelte.ts` + the pre-paint script in `app.html`), not DaisyUI `data-theme`. `@wagnerluca/ui` comes from GitHub Packages — `NODE_AUTH_TOKEN` (read:packages) for `npm install`, BuildKit secret in Docker, `GHP_READ_TOKEN` repo secret in CI.
 - **DB**: PostgreSQL 16 in production; **in-memory EF Core provider in local dev** (no Postgres needed to run the backend).
 
 ## Commands

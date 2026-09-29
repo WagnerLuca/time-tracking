@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Multi-stage build for SvelteKit with SSR support
 # Use BUILDPLATFORM for build stage to avoid QEMU issues with npm
 FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
@@ -6,10 +7,12 @@ FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy package files first (for better layer caching)
-COPY package*.json ./
+COPY package*.json .npmrc ./
 
-# Install all dependencies (including @sveltejs/adapter-node)
-RUN npm ci
+# Install all dependencies (including @sveltejs/adapter-node). @wagnerluca/ui
+# comes from GitHub Packages (see .npmrc), which needs a read:packages token,
+# passed as a BuildKit secret so it never lands in an image layer.
+RUN --mount=type=secret,id=NODE_AUTH_TOKEN     if [ ! -s /run/secrets/NODE_AUTH_TOKEN ]; then       echo "ERROR: NODE_AUTH_TOKEN secret not provided to the build (needed to install @wagnerluca/ui from GitHub Packages)" >&2;       exit 1;     fi &&     NODE_AUTH_TOKEN="$(cat /run/secrets/NODE_AUTH_TOKEN)" npm ci
 
 # Copy source code
 COPY . ./

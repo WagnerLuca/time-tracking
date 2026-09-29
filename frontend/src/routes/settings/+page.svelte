@@ -220,13 +220,6 @@
 		orgContext.select(orgId);
 	}
 
-	function formatThemeName(themeName: string): string {
-		return themeName
-			.split(/[-_]/g)
-			.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-			.join(' ');
-	}
-
 	async function handleSaveProfile() {
 		profileError = '';
 		profileSuccess = '';
@@ -812,36 +805,16 @@
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
 				<h2 class="card-title text-base">Theme</h2>
-				<p class="text-sm text-base-content/60 mb-4">Choose your preferred theme. The active tile is highlighted, and each tile previews its look.</p>
+				<p class="text-sm text-base-content/60 mb-4">Light or dark. The choice is shared with the other Wagner Luca apps.</p>
 
-				<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-					{#each theme.themes as t}
+				<div class="join">
+					{#each [{ dark: false, label: 'Light' }, { dark: true, label: 'Dark' }] as opt}
 						<button
 							type="button"
-							class={"group rounded-xl border p-2 text-left transition-all " + (theme.current === t
-								? 'border-primary bg-primary/5 ring-2 ring-primary/25'
-								: 'border-base-300 hover:border-primary/50 hover:bg-base-200/40')}
-							onclick={() => theme.set(t)}
-							aria-pressed={theme.current === t}
-						>
-							<div data-theme={t} class="rounded-lg border border-base-300 bg-base-100 p-3 shadow-sm">
-								<div class="mb-2 flex items-center justify-between">
-									<span class="text-[0.65rem] font-semibold uppercase tracking-wider text-base-content/70">{formatThemeName(t)}</span>
-									{#if theme.current === t}
-										<span class="badge badge-primary badge-xs">Active</span>
-									{/if}
-								</div>
-								<div class="space-y-1.5">
-									<div class="h-1.5 w-full rounded bg-primary"></div>
-									<div class="h-1.5 w-3/4 rounded bg-secondary"></div>
-									<div class="h-1.5 w-1/2 rounded bg-accent"></div>
-									<div class="mt-2 flex gap-1">
-										<span class="badge badge-primary badge-xs">Aa</span>
-										<span class="badge badge-outline badge-xs">UI</span>
-									</div>
-								</div>
-							</div>
-						</button>
+							class="btn btn-sm join-item {theme.isDark === opt.dark ? 'btn-neutral' : 'btn-ghost border-base-300'}"
+							onclick={() => theme.set(opt.dark)}
+							aria-pressed={theme.isDark === opt.dark}
+						>{opt.label}</button>
 					{/each}
 				</div>
 			</div>

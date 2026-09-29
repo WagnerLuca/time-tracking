@@ -4,10 +4,10 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<script>
-			// Apply saved theme before first paint to prevent flash
+			// Apply the shared Wagner Luca light/dark choice before first paint (see stores/theme.svelte.ts)
 			(function() {
-				var t = localStorage.getItem('time-tracking-theme');
-				if (t) document.documentElement.setAttribute('data-theme', t);
+				var t = localStorage.getItem('wl-theme');
+				if (t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.classList.add('dark');
 			})();
 		</script>
 		%sveltekit.head%

@@ -1,4 +1,68 @@
 @import "tailwindcss";
+@import "@wagnerluca/ui/tokens.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
+
+/*
+  DaisyUI is kept for its components, but its only theme is the Wagner Luca
+  one: every colour is a var() onto @wagnerluca/ui's tokens.css, so the
+  `.dark` class (see stores/theme.svelte.ts) flips light/dark without a second
+  DaisyUI theme. Zeiterfassung's module accent is `time` (sage).
+*/
 @plugin "daisyui" {
-  themes: all;
+  themes: false;
+}
+
+@plugin "daisyui/theme" {
+  name: "wagnerluca";
+  default: true;
+  color-scheme: light;
+
+  --color-base-100: var(--color-surface);
+  --color-base-200: var(--color-bg-alt);
+  --color-base-300: var(--color-border);
+  --color-base-content: var(--color-text);
+
+  --color-primary: var(--accent-time-strong);
+  --color-primary-content: var(--on-accent);
+  --color-secondary: var(--accent-teal-strong);
+  --color-secondary-content: var(--on-accent);
+  --color-accent: var(--accent-future-strong);
+  --color-accent-content: var(--on-accent);
+  --color-neutral: var(--color-text);
+  --color-neutral-content: var(--color-bg);
+
+  --color-info: var(--accent-school-strong);
+  --color-info-content: var(--on-accent);
+  --color-success: var(--accent-time-strong);
+  --color-success-content: var(--on-accent);
+  --color-warning: var(--accent-mustard-strong);
+  --color-warning-content: var(--on-accent);
+  --color-error: var(--accent-danger-strong);
+  --color-error-content: var(--on-accent);
+
+  --radius-box: 22px;
+  --radius-field: 10px;
+  --radius-selector: 0.5rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+@theme {
+  --font-sans: 'Inter Variable', Inter, sans-serif;
+  --font-display: 'Space Grotesk Variable', 'Space Grotesk', sans-serif;
+}
+
+body {
+  background: var(--color-bg);
+}
+
+h1, h2, h3, .card-title {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
