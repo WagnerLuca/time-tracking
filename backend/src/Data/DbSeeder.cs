@@ -423,6 +423,16 @@ public static class DbSeeder
         context.TimeEntries.AddRange(annaEntries);
         context.TimeEntries.AddRange(tomEntries);
 
+        // Demo failure entry: a timer Tom "forgot" yesterday. FailureEntryService stops it at the
+        // business day end on its first run after startup and flags it for correction.
+        var yesterday = DateTime.UtcNow.Date.AddDays(-1);
+        context.TimeEntries.Add(new TimeEntry
+        {
+            UserId = tom.Id, OrganizationId = org.Id, Description = "Forgot to stop the timer",
+            StartTime = yesterday.AddHours(7), IsRunning = true,
+            CreatedAt = yesterday.AddHours(7), UpdatedAt = yesterday.AddHours(7)
+        });
+
         // Extra user time entries
         for (int i = 0; i < extraUserEntities.Count; i++)
         {
