@@ -183,7 +183,7 @@ public class TimeEntryExportService : ITimeEntryExportService
         if (membership == null)
             return ServiceResult.Forbidden<ImportPreviewResponse>("You are not a member of this organization.");
 
-        if (org.CsvImportMode == RuleMode.Disabled)
+        if (await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.CsvImport) == RuleMode.Disabled)
             return ServiceResult.Forbidden<ImportPreviewResponse>("CSV import is disabled in this organization.");
 
         var csvText = Encoding.UTF8.GetString(csvData);
@@ -279,9 +279,10 @@ public class TimeEntryExportService : ITimeEntryExportService
         if (membership == null)
             return ServiceResult.Forbidden<ImportResultResponse>("You are not a member of this organization.");
 
-        if (org.CsvImportMode == RuleMode.Disabled)
+        var csvImportMode = await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.CsvImport);
+        if (csvImportMode == RuleMode.Disabled)
             return ServiceResult.Forbidden<ImportResultResponse>("CSV import is disabled in this organization.");
-        if (org.CsvImportMode == RuleMode.RequiresApproval)
+        if (csvImportMode == RuleMode.RequiresApproval)
             return ServiceResult.Forbidden<ImportResultResponse>(
                 "CSV import requires admin approval in this organization. Please submit a request.");
 

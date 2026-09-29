@@ -167,7 +167,8 @@ public class TimeTrackingService : ITimeTrackingService
 
             if (org != null)
             {
-                var check = OrgRuleHelper.EnforceAllowed<TimeEntryResponse>(org.EditPastEntriesMode, "Editing past entries");
+                var check = OrgRuleHelper.EnforceAllowed<TimeEntryResponse>(
+                    await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.EditPastEntry), "Editing past entries");
                 if (check != null) return check;
             }
         }
@@ -212,7 +213,8 @@ public class TimeTrackingService : ITimeTrackingService
                     .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId);
                 if (pauseOrg != null)
                 {
-                    var check = OrgRuleHelper.EnforceAllowed<TimeEntryResponse>(pauseOrg.EditPauseMode, "Editing pause duration");
+                    var check = OrgRuleHelper.EnforceAllowed<TimeEntryResponse>(
+                        await EffectiveRuleResolver.ResolveAsync(_context, pauseOrg, userId, RequestType.EditPause), "Editing pause duration");
                     if (check != null) return check;
                 }
             }

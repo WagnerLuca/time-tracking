@@ -60,7 +60,8 @@ public class WorkScheduleService : IWorkScheduleService
         if (membership == null)
             return ServiceResult.Forbidden<WorkScheduleResponse>();
 
-        var ruleModeError = CheckRuleMode(org.WorkScheduleChangeMode, "Schedule changes");
+        var ruleModeError = CheckRuleMode(
+            await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.WorkScheduleChange), "Schedule changes");
         if (ruleModeError != null)
             return ServiceResult.Fail<WorkScheduleResponse>(ruleModeError.Value.Type, ruleModeError.Value.Message);
 
@@ -88,7 +89,8 @@ public class WorkScheduleService : IWorkScheduleService
         if (membership == null)
             return ServiceResult.Forbidden<WorkScheduleResponse>();
 
-        var ruleModeError = CheckRuleMode(org.WorkScheduleChangeMode, "Schedule changes");
+        var ruleModeError = CheckRuleMode(
+            await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.WorkScheduleChange), "Schedule changes");
         if (ruleModeError != null)
             return ServiceResult.Fail<WorkScheduleResponse>(ruleModeError.Value.Type, ruleModeError.Value.Message);
 
@@ -114,7 +116,8 @@ public class WorkScheduleService : IWorkScheduleService
         if (membership == null)
             return ServiceResult.Forbidden("You are not a member of this organization.");
 
-        var ruleModeError = CheckRuleMode(org.WorkScheduleChangeMode, "Schedule changes");
+        var ruleModeError = CheckRuleMode(
+            await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.WorkScheduleChange), "Schedule changes");
         if (ruleModeError != null)
             return ServiceResult.Fail(ruleModeError.Value.Type, ruleModeError.Value.Message);
 
@@ -140,9 +143,10 @@ public class WorkScheduleService : IWorkScheduleService
         if (membership == null)
             return ServiceResult.NotFound<MemberInitialOvertimeResponse>("You are not a member of this organization.");
 
-        if (org.InitialOvertimeMode == RuleMode.Disabled)
+        var initialOvertimeMode = await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.SetInitialOvertime);
+        if (initialOvertimeMode == RuleMode.Disabled)
             return ServiceResult.BadRequest<MemberInitialOvertimeResponse>("Initial overtime is disabled for this organization.");
-        if (org.InitialOvertimeMode == RuleMode.RequiresApproval)
+        if (initialOvertimeMode == RuleMode.RequiresApproval)
             return ServiceResult.BadRequest<MemberInitialOvertimeResponse>("Initial overtime requires admin approval. Please submit a request.");
 
         membership.InitialOvertimeHours = request.InitialOvertimeHours;
