@@ -56,14 +56,7 @@ public class RequestService : IRequestService
                     RespondedAt = DateTime.UtcNow
                 };
                 _context.OrgRequests.Add(autoRequest);
-                _context.UserOrganizations.Add(new UserOrganization
-                {
-                    UserId = userId,
-                    OrganizationId = org.Id,
-                    Role = OrganizationRole.Member,
-                    IsActive = true,
-                    JoinedAt = DateTime.UtcNow
-                });
+                await Memberships.ActivateAsync(_context, userId, org, OrganizationRole.Member);
                 await _context.SaveChangesAsync();
                 _cache.Remove($"org_role:{slug}:{userId}");
                 autoRequest.User = user;
@@ -386,14 +379,7 @@ public class RequestService : IRequestService
         switch (orgRequest.Type)
         {
             case RequestType.JoinOrganization:
-                _context.UserOrganizations.Add(new UserOrganization
-                {
-                    UserId = orgRequest.UserId,
-                    OrganizationId = org.Id,
-                    Role = OrganizationRole.Member,
-                    IsActive = true,
-                    JoinedAt = DateTime.UtcNow
-                });
+                await Memberships.ActivateAsync(_context, orgRequest.UserId, org, OrganizationRole.Member);
                 break;
 
             case RequestType.SetInitialOvertime:

@@ -67,7 +67,7 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasIndex("CustomTypeId");
 
-                    b.HasIndex("OrganizationId");
+                    b.HasIndex("OrganizationId", "Date");
 
                     b.HasIndex("UserId", "OrganizationId", "Date")
                         .IsUnique();
@@ -114,7 +114,8 @@ namespace TimeTracking.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OrganizationId", "Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsActive\"");
 
                     b.ToTable("AbsenceTypeDefinitions");
                 });
@@ -366,6 +367,8 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasIndex("OrganizationId");
 
+                    b.HasIndex("UserId", "CreatedAt");
+
                     b.HasIndex("UserId", "IsRead");
 
                     b.ToTable("Notifications");
@@ -527,7 +530,8 @@ namespace TimeTracking.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Slug")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsActive\"");
 
                     b.ToTable("Organizations");
                 });
@@ -651,9 +655,13 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrganizationId");
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasFilter("\"IsRunning\"");
 
-                    b.HasIndex("UserId", "IsRunning");
+                    b.HasIndex("OrganizationId", "StartTime");
+
+                    b.HasIndex("UserId", "StartTime");
 
                     b.ToTable("TimeEntries");
                 });
@@ -684,12 +692,6 @@ namespace TimeTracking.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<string>("GitHubId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("GitHubUsername")
-                        .HasColumnType("text");
-
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -709,12 +711,6 @@ namespace TimeTracking.Api.Migrations
                     b.Property<string>("ProfileImageUrl")
                         .HasColumnType("text");
 
-                    b.Property<string>("RefreshToken")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("RefreshTokenExpiryTime")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("TotpSecretKey")
                         .HasColumnType("text");
 
@@ -733,9 +729,6 @@ namespace TimeTracking.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
-                        .IsUnique();
-
-                    b.HasIndex("GitHubId")
                         .IsUnique();
 
                     b.ToTable("Users");

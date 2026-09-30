@@ -18,17 +18,6 @@ public class TimeTrackingService : ITimeTrackingService
 
     public async Task<ServiceResult<TimeEntryResponse>> StartAsync(int userId, StartTimeEntryRequest? request)
     {
-        // Stop any currently running entry
-        var running = await _context.TimeEntries
-            .FirstOrDefaultAsync(e => e.UserId == userId && e.IsRunning);
-
-        if (running != null)
-        {
-            running.EndTime = DateTime.UtcNow;
-            running.IsRunning = false;
-            running.UpdatedAt = DateTime.UtcNow;
-        }
-
         // Resolve organization
         int? orgId = request?.OrganizationId;
         if (orgId == null && !string.IsNullOrWhiteSpace(request?.OrganizationSlug))
@@ -53,6 +42,20 @@ public class TimeTrackingService : ITimeTrackingService
                 return ServiceResult.Forbidden<TimeEntryResponse>("You are not a member of this organization.");
         }
 
+        // Stop a running entry first — exactly like an explicit stop, including pause rules —
+        // and persist that before inserting, so the one-running-timer index is never violated
+        var running = await _context.TimeEntries
+            .Include(e => e.Organization)
+            .FirstOrDefaultAsync(e => e.UserId == userId && e.IsRunning);
+        if (running != null)
+        {
+            running.EndTime = DateTime.UtcNow;
+            running.IsRunning = false;
+            running.UpdatedAt = DateTime.UtcNow;
+            await ApplyPauseRulesAsync(running);
+            await _context.SaveChangesAsync();
+        }
+
         var entry = new TimeEntry
         {
             UserId = userId,
@@ -65,7 +68,16 @@ public class TimeTrackingService : ITimeTrackingService
         };
 
         _context.TimeEntries.Add(entry);
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
+        {
+            // A concurrent start (double click, RFID double-read) won the race
+            _context.Entry(entry).State = EntityState.Detached;
+            return ServiceResult.Conflict<TimeEntryResponse>("A timer is already running.");
+        }
         _logger.LogInformation("Time entry {EntryId} started by user {UserId}", entry.Id, userId);
 
         // Reload organization name for response

@@ -26,6 +26,18 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<GroupMember> GroupMembers { get; set; }
     public DbSet<ApiKey> ApiKeys { get; set; }
 
+    /// <summary>
+    /// Every DateTime is stored and compared as UTC. Values arriving without a kind (e.g.
+    /// "2026-03-03T10:00" from a client, or a date-only query parameter) are taken as UTC,
+    /// local ones are converted. Without this, Postgres rejects them for timestamptz while
+    /// the InMemory provider silently accepts them. Applies to query parameters too.
+    /// </summary>
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
+        configurationBuilder.Properties<DateTime?>().HaveConversion<UtcNullableDateTimeConverter>();
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -40,15 +52,14 @@ public class TimeTrackingDbContext : DbContext
             entity.Property(e => e.FirstName).IsRequired().HasMaxLength(100);
             entity.Property(e => e.LastName).IsRequired().HasMaxLength(100);
             entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
-            
+
             if (isInMemory)
                 entity.Property(e => e.CreatedAt).IsRequired();
             else
                 entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
-            
+
             // Create unique indexes
             entity.HasIndex(e => e.Email).IsUnique();
-            entity.HasIndex(e => e.GitHubId).IsUnique();
         });
 
         // Configure Organization entity
@@ -59,14 +70,15 @@ public class TimeTrackingDbContext : DbContext
             entity.Property(e => e.Slug).IsRequired().HasMaxLength(100);
             entity.Property(e => e.TimeZone).IsRequired().HasMaxLength(64).HasDefaultValue("Europe/Berlin");
             entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
-            
+
             if (isInMemory)
                 entity.Property(e => e.CreatedAt).IsRequired();
             else
                 entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
-            
+
             // Create unique index on Slug
-            entity.HasIndex(e => e.Slug).IsUnique();
+            // Only live organizations reserve their slug, so a deleted org's slug can be reused
+            entity.HasIndex(e => e.Slug).IsUnique().HasFilter("\"IsActive\"");
 
             // Global query filter: automatically exclude soft-deleted organizations
             entity.HasQueryFilter(e => e.IsActive);
@@ -78,12 +90,12 @@ public class TimeTrackingDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Role).IsRequired();
             entity.Property(e => e.IsActive).IsRequired().HasDefaultValue(true);
-            
+
             if (isInMemory)
                 entity.Property(e => e.JoinedAt).IsRequired();
             else
                 entity.Property(e => e.JoinedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
-            
+
             // Create unique index on UserId and OrganizationId combination
             entity.HasIndex(e => new { e.UserId, e.OrganizationId }).IsUnique();
 
@@ -93,13 +105,13 @@ public class TimeTrackingDbContext : DbContext
 
             // Global query filter: automatically exclude soft-deleted memberships
             entity.HasQueryFilter(e => e.IsActive);
-            
+
             // Configure relationships
             entity.HasOne(e => e.User)
                 .WithMany(u => u.UserOrganizations)
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
-                
+
             entity.HasOne(e => e.Organization)
                 .WithMany(o => o.UserOrganizations)
                 .HasForeignKey(e => e.OrganizationId)
@@ -113,15 +125,15 @@ public class TimeTrackingDbContext : DbContext
             entity.Property(e => e.Token).IsRequired();
             entity.Property(e => e.ExpiresAt).IsRequired();
             entity.Property(e => e.IsRevoked).IsRequired().HasDefaultValue(false);
-            
+
             if (isInMemory)
                 entity.Property(e => e.CreatedAt).IsRequired();
             else
                 entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
-            
+
             // Create unique index on Token
             entity.HasIndex(e => e.Token).IsUnique();
-            
+
             // Configure relationship
             entity.HasOne(e => e.User)
                 .WithMany()
@@ -142,8 +154,11 @@ public class TimeTrackingDbContext : DbContext
             else
                 entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            // Index for quick lookup of running entries per user
-            entity.HasIndex(e => new { e.UserId, e.IsRunning });
+            // At most one running timer per user — enforced by the database, not just by the
+            // check-then-insert in StartAsync (races, double-read RFID badges)
+            entity.HasIndex(e => e.UserId).IsUnique().HasFilter("\"IsRunning\"");
+            entity.HasIndex(e => new { e.UserId, e.StartTime });
+            entity.HasIndex(e => new { e.OrganizationId, e.StartTime });
 
             // Configure relationships
             entity.HasOne(e => e.User)
@@ -261,6 +276,7 @@ public class TimeTrackingDbContext : DbContext
                 entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasIndex(e => new { e.UserId, e.OrganizationId, e.Date }).IsUnique();
+            entity.HasIndex(e => new { e.OrganizationId, e.Date });
 
             // Keep dependent rows hidden when the parent organization is soft-deleted.
             entity.HasQueryFilter(e => e.Organization.IsActive);
@@ -294,7 +310,8 @@ public class TimeTrackingDbContext : DbContext
             else
                 entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            entity.HasIndex(e => new { e.OrganizationId, e.Name }).IsUnique();
+            // Deleted (inactive) types free their name for reuse
+            entity.HasIndex(e => new { e.OrganizationId, e.Name }).IsUnique().HasFilter("\"IsActive\"");
 
             // Keep dependent rows hidden when the parent organization is soft-deleted.
             entity.HasQueryFilter(e => e.Organization.IsActive);
@@ -347,6 +364,7 @@ public class TimeTrackingDbContext : DbContext
                 entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasIndex(e => new { e.UserId, e.IsRead });
+            entity.HasIndex(e => new { e.UserId, e.CreatedAt });
 
             entity.HasOne(e => e.User)
                 .WithMany()

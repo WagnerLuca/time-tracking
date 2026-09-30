@@ -38,16 +38,6 @@ public class TokenService : ITokenService
             new("lastName", user.LastName)
         };
 
-        // Add GitHub claims if available
-        if (!string.IsNullOrEmpty(user.GitHubId))
-        {
-            claims.Add(new Claim("githubId", user.GitHubId));
-        }
-        if (!string.IsNullOrEmpty(user.GitHubUsername))
-        {
-            claims.Add(new Claim("githubUsername", user.GitHubUsername));
-        }
-
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var expiry = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes);
