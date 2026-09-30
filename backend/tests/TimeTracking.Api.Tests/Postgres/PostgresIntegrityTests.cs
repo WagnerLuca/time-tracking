@@ -89,4 +89,30 @@ public class PostgresIntegrityTests
             new { email = "case@pg.TEST", password = "StrongPass1!", firstName = "C", lastName = "D" });
         dup.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
+
+    [Fact]
+    public async Task ConcurrentApprovals_ApplyOnlyOnce()
+    {
+        var (owner, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "pg-approve-owner@pg.test");
+        var org = await TestHelpers.CreateOrganizationAsync(owner, "Approve Org", "pg-approve-org");
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/settings", new { csvImportMode = 1 /* RequiresApproval */ })).EnsureSuccessStatusCode();
+        var (member, m) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "pg-approve-m@pg.test");
+        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members", new { userId = m.User.Id })).EnsureSuccessStatusCode();
+
+        var data = JsonSerializer.Serialize(new
+        {
+            entries = new[] { new { date = "2026-03-02", startTime = "08:00", endTime = "12:00", pauseMinutes = 0, description = "once" } }
+        });
+        var id = (await (await member.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/requests", new { type = 5, requestData = data }))
+            .Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+
+        // Status is a concurrency token: only one of several simultaneous approvals may apply the import
+        var results = await Task.WhenAll(Enumerable.Range(0, 4)
+            .Select(_ => owner.PutAsJsonAsync($"/api/v1/organizations/{org.Slug}/requests/{id}", new { accept = true })));
+        results.Count(r => r.IsSuccessStatusCode).Should().Be(1);
+        results.Should().OnlyContain(r => r.IsSuccessStatusCode || r.StatusCode == HttpStatusCode.Conflict || r.StatusCode == HttpStatusCode.BadRequest);
+
+        var history = await member.GetFromJsonAsync<JsonElement>("/api/v1/TimeTracking?limit=50");
+        history.GetProperty("items").EnumerateArray().Count(e => e.GetProperty("description").GetString() == "once").Should().Be(1);
+    }
 }

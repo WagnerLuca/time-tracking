@@ -201,6 +201,9 @@ public class TimeTrackingService : ITimeTrackingService
             }
         }
 
+        var timesChanged = (request.StartTime.HasValue && request.StartTime.Value != entry.StartTime)
+                           || (request.EndTime.HasValue && request.EndTime.Value != entry.EndTime);
+
         if (request.StartTime.HasValue)  entry.StartTime = request.StartTime.Value;
         if (request.EndTime.HasValue)
         {
@@ -252,9 +255,10 @@ public class TimeTrackingService : ITimeTrackingService
             }
             entry.PauseDurationMinutes = Math.Max(0, request.PauseDurationMinutes.Value);
         }
-        else
+        else if (timesChanged)
         {
-            entry.PauseDurationMinutes = 0;
+            // New times, no explicit pause: recompute it from the rules. Otherwise keep the
+            // current pause, so editing e.g. the description never wipes a manually set pause.
             await ApplyPauseRulesAsync(entry);
         }
 
@@ -296,28 +300,7 @@ public class TimeTrackingService : ITimeTrackingService
     //  Private helpers
     // ────────────────────────────────────────────────────
 
-    private async Task ApplyPauseRulesAsync(TimeEntry entry)
-    {
-        if (entry.OrganizationId == null || !entry.EndTime.HasValue) return;
-
-        var org = await _context.Organizations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId && o.AutoPauseEnabled);
-        if (org == null) return;
-
-        var workHours = (entry.EndTime.Value - entry.StartTime).TotalHours;
-
-        var rule = await _context.PauseRules
-            .AsNoTracking()
-            .Where(pr => pr.OrganizationId == entry.OrganizationId && pr.MinHours <= workHours)
-            .OrderByDescending(pr => pr.MinHours)
-            .FirstOrDefaultAsync();
-
-        if (rule != null)
-        {
-            entry.PauseDurationMinutes = rule.PauseMinutes;
-        }
-    }
+    private Task ApplyPauseRulesAsync(TimeEntry entry) => PauseRules.ApplyAsync(_context, entry);
 
     private static TimeEntryResponse MapToResponse(TimeEntry entry)
     {

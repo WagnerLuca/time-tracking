@@ -205,7 +205,8 @@ public class TimeTrackingDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Message).HasMaxLength(500);
-            entity.Property(e => e.Status).IsRequired();
+            // Concurrency token: two admins answering the same request cannot both apply it
+            entity.Property(e => e.Status).IsRequired().IsConcurrencyToken();
             entity.Property(e => e.Type).IsRequired();
             entity.Property(e => e.RequestData).HasMaxLength(50000);
 

@@ -214,9 +214,6 @@ public class RequestService : IRequestService
                 return ServiceResult.Forbidden<OrgRequestResponse>();
         }
 
-        if (orgRequest == null)
-            return ServiceResult.NotFound<OrgRequestResponse>("Request not found.");
-
         if (orgRequest.Status != RequestStatus.Pending)
             return ServiceResult.BadRequest<OrgRequestResponse>("This request has already been responded to.");
 
@@ -224,17 +221,24 @@ public class RequestService : IRequestService
         orgRequest.RespondedAt = DateTime.UtcNow;
         orgRequest.RespondedByUserId = callerUserId;
 
-        // Apply side effects on acceptance
+        // Apply side effects on acceptance. They are only staged here and saved together with
+        // the status below, so an approval applies completely or not at all.
         if (request.Accept)
         {
-            await ApplyAcceptanceSideEffectsAsync(orgRequest, org);
+            var error = await ApplyAcceptanceSideEffectsAsync(orgRequest, org);
+            if (error != null)
+                return ServiceResult.BadRequest<OrgRequestResponse>(
+                    $"The request cannot be applied: {error} Decline it and ask for a new one.");
         }
 
-        await _context.SaveChangesAsync();
-
-        // Evict cached role for the affected user (join requests add new members)
-        if (request.Accept && orgRequest.Type == RequestType.JoinOrganization)
+        try
         {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Status is a concurrency token: another admin answered this request at the same time
+            return ServiceResult.Conflict<OrgRequestResponse>("This request has already been responded to.");
         }
 
         _logger.LogInformation("Request {RequestId} {Action} by user {UserId}", requestId, request.Accept ? "accepted" : "declined", callerUserId);
@@ -369,7 +373,22 @@ public class RequestService : IRequestService
     //  Private helpers
     // ────────────────────────────────────────────────────
 
-    private async Task ApplyAcceptanceSideEffectsAsync(OrgRequest orgRequest, Organization org)
+    private static readonly JsonSerializerOptions RequestDataJson = new() { PropertyNameCaseInsensitive = true };
+
+    /// <summary>Stages the effects of an accepted request (no save). Returns an error message when they cannot be applied.</summary>
+    private async Task<string?> ApplyAcceptanceSideEffectsAsync(OrgRequest orgRequest, Organization org)
+    {
+        try
+        {
+            return await ApplyAcceptanceSideEffectsCoreAsync(orgRequest, org);
+        }
+        catch (JsonException)
+        {
+            return "Its data is invalid.";
+        }
+    }
+
+    private async Task<string?> ApplyAcceptanceSideEffectsCoreAsync(OrgRequest orgRequest, Organization org)
     {
         switch (orgRequest.Type)
         {
@@ -398,22 +417,20 @@ public class RequestService : IRequestService
                         .FirstOrDefaultAsync(e => e.Id == orgRequest.RelatedEntityId.Value
                                                && e.OrganizationId == org.Id
                                                && e.UserId == orgRequest.UserId);
-                    if (entry != null)
+                    if (entry == null)
+                        return "The time entry no longer exists.";
+
+                    var data = JsonSerializer.Deserialize<EditEntryRequestData>(orgRequest.RequestData, RequestDataJson);
+                    if (data != null)
                     {
-                        try
-                        {
-                            var data = JsonSerializer.Deserialize<EditEntryRequestData>(
-                                orgRequest.RequestData,
-                                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                            if (data != null)
-                            {
-                                if (data.StartTime.HasValue) entry.StartTime = data.StartTime.Value;
-                                if (data.EndTime.HasValue)   { entry.EndTime = data.EndTime.Value; entry.IsFailure = false; }
-                                if (data.Description != null) entry.Description = data.Description;
-                                entry.UpdatedAt = DateTime.UtcNow;
-                            }
-                        }
-                        catch { /* invalid JSON, skip */ }
+                        var timesChanged = data.StartTime.HasValue || data.EndTime.HasValue;
+                        if (data.StartTime.HasValue) entry.StartTime = data.StartTime.Value;
+                        if (data.EndTime.HasValue)   { entry.EndTime = data.EndTime.Value; entry.IsFailure = false; }
+                        if (data.Description != null) entry.Description = data.Description;
+                        if (entry.EndTime.HasValue && entry.EndTime.Value <= entry.StartTime)
+                            return "The end time would be before the start time.";
+                        if (timesChanged) await PauseRules.ApplyAsync(_context, entry);
+                        entry.UpdatedAt = DateTime.UtcNow;
                     }
                 }
                 break;
@@ -436,54 +453,32 @@ public class RequestService : IRequestService
             case RequestType.WorkScheduleChange:
                 if (orgRequest.RequestData != null)
                 {
-                    try
-                    {
-                        var scheduleData = JsonSerializer.Deserialize<WorkScheduleChangeRequestData>(
-                            orgRequest.RequestData,
-                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                        if (scheduleData != null)
-                        {
-                            await ApplyWorkScheduleChangeAsync(orgRequest.UserId, org.Id, scheduleData);
-                        }
-                    }
-                    catch { /* invalid JSON — request is accepted but schedule unchanged */ }
+                    var scheduleData = JsonSerializer.Deserialize<WorkScheduleChangeRequestData>(orgRequest.RequestData, RequestDataJson);
+                    if (scheduleData != null)
+                        await ApplyWorkScheduleChangeAsync(orgRequest.UserId, org.Id, scheduleData);
                 }
                 break;
 
             case RequestType.CsvImport:
                 if (orgRequest.RequestData != null)
                 {
-                    try
-                    {
-                        var importData = JsonSerializer.Deserialize<CsvImportRequestData>(
-                            orgRequest.RequestData,
-                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                        if (importData?.Entries != null)
-                        {
-                            await ApplyCsvImportAsync(orgRequest.UserId, org, importData.Entries);
-                        }
-                    }
-                    catch { /* invalid JSON — request is accepted but entries not imported */ }
+                    var importData = JsonSerializer.Deserialize<CsvImportRequestData>(orgRequest.RequestData, RequestDataJson);
+                    if (importData?.Entries != null)
+                        await ApplyCsvImportAsync(orgRequest.UserId, org, importData.Entries);
                 }
                 break;
 
             case RequestType.RequestAbsence:
                 if (orgRequest.RequestData != null)
                 {
-                    try
-                    {
-                        var absenceData = JsonSerializer.Deserialize<AbsenceRequestData>(
-                            orgRequest.RequestData,
-                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                        if (absenceData != null)
-                        {
-                            await ApplyAbsenceRequestAsync(orgRequest, org, absenceData);
-                        }
-                    }
-                    catch { /* invalid JSON — request is accepted but absences not created */ }
+                    var absenceData = JsonSerializer.Deserialize<AbsenceRequestData>(orgRequest.RequestData, RequestDataJson);
+                    if (absenceData != null)
+                        await ApplyAbsenceRequestAsync(orgRequest, org, absenceData);
                 }
                 break;
         }
+
+        return null;
     }
 
     /// <summary>
@@ -610,9 +605,6 @@ public class RequestService : IRequestService
             });
             imported++;
         }
-
-        if (imported > 0)
-            await _context.SaveChangesAsync();
 
         _logger.LogInformation("CSV import approved: {Count} entries created for user {UserId} in org {OrgId}",
             imported, userId, org.Id);

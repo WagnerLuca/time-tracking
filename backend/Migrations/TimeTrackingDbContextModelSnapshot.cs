@@ -411,6 +411,7 @@ namespace TimeTracking.Api.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer");
 
                     b.Property<int>("Type")
