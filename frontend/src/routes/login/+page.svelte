@@ -147,8 +147,10 @@
 					</div>
 
 					<div class="mb-5">
-						<!-- TODO(backend): link "Passwort vergessen?" to the password-reset flow once the endpoints exist -->
-						<label for="password" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.password')}</label>
+						<div class="flex items-baseline justify-between gap-2 mb-1.5">
+							<label for="password" class="block font-medium text-base-content/80 text-sm">{t('auth.password')}</label>
+							<a href="/forgot-password" class="link link-primary text-xs">{t('auth.login.forgot')}</a>
+						</div>
 						<input
 							id="password"
 							type="password"

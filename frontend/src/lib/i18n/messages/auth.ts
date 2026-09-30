@@ -11,7 +11,8 @@ export const de = {
 		submitting: 'Wird angemeldet…',
 		failed: 'Anmeldung fehlgeschlagen. Bitte E-Mail und Passwort prüfen.',
 		noAccount: 'Noch kein Konto?',
-		register: 'Konto erstellen'
+		register: 'Konto erstellen',
+		forgot: 'Passwort vergessen?'
 	},
 	twoFactor: {
 		title: 'Zwei-Faktor-Authentifizierung',
@@ -22,6 +23,38 @@ export const de = {
 		verifying: 'Wird geprüft…',
 		failed: 'Ungültiger Code. Bitte erneut versuchen.',
 		back: 'Zurück zur Anmeldung'
+	},
+	forgot: {
+		pageTitle: 'Passwort vergessen',
+		title: 'Passwort vergessen?',
+		subtitle: 'Gib deine E-Mail-Adresse ein. Wir senden dir einen Link zum Zurücksetzen.',
+		submit: 'Link senden',
+		submitting: 'Wird gesendet…',
+		sent: 'Falls ein Konto mit dieser Adresse existiert, haben wir dir einen Link zum Zurücksetzen gesendet. Bitte prüfe dein Postfach.',
+		failed: 'Die Anfrage konnte nicht gesendet werden. Bitte später erneut versuchen.',
+		back: 'Zurück zur Anmeldung'
+	},
+	reset: {
+		pageTitle: 'Neues Passwort',
+		title: 'Neues Passwort festlegen',
+		subtitle: 'Wähle ein neues Passwort für dein Konto.',
+		newPassword: 'Neues Passwort',
+		submit: 'Passwort speichern',
+		submitting: 'Wird gespeichert…',
+		done: 'Dein Passwort wurde geändert. Du kannst dich jetzt anmelden.',
+		failed: 'Das Passwort konnte nicht zurückgesetzt werden. Der Link ist evtl. abgelaufen.',
+		missingToken: 'Dieser Link ist unvollständig. Bitte fordere einen neuen an.',
+		requestNew: 'Neuen Link anfordern',
+		toLogin: 'Zur Anmeldung'
+	},
+	verify: {
+		pageTitle: 'E-Mail bestätigen',
+		verifying: 'E-Mail-Adresse wird bestätigt…',
+		success: 'Deine E-Mail-Adresse ist bestätigt.',
+		failed: 'Die E-Mail-Adresse konnte nicht bestätigt werden. Der Link ist evtl. abgelaufen oder wurde schon benutzt.',
+		missingToken: 'Dieser Bestätigungslink ist unvollständig.',
+		toApp: 'Zur App',
+		toLogin: 'Zur Anmeldung'
 	},
 	register: {
 		pageTitle: 'Registrieren',
@@ -38,7 +71,8 @@ export const de = {
 		submitting: 'Konto wird erstellt…',
 		failed: 'Registrierung fehlgeschlagen. Bitte erneut versuchen.',
 		haveAccount: 'Schon ein Konto?',
-		login: 'Anmelden'
+		login: 'Anmelden',
+		verifySent: 'Konto erstellt. Wir haben dir eine E-Mail geschickt – bitte bestätige deine Adresse über den Link darin.'
 	}
 };
 
@@ -54,7 +88,8 @@ export const en: typeof de = {
 		submitting: 'Signing in…',
 		failed: 'Sign-in failed. Please check your email and password.',
 		noAccount: "Don't have an account?",
-		register: 'Create one'
+		register: 'Create one',
+		forgot: 'Forgot password?'
 	},
 	twoFactor: {
 		title: 'Two-factor authentication',
@@ -65,6 +100,38 @@ export const en: typeof de = {
 		verifying: 'Verifying…',
 		failed: 'Invalid verification code. Please try again.',
 		back: 'Back to sign in'
+	},
+	forgot: {
+		pageTitle: 'Forgot password',
+		title: 'Forgot your password?',
+		subtitle: "Enter your email address and we'll send you a reset link.",
+		submit: 'Send link',
+		submitting: 'Sending…',
+		sent: 'If an account exists for this address, we have sent you a reset link. Please check your inbox.',
+		failed: 'The request could not be sent. Please try again later.',
+		back: 'Back to sign in'
+	},
+	reset: {
+		pageTitle: 'New password',
+		title: 'Set a new password',
+		subtitle: 'Choose a new password for your account.',
+		newPassword: 'New password',
+		submit: 'Save password',
+		submitting: 'Saving…',
+		done: 'Your password has been changed. You can sign in now.',
+		failed: 'The password could not be reset. The link may have expired.',
+		missingToken: 'This link is incomplete. Please request a new one.',
+		requestNew: 'Request a new link',
+		toLogin: 'Go to sign in'
+	},
+	verify: {
+		pageTitle: 'Confirm email',
+		verifying: 'Confirming your email address…',
+		success: 'Your email address is confirmed.',
+		failed: 'The email address could not be confirmed. The link may have expired or was already used.',
+		missingToken: 'This confirmation link is incomplete.',
+		toApp: 'Go to the app',
+		toLogin: 'Go to sign in'
 	},
 	register: {
 		pageTitle: 'Register',
@@ -81,6 +148,7 @@ export const en: typeof de = {
 		submitting: 'Creating account…',
 		failed: 'Registration failed. Please try again.',
 		haveAccount: 'Already have an account?',
-		login: 'Sign in'
+		login: 'Sign in',
+		verifySent: 'Account created. We have sent you an email – please confirm your address using the link in it.'
 	}
 };

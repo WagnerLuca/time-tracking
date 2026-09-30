@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth.svelte';
 	import { goto } from '$app/navigation';
+	import { toast } from '$lib/stores/toast.svelte';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { t } from '$lib/i18n';
 	import AuthLanguageToggle from '$lib/components/AuthLanguageToggle.svelte';
@@ -32,7 +33,7 @@
 		submitting = true;
 		try {
 			await auth.register({ email: email.trim(), password, firstName: firstName.trim(), lastName: lastName.trim() });
-			// TODO(backend): email verification step once available
+			toast.success(t('auth.register.verifySent'));
 			goto('/organizations');
 		} catch (err) {
 			error = extractErrorMessage(err, t('auth.register.failed'));

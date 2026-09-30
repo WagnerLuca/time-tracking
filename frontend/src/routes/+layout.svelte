@@ -10,7 +10,7 @@
 	import { goto, afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
-	import { requestsApi, timeTrackingApi } from '$lib/apiClient';
+	import { authApi, requestsApi, timeTrackingApi } from '$lib/apiClient';
 	import type { OrgRequestResponse, TimeEntryResponse } from '$lib/api';
 	import { parseRequestData, formatRequestTypeFull, formatRequestType, formatRequestStatus, formatTimeAgo, formatDateTime, formatClock, statusBadgeClass, roleLabel } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
@@ -21,7 +21,7 @@
 
 	let { children } = $props();
 
-	const publicRoutes = ['/login', '/register', '/health'];
+	const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/health'];
 	const isPublicRoute = $derived(publicRoutes.some((r) => page.url.pathname.startsWith(r)));
 
 	// Which nav popup is open (one at a time); Esc or a click outside closes it
@@ -65,6 +65,23 @@
 			timer.refresh().catch(() => {});
 		}
 	});
+
+	// Unconfirmed email: a dismissible hint with a resend button (undefined = older cached user → no hint)
+	let emailHintDismissed = $state(false);
+	let resendingEmail = $state(false);
+	const showEmailHint = $derived(auth.user?.emailConfirmed === false && !emailHintDismissed);
+
+	async function resendVerification() {
+		resendingEmail = true;
+		try {
+			await authApi.apiV1AuthVerifyEmailResendPost();
+			toast.success(t('common.emailVerify.resent'));
+		} catch (err) {
+			toast.error(err, t('common.emailVerify.resendFailed'));
+		} finally {
+			resendingEmail = false;
+		}
+	}
 
 	// 2FA enforcement: the selected org requires 2FA but the user hasn't set it up
 	let requires2faSetup = $derived.by(() => {
@@ -452,6 +469,17 @@
 				</div>
 			</div>
 		{:else}
+			{#if showEmailHint}
+				<div role="status" class="alert alert-info mb-6 max-sm:alert-vertical text-sm">
+					<span>{t('common.emailVerify.notConfirmed')}</span>
+					<div class="flex gap-2">
+						<button type="button" class="btn btn-sm" onclick={resendVerification} disabled={resendingEmail}>
+							{resendingEmail ? t('common.emailVerify.resending') : t('common.emailVerify.resend')}
+						</button>
+						<button type="button" class="btn btn-sm btn-ghost btn-square" onclick={() => (emailHintDismissed = true)} aria-label={t('common.emailVerify.dismiss')} title={t('common.emailVerify.dismiss')}>✕</button>
+					</div>
+				</div>
+			{/if}
 			{#if failures.length > 0}
 				<div role="alert" class="alert alert-error mb-6 max-sm:alert-vertical">
 					<span>
