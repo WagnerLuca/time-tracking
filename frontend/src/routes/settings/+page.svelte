@@ -1,4 +1,5 @@
 <script lang="ts">
+	import QRCode from 'qrcode';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { goto } from '$app/navigation';
@@ -49,6 +50,13 @@
 	// Two-factor authentication
 	let twoFactorStep = $state<'idle' | 'setup' | 'backup'>('idle');
 	let twoFactorSetup = $state<TwoFactorSetupResponse | null>(null);
+	// QR rendered locally — the TOTP secret must never be sent to a third-party QR service
+	let qrDataUrl = $state('');
+	$effect(() => {
+		const uri = twoFactorSetup?.authenticatorUri;
+		qrDataUrl = '';
+		if (uri) QRCode.toDataURL(uri, { width: 200, margin: 1 }).then((url) => (qrDataUrl = url));
+	});
 	let twoFactorConfirmCode = $state('');
 	let twoFactorBackupCodes = $state<string[]>([]);
 	let twoFactorError = $state('');
@@ -370,7 +378,7 @@
 						<div class="flex flex-col items-center gap-4 p-4 bg-base-200/50 rounded-lg border border-base-300">
 							<div class="bg-white p-3 rounded-lg">
 								<img
-									src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={encodeURIComponent(twoFactorSetup.authenticatorUri ?? '')}"
+									src={qrDataUrl}
 									alt={t('settings.twoFactor.qrAlt')}
 									width="200"
 									height="200"

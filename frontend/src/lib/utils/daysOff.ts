@@ -1,4 +1,6 @@
 import { holidayApi, absenceDayApi } from '$lib/apiClient';
+import { toast } from '$lib/stores/toast.svelte';
+import { t } from '$lib/i18n';
 
 export interface DaysOffData {
 	daysOffSet: Set<string>;
@@ -75,7 +77,9 @@ export async function loadDaysOff(orgSlug: string | null | undefined, userId?: n
 		}
 
 		return result;
-	} catch {
+	} catch (err) {
+		// Keep the page usable, but say that holidays/absences are missing from the numbers
+		toast.error(err, t('common.loadFailed'));
 		return emptyDaysOff();
 	}
 }

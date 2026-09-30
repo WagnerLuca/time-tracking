@@ -23,6 +23,7 @@
 		"@sveltejs/kit": "^2.22.0",
 		"@sveltejs/vite-plugin-svelte": "^6.0.0",
 		"@tailwindcss/vite": "^4.2.1",
+		"@types/qrcode": "^1.5.6",
 		"@wagnerluca/ui": "^0.0.2",
 		"daisyui": "^5.5.19",
 		"svelte": "^5.0.0",
@@ -33,6 +34,7 @@
 		"vitest": "^3.2.7"
 	},
 	"dependencies": {
-		"axios": "^1.15.2"
+		"axios": "^1.15.2",
+		"qrcode": "^1.5.4"
 	}
 }
