@@ -9,7 +9,9 @@
 			(function() {
 				var theme = null, lang = null;
 				try { theme = localStorage.getItem('wl-theme'); lang = localStorage.getItem('wl-locale'); } catch (e) {}
-				if (theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.classList.add('dark');
+				var dark = theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+				// Always set one class: newer @wagnerluca/ui tokens follow the OS when neither is present
+				document.documentElement.classList.add(dark ? 'dark' : 'light');
 				document.documentElement.lang = lang === 'en' ? 'en' : 'de';
 			})();
 		</script>

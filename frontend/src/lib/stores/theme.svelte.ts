@@ -12,6 +12,7 @@ function createThemeStore() {
 
 	function apply() {
 		document.documentElement.classList.toggle('dark', isDark);
+		document.documentElement.classList.toggle('light', !isDark);
 	}
 
 	function load() {
