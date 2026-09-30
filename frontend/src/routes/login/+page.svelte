@@ -12,6 +12,12 @@
 
 	// 2FA state
 	let twoFactorCode = $state('');
+	let codeInput = $state<HTMLInputElement>();
+
+	// Focus the code input as soon as the 2FA step appears
+	$effect(() => {
+		if (auth.twoFactorRequired) codeInput?.focus();
+	});
 
 	/** Where to go after login: a same-origin path from ?next= (set by the 401 handler), else the default flow. */
 	const next = $derived.by(() => {
@@ -40,11 +46,7 @@
 		submitting = true;
 		try {
 			const result = await auth.login({ email, password });
-			if (result === '2fa') {
-				// 2FA step — stay on page, show code input
-				submitting = false;
-				return;
-			}
+			if (result === '2fa') return; // 2FA step — stay on page, show code input
 			await navigateAfterLogin();
 		} catch (err) {
 			error = extractErrorMessage(err, 'Login failed. Please check your credentials.');
@@ -58,7 +60,7 @@
 		error = '';
 		submitting = true;
 		try {
-			await auth.verifyTwoFactor(twoFactorCode);
+			await auth.verifyTwoFactor(twoFactorCode.replace(/\s/g, ''));
 			await navigateAfterLogin();
 		} catch (err) {
 			error = extractErrorMessage(err, 'Invalid verification code. Please try again.');
@@ -80,19 +82,20 @@
 
 <div class="min-h-screen flex items-center justify-center bg-base-200 p-4">
 	<div class="card bg-base-100 shadow-lg w-full max-w-[420px]">
-		<div class="card-body p-10">
+		<div class="card-body p-6 sm:p-10">
 			{#if auth.twoFactorRequired}
 				<h1 class="text-2xl font-bold mb-1">Two-Factor Authentication</h1>
 				<p class="text-base-content/60 mb-6">Enter the 6-digit code from your authenticator app</p>
 
 				{#if error}
-					<div class="alert alert-error text-sm mb-4">{error}</div>
+					<div id="loginError" class="alert alert-error text-sm mb-4" role="alert">{error}</div>
 				{/if}
 
 				<form onsubmit={handleTwoFactor}>
 					<div class="mb-5">
 						<label for="twoFactorCode" class="block font-medium mb-1.5 text-base-content/80 text-sm">Verification Code</label>
 						<input
+							bind:this={codeInput}
 							id="twoFactorCode"
 							type="text"
 							inputmode="numeric"
@@ -102,17 +105,19 @@
 							placeholder="000000"
 							maxlength="10"
 							required
+							aria-invalid={!!error}
+							aria-describedby="twoFactorHint{error ? ' loginError' : ''}"
 							disabled={submitting}
 						/>
-						<p class="text-xs text-base-content/50 mt-2">You can also use a backup code.</p>
+						<p id="twoFactorHint" class="text-xs text-base-content/60 mt-2">You can also use a backup code.</p>
 					</div>
 
 					<button type="submit" class="btn btn-primary w-full" disabled={submitting || !twoFactorCode}>
-						{submitting ? 'Verifying...' : 'Verify'}
+						{submitting ? 'Verifying…' : 'Verify'}
 					</button>
 				</form>
 
-				<button type="button" class="btn btn-ghost btn-sm mt-3 w-full" onclick={cancelTwoFactor}>
+				<button type="button" class="btn btn-ghost btn-sm mt-3 w-full" onclick={cancelTwoFactor} disabled={submitting}>
 					Back to Login
 				</button>
 			{:else}
@@ -120,7 +125,7 @@
 				<p class="text-base-content/60 mb-6">Welcome back to Time Tracking</p>
 
 				{#if error}
-					<div class="alert alert-error text-sm mb-4">{error}</div>
+					<div id="loginError" class="alert alert-error text-sm mb-4" role="alert">{error}</div>
 				{/if}
 
 				<form onsubmit={handleLogin}>
@@ -129,6 +134,7 @@
 						<input
 							id="email"
 							type="email"
+							autocomplete="email"
 							class="input input-bordered w-full"
 							bind:value={email}
 							placeholder="you@example.com"
@@ -138,10 +144,12 @@
 					</div>
 
 					<div class="mb-5">
+						<!-- TODO(backend): link "Passwort vergessen?" to the password-reset flow once the endpoints exist -->
 						<label for="password" class="block font-medium mb-1.5 text-base-content/80 text-sm">Password</label>
 						<input
 							id="password"
 							type="password"
+							autocomplete="current-password"
 							class="input input-bordered w-full"
 							bind:value={password}
 							placeholder="••••••••"
@@ -150,8 +158,8 @@
 						/>
 					</div>
 
-					<button type="submit" class="btn btn-primary w-full" disabled={submitting}>
-						{submitting ? 'Signing in...' : 'Sign In'}
+					<button type="submit" class="btn btn-primary w-full" disabled={submitting || !email || !password}>
+						{submitting ? 'Signing in…' : 'Sign in'}
 					</button>
 				</form>
 
