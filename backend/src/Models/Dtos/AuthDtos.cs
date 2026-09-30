@@ -50,6 +50,8 @@ public record LoginResponse
 /// <summary>Authenticated user profile information.</summary>
 public record UserInfo
 {
+    /// <summary>New email address waiting for confirmation (the link was mailed to it), if any.</summary>
+    public string? PendingEmail { get; init; }
     public required int Id { get; init; }
     public required string Email { get; init; }
     public required string FirstName { get; init; }
@@ -107,9 +109,46 @@ public record UpdateProfileRequest
     [MaxLength(100)]
     public string? LastName { get; init; }
 
-    /// <summary>Updated email address.</summary>
+    /// <summary>
+    /// New email address. Not applied directly: a confirmation link is mailed to it and the
+    /// address changes once that link is used. Requires <see cref="CurrentPassword"/>.
+    /// </summary>
     [EmailAddress, MaxLength(255)]
     public string? Email { get; init; }
+
+    /// <summary>Current password; required when changing the email address.</summary>
+    public string? CurrentPassword { get; init; }
+}
+
+/// <summary>Request payload for deleting (anonymizing) the current account.</summary>
+public record DeleteAccountRequest
+{
+    [Required]
+    public required string Password { get; init; }
+}
+
+/// <summary>Request a password reset link for an email address.</summary>
+public record ForgotPasswordRequest
+{
+    [Required, EmailAddress, MaxLength(256)]
+    public required string Email { get; init; }
+}
+
+/// <summary>Set a new password using the token from a reset link.</summary>
+public record ResetPasswordRequest
+{
+    [Required]
+    public required string Token { get; init; }
+
+    [Required, MinLength(8), MaxLength(128)]
+    public required string NewPassword { get; init; }
+}
+
+/// <summary>Confirm an email address (registration or email change) with the token from the link.</summary>
+public record VerifyEmailRequest
+{
+    [Required]
+    public required string Token { get; init; }
 }
 
 // ── Two-Factor Authentication DTOs ──

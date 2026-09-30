@@ -6,7 +6,7 @@ using TimeTracking.Api.Tests.Infrastructure;
 namespace TimeTracking.Api.Tests.Flows;
 
 /// <summary>
-/// End-to-end integration tests that cover complete user journeys 
+/// End-to-end integration tests that cover complete user journeys
 /// spanning multiple controllers and verifying cross-cutting behavior.
 /// </summary>
 public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
@@ -16,7 +16,7 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
     public EndToEndFlowTests(TimeTrackingApiFactory factory) => _factory = factory;
 
     /// <summary>
-    /// Complete user lifecycle: register → create org → configure settings → 
+    /// Complete user lifecycle: register → create org → configure settings →
     /// track time → view history → change password → delete account.
     /// </summary>
     [Fact]
@@ -73,8 +73,12 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
         });
         pwResp.EnsureSuccessStatusCode();
 
-        // 7. Delete account
-        var deleteResp = await client.DeleteAsync("/api/v1/Auth/account");
+        // 7. Owners must delete (or hand over) their organization before deleting the account
+        var blocked = await client.PostAsJsonAsync("/api/v1/Auth/account/delete", new { password = "NewPassword2!" });
+        blocked.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await client.DeleteAsync("/api/v1/Organizations/lifecycle-org")).EnsureSuccessStatusCode();
+
+        var deleteResp = await client.PostAsJsonAsync("/api/v1/Auth/account/delete", new { password = "NewPassword2!" });
         deleteResp.EnsureSuccessStatusCode();
 
         // 8. Verify can't login
@@ -88,7 +92,7 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     /// <summary>
-    /// Multi-user organization flow: Owner creates org → adds members → 
+    /// Multi-user organization flow: Owner creates org → adds members →
     /// members track time → owner views overview → admin creates schedules.
     /// </summary>
     [Fact]
@@ -215,7 +219,7 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     /// <summary>
-    /// Holiday and absence management: owner creates holidays → 
+    /// Holiday and absence management: owner creates holidays →
     /// member creates absence → owner sees absences → admin creates absence for member.
     /// </summary>
     [Fact]

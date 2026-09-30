@@ -10,9 +10,15 @@ public interface IAuthService
     Task<ServiceResult<RefreshTokenResponse>> RefreshTokenAsync(string refreshToken);
     Task<ServiceResult<AuthResponse>> LogoutAsync(int userId, string refreshToken);
     Task<ServiceResult<AuthResponse>> ChangePasswordAsync(int userId, ChangePasswordRequest request);
-    Task<ServiceResult<AuthResponse>> DeleteAccountAsync(int userId);
+    Task<ServiceResult<AuthResponse>> DeleteAccountAsync(int userId, string password);
     Task<ServiceResult<UserInfo>> GetCurrentUserAsync(int userId);
     Task<ServiceResult<UserInfo>> UpdateProfileAsync(int userId, UpdateProfileRequest request);
+
+    // Email verification / change and password reset
+    Task<ServiceResult<AuthResponse>> VerifyEmailAsync(string token);
+    Task<ServiceResult<AuthResponse>> ResendVerificationAsync(int userId);
+    Task<ServiceResult<AuthResponse>> ForgotPasswordAsync(string email);
+    Task<ServiceResult<AuthResponse>> ResetPasswordAsync(ResetPasswordRequest request);
 
     // Two-Factor Authentication
     Task<ServiceResult<LoginResponse>> VerifyTwoFactorAsync(TwoFactorVerifyRequest request);

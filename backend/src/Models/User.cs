@@ -34,6 +34,10 @@ public class User
     [JsonIgnore]
     public string? TwoFactorBackupCodes { get; set; }
 
+    /// <summary>TOTP time step of the last accepted code; a code can never be used twice.</summary>
+    [JsonIgnore]
+    public long? TotpLastStep { get; set; }
+
     // Navigation properties
     [JsonIgnore]
     public ICollection<UserOrganization> UserOrganizations { get; set; } = new List<UserOrganization>();

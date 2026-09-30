@@ -53,100 +53,61 @@ public class TokenService : ITokenService
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    public RefreshToken GenerateRefreshToken(int userId)
-    {
-        var randomNumber = new byte[64];
-        using var rng = RandomNumberGenerator.Create();
-        rng.GetBytes(randomNumber);
+    /// <summary>Lower-case hex SHA-256; refresh tokens are only ever stored and looked up by this hash.</summary>
+    public static string HashToken(string token) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
-        return new RefreshToken
+    public (RefreshToken Entity, string Token) GenerateRefreshToken(int userId)
+    {
+        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+        return (new RefreshToken
         {
             UserId = userId,
-            Token = Convert.ToBase64String(randomNumber),
+            Token = HashToken(token),
             ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays),
             CreatedAt = DateTime.UtcNow,
             IsRevoked = false
-        };
-    }
-
-    public ClaimsPrincipal? ValidateToken(string token)
-    {
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.UTF8.GetBytes(_jwtSettings.Secret);
-
-        try
-        {
-            var principal = tokenHandler.ValidateToken(token, new TokenValidationParameters
-            {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(key),
-                ValidateIssuer = true,
-                ValidIssuer = _jwtSettings.Issuer,
-                ValidateAudience = true,
-                ValidAudience = _jwtSettings.Audience,
-                ValidateLifetime = true,
-                ClockSkew = TimeSpan.Zero
-            }, out var validatedToken);
-
-            return principal;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Token validation failed");
-            return null;
-        }
+        }, token);
     }
 
     public async Task<RefreshToken?> ValidateRefreshTokenAsync(string token)
     {
+        var hash = HashToken(token);
         var refreshToken = await _context.RefreshTokens
-            .AsNoTracking()
             .Include(rt => rt.User)
-            .FirstOrDefaultAsync(rt => rt.Token == token);
+            .FirstOrDefaultAsync(rt => rt.Token == hash);
 
         if (refreshToken == null)
-        {
-            _logger.LogWarning("Refresh token not found: {Token}", token);
             return null;
-        }
 
         if (refreshToken.IsRevoked)
         {
-            _logger.LogWarning("Refresh token is revoked: {Token}", token);
+            // A rotated-away token came back: it was stolen or replayed. Revoke the user's
+            // whole session family so the attacker's copy dies with the victim's.
+            var active = await _context.RefreshTokens
+                .Where(rt => rt.UserId == refreshToken.UserId && !rt.IsRevoked)
+                .ToListAsync();
+            foreach (var t in active) { t.IsRevoked = true; t.RevokedAt = DateTime.UtcNow; }
+            await _context.SaveChangesAsync();
+            _logger.LogWarning("Reuse of a revoked refresh token for user {UserId}; revoked {Count} active session(s)", refreshToken.UserId, active.Count);
             return null;
         }
 
-        if (refreshToken.ExpiresAt < DateTime.UtcNow)
-        {
-            _logger.LogWarning("Refresh token has expired: {Token}", token);
+        if (refreshToken.ExpiresAt < DateTime.UtcNow || !refreshToken.User.IsActive)
             return null;
-        }
-
-        if (!refreshToken.User.IsActive)
-        {
-            _logger.LogWarning("User is inactive: {UserId}", refreshToken.UserId);
-            return null;
-        }
 
         return refreshToken;
     }
 
-    public async Task RevokeRefreshTokenAsync(string token, string? replacedByToken = null)
+    public async Task RevokeRefreshTokenAsync(string token)
     {
-        var refreshToken = await _context.RefreshTokens
-            .FirstOrDefaultAsync(rt => rt.Token == token);
-
-        if (refreshToken == null)
-        {
-            _logger.LogWarning("Attempted to revoke non-existent refresh token");
-            return;
-        }
+        var hash = HashToken(token);
+        var refreshToken = await _context.RefreshTokens.FirstOrDefaultAsync(rt => rt.Token == hash);
+        if (refreshToken == null || refreshToken.IsRevoked) return;
 
         refreshToken.IsRevoked = true;
         refreshToken.RevokedAt = DateTime.UtcNow;
-        refreshToken.ReplacedByToken = replacedByToken;
-
         await _context.SaveChangesAsync();
-        _logger.LogInformation("Refresh token revoked: {Token}", token);
+        _logger.LogInformation("Refresh token {TokenId} of user {UserId} revoked", refreshToken.Id, refreshToken.UserId);
     }
 }

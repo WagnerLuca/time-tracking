@@ -35,11 +35,15 @@ public class TimeTrackingService : ITimeTrackingService
             if (!orgExists)
                 return ServiceResult.BadRequest<TimeEntryResponse>("Organization not found.");
 
-            // Verify the user is a member of the organization
-            var isMember = await _context.UserOrganizations
-                .AnyAsync(uo => uo.OrganizationId == orgId && uo.UserId == userId);
-            if (!isMember)
+            // Verify the user is a member of the organization (and meets its 2FA requirement)
+            var membership = await _context.UserOrganizations
+                .Where(uo => uo.OrganizationId == orgId && uo.UserId == userId)
+                .Select(uo => new { uo.Organization.Require2fa, uo.User.TwoFactorEnabled })
+                .FirstOrDefaultAsync();
+            if (membership == null)
                 return ServiceResult.Forbidden<TimeEntryResponse>("You are not a member of this organization.");
+            if (membership.Require2fa && !membership.TwoFactorEnabled)
+                return ServiceResult.Forbidden<TimeEntryResponse>("This organization requires two-factor authentication. Enable it in your account settings to continue.");
         }
 
         // Stop a running entry first — exactly like an explicit stop, including pause rules —

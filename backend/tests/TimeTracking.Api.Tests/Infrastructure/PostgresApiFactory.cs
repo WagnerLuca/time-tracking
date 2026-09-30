@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
+using TimeTracking.Api.Services;
 using Testcontainers.PostgreSql;
 
 namespace TimeTracking.Api.Tests.Infrastructure;
@@ -20,6 +23,9 @@ public class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     private readonly PostgreSqlContainer _db = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
         .Build();
+
+    /// <summary>Mails the app "sent" (verification, password reset, ...).</summary>
+    public CapturingEmailSender Mail { get; } = new();
 
     /// <summary>Connection string of the app role (subject to RLS).</summary>
     public string AppConnectionString { get; private set; } = "";
@@ -60,6 +66,11 @@ public class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("UseInMemoryDatabase", "false");
         builder.UseSetting("SeedDemoData", "true");
         builder.UseSetting("ConnectionStrings:DefaultConnection", AppConnectionString);
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender>(Mail);
+        });
     }
 
     public new async Task DisposeAsync()

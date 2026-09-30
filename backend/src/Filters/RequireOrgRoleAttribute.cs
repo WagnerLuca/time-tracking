@@ -2,7 +2,6 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using TimeTracking.Api.Data;
 using TimeTracking.Api.Models;
 
@@ -11,10 +10,11 @@ namespace TimeTracking.Api.Filters;
 /// <summary>
 /// Declarative authorization attribute for organization-scoped endpoints.
 /// Reads the <c>{slug}</c> route parameter and verifies the caller has the
-/// required <see cref="OrganizationRole"/> (Member ≤ Admin ≤ Owner).
+/// required <see cref="OrganizationRole"/> (Member ≤ Admin ≤ Owner), and — when the
+/// organization requires two-factor authentication — that the caller has it enabled.
 /// <para>
-/// Results are cached in-memory for <see cref="OrgRoleAuthorizationFilter.CacheDuration"/>
-/// to avoid hitting the database on every request.
+/// The role is looked up on every request (one indexed query) rather than cached, so a
+/// demotion, removal, org deletion or slug rename takes effect immediately.
 /// </para>
 /// <para>
 /// Usage:
@@ -36,44 +36,29 @@ public class RequireOrgRoleAttribute : TypeFilterAttribute
 }
 
 /// <summary>
-/// Action filter that enforces organization-level role requirements.
+/// Action filter that enforces organization-level role and 2FA requirements.
 /// Injected via <see cref="RequireOrgRoleAttribute"/>.
-/// Caches role lookups in-memory for <see cref="CacheDuration"/>.
 /// </summary>
 public class OrgRoleAuthorizationFilter : IAsyncActionFilter
 {
-    /// <summary>How long role lookups are cached. Short TTL balances performance vs. freshness.</summary>
-    internal static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(2);
-
     private readonly OrganizationRole _minimumRole;
     private readonly TimeTrackingDbContext _context;
-    private readonly IMemoryCache _cache;
 
-    public OrgRoleAuthorizationFilter(OrganizationRole minimumRole, TimeTrackingDbContext context, IMemoryCache cache)
+    public OrgRoleAuthorizationFilter(OrganizationRole minimumRole, TimeTrackingDbContext context)
     {
         _minimumRole = minimumRole;
         _context = context;
-        _cache = cache;
     }
 
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        // Extract org slug from route
         var slug = context.RouteData.Values["slug"]?.ToString();
         if (string.IsNullOrEmpty(slug))
         {
-            context.Result = new ObjectResult(new ProblemDetails
-            {
-                Type = "https://httpstatuses.io/400",
-                Title = "Bad Request",
-                Status = StatusCodes.Status400BadRequest,
-                Detail = "Organization slug is required."
-            })
-            { StatusCode = StatusCodes.Status400BadRequest };
+            context.Result = Problem(StatusCodes.Status400BadRequest, "Bad Request", "Organization slug is required.");
             return;
         }
 
-        // Extract userId from JWT claims
         var userIdClaim = context.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdClaim, out var userId))
         {
@@ -81,43 +66,34 @@ public class OrgRoleAuthorizationFilter : IAsyncActionFilter
             return;
         }
 
-        // Check the user's role in this organization (cached)
-        var cacheKey = $"org_role:{slug}:{userId}";
-        var role = await _cache.GetOrCreateAsync(cacheKey, async entry =>
-        {
-            entry.AbsoluteExpirationRelativeToNow = CacheDuration;
-            return await _context.UserOrganizations
-                .Where(uo => uo.Organization.Slug == slug && uo.UserId == userId)
-                .Select(uo => (OrganizationRole?)uo.Role)
-                .FirstOrDefaultAsync();
-        });
+        var membership = await _context.UserOrganizations
+            .Where(uo => uo.Organization.Slug == slug && uo.UserId == userId)
+            .Select(uo => new { uo.Role, uo.Organization.Require2fa, uo.User.TwoFactorEnabled })
+            .FirstOrDefaultAsync();
 
-        if (role == null)
+        if (membership == null)
         {
-            context.Result = new ObjectResult(new ProblemDetails
-            {
-                Type = "https://httpstatuses.io/403",
-                Title = "Forbidden",
-                Status = StatusCodes.Status403Forbidden,
-                Detail = "You are not a member of this organization."
-            })
-            { StatusCode = StatusCodes.Status403Forbidden };
+            context.Result = Problem(StatusCodes.Status403Forbidden, "Forbidden", "You are not a member of this organization.");
             return;
         }
 
-        if (role < _minimumRole)
+        if (membership.Role < _minimumRole)
         {
-            context.Result = new ObjectResult(new ProblemDetails
-            {
-                Type = "https://httpstatuses.io/403",
-                Title = "Forbidden",
-                Status = StatusCodes.Status403Forbidden,
-                Detail = $"This action requires {_minimumRole} role or higher."
-            })
-            { StatusCode = StatusCodes.Status403Forbidden };
+            context.Result = Problem(StatusCodes.Status403Forbidden, "Forbidden", $"This action requires {_minimumRole} role or higher.");
+            return;
+        }
+
+        if (membership.Require2fa && !membership.TwoFactorEnabled)
+        {
+            context.Result = Problem(StatusCodes.Status403Forbidden, "TwoFactorRequired",
+                "This organization requires two-factor authentication. Enable it in your account settings to continue.");
             return;
         }
 
         await next();
     }
+
+    private static ObjectResult Problem(int status, string title, string detail) =>
+        new(new ProblemDetails { Type = $"https://httpstatuses.io/{status}", Title = title, Status = status, Detail = detail })
+        { StatusCode = status };
 }

@@ -48,7 +48,8 @@ public class RefreshTokenCleanupService : BackgroundService
         var cutoff = DateTime.UtcNow;
 
         var expiredTokens = await context.RefreshTokens
-            .Where(rt => rt.ExpiresAt < cutoff || rt.IsRevoked)
+            // Revoked-but-unexpired tokens are kept: reuse detection needs them to recognise a replay
+            .Where(rt => rt.ExpiresAt < cutoff)
             .ToListAsync(cancellationToken);
 
         if (expiredTokens.Count > 0)

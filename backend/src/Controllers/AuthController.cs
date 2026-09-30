@@ -83,16 +83,54 @@ public class AuthController : OrganizationBaseController
     }
 
     /// <summary>
-    /// Delete the authenticated user's account and all associated data
+    /// Delete the authenticated user's account (requires the password). Personal data is
+    /// anonymized; time entries stay with the organization as required for working-time records.
     /// </summary>
-    [HttpDelete("account")]
+    [HttpPost("account/delete")]
+    [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> DeleteAccount()
+    public async Task<IActionResult> DeleteAccount([FromBody] DeleteAccountRequest request)
     {
         if (GetCurrentUserId() is not int userId) return Unauthorized();
-        return ToResponse(await _authService.DeleteAccountAsync(userId));
+        return ToResponse(await _authService.DeleteAccountAsync(userId, request.Password));
     }
+
+    /// <summary>Confirm an email address (after registration or an email change) with the token from the mail.</summary>
+    [HttpPost("verify-email")]
+    [AllowAnonymous]
+    [EnableRateLimiting("AuthModerate")]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request)
+        => ToResponse(await _authService.VerifyEmailAsync(request.Token));
+
+    /// <summary>Send the email confirmation link again.</summary>
+    [HttpPost("verify-email/resend")]
+    [EnableRateLimiting("AuthStrict")]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ResendVerification()
+    {
+        if (GetCurrentUserId() is not int userId) return Unauthorized();
+        return ToResponse(await _authService.ResendVerificationAsync(userId));
+    }
+
+    /// <summary>Mail a password reset link. Always answers the same, whether or not the account exists.</summary>
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [EnableRateLimiting("AuthStrict")]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        => ToResponse(await _authService.ForgotPasswordAsync(request.Email));
+
+    /// <summary>Set a new password with the token from a reset link; ends all sessions.</summary>
+    [HttpPost("reset-password")]
+    [AllowAnonymous]
+    [EnableRateLimiting("AuthStrict")]
+    [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        => ToResponse(await _authService.ResetPasswordAsync(request));
 
     /// <summary>
     /// Get current authenticated user info

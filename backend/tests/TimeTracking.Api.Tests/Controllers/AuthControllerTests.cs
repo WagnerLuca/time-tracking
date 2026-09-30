@@ -301,7 +301,10 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.RegisterAsync(client, "deleteme@test.com", "Password123!", "Del", "Ete");
         await TestHelpers.AuthenticateAsync(client, "deleteme@test.com", "Password123!");
 
-        var response = await client.DeleteAsync("/api/v1/Auth/account");
+        (await client.PostAsJsonAsync("/api/v1/Auth/account/delete", new { password = "wrong" }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var response = await client.PostAsJsonAsync("/api/v1/Auth/account/delete", new { password = "Password123!" });
         response.EnsureSuccessStatusCode();
 
         // Can no longer login
@@ -345,18 +348,32 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     [Fact]
-    public async Task UpdateProfile_ChangeEmail_ReturnsUpdatedUser()
+    public async Task UpdateProfile_ChangeEmail_NeedsPasswordAndConfirmation()
     {
         var (client, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "profile-email@test.com");
 
+        (await client.PutAsJsonAsync("/api/v1/Auth/profile", new { email = "new-profile-email@test.com" }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
         var response = await client.PutAsJsonAsync("/api/v1/Auth/profile", new
         {
-            email = "new-profile-email@test.com"
+            email = "new-profile-email@test.com",
+            currentPassword = "Password123!"
         });
         response.EnsureSuccessStatusCode();
 
-        var user = await response.Content.ReadFromJsonAsync<UserInfoDto>(TestHelpers.JsonOptions);
-        user!.Email.Should().Be("new-profile-email@test.com");
+        // Not switched yet: the new address has to confirm first
+        var user = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        user.GetProperty("email").GetString().Should().Be("profile-email@test.com");
+        user.GetProperty("pendingEmail").GetString().Should().Be("new-profile-email@test.com");
+
+        var token = _factory.Mail.LinkToken("new-profile-email@test.com", "verify-email");
+        (await client.PostAsJsonAsync("/api/v1/Auth/verify-email", new { token })).EnsureSuccessStatusCode();
+
+        var me = await client.GetFromJsonAsync<UserInfoDto>("/api/v1/Auth/me", TestHelpers.JsonOptions);
+        me!.Email.Should().Be("new-profile-email@test.com");
+        (await client.PostAsJsonAsync("/api/v1/Auth/verify-email", new { token }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);   // single use
     }
 
     [Fact]

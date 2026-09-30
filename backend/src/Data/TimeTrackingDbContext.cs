@@ -25,6 +25,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<Group> Groups { get; set; }
     public DbSet<GroupMember> GroupMembers { get; set; }
     public DbSet<ApiKey> ApiKeys { get; set; }
+    public DbSet<UserToken> UserTokens { get; set; }
 
     /// <summary>
     /// Every DateTime is stored and compared as UTC. Values arriving without a kind (e.g.
@@ -124,7 +125,8 @@ public class TimeTrackingDbContext : DbContext
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Token).IsRequired();
             entity.Property(e => e.ExpiresAt).IsRequired();
-            entity.Property(e => e.IsRevoked).IsRequired().HasDefaultValue(false);
+            // Concurrency token: two refreshes racing with the same token cannot both rotate it
+            entity.Property(e => e.IsRevoked).IsRequired().HasDefaultValue(false).IsConcurrencyToken();
 
             if (isInMemory)
                 entity.Property(e => e.CreatedAt).IsRequired();
@@ -422,6 +424,19 @@ public class TimeTrackingDbContext : DbContext
                 .HasForeignKey(e => e.GroupId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure UserToken entity (email verification / password reset links)
+        modelBuilder.Entity<UserToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.NewEmail).HasMaxLength(256);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
             entity.HasOne(e => e.User)
                 .WithMany()
                 .HasForeignKey(e => e.UserId)

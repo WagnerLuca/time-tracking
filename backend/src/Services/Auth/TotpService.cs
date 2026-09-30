@@ -26,11 +26,11 @@ public class TotpService : ITotpService
         return (base32Secret, base32Secret, uri);
     }
 
-    public bool VerifyCode(string base32Secret, string code)
+    public bool VerifyCode(string base32Secret, string code, long? lastUsedStep, out long matchedStep)
     {
-        var secretBytes = Base32Encoding.ToBytes(base32Secret);
-        var totp = new Totp(secretBytes);
-        return totp.VerifyTotp(code, out _, new VerificationWindow(previous: 1, future: 1));
+        var totp = new Totp(Base32Encoding.ToBytes(base32Secret));
+        var ok = totp.VerifyTotp(code.Trim(), out matchedStep, new VerificationWindow(previous: 1, future: 1));
+        return ok && (lastUsedStep == null || matchedStep > lastUsedStep);
     }
 
     public List<string> GenerateBackupCodes(int count = 8)
@@ -51,7 +51,7 @@ public class TotpService : ITotpService
         // Create a short-lived HMAC-based token: userId|timestamp|hmac
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var payload = $"{userId}|{timestamp}";
-        var key = Encoding.UTF8.GetBytes(_jwtSettings.Secret);
+        var key = TwoFactorKey();
         var payloadBytes = Encoding.UTF8.GetBytes(payload);
         var hmac = HMACSHA256.HashData(key, payloadBytes);
         var sig = Convert.ToBase64String(hmac);
@@ -76,7 +76,7 @@ public class TotpService : ITotpService
 
             // Verify HMAC
             var payload = $"{userId}|{timestamp}";
-            var key = Encoding.UTF8.GetBytes(_jwtSettings.Secret);
+            var key = TwoFactorKey();
             var expectedHmac = HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(payload));
             var expectedSig = Convert.ToBase64String(expectedHmac);
 
@@ -94,4 +94,7 @@ public class TotpService : ITotpService
             return null;
         }
     }
+
+    /// <summary>HMAC key for 2FA login tokens, derived from (not equal to) the JWT signing secret.</summary>
+    private byte[] TwoFactorKey() => SHA256.HashData(Encoding.UTF8.GetBytes("tt-2fa-login-token:" + _jwtSettings.Secret));
 }

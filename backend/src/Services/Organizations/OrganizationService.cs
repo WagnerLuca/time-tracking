@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using TimeTracking.Api.Data;
 using TimeTracking.Api.Models;
 using TimeTracking.Api.Models.Dtos;
@@ -10,13 +9,11 @@ public class OrganizationService : IOrganizationService
 {
     private readonly TimeTrackingDbContext _context;
     private readonly ILogger<OrganizationService> _logger;
-    private readonly IMemoryCache _cache;
 
-    public OrganizationService(TimeTrackingDbContext context, ILogger<OrganizationService> logger, IMemoryCache cache)
+    public OrganizationService(TimeTrackingDbContext context, ILogger<OrganizationService> logger)
     {
         _context = context;
         _logger = logger;
-        _cache = cache;
     }
 
     // ────────────────────────────────────────────────────
@@ -452,7 +449,6 @@ public class OrganizationService : IOrganizationService
 
         await _context.SaveChangesAsync();
 
-        _cache.Remove($"org_role:{slug}:{request.UserId}");
         _logger.LogInformation("User {MemberId} added to organization {OrgId} by user {CallerId}", request.UserId, org.Id, callerUserId);
 
         return ServiceResult.Ok(new OrganizationMemberResponse
@@ -501,7 +497,6 @@ public class OrganizationService : IOrganizationService
         membership.Role = request.Role;
         await _context.SaveChangesAsync();
 
-        _cache.Remove($"org_role:{slug}:{userId}");
         _logger.LogInformation("Member {UserId} role updated to {Role} in org {OrgId} by user {CallerId}", userId, membership.Role, org.Id, callerUserId);
 
         return ServiceResult.Ok(new OrganizationMemberResponse
@@ -548,7 +543,6 @@ public class OrganizationService : IOrganizationService
 
         membership.IsActive = false;
 
-        _cache.Remove($"org_role:{slug}:{userId}");
         _logger.LogInformation("Member {UserId} removed from org {OrgId} by user {CallerId}", userId, org.Id, callerUserId);
 
         await _context.SaveChangesAsync();
@@ -578,6 +572,13 @@ public class OrganizationService : IOrganizationService
         if (request.JoinPolicy.HasValue)          org.JoinPolicy = request.JoinPolicy.Value;
         if (request.WorkScheduleChangeMode.HasValue) org.WorkScheduleChangeMode = request.WorkScheduleChangeMode.Value;
         if (request.MemberTimeEntryVisibility.HasValue) org.MemberTimeEntryVisibility = request.MemberTimeEntryVisibility.Value;
+        if (request.Require2fa == true && !org.Require2fa)
+        {
+            // Otherwise the admin would lock themselves out of the settings they just changed
+            var callerHas2fa = await _context.Users.AnyAsync(u => u.Id == callerUserId && u.TwoFactorEnabled);
+            if (!callerHas2fa)
+                return ServiceResult.BadRequest<OrganizationSettingsResponse>("Enable two-factor authentication for your own account before requiring it for the organization.");
+        }
         if (request.Require2fa.HasValue) org.Require2fa = request.Require2fa.Value;
         if (request.CsvImportMode.HasValue) org.CsvImportMode = request.CsvImportMode.Value;
         if (request.AbsenceSelfServiceMode.HasValue) org.AbsenceSelfServiceMode = request.AbsenceSelfServiceMode.Value;
