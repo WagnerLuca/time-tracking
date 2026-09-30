@@ -1,4 +1,4 @@
-import { authApi } from '$lib/apiClient';
+import { authApi, setAuthHandlers } from '$lib/apiClient';
 import type { TwoFactorRequiredResponse } from '$lib/apiClient';
 import type { LoginRequest, LoginResponse, RegisterRequest, UserInfo } from '$lib/api';
 
@@ -38,6 +38,13 @@ function createAuthStore() {
 		localStorage.setItem(TOKEN_KEY, loginResponse.accessToken!);
 		localStorage.setItem(REFRESH_TOKEN_KEY, loginResponse.refreshToken!);
 		localStorage.setItem(USER_KEY, JSON.stringify(loginResponse.user));
+	}
+
+	/** Store tokens rotated by the refresh interceptor (apiClient.ts). */
+	function setTokens(accessToken: string, refreshToken: string) {
+		token = accessToken;
+		localStorage.setItem(TOKEN_KEY, accessToken);
+		localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 	}
 
 	function clear() {
@@ -102,6 +109,11 @@ function createAuthStore() {
 		}
 	}
 
+	setAuthHandlers({
+		onRefreshed: (tokens) => setTokens(tokens.accessToken, tokens.refreshToken),
+		onAuthFailure: clear
+	});
+
 	return {
 		get user() { return user; },
 		get token() { return token; },
@@ -109,6 +121,7 @@ function createAuthStore() {
 		get isAuthenticated() { return !!token && !!user; },
 		get twoFactorRequired() { return twoFactorRequired; },
 		init,
+		clear,
 		login,
 		verifyTwoFactor,
 		clearTwoFactor,

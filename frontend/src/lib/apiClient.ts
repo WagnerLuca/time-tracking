@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { env } from '$env/dynamic/public';
+import { installRefreshInterceptor, type RefreshedTokens } from '$lib/authRefresh';
 import { Configuration, AbsenceDayApi, ApiKeysApi, AuthApi, ExportImportApi, GroupApi, HolidayApi, NotificationsApi, OrganizationsApi, PauseRulesApi, ReportsApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
 
 // Detect base URL: browser uses current hostname, SSR uses Docker service name
@@ -35,21 +36,45 @@ axiosInstance.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Response interceptor: handle 401
-axiosInstance.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        if (error.response?.status === 401) {
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('refreshToken');
-            localStorage.removeItem('authUser');
-            if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-                window.location.href = '/login';
-            }
-        }
-        return Promise.reject(error);
+// Response interceptor: on 401 refresh the access token once (shared by concurrent
+// requests) and retry; only a failed refresh ends the session. See authRefresh.ts.
+export interface AuthHandlers {
+    onRefreshed: (tokens: RefreshedTokens) => void;
+    onAuthFailure: () => void;
+}
+
+let authHandlers: AuthHandlers = {
+    onRefreshed: (tokens) => {
+        localStorage.setItem('authToken', tokens.accessToken);
+        localStorage.setItem('refreshToken', tokens.refreshToken);
+    },
+    onAuthFailure: () => {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('authUser');
     }
-);
+};
+
+/** Lets the auth store keep its reactive state in sync with refreshes and forced logouts. */
+export function setAuthHandlers(handlers: AuthHandlers): void {
+    authHandlers = handlers;
+}
+
+installRefreshInterceptor(axiosInstance, {
+    getRefreshToken: () => localStorage.getItem('refreshToken'),
+    refresh: async (refreshToken) => {
+        const { data } = await authApi.apiV1AuthRefreshPost({ refreshToken });
+        return { accessToken: data.accessToken!, refreshToken: data.refreshToken! };
+    },
+    onRefreshed: (tokens) => authHandlers.onRefreshed(tokens),
+    onAuthFailure: () => {
+        authHandlers.onAuthFailure();
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+            const next = window.location.pathname + window.location.search;
+            window.location.href = `/login?next=${encodeURIComponent(next)}`;
+        }
+    }
+});
 
 // SDK Configuration — accessToken is a function so it reads fresh token on every request
 const config = new Configuration({

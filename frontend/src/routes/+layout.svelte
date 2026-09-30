@@ -14,6 +14,7 @@
 	let { children } = $props();
 
 	const publicRoutes = ['/login', '/register', '/health'];
+	const isPublicRoute = $derived(publicRoutes.some((r) => page.url.pathname.startsWith(r)));
 
 	// Notification state
 	let pendingCount = $state(0);
@@ -59,11 +60,9 @@
 	});
 
 	$effect(() => {
-		if (!auth.loading && !auth.isAuthenticated) {
-			const path = window.location.pathname;
-			if (!publicRoutes.some((r) => path.startsWith(r))) {
-				goto('/login');
-			}
+		if (!auth.loading && !auth.isAuthenticated && !isPublicRoute) {
+			const next = page.url.pathname + page.url.search;
+			goto(next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`, { replaceState: true });
 		}
 	});
 
@@ -422,7 +421,12 @@
 			{@render children?.()}
 		{/if}
 	</main>
-{:else}
+{:else if isPublicRoute}
 	{@render children?.()}
+{:else}
+	<!-- Protected page while signed out: render nothing (no API calls) until the redirect to /login lands -->
+	<div class="min-h-screen flex items-center justify-center text-base-content/60">
+		<span class="loading loading-spinner loading-md"></span>
+	</div>
 {/if}
 

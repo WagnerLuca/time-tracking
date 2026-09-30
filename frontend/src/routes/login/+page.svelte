@@ -2,6 +2,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 
 	let email = $state('');
@@ -12,11 +13,19 @@
 	// 2FA state
 	let twoFactorCode = $state('');
 
+	/** Where to go after login: a same-origin path from ?next= (set by the 401 handler), else the default flow. */
+	const next = $derived.by(() => {
+		const value = page.url.searchParams.get('next');
+		return value && value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\') && !value.startsWith('/login') ? value : null;
+	});
+
 	async function navigateAfterLogin() {
 		if (auth.user?.id) {
 			await orgContext.loadOrganizations(auth.user.id);
 		}
-		if (orgContext.selectedOrgId) {
+		if (next) {
+			goto(next);
+		} else if (orgContext.selectedOrgId) {
 			goto('/');
 		} else if (orgContext.organizations.length > 0) {
 			goto('/select-org');
