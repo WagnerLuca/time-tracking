@@ -159,7 +159,10 @@ builder.Services.AddHostedService<FailureEntryService>();
 
 // Add Entity Framework - PostgreSQL or InMemory
 var useInMemory = builder.Configuration.GetValue<bool>("UseInMemoryDatabase");
-builder.Services.AddDbContext<TimeTrackingDbContext>(options =>
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<RlsContext>();
+builder.Services.AddScoped<RlsConnectionInterceptor>();
+builder.Services.AddDbContext<TimeTrackingDbContext>((sp, options) =>
 {
     if (useInMemory)
     {
@@ -177,6 +180,8 @@ builder.Services.AddDbContext<TimeTrackingDbContext>(options =>
         }
 
         options.UseNpgsql(connectionString);
+        // Row-level security: every connection carries the acting user (see RowLevelSecurity.cs)
+        options.AddInterceptors(sp.GetRequiredService<RlsConnectionInterceptor>());
     }
 });
 

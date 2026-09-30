@@ -26,12 +26,14 @@ public class ApiKeyService : IApiKeyService
 
     private readonly TimeTrackingDbContext _context;
     private readonly ITimeTrackingService _timeTracking;
+    private readonly RlsContext _rls;
     private readonly ILogger<ApiKeyService> _logger;
 
-    public ApiKeyService(TimeTrackingDbContext context, ITimeTrackingService timeTracking, ILogger<ApiKeyService> logger)
+    public ApiKeyService(TimeTrackingDbContext context, ITimeTrackingService timeTracking, RlsContext rls, ILogger<ApiKeyService> logger)
     {
         _context = context;
         _timeTracking = timeTracking;
+        _rls = rls;
         _logger = logger;
     }
 
@@ -135,7 +137,10 @@ public class ApiKeyService : IApiKeyService
 
         key.LastUsedAt = DateTime.UtcNow;
 
+        // The request is anonymous; the key + badge identified the member, so the database
+        // may treat the rest of this request as that member (row-level security)
         var userId = membership.UserId;
+        _rls.ActAsUser(userId);
         var isRunning = await _context.TimeEntries.AnyAsync(e => e.UserId == userId && e.IsRunning);
         var result = isRunning
             ? await _timeTracking.StopAsync(userId, null)

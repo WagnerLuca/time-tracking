@@ -31,6 +31,11 @@ services:
       # If you pin POSTGRES_VERSION to 17 or older, change this to
       # /var/lib/postgresql/data or the data will not persist.
       - db_data:/var/lib/postgresql
+    configs:
+      # Runs once, on an empty data volume only (see .env.example for existing databases)
+      - source: app_db_role
+        target: /docker-entrypoint-initdb.d/10-app-role.sh
+        mode: 0555
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-timetracking}"]
       interval: 5s
@@ -45,7 +50,9 @@ services:
       ACCEPT_EULA: ${SEQ_ACCEPT_EULA:-Y}
       SEQ_FIRSTRUN_NOAUTHENTICATION: ${SEQ_NO_AUTH:-true}
     ports:
-      - "${SEQ_PORT:-5341}:80"
+      # Localhost only: without auth, Seq would expose every log line to the internet.
+      # Reach it via an SSH tunnel, or enable Seq auth and change the bind address.
+      - "127.0.0.1:${SEQ_PORT:-5341}:80"
     volumes:
       - seq_data:/data
     restart: unless-stopped
@@ -54,7 +61,9 @@ services:
     image: ghcr.io/wagnerluca/time-tracking-backend:${IMAGE_TAG:-latest}
     environment:
       UseInMemoryDatabase: ${USE_INMEMORY_DB:-false}
-      DATABASE_URL: postgres://${POSTGRES_USER:-timetracking}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-timetracking}
+      # The app connects as a normal role (never the superuser), so Postgres row-level
+      # security actually applies — superusers bypass it.
+      DATABASE_URL: postgres://${APP_DB_USER:-timetracking_app}:${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}@db:5432/${POSTGRES_DB:-timetracking}
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_URLS: http://+:${BACKEND_PORT:-7000}
       Serilog__WriteTo__1__Args__serverUrl: http://seq:80
@@ -91,6 +100,19 @@ services:
 volumes:
   db_data:
   seq_data:
+
+configs:
+  # Creates the app role that owns the database (so migrations can run as it) but is
+  # neither superuser nor BYPASSRLS. Needs Docker Compose v2.23+ for inline config content.
+  app_db_role:
+    content: |
+      #!/bin/sh
+      set -e
+      psql -v ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" <<'SQL'
+      CREATE ROLE ${APP_DB_USER:-timetracking_app} LOGIN PASSWORD '${APP_DB_PASSWORD}' NOSUPERUSER NOBYPASSRLS;
+      ALTER DATABASE ${POSTGRES_DB:-timetracking} OWNER TO ${APP_DB_USER:-timetracking_app};
+      ALTER SCHEMA public OWNER TO ${APP_DB_USER:-timetracking_app};
+      SQL
 
 networks:
   default:

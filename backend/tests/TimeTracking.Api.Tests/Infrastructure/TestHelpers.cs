@@ -86,7 +86,7 @@ public static class TestHelpers
 
     /// <summary>Register a new user, log them in, and return the client with auth set.</summary>
     public static async Task<(HttpClient Client, LoginResponseDto Login)> CreateAuthenticatedUserAsync(
-        TimeTrackingApiFactory factory, string email, string firstName = "Test", string lastName = "User")
+        Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory, string email, string firstName = "Test", string lastName = "User")
     {
         var client = factory.CreateClient();
         var login = await RegisterAsync(client, email, "Password123!", firstName, lastName);
