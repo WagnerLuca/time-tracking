@@ -43,6 +43,23 @@ public record CreateAbsenceDayRequest
 }
 
 /// <summary>Request payload for an admin to create an absence day for any member.</summary>
+/// <summary>
+/// Several absence days at once (e.g. a vacation week): every weekday from <see cref="From"/> to
+/// <see cref="To"/> is created, all or nothing. <see cref="UserId"/> is only used by the admin endpoint.
+/// </summary>
+public record CreateAbsenceRangeRequest
+{
+    public int? UserId { get; init; }
+    public DateOnly From { get; init; }
+    public DateOnly To { get; init; }
+    public AbsenceType Type { get; init; } = AbsenceType.Vacation;
+    public bool IsHalfDay { get; init; }
+    public int? CustomTypeId { get; init; }
+
+    [MaxLength(500)]
+    public string? Note { get; init; }
+}
+
 public record AdminCreateAbsenceDayRequest
 {
     public int UserId { get; init; }

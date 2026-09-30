@@ -10,6 +10,10 @@ public interface IAbsenceDayService
     Task<ServiceResult<PaginatedResponse<AbsenceDayResponse>>> GetAbsencesAsync(string slug, int callerUserId, int? userId, DateOnly? from, DateOnly? to, int limit, int offset);
     Task<ServiceResult<AbsenceDayResponse>> CreateAbsenceAsync(string slug, int userId, CreateAbsenceDayRequest request);
     Task<ServiceResult<AbsenceDayResponse>> AdminCreateAbsenceAsync(string slug, int callerUserId, AdminCreateAbsenceDayRequest request);
+    /// <summary>All weekdays of a range, all or nothing (own absences, self-service rule applies).</summary>
+    Task<ServiceResult<List<AbsenceDayResponse>>> CreateAbsenceRangeAsync(string slug, int userId, CreateAbsenceRangeRequest request);
+    /// <summary>All weekdays of a range for a member, all or nothing (admins).</summary>
+    Task<ServiceResult<List<AbsenceDayResponse>>> AdminCreateAbsenceRangeAsync(string slug, int callerUserId, CreateAbsenceRangeRequest request);
     Task<ServiceResult> DeleteAbsenceAsync(string slug, int callerUserId, int absenceId);
 
     // Custom absence type definitions

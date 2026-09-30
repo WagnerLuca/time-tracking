@@ -71,6 +71,30 @@ public class AbsenceDayController : OrganizationBaseController
         return ToResponse(await _service.AdminCreateAbsenceAsync(slug, callerId.Value, request));
     }
 
+    /// <summary>Create own absences for every weekday of a range, all or nothing (members only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    [HttpPost("{slug}/absences/range")]
+    [RequireOrgRole]
+    [ProducesResponseType(typeof(List<AbsenceDayResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateAbsenceRange(string slug, [FromBody] CreateAbsenceRangeRequest request)
+    {
+        if (GetCurrentUserId() is not int userId) return Unauthorized();
+        return ToResponse(await _service.CreateAbsenceRangeAsync(slug, userId, request));
+    }
+
+    /// <summary>Create absences for a member for every weekday of a range, all or nothing (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    [HttpPost("{slug}/absences/admin/range")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(typeof(List<AbsenceDayResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> AdminCreateAbsenceRange(string slug, [FromBody] CreateAbsenceRangeRequest request)
+    {
+        if (GetCurrentUserId() is not int callerId) return Unauthorized();
+        return ToResponse(await _service.AdminCreateAbsenceRangeAsync(slug, callerId, request));
+    }
+
     /// <summary>Delete an absence day (members only; service enforces ownership rules).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="id">Absence day ID.</param>

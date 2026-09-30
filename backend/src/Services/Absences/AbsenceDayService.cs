@@ -110,14 +110,43 @@ public class AbsenceDayService : IAbsenceDayService
 
     public async Task<ServiceResult<AbsenceDayResponse>> CreateAbsenceAsync(
         string slug, int userId, CreateAbsenceDayRequest request)
+        => Single(await CreateOwnAsync(slug, userId, [request.Date], request.Type, request.CustomTypeId, request.IsHalfDay, request.Note));
+
+    public async Task<ServiceResult<List<AbsenceDayResponse>>> CreateAbsenceRangeAsync(
+        string slug, int userId, CreateAbsenceRangeRequest request)
+    {
+        var dates = WeekdaysBetween(request.From, request.To);
+        if (dates == null)
+            return ServiceResult.BadRequest<List<AbsenceDayResponse>>("Choose a range of at most one year with at least one weekday.");
+        return await CreateOwnAsync(slug, userId, dates, request.Type, request.CustomTypeId, request.IsHalfDay, request.Note);
+    }
+
+    public async Task<ServiceResult<AbsenceDayResponse>> AdminCreateAbsenceAsync(
+        string slug, int callerUserId, AdminCreateAbsenceDayRequest request)
+        => Single(await CreateForMemberAsync(slug, callerUserId, request.UserId, [request.Date], request.Type, request.CustomTypeId, request.IsHalfDay, request.Note));
+
+    public async Task<ServiceResult<List<AbsenceDayResponse>>> AdminCreateAbsenceRangeAsync(
+        string slug, int callerUserId, CreateAbsenceRangeRequest request)
+    {
+        if (request.UserId is not int targetUserId)
+            return ServiceResult.BadRequest<List<AbsenceDayResponse>>("UserId is required.");
+        var dates = WeekdaysBetween(request.From, request.To);
+        if (dates == null)
+            return ServiceResult.BadRequest<List<AbsenceDayResponse>>("Choose a range of at most one year with at least one weekday.");
+        return await CreateForMemberAsync(slug, callerUserId, targetUserId, dates, request.Type, request.CustomTypeId, request.IsHalfDay, request.Note);
+    }
+
+    /// <summary>Self-service: the member adds their own absences, subject to the effective self-service rule.</summary>
+    private async Task<ServiceResult<List<AbsenceDayResponse>>> CreateOwnAsync(
+        string slug, int userId, IReadOnlyList<DateOnly> dates, AbsenceType type, int? customTypeId, bool isHalfDay, string? note)
     {
         var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound<AbsenceDayResponse>("Organization not found");
+            return ServiceResult.NotFound<List<AbsenceDayResponse>>("Organization not found");
 
         var callerRole = await _context.GetOrgRoleAsync(userId, org.Id);
         if (callerRole == null)
-            return ServiceResult.Forbidden<AbsenceDayResponse>();
+            return ServiceResult.Forbidden<List<AbsenceDayResponse>>();
 
         // Enforce the effective self-service rule. Org admins and users who can
         // approve absences (group admins with the capability) bypass this check.
@@ -126,84 +155,90 @@ public class AbsenceDayService : IAbsenceDayService
         {
             var mode = await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.RequestAbsence);
             if (mode == RuleMode.Disabled)
-                return ServiceResult.Forbidden<AbsenceDayResponse>("Adding absences is disabled in this organization. Ask an admin.");
+                return ServiceResult.Forbidden<List<AbsenceDayResponse>>("Adding absences is disabled in this organization. Ask an admin.");
             if (mode == RuleMode.RequiresApproval)
-                return ServiceResult.Forbidden<AbsenceDayResponse>("Absences require approval in this organization. Please submit an absence request.");
+                return ServiceResult.Forbidden<List<AbsenceDayResponse>>("Absences require approval in this organization. Please submit an absence request.");
         }
 
-        var customTypeResult = await ResolveCustomTypeAsync(org.Id, request.CustomTypeId);
-        if (!customTypeResult.ok)
-            return ServiceResult.BadRequest<AbsenceDayResponse>("Unknown or inactive custom absence type.");
-
-        var exists = await _context.AbsenceDays
-            .AnyAsync(a => a.UserId == userId && a.OrganizationId == org.Id && a.Date == request.Date);
-        if (exists)
-            return ServiceResult.Conflict<AbsenceDayResponse>("An absence already exists on this date.");
-
-        var absence = new AbsenceDay
-        {
-            UserId = userId,
-            OrganizationId = org.Id,
-            Date = request.Date,
-            Type = customTypeResult.type != null ? AbsenceType.Other : request.Type,
-            CustomTypeId = customTypeResult.type?.Id,
-            IsHalfDay = request.IsHalfDay,
-            Note = request.Note,
-            CreatedByUserId = userId
-        };
-
-        _context.AbsenceDays.Add(absence);
-        await _context.SaveChangesAsync();
-        _logger.LogInformation("Absence {AbsenceId} created for user {UserId} in org {OrgSlug}", absence.Id, userId, slug);
-
-        var user = await _context.Users.FindAsync(userId);
-        return ServiceResult.Ok(MapToResponse(absence, user, customTypeResult.type));
+        return await AddAbsencesAsync(org, userId, userId, dates, type, customTypeId, isHalfDay, note);
     }
 
-    public async Task<ServiceResult<AbsenceDayResponse>> AdminCreateAbsenceAsync(
-        string slug, int callerUserId, AdminCreateAbsenceDayRequest request)
+    /// <summary>Admins add absences for any member.</summary>
+    private async Task<ServiceResult<List<AbsenceDayResponse>>> CreateForMemberAsync(
+        string slug, int callerUserId, int targetUserId, IReadOnlyList<DateOnly> dates, AbsenceType type, int? customTypeId, bool isHalfDay, string? note)
     {
         var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound<AbsenceDayResponse>("Organization not found");
+            return ServiceResult.NotFound<List<AbsenceDayResponse>>("Organization not found");
 
         var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
-            return ServiceResult.Forbidden<AbsenceDayResponse>();
+            return ServiceResult.Forbidden<List<AbsenceDayResponse>>();
 
         var isMember = await _context.UserOrganizations
-            .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == request.UserId);
+            .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == targetUserId);
         if (!isMember)
-            return ServiceResult.NotFound<AbsenceDayResponse>("User is not a member of this organization.");
+            return ServiceResult.NotFound<List<AbsenceDayResponse>>("User is not a member of this organization.");
 
-        var customTypeResult = await ResolveCustomTypeAsync(org.Id, request.CustomTypeId);
-        if (!customTypeResult.ok)
-            return ServiceResult.BadRequest<AbsenceDayResponse>("Unknown or inactive custom absence type.");
-
-        var exists = await _context.AbsenceDays
-            .AnyAsync(a => a.UserId == request.UserId && a.OrganizationId == org.Id && a.Date == request.Date);
-        if (exists)
-            return ServiceResult.Conflict<AbsenceDayResponse>("An absence already exists on this date for this user.");
-
-        var absence = new AbsenceDay
-        {
-            UserId = request.UserId,
-            OrganizationId = org.Id,
-            Date = request.Date,
-            Type = customTypeResult.type != null ? AbsenceType.Other : request.Type,
-            CustomTypeId = customTypeResult.type?.Id,
-            IsHalfDay = request.IsHalfDay,
-            Note = request.Note,
-            CreatedByUserId = callerUserId
-        };
-
-        _context.AbsenceDays.Add(absence);
-        await _context.SaveChangesAsync();
-        _logger.LogInformation("Admin absence {AbsenceId} created for user {TargetUserId} in org {OrgSlug} by user {CallerId}", absence.Id, request.UserId, slug, callerUserId);
-
-        var user = await _context.Users.FindAsync(request.UserId);
-        return ServiceResult.Ok(MapToResponse(absence, user, customTypeResult.type));
+        return await AddAbsencesAsync(org, callerUserId, targetUserId, dates, type, customTypeId, isHalfDay, note);
     }
+
+    /// <summary>Validates all days first, then saves them together: either every day is created or none.</summary>
+    private async Task<ServiceResult<List<AbsenceDayResponse>>> AddAbsencesAsync(
+        Organization org, int callerUserId, int targetUserId, IReadOnlyList<DateOnly> dates,
+        AbsenceType type, int? customTypeId, bool isHalfDay, string? note)
+    {
+        var customTypeResult = await ResolveCustomTypeAsync(org.Id, customTypeId);
+        if (!customTypeResult.ok)
+            return ServiceResult.BadRequest<List<AbsenceDayResponse>>("Unknown or inactive custom absence type.");
+
+        var taken = await _context.AbsenceDays
+            .Where(a => a.UserId == targetUserId && a.OrganizationId == org.Id && dates.Contains(a.Date))
+            .Select(a => a.Date)
+            .OrderBy(d => d)
+            .ToListAsync();
+        if (taken.Count > 0)
+            return ServiceResult.Conflict<List<AbsenceDayResponse>>(
+                dates.Count == 1
+                    ? "An absence already exists on this date."
+                    : $"Absences already exist on {string.Join(", ", taken.Select(d => d.ToString("yyyy-MM-dd")))}.");
+
+        var absences = dates.Select(date => new AbsenceDay
+        {
+            UserId = targetUserId,
+            OrganizationId = org.Id,
+            Date = date,
+            Type = customTypeResult.type != null ? AbsenceType.Other : type,
+            CustomTypeId = customTypeResult.type?.Id,
+            IsHalfDay = isHalfDay,
+            Note = note,
+            CreatedByUserId = callerUserId
+        }).ToList();
+
+        _context.AbsenceDays.AddRange(absences);
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("{Count} absence day(s) created for user {TargetUserId} in org {OrgSlug} by user {CallerId}",
+            absences.Count, targetUserId, org.Slug, callerUserId);
+
+        var user = await _context.Users.FindAsync(targetUserId);
+        return ServiceResult.Ok(absences.Select(a => MapToResponse(a, user, customTypeResult.type)).ToList());
+    }
+
+    /// <summary>Mon–Fri between from and to (inclusive); null for an empty, reversed or &gt; 1 year range.</summary>
+    private static List<DateOnly>? WeekdaysBetween(DateOnly from, DateOnly to)
+    {
+        if (to < from || to.DayNumber - from.DayNumber > 366) return null;
+        var days = Enumerable.Range(0, to.DayNumber - from.DayNumber + 1)
+            .Select(from.AddDays)
+            .Where(d => d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
+            .ToList();
+        return days.Count == 0 ? null : days;
+    }
+
+    private static ServiceResult<AbsenceDayResponse> Single(ServiceResult<List<AbsenceDayResponse>> result) =>
+        result.IsSuccess
+            ? ServiceResult.Ok(result.Data![0])
+            : ServiceResult.Fail<AbsenceDayResponse>(result.ErrorType!.Value, result.ErrorMessage!);
 
     public async Task<ServiceResult> DeleteAbsenceAsync(string slug, int callerUserId, int absenceId)
     {
