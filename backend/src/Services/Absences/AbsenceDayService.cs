@@ -19,11 +19,11 @@ public class AbsenceDayService : IAbsenceDayService
     public async Task<ServiceResult<PaginatedResponse<AbsenceDayResponse>>> GetAbsencesAsync(
         string slug, int callerUserId, int? filterUserId, DateOnly? from, DateOnly? to, int limit, int offset)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<PaginatedResponse<AbsenceDayResponse>>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null)
             return ServiceResult.Forbidden<PaginatedResponse<AbsenceDayResponse>>();
 
@@ -111,11 +111,11 @@ public class AbsenceDayService : IAbsenceDayService
     public async Task<ServiceResult<AbsenceDayResponse>> CreateAbsenceAsync(
         string slug, int userId, CreateAbsenceDayRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<AbsenceDayResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(userId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(userId, org.Id);
         if (callerRole == null)
             return ServiceResult.Forbidden<AbsenceDayResponse>();
 
@@ -163,11 +163,11 @@ public class AbsenceDayService : IAbsenceDayService
     public async Task<ServiceResult<AbsenceDayResponse>> AdminCreateAbsenceAsync(
         string slug, int callerUserId, AdminCreateAbsenceDayRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<AbsenceDayResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<AbsenceDayResponse>();
 
@@ -207,11 +207,11 @@ public class AbsenceDayService : IAbsenceDayService
 
     public async Task<ServiceResult> DeleteAbsenceAsync(string slug, int callerUserId, int absenceId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null)
             return ServiceResult.Forbidden();
 
@@ -236,11 +236,11 @@ public class AbsenceDayService : IAbsenceDayService
 
     public async Task<ServiceResult<List<AbsenceTypeDefinitionResponse>>> GetAbsenceTypesAsync(string slug, int callerUserId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<List<AbsenceTypeDefinitionResponse>>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null)
             return ServiceResult.Forbidden<List<AbsenceTypeDefinitionResponse>>();
 
@@ -257,11 +257,11 @@ public class AbsenceDayService : IAbsenceDayService
     public async Task<ServiceResult<AbsenceTypeDefinitionResponse>> CreateAbsenceTypeAsync(
         string slug, int callerUserId, UpsertAbsenceTypeDefinitionRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<AbsenceTypeDefinitionResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<AbsenceTypeDefinitionResponse>();
 
@@ -289,11 +289,11 @@ public class AbsenceDayService : IAbsenceDayService
     public async Task<ServiceResult<AbsenceTypeDefinitionResponse>> UpdateAbsenceTypeAsync(
         string slug, int callerUserId, int typeId, UpsertAbsenceTypeDefinitionRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<AbsenceTypeDefinitionResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<AbsenceTypeDefinitionResponse>();
 
@@ -319,11 +319,11 @@ public class AbsenceDayService : IAbsenceDayService
 
     public async Task<ServiceResult> DeleteAbsenceTypeAsync(string slug, int callerUserId, int typeId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden();
 
@@ -388,17 +388,4 @@ public class AbsenceDayService : IAbsenceDayService
         return (type != null, type);
     }
 
-    private async Task<Organization?> GetOrgBySlugAsync(string slug)
-    {
-        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug);
-    }
-
-    private async Task<OrganizationRole?> GetRoleAsync(int userId, int organizationId)
-    {
-        var membership = await _context.UserOrganizations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
-                                    && uo.UserId == userId);
-        return membership?.Role;
-    }
 }

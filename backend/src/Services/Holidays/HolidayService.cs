@@ -18,7 +18,7 @@ public class HolidayService : IHolidayService
 
     public async Task<ServiceResult<List<HolidayResponse>>> GetHolidaysAsync(string slug, int callerUserId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<List<HolidayResponse>>("Organization not found");
 
@@ -47,11 +47,11 @@ public class HolidayService : IHolidayService
     public async Task<ServiceResult<HolidayResponse>> CreateHolidayAsync(
         string slug, int callerUserId, CreateHolidayRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<HolidayResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<HolidayResponse>();
 
@@ -79,11 +79,11 @@ public class HolidayService : IHolidayService
     public async Task<ServiceResult<HolidayResponse>> UpdateHolidayAsync(
         string slug, int callerUserId, int holidayId, UpdateHolidayRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<HolidayResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<HolidayResponse>();
 
@@ -103,11 +103,11 @@ public class HolidayService : IHolidayService
 
     public async Task<ServiceResult> DeleteHolidayAsync(string slug, int callerUserId, int holidayId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden();
 
@@ -125,11 +125,11 @@ public class HolidayService : IHolidayService
     public async Task<ServiceResult<List<HolidayResponse>>> ImportPresetHolidaysAsync(
         string slug, int callerUserId, string preset, int? year)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<List<HolidayResponse>>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<List<HolidayResponse>>();
 
@@ -196,20 +196,6 @@ public class HolidayService : IHolidayService
         IsRecurring = h.IsRecurring,
         IsHalfDay = h.IsHalfDay
     };
-
-    private async Task<Organization?> GetOrgBySlugAsync(string slug)
-    {
-        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug);
-    }
-
-    private async Task<OrganizationRole?> GetRoleAsync(int userId, int organizationId)
-    {
-        var membership = await _context.UserOrganizations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
-                                    && uo.UserId == userId);
-        return membership?.Role;
-    }
 
     // ────────────────────────────────────────────────────
     //  Preset holiday data

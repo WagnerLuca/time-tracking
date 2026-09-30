@@ -22,7 +22,7 @@ public class WorkScheduleService : IWorkScheduleService
 
     public async Task<ServiceResult<WorkScheduleResponse>> GetMyWorkScheduleAsync(string slug, int userId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<WorkScheduleResponse>("Organization not found");
 
@@ -36,7 +36,7 @@ public class WorkScheduleService : IWorkScheduleService
 
     public async Task<ServiceResult<List<WorkScheduleResponse>>> GetMyWorkSchedulesAsync(string slug, int userId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<List<WorkScheduleResponse>>("Organization not found");
 
@@ -52,7 +52,7 @@ public class WorkScheduleService : IWorkScheduleService
     public async Task<ServiceResult<WorkScheduleResponse>> CreateMyWorkScheduleAsync(
         string slug, int userId, CreateWorkScheduleRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<WorkScheduleResponse>("Organization not found");
 
@@ -81,7 +81,7 @@ public class WorkScheduleService : IWorkScheduleService
     public async Task<ServiceResult<WorkScheduleResponse>> UpdateMyWorkScheduleAsync(
         string slug, int userId, int scheduleId, UpdateWorkScheduleRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<WorkScheduleResponse>("Organization not found");
 
@@ -108,7 +108,7 @@ public class WorkScheduleService : IWorkScheduleService
 
     public async Task<ServiceResult> DeleteMyWorkScheduleAsync(string slug, int userId, int scheduleId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound("Organization not found");
 
@@ -135,7 +135,7 @@ public class WorkScheduleService : IWorkScheduleService
     public async Task<ServiceResult<MemberInitialOvertimeResponse>> UpdateMyInitialOvertimeAsync(
         string slug, int userId, SetInitialOvertimeRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<MemberInitialOvertimeResponse>("Organization not found");
 
@@ -163,11 +163,11 @@ public class WorkScheduleService : IWorkScheduleService
     public async Task<ServiceResult<WorkScheduleResponse>> GetMemberWorkScheduleAsync(
         string slug, int callerUserId, int memberId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<WorkScheduleResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<WorkScheduleResponse>();
 
@@ -182,11 +182,11 @@ public class WorkScheduleService : IWorkScheduleService
     public async Task<ServiceResult<List<WorkScheduleResponse>>> GetMemberWorkSchedulesAsync(
         string slug, int callerUserId, int memberId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<List<WorkScheduleResponse>>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<List<WorkScheduleResponse>>();
 
@@ -202,11 +202,11 @@ public class WorkScheduleService : IWorkScheduleService
     public async Task<ServiceResult<WorkScheduleResponse>> CreateMemberWorkScheduleAsync(
         string slug, int callerUserId, int memberId, CreateWorkScheduleRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<WorkScheduleResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<WorkScheduleResponse>();
 
@@ -230,11 +230,11 @@ public class WorkScheduleService : IWorkScheduleService
     public async Task<ServiceResult<WorkScheduleResponse>> UpdateMemberWorkScheduleAsync(
         string slug, int callerUserId, int memberId, int scheduleId, UpdateWorkScheduleRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<WorkScheduleResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<WorkScheduleResponse>();
 
@@ -254,11 +254,11 @@ public class WorkScheduleService : IWorkScheduleService
     public async Task<ServiceResult> DeleteMemberWorkScheduleAsync(
         string slug, int callerUserId, int memberId, int scheduleId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden();
 
@@ -449,20 +449,10 @@ public class WorkScheduleService : IWorkScheduleService
         return null;
     }
 
-    private async Task<Organization?> GetOrgBySlugAsync(string slug)
-    {
-        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug);
-    }
-
     private async Task<UserOrganization?> GetMembershipAsync(int userId, int orgId)
     {
         return await _context.UserOrganizations
             .FirstOrDefaultAsync(uo => uo.OrganizationId == orgId && uo.UserId == userId);
     }
 
-    private async Task<OrganizationRole?> GetRoleAsync(int userId, int orgId)
-    {
-        var membership = await GetMembershipAsync(userId, orgId);
-        return membership?.Role;
-    }
 }

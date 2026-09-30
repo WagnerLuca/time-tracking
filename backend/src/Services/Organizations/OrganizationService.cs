@@ -179,7 +179,7 @@ public class OrganizationService : IOrganizationService
 
         // Determine whose vacation balance the caller may see (self, admins, effective VacationVisibility)
         var vacationVisibleIds = await GetVacationVisibleUserIdsAsync(callerUserId!.Value, organization.Id);
-        var callerIsAdmin = await GetRoleAsync(callerUserId.Value, organization.Id) >= OrganizationRole.Admin;
+        var callerIsAdmin = organization.Members.First(m => m.Id == callerUserId.Value).Role is nameof(OrganizationRole.Owner) or nameof(OrganizationRole.Admin);
 
         var membersWithVacation = organization.Members.Select(m =>
         {
@@ -288,7 +288,7 @@ public class OrganizationService : IOrganizationService
         if (organization == null)
             return ServiceResult.NotFound<OrganizationResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, organization.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, organization.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<OrganizationResponse>();
 
@@ -332,7 +332,7 @@ public class OrganizationService : IOrganizationService
         if (organization == null)
             return ServiceResult.NotFound("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, organization.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, organization.Id);
         if (callerRole == null || callerRole != OrganizationRole.Owner)
             return ServiceResult.Forbidden();
 
@@ -356,11 +356,11 @@ public class OrganizationService : IOrganizationService
     public async Task<ServiceResult<OrganizationMemberResponse>> AddMemberAsync(
         string slug, int callerUserId, AddMemberRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug, tracked: true);
         if (org == null)
             return ServiceResult.NotFound<OrganizationMemberResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<OrganizationMemberResponse>();
 
@@ -420,11 +420,11 @@ public class OrganizationService : IOrganizationService
     public async Task<ServiceResult<OrganizationMemberResponse>> UpdateMemberRoleAsync(
         string slug, int callerUserId, int userId, UpdateMemberRoleRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug, tracked: true);
         if (org == null)
             return ServiceResult.NotFound<OrganizationMemberResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<OrganizationMemberResponse>();
 
@@ -466,11 +466,11 @@ public class OrganizationService : IOrganizationService
 
     public async Task<ServiceResult> RemoveMemberAsync(string slug, int callerUserId, int userId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug, tracked: true);
         if (org == null)
             return ServiceResult.NotFound("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null)
             return ServiceResult.Forbidden();
 
@@ -509,11 +509,11 @@ public class OrganizationService : IOrganizationService
     public async Task<ServiceResult<OrganizationSettingsResponse>> UpdateSettingsAsync(
         string slug, int callerUserId, UpdateOrganizationSettingsRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug, tracked: true);
         if (org == null)
             return ServiceResult.NotFound<OrganizationSettingsResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<OrganizationSettingsResponse>();
 
@@ -596,11 +596,11 @@ public class OrganizationService : IOrganizationService
     public async Task<ServiceResult<List<MemberTimeOverviewResponse>>> GetTimeOverviewAsync(
         string slug, int callerUserId, DateTime? from, DateTime? to)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug, tracked: true);
         if (org == null)
             return ServiceResult.NotFound<List<MemberTimeOverviewResponse>>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null)
             return ServiceResult.Forbidden<List<MemberTimeOverviewResponse>>();
 
@@ -693,11 +693,11 @@ public class OrganizationService : IOrganizationService
     public async Task<ServiceResult<PaginatedResponse<TimeEntryResponse>>> GetMemberEntriesAsync(
         string slug, int callerUserId, int userId, DateTime? from, DateTime? to, int limit, int offset)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug, tracked: true);
         if (org == null)
             return ServiceResult.NotFound<PaginatedResponse<TimeEntryResponse>>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null)
             return ServiceResult.Forbidden<PaginatedResponse<TimeEntryResponse>>();
 
@@ -779,11 +779,11 @@ public class OrganizationService : IOrganizationService
     public async Task<ServiceResult<MemberInitialOvertimeResponse>> SetMemberInitialOvertimeAsync(
         string slug, int callerUserId, int userId, SetInitialOvertimeRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug, tracked: true);
         if (org == null)
             return ServiceResult.NotFound<MemberInitialOvertimeResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<MemberInitialOvertimeResponse>();
 
@@ -804,11 +804,11 @@ public class OrganizationService : IOrganizationService
     public async Task<ServiceResult<MemberVacationDaysResponse>> SetMemberVacationDaysAsync(
         string slug, int callerUserId, int userId, SetVacationDaysRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug, tracked: true);
         if (org == null)
             return ServiceResult.NotFound<MemberVacationDaysResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<MemberVacationDaysResponse>();
 
@@ -830,19 +830,6 @@ public class OrganizationService : IOrganizationService
     // ────────────────────────────────────────────────────
     //  Private helpers
     // ────────────────────────────────────────────────────
-
-    private async Task<Organization?> GetOrgBySlugAsync(string slug)
-    {
-        return await _context.Organizations.FirstOrDefaultAsync(o => o.Slug == slug);
-    }
-
-    private async Task<OrganizationRole?> GetRoleAsync(int userId, int organizationId)
-    {
-        var membership = await _context.UserOrganizations
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
-                                    && uo.UserId == userId);
-        return membership?.Role;
-    }
 
     /// <summary>
     /// Returns the set of user IDs that a Group Admin can view time entries for,

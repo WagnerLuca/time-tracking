@@ -21,7 +21,7 @@ public class RequestService : IRequestService
     public async Task<ServiceResult<OrgRequestResponse>> CreateRequestAsync(
         string slug, int userId, CreateOrgRequestRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<OrgRequestResponse>("Organization not found");
 
@@ -138,11 +138,11 @@ public class RequestService : IRequestService
     public async Task<ServiceResult<PaginatedResponse<OrgRequestResponse>>> GetRequestsAsync(
         string slug, int callerUserId, RequestType? type, RequestStatus? status, int limit, int offset)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<PaginatedResponse<OrgRequestResponse>>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         var isOrgAdmin = callerRole != null && callerRole >= OrganizationRole.Admin;
         var adminGroupIds = !isOrgAdmin ? await GetAdminGroupIdsAsync(callerUserId, org.Id) : new List<int>();
 
@@ -185,7 +185,7 @@ public class RequestService : IRequestService
     public async Task<ServiceResult<OrgRequestResponse>> RespondToRequestAsync(
         string slug, int callerUserId, int requestId, RespondToOrgRequestRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<OrgRequestResponse>("Organization not found");
 
@@ -198,7 +198,7 @@ public class RequestService : IRequestService
             return ServiceResult.NotFound<OrgRequestResponse>("Request not found.");
 
         // Authorization: Org Admin can always respond; Group Admin can respond to group-routed requests
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         var isOrgAdmin = callerRole != null && callerRole >= OrganizationRole.Admin;
 
         if (!isOrgAdmin)
@@ -635,20 +635,6 @@ public class RequestService : IRequestService
             GroupId = r.GroupId,
             GroupName = r.Group?.Name
         };
-    }
-
-    private async Task<Organization?> GetOrgBySlugAsync(string slug)
-    {
-        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug);
-    }
-
-    private async Task<OrganizationRole?> GetRoleAsync(int userId, int organizationId)
-    {
-        var membership = await _context.UserOrganizations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
-                                    && uo.UserId == userId);
-        return membership?.Role;
     }
 
     /// <summary>

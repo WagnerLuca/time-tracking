@@ -18,11 +18,11 @@ public class PauseRuleService : IPauseRuleService
 
     public async Task<ServiceResult<List<PauseRuleResponse>>> GetPauseRulesAsync(string slug, int callerUserId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<List<PauseRuleResponse>>("Organization not found");
 
-        var role = await GetRoleAsync(callerUserId, org.Id);
+        var role = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (role == null)
             return ServiceResult.Forbidden<List<PauseRuleResponse>>();
 
@@ -44,11 +44,11 @@ public class PauseRuleService : IPauseRuleService
     public async Task<ServiceResult<PauseRuleResponse>> CreatePauseRuleAsync(
         string slug, int callerUserId, CreatePauseRuleRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<PauseRuleResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<PauseRuleResponse>();
 
@@ -80,11 +80,11 @@ public class PauseRuleService : IPauseRuleService
     public async Task<ServiceResult<PauseRuleResponse>> UpdatePauseRuleAsync(
         string slug, int callerUserId, int ruleId, UpdatePauseRuleRequest request)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound<PauseRuleResponse>("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<PauseRuleResponse>();
 
@@ -103,11 +103,11 @@ public class PauseRuleService : IPauseRuleService
 
     public async Task<ServiceResult> DeletePauseRuleAsync(string slug, int callerUserId, int ruleId)
     {
-        var org = await GetOrgBySlugAsync(slug);
+        var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
             return ServiceResult.NotFound("Organization not found");
 
-        var callerRole = await GetRoleAsync(callerUserId, org.Id);
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden();
 
@@ -134,17 +134,4 @@ public class PauseRuleService : IPauseRuleService
         PauseMinutes = rule.PauseMinutes
     };
 
-    private async Task<Organization?> GetOrgBySlugAsync(string slug)
-    {
-        return await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug);
-    }
-
-    private async Task<OrganizationRole?> GetRoleAsync(int userId, int organizationId)
-    {
-        var membership = await _context.UserOrganizations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
-                                    && uo.UserId == userId);
-        return membership?.Role;
-    }
 }
