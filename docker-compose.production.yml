@@ -1,48 +1,97 @@
+# Time Tracking — deployment using the pre-built images from ghcr.io.
+# Nothing is built here; see docker-compose.yml for the local build setup.
+#
+# Usage:
+#   cp .env.example .env      # then edit JWT_SECRET and POSTGRES_PASSWORD
+#   docker compose -f docker-compose.production.yml up -d
+#   open http://localhost:3000
+#
+# Images come from .github/workflows/{backend,frontend}.yml:
+#   ghcr.io/wagnerluca/time-tracking-backend
+#   ghcr.io/wagnerluca/time-tracking-frontend
+# This repo is public, but its GHCR packages are private by default — if pull is
+# refused, either make the packages public or log in once per host:
+#   echo $GHP_READ_TOKEN | docker login ghcr.io -u WagnerLuca --password-stdin
+#
+# Required env: JWT_SECRET, POSTGRES_PASSWORD  (see .env.example)
+# Optional env: IMAGE_TAG, *_PORT, PUBLIC_API_BASE_URL, ALLOWED_ORIGINS
+#
+# EF Core migrations run automatically on backend startup
+# (Program.cs: context.Database.Migrate()), so there is no manual migrate step.
 services:
   db:
-    image: postgres:${POSTGRES_VERSION}
+    image: postgres:${POSTGRES_VERSION:-18-alpine}
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-timetracking}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-timetracking}
     volumes:
+      # NOTE: correct mount point for the postgres:18 image, which keeps PGDATA
+      # under a versioned subdirectory and declares the volume at the parent.
+      # If you pin POSTGRES_VERSION to 17 or older, change this to
+      # /var/lib/postgresql/data or the data will not persist.
       - db_data:/var/lib/postgresql
-    ports:
-      - ${POSTGRES_PORT}:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-timetracking}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
+
   seq:
-    image: datalust/seq:${SEQ_VERSION}
+    # Structured log sink; the backend's Serilog config writes to it.
+    image: datalust/seq:${SEQ_VERSION:-latest}
     environment:
-      ACCEPT_EULA: ${SEQ_ACCEPT_EULA}
-      SEQ_FIRSTRUN_NOAUTHENTICATION: ${SEQ_NO_AUTH}
+      ACCEPT_EULA: ${SEQ_ACCEPT_EULA:-Y}
+      SEQ_FIRSTRUN_NOAUTHENTICATION: ${SEQ_NO_AUTH:-true}
     ports:
-      - ${SEQ_PORT}:80
+      - "${SEQ_PORT:-5341}:80"
     volumes:
       - seq_data:/data
-  backend:
-    image: ${BACKEND_IMAGE}
-    environment:
-      UseInMemoryDatabase: ${USE_INMEMORY_DB}
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
-      ASPNETCORE_URLS: http://+:${BACKEND_PORT}
-      Serilog__WriteTo__1__Args__serverUrl: http://seq:80
-      JwtSettings__Secret: ${JWT_SECRET}
-      JwtSettings__AccessTokenExpiryMinutes: ${ACCESS_TOKEN_EXPIRY_MINUTES}
-      Cors__AllowedOrigins__0: ${ALLOWED_ORIGINS}
-    ports:
-      - ${BACKEND_PORT}:${BACKEND_PORT}
-      
-  frontend:
-    image: ${FRONTEND_IMAGE}
-    environment:
-      PORT: ${FRONTEND_PORT}
-      HOST: ${FRONTEND_HOST}
-      NODE_ENV: ${NODE_ENV}
-      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
-    ports:
-      - ${FRONTEND_PORT}:${FRONTEND_PORT}
     restart: unless-stopped
+
+  backend:
+    image: ghcr.io/wagnerluca/time-tracking-backend:${IMAGE_TAG:-latest}
+    environment:
+      UseInMemoryDatabase: ${USE_INMEMORY_DB:-false}
+      DATABASE_URL: postgres://${POSTGRES_USER:-timetracking}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-timetracking}
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://+:${BACKEND_PORT:-7000}
+      Serilog__WriteTo__1__Args__serverUrl: http://seq:80
+      JwtSettings__Secret: ${JWT_SECRET:?JWT_SECRET is required — generate one with `openssl rand -base64 48`}
+      JwtSettings__AccessTokenExpiryMinutes: ${ACCESS_TOKEN_EXPIRY_MINUTES:-60}
+      Cors__AllowedOrigins__0: ${ALLOWED_ORIGINS:-http://localhost:3000}
+    ports:
+      # Must stay published: the browser talks to the API directly (the frontend
+      # falls back to <current-host>:7000 when PUBLIC_API_BASE_URL is unset).
+      - "${BACKEND_PORT:-7000}:${BACKEND_PORT:-7000}"
+    depends_on:
+      db:
+        condition: service_healthy
+      seq:
+        condition: service_started
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/wagnerluca/time-tracking-frontend:${IMAGE_TAG:-latest}
+    environment:
+      PORT: ${FRONTEND_PORT:-3000}
+      HOST: ${FRONTEND_HOST:-0.0.0.0}
+      NODE_ENV: ${NODE_ENV:-production}
+      # Read at RUNTIME ($env/dynamic/public), so changing it only needs a
+      # restart — no image rebuild. Point it at the public API URL when the
+      # backend is not reachable at <frontend-host>:7000.
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-}
+    ports:
+      - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
 volumes:
-  db_data: null
-  seq_data: null
+  db_data:
+  seq_data:
+
+networks:
+  default:
+    name: time-tracking-network
