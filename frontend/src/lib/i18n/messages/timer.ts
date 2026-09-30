@@ -6,6 +6,7 @@ export const de = {
 	starting: 'Wird gestartet…',
 	stopping: 'Wird gestoppt…',
 	startFailed: 'Timer konnte nicht gestartet werden.',
+	alreadyRunning: 'Es läuft bereits ein Timer – er wird jetzt angezeigt.',
 	stopFailed: 'Timer konnte nicht gestoppt werden.',
 	personal: 'Privat (ohne Organisation)',
 	runningFor: 'Läuft für {org}',
@@ -26,7 +27,8 @@ export const de = {
 	overtimeFailed: 'Saldo konnte nicht berechnet werden.',
 	cumulativeBalance: 'Saldo gesamt',
 	asOfToday: 'Stand heute',
-	endOfWeek: 'Ende der gewählten Woche',
+	thisWeek: 'Diese Woche bis heute',
+	weekOfTarget: '{worked} von {target}',
 	entriesThisWeek: 'Zeiteinträge dieser Woche',
 	noEntries: 'Keine Zeiteinträge in dieser Woche.'
 };
@@ -38,6 +40,7 @@ export const en: typeof de = {
 	starting: 'Starting…',
 	stopping: 'Stopping…',
 	startFailed: 'Could not start the timer.',
+	alreadyRunning: 'A timer is already running – it is shown now.',
 	stopFailed: 'Could not stop the timer.',
 	personal: 'Personal (no organization)',
 	runningFor: 'Running for {org}',
@@ -58,7 +61,8 @@ export const en: typeof de = {
 	overtimeFailed: 'Could not calculate the balance.',
 	cumulativeBalance: 'Cumulative balance',
 	asOfToday: 'As of today',
-	endOfWeek: 'End of selected week',
+	thisWeek: 'This week so far',
+	weekOfTarget: '{worked} of {target}',
 	entriesThisWeek: 'Time entries this week',
 	noEntries: 'No time entries this week.'
 };

@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { env } from '$env/dynamic/public';
+import { goto } from '$app/navigation';
+import { isTwoFactorRequired } from '$lib/utils/errorHandler';
 import { installRefreshInterceptor, type RefreshedTokens } from '$lib/authRefresh';
 import { Configuration, AbsenceDayApi, ApiKeysApi, AuthApi, ExportImportApi, GroupApi, HolidayApi, NotificationsApi, OrganizationsApi, PauseRulesApi, ReportsApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
 
@@ -74,6 +76,15 @@ installRefreshInterceptor(axiosInstance, {
             window.location.href = `/login?next=${encodeURIComponent(next)}`;
         }
     }
+});
+
+// An org that requires 2FA answers 403 "TwoFactorRequired" until the user sets it up:
+// send them to the 2FA section (the error still reaches the caller, localized by extractErrorMessage).
+axiosInstance.interceptors.response.use(undefined, (error) => {
+    if (isTwoFactorRequired(error) && typeof window !== 'undefined' && window.location.pathname !== '/settings') {
+        goto('/settings#two-factor');
+    }
+    return Promise.reject(error);
 });
 
 // SDK Configuration — accessToken is a function so it reads fresh token on every request

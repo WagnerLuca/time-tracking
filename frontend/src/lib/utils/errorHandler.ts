@@ -23,6 +23,8 @@ export function extractErrorMessage(err: unknown, fallback: string = t('common.u
 		const res = (err as { response?: { status?: number; data?: Record<string, unknown> | string } }).response;
 		if (res?.data) {
 			if (typeof res.data === 'object') {
+				// Org requires 2FA the caller has not set up (RequireOrgRole filter)
+				if (isTwoFactorRequired(err)) return t('common.twoFactorRequired');
 				// Backend ServiceResult / custom JSON: { message: "..." }
 				if ('message' in res.data && typeof res.data.message === 'string') {
 					return res.data.message;
@@ -70,4 +72,10 @@ export function getErrorStatus(err: unknown): number | null {
 		if (typeof res?.status === 'number') return res.status;
 	}
 	return null;
+}
+
+/** 403 from an org that requires 2FA while the caller has none (ProblemDetails title "TwoFactorRequired"). */
+export function isTwoFactorRequired(err: unknown): boolean {
+	const res = (err as { response?: { status?: number; data?: { title?: unknown } } } | null)?.response;
+	return res?.status === 403 && res.data?.title === 'TwoFactorRequired';
 }

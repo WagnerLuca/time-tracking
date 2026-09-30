@@ -38,6 +38,15 @@ export const de = {
 	unknown: 'Unbekannt',
 	ongoing: 'laufend',
 	required: 'Pflichtfeld',
+	twoFactorRequired: 'Diese Organisation verlangt die Zwei-Faktor-Authentifizierung. Richte sie in den Einstellungen ein, um fortzufahren.',
+	emailVerify: {
+		notConfirmed: 'Deine E-Mail-Adresse ist noch nicht bestätigt.',
+		resend: 'Link erneut senden',
+		resending: 'Wird gesendet…',
+		resent: 'Bestätigungslink gesendet.',
+		resendFailed: 'Der Bestätigungslink konnte nicht gesendet werden.',
+		dismiss: 'Hinweis ausblenden'
+	},
 	unexpectedError: 'Ein unerwarteter Fehler ist aufgetreten.',
 	loadFailed: 'Daten konnten nicht geladen werden.',
 	actionFailed: 'Die Aktion ist fehlgeschlagen.',
@@ -84,6 +93,15 @@ export const en: typeof de = {
 	unknown: 'Unknown',
 	ongoing: 'ongoing',
 	required: 'Required',
+	twoFactorRequired: 'This organization requires two-factor authentication. Set it up in your settings to continue.',
+	emailVerify: {
+		notConfirmed: 'Your email address is not confirmed yet.',
+		resend: 'Resend link',
+		resending: 'Sending…',
+		resent: 'Confirmation link sent.',
+		resendFailed: 'Could not send the confirmation link.',
+		dismiss: 'Dismiss notice'
+	},
 	unexpectedError: 'An unexpected error occurred.',
 	loadFailed: 'Could not load data.',
 	actionFailed: 'The action failed.',

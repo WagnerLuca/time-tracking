@@ -1,4 +1,6 @@
 import { timeTrackingApi } from '$lib/apiClient';
+import { getErrorStatus } from '$lib/utils/errorHandler';
+import { t } from '$lib/i18n';
 import type { StartTimeEntryRequest, StopTimeEntryRequest, TimeEntryResponse } from '$lib/api';
 
 /**
@@ -39,9 +41,18 @@ function createTimerStore() {
 	}
 
 	async function start(request: StartTimeEntryRequest): Promise<TimeEntryResponse> {
-		const { data } = await timeTrackingApi.apiV1TimeTrackingStartPost(request);
-		setCurrent(data);
-		return data;
+		try {
+			const { data } = await timeTrackingApi.apiV1TimeTrackingStartPost(request);
+			setCurrent(data);
+			return data;
+		} catch (err) {
+			// 409: a timer was started meanwhile (another tab, a terminal) — show that one instead
+			if (getErrorStatus(err) === 409) {
+				await refresh().catch(() => {});
+				throw new Error(t('timer.alreadyRunning'));
+			}
+			throw err;
+		}
 	}
 
 	async function stop(request: StopTimeEntryRequest = {}): Promise<void> {
