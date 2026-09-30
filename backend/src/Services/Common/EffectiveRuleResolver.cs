@@ -6,11 +6,24 @@ namespace TimeTracking.Api.Services;
 
 /// <summary>
 /// Resolves the effective <see cref="RuleMode"/> for a user by combining the
-/// organization default with the user's group overrides (most permissive wins).
+/// organization default with the user's group overrides (see <see cref="Combine{T}"/>).
 /// Shared by services that enforce rules or gate requests.
 /// </summary>
 public static class EffectiveRuleResolver
 {
+    /// <summary>
+    /// The one override rule: a group override replaces the organization default in either
+    /// direction (a group may be stricter or looser than the org); with several overriding
+    /// groups the most permissive one wins; without any override the org default applies.
+    /// Enum order is the permissiveness order (Disabled &lt; RequiresApproval &lt; Allowed,
+    /// Private &lt; AdminOnly &lt; AllMembers).
+    /// </summary>
+    public static T Combine<T>(T orgDefault, IEnumerable<T?> groupOverrides) where T : struct, Enum
+    {
+        var overrides = groupOverrides.Where(o => o.HasValue).Select(o => o!.Value).ToList();
+        return overrides.Count == 0 ? orgDefault : overrides.Max();
+    }
+
     public static async Task<RuleMode> ResolveAsync(
         TimeTrackingDbContext context, Organization org, int userId, RequestType action)
     {
@@ -25,17 +38,7 @@ public static class EffectiveRuleResolver
             .Select(gm => gm.Group)
             .ToListAsync();
 
-        var overrides = userGroups
-            .Select(g => OrgRuleHelper.GetGroupRuleMode(g, action))
-            .Where(m => m.HasValue)
-            .Select(m => m!.Value)
-            .ToList();
-
-        if (overrides.Count == 0) return orgMode;
-
-        // Most permissive wins (Allowed > RequiresApproval > Disabled), but never below org default
-        var mostPermissive = overrides.Max();
-        return mostPermissive > orgMode ? mostPermissive : orgMode;
+        return Combine(orgMode, userGroups.Select(g => OrgRuleHelper.GetGroupRuleMode(g, action)));
     }
 
     /// <summary>

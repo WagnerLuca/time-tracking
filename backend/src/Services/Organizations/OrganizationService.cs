@@ -205,58 +205,11 @@ public class OrganizationService : IOrganizationService
         return ServiceResult.Ok(organization with { Members = membersWithVacation });
     }
 
-    /// <summary>
-    /// Returns the set of user IDs whose vacation balance the caller may see, based on the
-    /// effective <see cref="VisibilityMode"/> (organization default + group overrides).
-    /// Always includes the caller themselves; org admins/owners see everyone.
-    /// </summary>
+    /// <summary>User IDs whose vacation balance the caller may see (same rule as vacation days, see AbsenceVisibility).</summary>
     private async Task<HashSet<int>> GetVacationVisibleUserIdsAsync(int callerUserId, int orgId)
     {
         var org = await _context.Organizations.AsNoTracking().FirstAsync(o => o.Id == orgId);
-        var callerRole = await GetRoleAsync(callerUserId, orgId);
-
-        var allMemberIds = await _context.UserOrganizations.AsNoTracking()
-            .Where(uo => uo.OrganizationId == orgId)
-            .Select(uo => uo.UserId)
-            .ToListAsync();
-
-        // Admins/owners and org-wide "AllMembers" visibility expose everyone
-        if (callerRole >= OrganizationRole.Admin || org.VacationVisibility >= VisibilityMode.AllMembers)
-            return allMemberIds.ToHashSet();
-
-        var visible = new HashSet<int> { callerUserId };
-
-        // Groups the caller belongs to, with their overrides
-        var callerGroups = await _context.GroupMembers.AsNoTracking()
-            .Include(gm => gm.Group)
-            .Where(gm => gm.UserId == callerUserId
-                      && gm.Group.OrganizationId == orgId
-                      && gm.Group.IsActive)
-            .Select(gm => new { gm.GroupId, gm.Role, gm.Group.VacationVisibility })
-            .ToListAsync();
-
-        // Group where the caller is a Group Admin and the effective visibility is at least AdminOnly
-        var adminGroupIds = callerGroups
-            .Where(g => g.Role == GroupRole.Admin
-                     && (g.VacationVisibility ?? org.VacationVisibility) >= VisibilityMode.AdminOnly)
-            .Select(g => g.GroupId).ToList();
-
-        // Groups whose effective visibility is AllMembers (any member sees fellow members)
-        var allMembersGroupIds = callerGroups
-            .Where(g => (g.VacationVisibility ?? org.VacationVisibility) >= VisibilityMode.AllMembers)
-            .Select(g => g.GroupId).ToList();
-
-        var reachableGroupIds = adminGroupIds.Union(allMembersGroupIds).Distinct().ToList();
-        if (reachableGroupIds.Count > 0)
-        {
-            var groupMemberIds = await _context.GroupMembers.AsNoTracking()
-                .Where(gm => reachableGroupIds.Contains(gm.GroupId))
-                .Select(gm => gm.UserId)
-                .ToListAsync();
-            foreach (var id in groupMemberIds) visible.Add(id);
-        }
-
-        return visible;
+        return (await AbsenceVisibility.ForCallerAsync(_context, org, callerUserId)).Vacation;
     }
 
     public async Task<ServiceResult<List<UserOrganizationResponse>>> GetUserOrganizationsAsync(int callerUserId)

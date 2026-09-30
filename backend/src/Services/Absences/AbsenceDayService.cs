@@ -49,62 +49,20 @@ public class AbsenceDayService : IAbsenceDayService
         }
         else
         {
-            // Non-admin viewing others or all — resolve group-aware visibility
-            var groupAdminMemberIds = await GetGroupAdminAbsenceVisibleMemberIdsAsync(callerUserId, org.Id);
-            bool isGroupAdmin = groupAdminMemberIds.Count > 0;
-
-            // Get group member IDs for visibility (group members who share a group with the caller)
-            var groupMemberIds = await GetGroupMemberVisibleUserIdsAsync(callerUserId, org.Id);
-
-            // Effective visibility: org-level baseline, but GroupAdmins with AdminOnly also see their group members
-            bool canSeeVacation = org.VacationVisibility >= VisibilityMode.AllMembers;
-            bool canSeeSick = org.SickDayVisibility >= VisibilityMode.AllMembers;
-            bool groupAdminCanSeeVacation = isGroupAdmin && org.VacationVisibility >= VisibilityMode.AdminOnly;
-            bool groupAdminCanSeeSick = isGroupAdmin && org.SickDayVisibility >= VisibilityMode.AdminOnly;
-
-            // Check group-level visibility overrides for regular members
-            bool groupMemberCanSeeVacation = groupMemberIds.vacationVisible.Count > 0;
-            bool groupMemberCanSeeSick = groupMemberIds.sickVisible.Count > 0;
+            // Non-admin viewing others or all — one resolver for org default + group overrides
+            var visible = await AbsenceVisibility.ForCallerAsync(_context, org, callerUserId);
+            var vacationIds = visible.Vacation.ToList();
+            var sickIds = visible.SickDay.ToList();
+            var otherIds = visible.Other.ToList();
 
             if (filterUserId.HasValue)
-            {
-                // Viewing a specific other member's absences
-                bool isGroupAdminMember = groupAdminMemberIds.Contains(filterUserId.Value);
-                bool isVacationVisible = canSeeVacation || (groupAdminCanSeeVacation && isGroupAdminMember) || groupMemberIds.vacationVisible.Contains(filterUserId.Value);
-                bool isSickVisible = canSeeSick || (groupAdminCanSeeSick && isGroupAdminMember) || groupMemberIds.sickVisible.Contains(filterUserId.Value);
-
                 query = query.Where(a => a.UserId == filterUserId.Value);
-                if (!isVacationVisible && !isSickVisible)
-                    query = query.Where(a => a.UserId == callerUserId); // fallback to own
-                else if (!isVacationVisible)
-                    query = query.Where(a => a.Type != AbsenceType.Vacation);
-                else if (!isSickVisible)
-                    query = query.Where(a => a.Type != AbsenceType.SickDay);
-            }
-            else
-            {
-                // No filter — list all visible absences
-                if (!canSeeVacation && !canSeeSick && !groupAdminCanSeeVacation && !groupAdminCanSeeSick && !groupMemberCanSeeVacation && !groupMemberCanSeeSick)
-                {
-                    query = query.Where(a => a.UserId == callerUserId);
-                }
-                else
-                {
-                    query = query.Where(a =>
-                        a.UserId == callerUserId
-                        // All members can see these types (org-level AllMembers)
-                        || (canSeeVacation && a.Type == AbsenceType.Vacation)
-                        || (canSeeSick && a.Type == AbsenceType.SickDay)
-                        || (canSeeVacation && canSeeSick && a.Type == AbsenceType.Other)
-                        // Group admin can see their group members' absences (AdminOnly)
-                        || (groupAdminCanSeeVacation && groupAdminMemberIds.Contains(a.UserId) && a.Type == AbsenceType.Vacation)
-                        || (groupAdminCanSeeSick && groupAdminMemberIds.Contains(a.UserId) && a.Type == AbsenceType.SickDay)
-                        // Group members can see fellow group members' absences (group-level AllMembers)
-                        || (groupMemberCanSeeVacation && groupMemberIds.vacationVisible.Contains(a.UserId) && a.Type == AbsenceType.Vacation)
-                        || (groupMemberCanSeeSick && groupMemberIds.sickVisible.Contains(a.UserId) && a.Type == AbsenceType.SickDay)
-                    );
-                }
-            }
+
+            query = query.Where(a =>
+                a.UserId == callerUserId
+                || (a.Type == AbsenceType.Vacation && vacationIds.Contains(a.UserId))
+                || (a.Type == AbsenceType.SickDay && sickIds.Contains(a.UserId))
+                || (a.Type == AbsenceType.Other && otherIds.Contains(a.UserId)));
         }
 
         if (from.HasValue) query = query.Where(a => a.Date >= from.Value);
@@ -442,80 +400,5 @@ public class AbsenceDayService : IAbsenceDayService
             .FirstOrDefaultAsync(uo => uo.OrganizationId == organizationId
                                     && uo.UserId == userId);
         return membership?.Role;
-    }
-
-    /// <summary>
-    /// Returns the set of user IDs whose absences a Group Admin can view,
-    /// based on groups where they are Admin. (Used for AdminOnly visibility.)
-    /// </summary>
-    private async Task<List<int>> GetGroupAdminAbsenceVisibleMemberIdsAsync(int callerUserId, int orgId)
-    {
-        var adminGroupIds = await _context.GroupMembers
-            .Include(gm => gm.Group)
-            .Where(gm => gm.UserId == callerUserId
-                      && gm.Role == GroupRole.Admin
-                      && gm.Group.OrganizationId == orgId
-                      && gm.Group.IsActive)
-            .Select(gm => gm.GroupId)
-            .ToListAsync();
-
-        if (adminGroupIds.Count == 0)
-            return new List<int>();
-
-        return await _context.GroupMembers
-            .Where(gm => adminGroupIds.Contains(gm.GroupId))
-            .Select(gm => gm.UserId)
-            .Distinct()
-            .ToListAsync();
-    }
-
-    /// <summary>
-    /// Returns the sets of user IDs whose absences are visible to a regular group member,
-    /// based on group-level VacationVisibility/SickDayVisibility overrides.
-    /// Only includes users from groups where visibility is set to AllMembers.
-    /// </summary>
-    private async Task<(List<int> vacationVisible, List<int> sickVisible)> GetGroupMemberVisibleUserIdsAsync(int callerUserId, int orgId)
-    {
-        // Get all groups the caller belongs to in this org
-        var userGroups = await _context.GroupMembers
-            .Include(gm => gm.Group)
-            .Where(gm => gm.UserId == callerUserId
-                      && gm.Group.OrganizationId == orgId
-                      && gm.Group.IsActive)
-            .Select(gm => gm.Group)
-            .ToListAsync();
-
-        if (userGroups.Count == 0)
-            return (new List<int>(), new List<int>());
-
-        // Groups where vacation is visible to all members
-        var vacationGroupIds = userGroups
-            .Where(g => g.VacationVisibility == VisibilityMode.AllMembers)
-            .Select(g => g.Id).ToList();
-
-        // Groups where sick days are visible to all members
-        var sickGroupIds = userGroups
-            .Where(g => g.SickDayVisibility == VisibilityMode.AllMembers)
-            .Select(g => g.Id).ToList();
-
-        var allGroupIds = vacationGroupIds.Union(sickGroupIds).Distinct().ToList();
-        if (allGroupIds.Count == 0)
-            return (new List<int>(), new List<int>());
-
-        // Get member IDs per group
-        var groupMembers = await _context.GroupMembers
-            .Where(gm => allGroupIds.Contains(gm.GroupId))
-            .Select(gm => new { gm.GroupId, gm.UserId })
-            .ToListAsync();
-
-        var vacationVisible = groupMembers
-            .Where(gm => vacationGroupIds.Contains(gm.GroupId))
-            .Select(gm => gm.UserId).Distinct().ToList();
-
-        var sickVisible = groupMembers
-            .Where(gm => sickGroupIds.Contains(gm.GroupId))
-            .Select(gm => gm.UserId).Distinct().ToList();
-
-        return (vacationVisible, sickVisible);
     }
 }

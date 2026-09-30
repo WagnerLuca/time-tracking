@@ -271,6 +271,20 @@ public class TimeTrackingService : ITimeTrackingService
         if (entry == null)
             return ServiceResult.NotFound("Time entry not found.");
 
+        // Deleting a past entry changes the record as much as editing it, so the same rule applies
+        if (entry.OrganizationId.HasValue && !entry.IsRunning)
+        {
+            var org = await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == entry.OrganizationId);
+            if (org != null)
+            {
+                var mode = await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.EditPastEntry);
+                if (mode != RuleMode.Allowed)
+                    return ServiceResult.Forbidden(mode == RuleMode.Disabled
+                        ? "Editing past entries is disabled in this organization."
+                        : "Editing past entries requires admin approval in this organization. Please submit a request.");
+            }
+        }
+
         _context.TimeEntries.Remove(entry);
         await _context.SaveChangesAsync();
         _logger.LogInformation("Time entry {EntryId} deleted by user {UserId}", entry.Id, userId);

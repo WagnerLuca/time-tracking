@@ -228,7 +228,8 @@ public class GroupService : IGroupService
         var (org, callerMembership) = await ResolveOrgMemberAsync(slug, callerUserId);
         if (org is null) return ServiceResult.NotFound<GroupMemberResponse>("Organization not found.");
 
-        if (callerMembership?.Role < OrganizationRole.Admin)
+        // Pattern, not `?.Role < Admin`: that is false for a null membership and would let non-members through
+        if (callerMembership is not { Role: >= OrganizationRole.Admin })
             return ServiceResult.Forbidden<GroupMemberResponse>("Only org admins can change group member roles.");
 
         var groupMember = await _context.GroupMembers
@@ -420,21 +421,10 @@ public class GroupService : IGroupService
     private static T? NormalizeOverride<T>(T? value) where T : struct, Enum
         => value.HasValue && Convert.ToInt32(value.Value) < 0 ? null : value;
 
-    // Most permissive RuleMode wins (Allowed > RequiresApproval > Disabled)
+    // Same override rule as enforcement (EffectiveRuleResolver.Combine), so what the UI shows is what the API does
     private static RuleMode ResolveRuleMode(RuleMode orgDefault, List<Group> userGroups, Func<Group, RuleMode?> selector)
-    {
-        var overrides = userGroups.Select(selector).Where(v => v.HasValue).Select(v => v!.Value).ToList();
-        if (overrides.Count == 0) return orgDefault;
-        var mostPermissive = overrides.Max();
-        return mostPermissive > orgDefault ? mostPermissive : orgDefault;
-    }
+        => EffectiveRuleResolver.Combine(orgDefault, userGroups.Select(selector));
 
-    // Most permissive VisibilityMode wins (AllMembers > AdminOnly > Private)
     private static VisibilityMode ResolveVisibilityMode(VisibilityMode orgDefault, List<Group> userGroups, Func<Group, VisibilityMode?> selector)
-    {
-        var overrides = userGroups.Select(selector).Where(v => v.HasValue).Select(v => v!.Value).ToList();
-        if (overrides.Count == 0) return orgDefault;
-        var mostPermissive = overrides.Max();
-        return mostPermissive > orgDefault ? mostPermissive : orgDefault;
-    }
+        => EffectiveRuleResolver.Combine(orgDefault, userGroups.Select(selector));
 }
