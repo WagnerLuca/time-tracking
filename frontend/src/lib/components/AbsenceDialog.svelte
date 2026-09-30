@@ -126,17 +126,10 @@
 				});
 				onsaved(tp('absences.dialog.requestSent', workdays.length));
 			} else {
-				for (const dateStr of workdays) {
-					if (isAdmin) {
-						await absenceDayApi.apiV1OrganizationsSlugAbsencesAdminPost(orgSlug, {
-							userId: targetUserId, date: dateStr, type, customTypeId, isHalfDay: halfDay, note: note || undefined
-						});
-					} else {
-						await absenceDayApi.apiV1OrganizationsSlugAbsencesPost(orgSlug, {
-							date: dateStr, type, customTypeId, isHalfDay: halfDay, note: note || undefined
-						});
-					}
-				}
+				// All weekdays of the range in one call, all-or-nothing (409 names the dates already taken)
+				const range = { from: fromDate, to: toDate || fromDate, type, customTypeId, isHalfDay: halfDay, note: note || undefined };
+				if (isAdmin) await absenceDayApi.apiV1OrganizationsSlugAbsencesAdminRangePost(orgSlug, { ...range, userId: targetUserId });
+				else await absenceDayApi.apiV1OrganizationsSlugAbsencesRangePost(orgSlug, range);
 				onsaved();
 			}
 			onclose();
