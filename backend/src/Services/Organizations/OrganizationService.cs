@@ -123,8 +123,9 @@ public class OrganizationService : IOrganizationService
             return ServiceResult.Ok(organization with { Members = new List<OrganizationMemberResponse>() });
         }
 
-        // Compute vacation days used for each member (current year)
-        var currentYear = DateTime.UtcNow.Year;
+        // Compute vacation days used for each member (current year, in the org's time zone)
+        var today = OrgClock.For(organization.TimeZone).Today();
+        var currentYear = today.Year;
         var yearStart = new DateOnly(currentYear, 1, 1);
         var yearEnd = new DateOnly(currentYear, 12, 31);
         var memberIds = organization.Members.Select(m => m.Id).ToList();
@@ -133,21 +134,19 @@ public class OrganizationService : IOrganizationService
         var orgHolidays = await _context.Holidays.AsNoTracking()
             .Where(h => h.OrganizationId == organization.Id)
             .ToListAsync();
-        var holidayDates = new HashSet<DateOnly>(
-            orgHolidays.Select(h => h.IsRecurring
-                ? new DateOnly(currentYear, h.Date.Month, h.Date.Day)
-                : h.Date)
-            .Where(d => d >= yearStart && d <= yearEnd));
+        var holidayDates = orgHolidays
+            .Select(h => h.DateIn(currentYear))
+            .OfType<DateOnly>()
+            .ToHashSet();
 
         var vacationUsage = await _context.AbsenceDays.AsNoTracking()
             .Where(a => a.OrganizationId == organization.Id
                      && memberIds.Contains(a.UserId)
-                     && a.Type == AbsenceType.Vacation
+                     && (a.Type == AbsenceType.Vacation || (a.CustomType != null && a.CustomType.CountsAsVacation))
                      && a.Date >= yearStart && a.Date <= yearEnd)
             .ToListAsync();
 
         // Split usage into taken (up to today) and planned (after today, rest of year)
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var usageByUser = vacationUsage
             .Where(a => !holidayDates.Contains(a.Date))
             .GroupBy(a => a.UserId)

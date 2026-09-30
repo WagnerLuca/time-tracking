@@ -74,7 +74,7 @@ public class PdfReportService : IPdfReportService
                 CumulativeOvertimeAtEnd: g.Last().CumulativeOvertime,
                 WorkedDays: g.Count(r => r.Status == "Worked"),
                 MissingDays: g.Count(r => r.Status == "Missing"),
-                VacationDays: g.Count(r => r.AbsenceType == AbsenceType.Vacation),
+                VacationDays: g.Count(r => r.CountsAsVacation),
                 SickDays: g.Count(r => r.AbsenceType == AbsenceType.SickDay),
                 HolidayDays: g.Count(r => r.HolidayName != null)
             ))

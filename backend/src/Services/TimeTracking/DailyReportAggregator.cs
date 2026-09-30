@@ -22,7 +22,9 @@ public record DailyReportRow(
     string? HolidayName,
     AbsenceType? AbsenceType,
     string? AbsenceNote,
-    string EntrySummary
+    string EntrySummary,
+    /// <summary>The absence counts against the vacation budget (vacation, or a custom type that counts as vacation).</summary>
+    bool CountsAsVacation = false
 );
 
 /// <summary>
@@ -67,6 +69,7 @@ public static class DailyReportAggregator
             .ToListAsync();
 
         var absences = await context.AbsenceDays.AsNoTracking()
+            .Include(a => a.CustomType)
             .Where(a => a.UserId == userId && a.OrganizationId == orgId
                      && a.Date >= dateFrom && a.Date <= dateTo)
             .ToListAsync();
@@ -78,18 +81,10 @@ public static class DailyReportAggregator
         var holidaysByDate = new Dictionary<DateOnly, Holiday>();
         foreach (var h in holidays)
         {
-            if (h.IsRecurring)
+            for (var year = dateFrom.Year; year <= dateTo.Year; year++)
             {
-                for (var year = dateFrom.Year; year <= dateTo.Year; year++)
-                {
-                    var recurringDate = new DateOnly(year, h.Date.Month, h.Date.Day);
-                    if (recurringDate >= dateFrom && recurringDate <= dateTo)
-                        holidaysByDate.TryAdd(recurringDate, h);
-                }
-            }
-            else
-            {
-                holidaysByDate.TryAdd(h.Date, h);
+                if (h.DateIn(year) is { } date && date >= dateFrom && date <= dateTo)
+                    holidaysByDate.TryAdd(date, h);
             }
         }
 
@@ -118,31 +113,14 @@ public static class DailyReportAggregator
             var isAbsence = absencesByDate.TryGetValue(currentDate, out var absence);
 
             var holidayCredit = isHoliday ? (holiday!.IsHalfDay ? targetHours / 2.0 : targetHours) : 0;
-            var absenceCredit = isAbsence ? (absence!.IsHalfDay ? targetHours / 2.0 : targetHours) : 0;
+            var absenceCredit = isAbsence ? AbsenceCredit(absence!, targetHours, netHours) : 0;
             var effectiveTarget = Math.Max(0, targetHours - holidayCredit - absenceCredit);
             string status;
 
             // An uncorrected forgotten timer is the one thing the reader must act on, so it wins
             if (hasFailures) { status = "Needs Correction"; }
-            else if (isHoliday && isAbsence)
-            {
-                status = absence!.Type switch
-                {
-                    AbsenceType.SickDay => "Sick",
-                    AbsenceType.Vacation => "Vacation",
-                    _ => "Absent"
-                };
-            }
+            else if (isAbsence) { status = AbsenceStatus(absence!); }
             else if (isHoliday) { status = holiday!.IsHalfDay ? "Half Holiday" : "Holiday"; }
-            else if (isAbsence)
-            {
-                status = absence!.Type switch
-                {
-                    AbsenceType.SickDay => "Sick",
-                    AbsenceType.Vacation => "Vacation",
-                    _ => "Absent"
-                };
-            }
             else if (dayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) { status = "Weekend"; }
             else if (targetHours == 0) { status = "Day Off"; }
             else if (dayEntries.Count > 0) { status = "Worked"; }
@@ -164,7 +142,8 @@ public static class DailyReportAggregator
                 isHoliday ? holiday!.Name : null,
                 isAbsence ? absence!.Type : null,
                 isAbsence ? absence!.Note : null,
-                entrySummary
+                entrySummary,
+                isAbsence && (absence!.Type == AbsenceType.Vacation || absence.CustomType?.CountsAsVacation == true)
             ));
 
             currentDate = currentDate.AddDays(1);
@@ -172,6 +151,30 @@ public static class DailyReportAggregator
 
         return rows;
     }
+
+    /// <summary>
+    /// Hours an absence takes off the day's target. Vacation, sick days and plain "other"
+    /// absences credit the (half) target; custom types follow their <see cref="AbsenceCreditMode"/>:
+    /// None credits nothing, FullCredit the (half) target, FillToTarget only what is missing
+    /// between the tracked hours and the (half) target.
+    /// </summary>
+    internal static double AbsenceCredit(AbsenceDay absence, double targetHours, double netWorkedHours)
+    {
+        var target = absence.IsHalfDay ? targetHours / 2.0 : targetHours;
+        return absence.CustomType?.CreditMode switch
+        {
+            AbsenceCreditMode.None => 0,
+            AbsenceCreditMode.FillToTarget => Math.Clamp(targetHours - netWorkedHours, 0, target),
+            _ => target
+        };
+    }
+
+    private static string AbsenceStatus(AbsenceDay absence) => absence.Type switch
+    {
+        AbsenceType.SickDay => "Sick",
+        AbsenceType.Vacation => "Vacation",
+        _ => absence.CustomType?.Name ?? "Absent"
+    };
 
     private static double GetTargetHours(List<WorkSchedule> schedules, DateOnly date)
     {
