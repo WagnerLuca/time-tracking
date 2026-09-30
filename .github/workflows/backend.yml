@@ -27,7 +27,7 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      
+
       - name: Restore dependencies
         run: dotnet restore
         working-directory: backend/tests/TimeTracking.Api.Tests
@@ -36,6 +36,13 @@ jobs:
         run: dotnet build --no-restore --configuration Release
         working-directory: backend/tests/TimeTracking.Api.Tests
 
+      - name: Check migrations match the model
+        run: |
+          dotnet tool install --global dotnet-ef
+          dotnet ef migrations has-pending-model-changes
+        working-directory: backend
+
+      # Includes the Postgres suite (Testcontainers; Docker is available on ubuntu-latest)
       - name: Run tests
         run: dotnet test --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
         working-directory: backend/tests/TimeTracking.Api.Tests

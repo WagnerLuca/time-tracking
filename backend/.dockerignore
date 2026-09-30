@@ -9,3 +9,9 @@ out/
 README.md
 Dockerfile*
 .env
+
+# Not part of the image: tests, local logs and build leftovers
+tests/
+logs/
+backend/
+**/TestResults/

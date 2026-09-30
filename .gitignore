@@ -3,3 +3,10 @@ eval_docs/
 .vs/
 artifacts/
 .env
+
+# Generated / local output
+swagger.json
+test-output.txt
+backend/logs/
+**/TestResults/
+backend/backend/

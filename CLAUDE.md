@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Full-stack multi-organization time tracking app. ASP.NET Core Web API backend (`backend/`) + SvelteKit frontend (`frontend/`). Domain covers time entries, work schedules, absences (vacation/sick), holidays, approval requests, notifications, and organization/group-scoped permissions.
 
-- **Backend**: ASP.NET Core, **.NET 10** (`net10.0`), C#. (README says 9.0 — outdated; trust the `.csproj`.)
+- **Backend**: ASP.NET Core, **.NET 10** (`net10.0`), C#.
 - **Frontend**: SvelteKit + **Svelte 5 (runes)**, TypeScript, SSR via `adapter-node`, Tailwind CSS 4 + DaisyUI 5, styled with the Wagner Luca design system: `src/app.css` defines a single DaisyUI theme (`wagnerluca`) whose colours are `var()`s onto `@wagnerluca/ui/tokens.css` (primary = `time` accent). Light/dark is the `.dark` class on `<html>` under the shared `wl-theme` key (`theme.svelte.ts` + the pre-paint script in `app.html`), not DaisyUI `data-theme`. `@wagnerluca/ui` comes from GitHub Packages — `NODE_AUTH_TOKEN` (read:packages) for `npm install`, BuildKit secret in Docker, `GHP_READ_TOKEN` repo secret in CI.
 - **DB**: PostgreSQL 16 in production; **in-memory EF Core provider in local dev** (no Postgres needed to run the backend).
 
@@ -20,10 +20,13 @@ Full-stack multi-organization time tracking app. ASP.NET Core Web API backend (`
 ### Backend tests (`cd backend/tests/TimeTracking.Api.Tests`)
 - All tests: `dotnet test`
 - Single test/class: `dotnet test --filter "FullyQualifiedName~AuthControllerTests"` or `--filter "DisplayName~specific test name"`
-- Tests are **integration tests** using `WebApplicationFactory` (`Infrastructure/TimeTrackingApiFactory.cs`), xUnit + FluentAssertions. They run with `ASPNETCORE_ENVIRONMENT=Testing` (rate limiting disabled in that env).
+- Tests are **integration tests** using `WebApplicationFactory`, xUnit + FluentAssertions, with `ASPNETCORE_ENVIRONMENT=Testing` (rate limiting disabled in that env). Two factories:
+  - `Infrastructure/TimeTrackingApiFactory.cs` — EF **InMemory** (fast; one DB per test class). InMemory enforces no unique indexes, transactions, DateTime kinds or RLS.
+  - `Infrastructure/PostgresApiFactory.cs` + `[Collection(PostgresCollection.Name)]` (tests under `Postgres/`) — a real **PostgreSQL container via Testcontainers** (needs Docker), connecting as a non-superuser app role so row-level security applies; runs the real migrations + seed. Put anything touching indexes, concurrency, UTC or RLS there.
+  - Mails are captured by `CapturingEmailSender` (`factory.Mail.LinkToken(to, "reset-password")`).
 
 ### Frontend (`cd frontend`)
-- Dev server: `npm run dev -- --port 5179` → http://localhost:5179 (HMR; 5173 is taken by another project)
+- Dev server: `npm run dev` → http://localhost:5179 (port fixed in `vite.config.ts`; 5173 is taken by another project)
 - Type-check: `npm run check` (svelte-check; there is no separate lint step) — keep it at 0 errors **and 0 warnings**
 - Unit tests: `npm test` (Vitest, `src/**/*.test.ts`, TZ pinned to Europe/Berlin in `vitest.config.ts`; runs in CI after the check). Pure unit tests, no DOM.
 - E2E smoke: `npm run test:e2e` (Playwright, `tests/e2e/`, not part of `npm test`) against the *running* dev servers (frontend :5179, backend :7000 with seeded users); first run `npx playwright install chromium`
@@ -32,14 +35,19 @@ Full-stack multi-organization time tracking app. ASP.NET Core Web API backend (`
 
 ### Full launch
 - `start-app.bat` (Windows) opens backend + frontend in separate terminals.
-- `docker-compose up -d` runs backend (in-memory DB) + Seq log server (:5341). Note: the dev compose file does **not** define a Postgres `db` service despite README references.
+- `docker-compose up -d` runs backend (in-memory DB) + Seq log server (:5341). The dev compose file has no Postgres; `docker-compose.production.yml` (+ `.env.example`) is the Postgres setup.
 
 ## Backend architecture
 
 Layered: **Controller → Service → EF Core `TimeTrackingDbContext`**. Business logic lives in services, never controllers.
 
 - **`ServiceResult` / `ServiceResult<T>`** (`Services/Common/ServiceResult.cs`) is the service→controller contract. Services return `ServiceResult.Ok(data)` or `ServiceResult.NotFound/BadRequest/Forbidden/Conflict(msg)` — they never touch HTTP types. Controllers extend **`OrganizationBaseController`** and call `ToResponse(result)` / `ToCreatedResponse(result)`, which map `ServiceErrorType` → HTTP status + RFC 7807 Problem Details. When adding an endpoint, follow this pattern rather than returning `IActionResult` directly.
-- **Authorization is org-scoped via `[RequireOrgRole(...)]`** (`Filters/RequireOrgRoleAttribute.cs`). It reads the `{slug}` route param, checks the caller's `OrganizationRole` (Member ≤ Admin ≤ Owner), and caches the lookup for 2 minutes. Org-scoped routes are `api/v{version}/organizations/{slug}/...`.
+- **Authorization is org-scoped via `[RequireOrgRole(...)]`** (`Filters/RequireOrgRoleAttribute.cs`). It reads the `{slug}` route param and checks the caller's `OrganizationRole` (Member ≤ Admin ≤ Owner) on every request (no cache — changes apply immediately) plus the org's `Require2fa`. Org-scoped routes are `api/v{version}/organizations/{slug}/...`. Services start with `_context.FindOrgBySlugAsync(slug)` / `_context.GetOrgRoleAsync(userId, orgId)` (`Data/OrgQueries.cs`).
+- **Row-level security (Postgres)**: `TimeEntries` and `AbsenceDays` have a forced RLS policy (migration `EnableRowLevelSecurity`): a row is visible/writable only to its owner and to active members of its organization. `Data/RowLevelSecurity.cs` stamps every connection with `app.user_id` (the authenticated user) or `app.bypass_rls = on` (no HttpContext = trusted system work: migrations, seed, background jobs). Anonymous requests see no rows; code that authenticates a user another way calls `RlsContext.ActAsUser(id)` (the terminal punch). The app must connect as a **non-superuser** role (superusers bypass RLS) — see `docker-compose.production.yml`.
+- **Time zones**: instants are UTC (a global value converter normalises every `DateTime`); "which day", "today", "this week" and times in CSV/PDF are the organization's local time via `Services/Common/OrgClock.cs` (`Organization.TimeZone`, default Europe/Berlin). Never use `DateTime.UtcNow.Date` / `DateOnly.FromDateTime(utc)` for business days.
+- **Group overrides**: `EffectiveRuleResolver.Combine` is the one rule — a group override replaces the org default in either direction, the most permissive of several groups wins. Absence visibility uses the same rule per member (`Services/Common/AbsenceVisibility.cs`).
+- **Auth**: refresh tokens and email/reset tokens are stored as SHA-256 only (`TokenService.HashToken`); refresh rotation has reuse detection; backup codes are BCrypt hashes; TOTP steps are single-use. Account deletion anonymizes. Email goes through `IEmailSender` (SMTP via `Email:*`, else `LogEmailSender`).
+- **Request approvals** stage their side effects and save them with the status in one `SaveChanges`; `OrgRequest.Status` is a concurrency token, and a side effect that cannot be applied returns 400 and leaves the request pending.
 - **Failure entries** (`Services/TimeTracking/FailureEntryService.cs`): a hosted service stops any timer still running at its organization's `BusinessDayEnd` (local time in `Organization.TimeZone`, default 00:00 Europe/Berlin) and sets `TimeEntry.IsFailure`. A failure entry counts as **0** everywhere: `TimeEntryResponse` returns null durations (so every client-side sum skips it), `DailyReportAggregator` (daily CSV, PDF, cumulative overtime) excludes it and marks the day "Needs Correction", and the admin overview reports `FailureEntryCount`. Setting an end time (direct edit or approved edit request) clears the flag. Tests call the static `CloseOverdueEntriesAsync(db, nowUtc)` directly.
 - **Terminal API keys** (`ApiKeysController`, `Services/ApiKeys/`): org-scoped keys for unattended devices (RFID scanner). `POST /api/v1/terminal/punch` is `[AllowAnonymous]` and checks the `X-Api-Key` header itself (SHA-256 hash lookup); it can only toggle the timer of the member whose `UserOrganization.BadgeId` matches. Keys are *not* an authentication scheme — they never yield a user principal.
 - **`ActiveUserFilter`** is a global filter rejecting requests from deactivated users on every authenticated call.
@@ -64,7 +72,6 @@ Migrations are **auto-applied on startup** (`context.Database.Migrate()` for Pos
 
 ## Conventions & gotchas
 
-- The frontend `README.md` is stale (references a nonexistent `apiService.ts` and "weather" demo). Trust `apiClient.ts` and this file instead.
-- Seeded dev logins (in-memory DB): `max.mueller@example.com` (Owner), `anna.schmidt@example.com` (Admin), `tom.weber@example.com` (Member) — all password `Password123`.
+- Seeded dev logins (in-memory DB): `max.mueller@example.com` (Owner), `anna.schmidt@example.com` (Admin), `tom.weber@example.com` (Member, with a demo failure entry) — all password `Password123`. The seed only runs for the in-memory DB or with `SeedDemoData=true`, never on a normal Postgres deploy.
 - CI (`.github/workflows/`) splits backend and frontend by changed paths; backend job builds/tests from `backend/tests/TimeTracking.Api.Tests` and publishes Docker images to GHCR on non-PR pushes.
 - `docs/` holds design/plan documents (auth guide, groups feature plan, improvement plans) — useful background but not always current.
