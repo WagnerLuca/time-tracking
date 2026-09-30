@@ -2,12 +2,13 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { organizationsApi, timeTrackingApi, workScheduleApi, absenceDayApi, groupApi } from '$lib/apiClient';
+	import { organizationsApi, timeTrackingApi, workScheduleApi, absenceDayApi, groupApi, reportsApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, WorkScheduleResponse, OrganizationDetailResponse, AbsenceTypeDefinitionResponse, EffectivePermissionsResponse } from '$lib/api';
 	import { formatHours, formatDelta, formatDate, formatDateFull, getMonthName, dayNamesShort, barWidth } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, type CustomCreditSets } from '$lib/utils/scheduleHelpers';
-	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
+	import { balanceToMinutes, type BalanceMinutes } from '$lib/utils/balance';
 	import { DAY_TYPE_CLASSES, dayTypeClasses, heatColor } from '$lib/utils/colors';
 	import { isOrgAdmin, canEditEntries, canRequestEditEntries, canEditPause, canRequestEditPause } from '$lib/utils/orgRules';
 	import { loadDaysOff as fetchDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
@@ -34,8 +35,10 @@
 		focusDate?: string | null;
 		/** … and pre-open the editor (or edit request) for this entry. */
 		focusEntryId?: number | null;
+		/** Called whenever the balance was (re)loaded, e.g. after an entry edit. */
+		onbalance?: (balance: BalanceMinutes | null) => void;
 	}
-	let { orgSlug, orgId = null, userId, isSelf = false, orgDetail: orgDetailProp = null, focusDate = null, focusEntryId = null }: Props = $props();
+	let { orgSlug, orgId = null, userId, isSelf = false, orgDetail: orgDetailProp = null, focusDate = null, focusEntryId = null, onbalance }: Props = $props();
 
 	// View mode
 	let viewMode = $state<'month' | 'year'>('month');
@@ -66,9 +69,8 @@
 	let yearEntries = $state<TimeEntryResponse[]>([]);
 	let yearLoading = $state(false);
 
-	// Cumulative balance
-	let cumulativeBalance = $state(0); // overall cumulative balance in minutes
-	let monthlyCumulativeBalances = $state<Map<string, number>>(new Map()); // "YYYY-MM" -> cumulative balance
+	/** Cumulative balance as of today (balance endpoint); null when not visible to the caller. */
+	let balance = $state<BalanceMinutes | null>(null);
 	let selectedDayKey = $state<string | null>(null);
 	let fetchedOrgDetail = $state<OrganizationDetailResponse | null>(null);
 	const orgDetail = $derived(orgDetailProp ?? fetchedOrgDetail);
@@ -112,8 +114,6 @@
 	const monthDays = $derived(calendarDays.filter((d) => d.isCurrentMonth));
 	const monthStats = $derived(computeMonthStats(calendarDays));
 	const yearMonths = $derived(viewMode === 'year' ? buildYearMonths(currentYear, yearEntries) : []);
-
-	const currentMonthCumulative = $derived(monthlyCumulativeBalances.get(monthKey(currentYear, currentMonth + 1)) ?? 0);
 
 	const selectedDay = $derived(selectedDayKey ? (monthDays.find((day) => day.key === selectedDayKey) ?? null) : null);
 
@@ -187,9 +187,9 @@
 			loadDaysOff(),
 			loadSchedulePeriods(),
 			loadAbsenceTypes(),
-			loadEffectivePermissions()
+			loadEffectivePermissions(),
+			loadCumulativeBalance()
 		]);
-		await loadCumulativeBalance();
 		if (viewMode === 'year') await loadYearEntries();
 		loading = false;
 	}
@@ -275,67 +275,16 @@
 		await loadCumulativeBalance();
 	}
 
-	// TODO(backend): replace with GET balance endpoint once available
 	async function loadCumulativeBalance() {
-		if (!workSchedule) {
-			cumulativeBalance = 0;
-			monthlyCumulativeBalances = new Map();
-			return;
+		try {
+			const { data } = await reportsApi.apiV1OrganizationsSlugMembersMemberIdBalanceGet(orgSlug, userId);
+			balance = balanceToMinutes(data);
+		} catch (err) {
+			balance = null;
+			// 403: the caller may see the calendar but not this member's balance
+			if (getErrorStatus(err) !== 403) loadError = extractErrorMessage(err, t('calendar.loadBalanceFailed'));
 		}
-		const finished = (await fetchEntriesRange(new Date(2000, 0, 1), new Date(2099, 11, 31), 50000))
-			.filter((e) => !e.isRunning && e.endTime && e.startTime);
-		if (finished.length === 0) {
-			cumulativeBalance = 0;
-			monthlyCumulativeBalances = new Map();
-			return;
-		}
-
-		const sorted = finished.sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime());
-		const firstDate = new Date(sorted[0].startTime!);
-		firstDate.setHours(0, 0, 0, 0);
-
-		// Group entries by month and by day (per-day needed for top-up credits)
-		const monthlyWorked = new Map<string, number>();
-		const dailyWorked = new Map<string, number>();
-		for (const e of sorted) {
-			const d = new Date(e.startTime!);
-			const mk = monthKey(d.getFullYear(), d.getMonth() + 1);
-			const minutes = e.netDurationMinutes ?? e.durationMinutes ?? 0;
-			monthlyWorked.set(mk, (monthlyWorked.get(mk) ?? 0) + minutes);
-			const dk = dateKey(d);
-			dailyWorked.set(dk, (dailyWorked.get(dk) ?? 0) + minutes);
-		}
-
-		// Walk the months from the first entry to now: worked + absence credits − target
-		const now = new Date();
-		const initialOvertime = (workSchedule.initialOvertimeMode !== 'Disabled' && workSchedule.initialOvertimeHours) ? workSchedule.initialOvertimeHours * 60 : 0;
-		let cumulative = initialOvertime;
-		const balances = new Map<string, number>();
-		const cursor = new Date(firstDate.getFullYear(), firstDate.getMonth(), 1);
-		while (cursor <= now) {
-			const mk = monthKey(cursor.getFullYear(), cursor.getMonth() + 1);
-			const lastDayOfMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
-			const dayCursor = new Date(cursor);
-			// Start from the actual first entry date in the first month
-			if (cursor.getFullYear() === firstDate.getFullYear() && cursor.getMonth() === firstDate.getMonth()) {
-				dayCursor.setDate(firstDate.getDate());
-			}
-			const endDate = now < lastDayOfMonth ? now : lastDayOfMonth;
-			let target = 0;
-			let absCredits = 0;
-			while (dayCursor <= endDate) {
-				const d = new Date(dayCursor);
-				target += getDayTarget(d, workSchedule, holidayDates, schedulePeriods, halfDayHolidays);
-				absCredits += getAbsenceCredit(d, workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods, halfDayAbsences, halfDayHolidays, customCredits, dailyWorked.get(dateKey(d)) ?? 0);
-				dayCursor.setDate(dayCursor.getDate() + 1);
-			}
-			cumulative += (monthlyWorked.get(mk) ?? 0) + absCredits - target;
-			balances.set(mk, cumulative);
-			cursor.setMonth(cursor.getMonth() + 1);
-		}
-
-		cumulativeBalance = cumulative;
-		monthlyCumulativeBalances = balances;
+		onbalance?.(balance);
 	}
 
 	// ── Navigation ────────────────────────────────────────────────────────
@@ -403,15 +352,6 @@
 
 	function deltaClass(delta: number, neutral = 'text-base-content'): string {
 		return delta > 0 ? 'text-success' : delta < 0 ? 'text-error' : neutral;
-	}
-
-	function getYearCumulative(year: number): number {
-		// Find the latest month in this year that has cumulative data
-		for (let m = 12; m >= 1; m--) {
-			const val = monthlyCumulativeBalances.get(monthKey(year, m));
-			if (val !== undefined) return val;
-		}
-		return cumulativeBalance;
 	}
 
 	interface CalendarDay {
@@ -614,7 +554,7 @@
 				{@render stat(formatHours(monthStats.totalCredits), t('calendar.credits'))}
 				{@render stat(formatHours(monthStats.totalTarget), t('calendar.target'))}
 				{@render stat(formatDelta(monthStats.totalDelta), t('calendar.monthBalance'), deltaClass(monthStats.totalDelta))}
-				{@render stat(formatDelta(currentMonthCumulative), t('calendar.cumulative'), deltaClass(currentMonthCumulative), 'border-l-3 border-l-secondary')}
+				{#if balance}{@render stat(formatDelta(balance.cumulative), t('calendar.cumulative'), deltaClass(balance.cumulative), 'border-l-3 border-l-secondary')}{/if}
 				{@render stat(formatHours(monthStats.avgPerDay), t('calendar.avgPerDay'))}
 			</div>
 
@@ -831,14 +771,13 @@
 				{@const yearHolidays = yearMonths.reduce((s, m) => s + m.holidays, 0)}
 				{@const yearSick = yearMonths.reduce((s, m) => s + m.sickDays, 0)}
 				{@const yearVacation = yearMonths.reduce((s, m) => s + m.vacationDays, 0)}
-				{@const yearCumulative = getYearCumulative(currentYear)}
 
 				<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-4">
 					{@render stat(formatHours(yearTotal), t('calendar.totalWorked'))}
 					{@render stat(formatHours(yearCredits), t('calendar.credits'))}
 					{@render stat(formatHours(yearTarget), t('calendar.totalTarget'))}
 					{@render stat(formatDelta(yearDelta), t('calendar.yearBalance'), deltaClass(yearDelta))}
-					{@render stat(formatDelta(yearCumulative), t('calendar.cumulative'), deltaClass(yearCumulative), 'border-l-3 border-l-secondary')}
+					{#if balance}{@render stat(formatDelta(balance.cumulative), t('calendar.cumulative'), deltaClass(balance.cumulative), 'border-l-3 border-l-secondary')}{/if}
 				</div>
 
 				<div class="flex flex-wrap gap-2 mb-5">
@@ -851,7 +790,6 @@
 				<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
 					{#each yearMonths as mo (mo.month)}
 						{@const isCurrent = mo.month === new Date().getMonth() && currentYear === new Date().getFullYear()}
-						{@const moCumulative = monthlyCumulativeBalances.get(monthKey(currentYear, mo.month + 1))}
 						<button type="button" class="bg-base-100 border rounded-lg p-3 cursor-pointer text-left transition-all w-full min-w-0 hover:border-primary/30 hover:shadow-md {isCurrent ? 'border-primary shadow-[0_0_0_1px] shadow-primary' : 'border-base-300'}" onclick={() => openMonth(mo.month)}>
 							<div class="flex flex-wrap justify-between items-center gap-1 mb-2">
 								<span class="font-semibold text-sm text-base-content">{mo.name}</span>
@@ -870,9 +808,6 @@
 							</div>
 							{#if mo.creditedMinutes > 0}
 								<div class="text-xs text-base-content/60 mb-1">{t('calendar.creditsSuffix', { value: formatHours(mo.creditedMinutes) })}</div>
-							{/if}
-							{#if moCumulative !== undefined}
-								<div class="text-xs font-semibold mb-1 {deltaClass(moCumulative, 'text-base-content/60')}">Σ {formatDelta(moCumulative)}</div>
 							{/if}
 							<div class="flex gap-1.5 flex-wrap">
 								{#if mo.holidays > 0}<span class="text-xs">{mo.holidays}{DAY_TYPE_CLASSES.holiday.icon}</span>{/if}

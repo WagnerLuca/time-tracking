@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { absenceCreditsForRange, getAbsenceCredit, getDayTarget, getDayType, getTargetForRange, type ScheduleLike } from './scheduleHelpers';
+import { getAbsenceCredit, getDayTarget, getDayType, getTargetForRange, type ScheduleLike } from './scheduleHelpers';
 
 // 40h week, 8h Mon–Fri (targets are hours in the API, the helpers return minutes)
 const schedule: ScheduleLike = { targetMon: 8, targetTue: 8, targetWed: 8, targetThu: 8, targetFri: 8, weeklyWorkHours: 40 };
@@ -86,11 +86,6 @@ describe('getAbsenceCredit', () => {
 		expect(getAbsenceCredit(mon, schedule, new Map(), none, none, other, [], undefined, undefined, { noCredit: new Set(), topUp: new Set([key]) }, 300)).toBe(180);
 		// worked more than the target → no negative credit
 		expect(getAbsenceCredit(mon, schedule, new Map(), none, none, other, [], undefined, undefined, { noCredit: new Set(), topUp: new Set([key]) }, 600)).toBe(0);
-	});
-
-	it('absenceCreditsForRange sums the week', () => {
-		const sick = new Set(['2026-03-02', '2026-03-03', '2026-03-07']); // Mon, Tue, Sat
-		expect(absenceCreditsForRange(mon, sun, schedule, new Map(), sick, none, none)).toBe(960);
 	});
 });
 

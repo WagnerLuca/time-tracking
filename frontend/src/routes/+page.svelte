@@ -4,12 +4,13 @@
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { timer } from '$lib/stores/timer.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { timeTrackingApi, workScheduleApi } from '$lib/apiClient';
+	import { timeTrackingApi, workScheduleApi, reportsApi } from '$lib/apiClient';
 	import type { WorkScheduleResponse } from '$lib/api';
-	import { formatHours, formatDelta, formatClock, formatDate, barWidth, getMonthName, dayNamesShort } from '$lib/utils/formatters';
+	import { formatHours, formatDelta, formatClock, barWidth, getMonthName, dayNamesShort } from '$lib/utils/formatters';
 	import { isToday, isFuture, sumMinutes, dateKey } from '$lib/utils/dateHelpers';
-	import { getDayTarget, getAbsenceCredit, absenceCreditsForRange, getDayType, getDayTypeLabel, getTargetForRange } from '$lib/utils/scheduleHelpers';
-	import { MAX_ENTRIES_FOR_OVERTIME, WEEKLY_ENTRY_LIMIT, MONTHLY_ENTRY_LIMIT } from '$lib/utils/constants';
+	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, getTargetForRange } from '$lib/utils/scheduleHelpers';
+	import { WEEKLY_ENTRY_LIMIT, MONTHLY_ENTRY_LIMIT } from '$lib/utils/constants';
+	import { balanceToMinutes } from '$lib/utils/balance';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { dayTypeClasses } from '$lib/utils/colors';
 	import { loadDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
@@ -24,9 +25,8 @@
 		todayTarget: number;
 		weekTarget: number;
 		monthTarget: number;
-		/** null without a work schedule (no target → no balance). */
+		/** From the balance endpoint; null without an org or work schedule (no target → no balance). */
 		cumulative: number | null;
-		firstEntryDate: Date | null;
 		weekDays: Array<{ label: string; date: Date; worked: number; target: number }>;
 		monthWeeks: Array<{ label: string; worked: number; target: number }>;
 	}
@@ -84,18 +84,18 @@
 			const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
 			const orgId = orgContext.selectedOrgId ?? undefined;
-			const [schedule, off, weekRes, monthRes, allRes] = await Promise.all([
+			const userId = auth.user?.id;
+			const [schedule, off, weekRes, monthRes, balanceRes] = await Promise.all([
 				slug ? workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(slug).then((r) => r.data) : Promise.resolve(null),
 				loadDaysOff(slug, auth.user?.id),
 				timeTrackingApi.apiV1TimeTrackingGet(orgId, weekStart.toISOString(), weekEnd.toISOString(), WEEKLY_ENTRY_LIMIT),
 				timeTrackingApi.apiV1TimeTrackingGet(orgId, monthStart.toISOString(), monthEnd.toISOString(), MONTHLY_ENTRY_LIMIT),
-				timeTrackingApi.apiV1TimeTrackingGet(orgId, undefined, undefined, MAX_ENTRIES_FOR_OVERTIME)
+				slug && userId ? reportsApi.apiV1OrganizationsSlugMembersMemberIdBalanceGet(slug, userId).then((r) => balanceToMinutes(r.data)) : Promise.resolve(null)
 			]);
 			workSchedule = schedule;
 			daysOff = off;
 			const { holidayDates, halfDayHolidays, sickDayDates, vacationDates, otherAbsenceDates, halfDayAbsences } = off;
 			const credit = (d: Date) => getAbsenceCredit(d, schedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, [], halfDayAbsences, halfDayHolidays);
-			const creditRange = (from: Date, to: Date) => absenceCreditsForRange(from, to, schedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, [], halfDayAbsences, halfDayHolidays);
 			const inRange = (from: Date, to: Date) => (e: { startTime?: string }) => {
 				const ts = new Date(e.startTime!);
 				return ts >= from && ts <= to;
@@ -103,16 +103,6 @@
 
 			const weekEntries = weekRes.data.items ?? [];
 			const monthEntries = monthRes.data.items ?? [];
-			const finished = (allRes.data.items ?? [])
-				.filter((e) => !e.isRunning && e.endTime && e.startTime)
-				.sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime());
-
-			// Targets only count from the first tracked entry on
-			let firstEntryDate: Date | null = null;
-			if (finished.length > 0) {
-				firstEntryDate = new Date(finished[0].startTime!);
-				firstEntryDate.setHours(0, 0, 0, 0);
-			}
 
 			const dayNames = dayNamesShort();
 			const weekDays: Stats['weekDays'] = dayNames.map((label, i) => {
@@ -139,31 +129,23 @@
 				monthWeeks.push({
 					label: t('dashboard.weekRange', { from: wkStart.getDate(), to: wkEnd.getDate() }),
 					worked: sumMinutes(monthEntries.filter(inRange(wkStart, wkEnd))),
-					target: getTargetForRange(wkStart, wkEnd, schedule, holidayDates, [], firstEntryDate, halfDayHolidays)
+					target: getTargetForRange(wkStart, wkEnd, schedule, holidayDates, [], null, halfDayHolidays)
 				});
 				wkStart = new Date(wkEnd);
 				wkStart.setDate(wkStart.getDate() + 1);
 				wkStart.setHours(0, 0, 0, 0);
 			}
 
-			// TODO(backend): replace with GET balance endpoint once available
-			let cumulativeBalance: number | null = null;
-			if (schedule?.weeklyWorkHours) {
-				const initialOvertime = schedule.initialOvertimeMode !== 'Disabled' && schedule.initialOvertimeHours ? schedule.initialOvertimeHours * 60 : 0;
-				cumulativeBalance = firstEntryDate
-					? sumMinutes(finished) + creditRange(firstEntryDate, todayEnd) - getTargetForRange(firstEntryDate, todayEnd, schedule, holidayDates, [], null, halfDayHolidays) + initialOvertime
-					: initialOvertime;
-			}
-
+			// Totals come from the balance endpoint (report rules); without an org only the tracked time is shown
+			const b = balanceRes;
 			stats = {
-				todayMinutes: sumMinutes(weekEntries.filter(inRange(todayStart, todayEnd))) + credit(now),
-				weekMinutes: sumMinutes(weekEntries) + creditRange(weekStart, weekEnd),
-				monthMinutes: sumMinutes(monthEntries) + creditRange(monthStart, monthEnd),
-				todayTarget: getDayTarget(now, schedule, holidayDates, [], halfDayHolidays),
-				weekTarget: getTargetForRange(weekStart, todayEnd, schedule, holidayDates, [], firstEntryDate, halfDayHolidays),
-				monthTarget: getTargetForRange(monthStart, todayEnd, schedule, holidayDates, [], firstEntryDate, halfDayHolidays),
-				cumulative: cumulativeBalance,
-				firstEntryDate,
+				todayMinutes: b ? b.today.worked : sumMinutes(weekEntries.filter(inRange(todayStart, todayEnd))),
+				weekMinutes: b ? b.week.worked : sumMinutes(weekEntries),
+				monthMinutes: b ? b.month.worked : sumMinutes(monthEntries),
+				todayTarget: b?.today.target ?? 0,
+				weekTarget: b?.week.target ?? 0,
+				monthTarget: b?.month.target ?? 0,
+				cumulative: b && schedule?.weeklyWorkHours ? b.cumulative : null,
 				weekDays,
 				monthWeeks
 			};
@@ -298,7 +280,7 @@
 				<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('dashboard.cumulativeBalance')}</span>
 				{#if cumulative != null}
 					<span class="text-2xl font-bold tabular-nums mt-1 {deltaClass(cumulative)}">{formatDelta(cumulative)}</span>
-					<span class="text-xs text-base-content/50 mt-1">{stats.firstEntryDate ? t('dashboard.since', { date: formatDate(stats.firstEntryDate) }) : t('dashboard.initialOvertime')}</span>
+					<span class="text-xs text-base-content/50 mt-1">{t('dashboard.asOfToday')}</span>
 				{:else}
 					<span class="text-2xl font-bold tabular-nums mt-1 text-base-content/30">–</span>
 					<span class="text-xs text-base-content/50 mt-1">{t('dashboard.needsSchedule')}</span>

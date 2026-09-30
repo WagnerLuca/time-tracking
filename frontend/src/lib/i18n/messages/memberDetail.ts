@@ -9,7 +9,6 @@ export const de = {
 	absenceTypesFailed: 'Die Abwesenheitsarten konnten nicht geladen werden.',
 	permissionsFailed: 'Die Berechtigungen konnten nicht geladen werden.',
 	overviewFailed: 'Die Zeitübersicht konnte nicht geladen werden.',
-	entriesFailed: 'Die Zeiteinträge konnten nicht geladen werden.',
 	scheduleFailed: 'Das Arbeitszeitmodell konnte nicht geladen werden.',
 	header: {
 		joined: 'Beigetreten am {date}',
@@ -26,7 +25,7 @@ export const de = {
 	summary: {
 		title: 'Gesamtübersicht',
 		calculating: 'Wird berechnet…',
-		cumulative: 'Überstunden-Saldo (geschätzt)',
+		cumulative: 'Überstunden-Saldo (heute)',
 		netTracked: 'Netto erfasst (gesamt)',
 		entries: 'Zeiteinträge',
 		initialOvertime: 'Anfangsüberstunden',
@@ -119,7 +118,6 @@ export const en: typeof de = {
 	absenceTypesFailed: 'Could not load the absence types.',
 	permissionsFailed: 'Could not load the permissions.',
 	overviewFailed: 'Could not load the time overview.',
-	entriesFailed: 'Could not load the time entries.',
 	scheduleFailed: 'Could not load the work schedule.',
 	header: {
 		joined: 'Joined {date}',
@@ -136,7 +134,7 @@ export const en: typeof de = {
 	summary: {
 		title: 'Cumulative summary',
 		calculating: 'Calculating…',
-		cumulative: 'Overtime balance (estimate)',
+		cumulative: 'Overtime balance (today)',
 		netTracked: 'Net tracked (all time)',
 		entries: 'Time entries',
 		initialOvertime: 'Initial overtime',

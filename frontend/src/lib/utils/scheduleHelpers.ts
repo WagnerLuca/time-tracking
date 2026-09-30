@@ -152,33 +152,6 @@ export function getAbsenceCredit(
 }
 
 /**
- * Sum absence credits over a date range.
- */
-export function absenceCreditsForRange(
-	from: Date,
-	to: Date,
-	schedule: ScheduleLike | null | undefined,
-	holidayDates: Map<string, string> | Set<string>,
-	sickDayDates: Set<string>,
-	vacationDates: Set<string>,
-	otherAbsenceDates: Set<string>,
-	periods: SchedulePeriodLike[] = [],
-	halfDayAbsences?: Set<string>,
-	halfDayHolidays?: Set<string>
-): number {
-	let credits = 0;
-	const cursor = new Date(from);
-	cursor.setHours(0, 0, 0, 0);
-	const end = new Date(to);
-	end.setHours(23, 59, 59, 999);
-	while (cursor <= end) {
-		credits += getAbsenceCredit(cursor, schedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, periods, halfDayAbsences, halfDayHolidays);
-		cursor.setDate(cursor.getDate() + 1);
-	}
-	return credits;
-}
-
-/**
  * Get the day type for a date based on holidays and absence sets.
  */
 export function getDayType(

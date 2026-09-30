@@ -5,12 +5,13 @@
 	import { timer } from '$lib/stores/timer.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
-	import { timeTrackingApi, organizationsApi, workScheduleApi, groupApi } from '$lib/apiClient';
+	import { timeTrackingApi, organizationsApi, workScheduleApi, groupApi, reportsApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, WorkScheduleResponse, OrganizationDetailResponse, EffectivePermissionsResponse } from '$lib/api';
 	import { formatHoursDecimal, formatDelta, formatDateShort, formatWeekLabel, formatClock, dayNamesShort } from '$lib/utils/formatters';
 	import { isToday, getWeekRange } from '$lib/utils/dateHelpers';
-	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel } from '$lib/utils/scheduleHelpers';
-	import { MAX_ENTRIES_FOR_OVERTIME, WEEKLY_ENTRY_LIMIT } from '$lib/utils/constants';
+	import { getDayTarget, getDayType, getDayTypeLabel } from '$lib/utils/scheduleHelpers';
+	import { WEEKLY_ENTRY_LIMIT } from '$lib/utils/constants';
+	import { balanceToMinutes, type BalanceMinutes } from '$lib/utils/balance';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { dayTypeClasses } from '$lib/utils/colors';
 	import { canEditEntries, canRequestEditEntries, canEditPause, canRequestEditPause } from '$lib/utils/orgRules';
@@ -31,10 +32,8 @@
 	/** The caller's effective permissions in the selected org (group overrides applied). */
 	let perms = $state<EffectivePermissionsResponse | null>(null);
 
-	// Cumulative overtime
-	let cumulativeOvertime = $state(0);
-	let cumulativeOvertimeWeekEnd = $state(0);
-	let hasOvertimeData = $state(false);
+	/** Balance from the backend (report rules); null without org/schedule or when it failed to load. */
+	let balance = $state<BalanceMinutes | null>(null);
 
 	let daysOff = $state<DaysOffData>(emptyDaysOff());
 	let holidayDates = $derived(daysOff.holidayDates);
@@ -91,7 +90,7 @@
 	async function loadAll(slug: string | null) {
 		loading = true;
 		await Promise.all([loadWeek(), loadOrgData(slug)]);
-		await loadCumulativeOvertime();
+		await loadBalance();
 		loading = false;
 	}
 
@@ -110,32 +109,6 @@
 			totals[dayIndex].minutes += entry.netDurationMinutes ?? entry.durationMinutes ?? 0;
 		}
 		return totals;
-	}
-
-	// TODO(backend): replace with GET balance endpoint once available
-	function computeCumulativeUntilDate(schedule: WorkScheduleResponse, entries: TimeEntryResponse[], firstTrackedDate: Date, untilDate: Date): number {
-		const rangeEnd = new Date(untilDate);
-		rangeEnd.setHours(23, 59, 59, 999);
-
-		let workedMinutes = 0;
-		for (const entry of entries) {
-			if (new Date(entry.startTime!) > rangeEnd) break;
-			workedMinutes += entry.netDurationMinutes ?? entry.durationMinutes ?? 0;
-		}
-
-		let targetMinutes = 0;
-		let absenceCredits = 0;
-		const cursor = new Date(firstTrackedDate);
-		while (cursor <= rangeEnd) {
-			targetMinutes += getDayTarget(cursor, schedule, holidayDates, [], halfDayHolidays);
-			absenceCredits += getAbsenceCredit(cursor, schedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, [], halfDayAbsences, halfDayHolidays);
-			cursor.setDate(cursor.getDate() + 1);
-		}
-		return workedMinutes + absenceCredits - targetMinutes + initialOvertimeMinutes(schedule);
-	}
-
-	function initialOvertimeMinutes(schedule: WorkScheduleResponse): number {
-		return schedule.initialOvertimeMode !== 'Disabled' && schedule.initialOvertimeHours ? schedule.initialOvertimeHours * 60 : 0;
 	}
 
 	async function loadWeek() {
@@ -173,29 +146,18 @@
 		if (od.status === 'rejected') toast.error(od.reason, t('timer.orgLoadFailed'));
 	}
 
-	async function loadCumulativeOvertime() {
-		const schedule = workSchedule;
-		if (!schedule?.weeklyWorkHours) {
-			hasOvertimeData = false;
+	async function loadBalance() {
+		const slug = selectedSlug;
+		const userId = auth.user?.id;
+		if (!slug || !userId || !workSchedule?.weeklyWorkHours) {
+			balance = null;
 			return;
 		}
 		try {
-			// TODO(backend): replace with GET balance endpoint once available
-			const { data } = await timeTrackingApi.apiV1TimeTrackingGet(orgContext.selectedOrgId ?? undefined, undefined, undefined, MAX_ENTRIES_FOR_OVERTIME);
-			const sorted = (data.items ?? [])
-				.filter((e) => !e.isRunning && e.endTime && e.startTime)
-				.sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime());
-			if (sorted.length > 0) {
-				const firstDate = new Date(sorted[0].startTime!);
-				firstDate.setHours(0, 0, 0, 0);
-				cumulativeOvertime = computeCumulativeUntilDate(schedule, sorted, firstDate, new Date());
-				cumulativeOvertimeWeekEnd = computeCumulativeUntilDate(schedule, sorted, firstDate, weekRange.end);
-			} else {
-				cumulativeOvertime = cumulativeOvertimeWeekEnd = initialOvertimeMinutes(schedule);
-			}
-			hasOvertimeData = true;
+			const { data } = await reportsApi.apiV1OrganizationsSlugMembersMemberIdBalanceGet(slug, userId);
+			if (slug === selectedSlug) balance = balanceToMinutes(data);
 		} catch (err) {
-			hasOvertimeData = false;
+			balance = null;
 			toast.error(err, t('timer.overtimeFailed'));
 		}
 	}
@@ -205,7 +167,7 @@
 		try {
 			await action();
 			await loadWeek();
-			loadCumulativeOvertime();
+			loadBalance();
 		} catch (err) {
 			toast.error(err, fallback);
 		} finally {
@@ -241,7 +203,6 @@
 	function changeWeek(dir: number) {
 		weekOffset += dir;
 		loadWeek();
-		loadCumulativeOvertime();
 	}
 
 	// Shared entry editing + request logic
@@ -249,8 +210,8 @@
 		getOrgDetail: () => orgDetail,
 		getPermissions: () => perms,
 		getOrgSlug: () => selectedSlug,
-		onSaved: async () => { await Promise.all([loadWeek(), loadCumulativeOvertime()]); },
-		onDeleted: async () => { await Promise.all([loadWeek(), loadCumulativeOvertime()]); },
+		onSaved: async () => { await Promise.all([loadWeek(), loadBalance()]); },
+		onDeleted: async () => { await Promise.all([loadWeek(), loadBalance()]); },
 		findEntry: (id) => weekEntries.find((e) => e.id === id)
 	});
 
@@ -383,18 +344,18 @@
 		</section>
 
 		<!-- Cumulative overtime -->
-		{#if hasOvertimeData}
-			<div class="card bg-base-100 border-2 p-4 mb-8 {cumulativeOvertime > 0 ? 'border-success/50 bg-success/5' : cumulativeOvertime < 0 ? 'border-error/50 bg-error/5' : 'border-base-300'}">
+		{#if balance}
+			<div class="card bg-base-100 border-2 p-4 mb-8 {balance.cumulative > 0 ? 'border-success/50 bg-success/5' : balance.cumulative < 0 ? 'border-error/50 bg-error/5' : 'border-base-300'}">
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 					<div class="flex flex-col gap-1">
 						<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('timer.cumulativeBalance')}</span>
-						<span class="text-xl font-bold tabular-nums {deltaClass(cumulativeOvertime)}">{formatDelta(cumulativeOvertime)}</span>
+						<span class="text-xl font-bold tabular-nums {deltaClass(balance.cumulative)}">{formatDelta(balance.cumulative)}</span>
 						<span class="text-xs text-base-content/50">{t('timer.asOfToday')}</span>
 					</div>
 					<div class="flex flex-col gap-1 sm:border-l sm:border-base-300 sm:pl-4">
-						<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('timer.endOfWeek')}</span>
-						<span class="text-xl font-bold tabular-nums {deltaClass(cumulativeOvertimeWeekEnd)}">{formatDelta(cumulativeOvertimeWeekEnd)}</span>
-						<span class="text-xs text-base-content/50">{formatWeekLabel(weekRange)}</span>
+						<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('timer.thisWeek')}</span>
+						<span class="text-xl font-bold tabular-nums {deltaClass(balance.week.delta)}">{formatDelta(balance.week.delta)}</span>
+						<span class="text-xs text-base-content/50">{t('timer.weekOfTarget', { worked: formatHoursDecimal(balance.week.worked), target: formatHoursDecimal(balance.week.target) })}</span>
 					</div>
 				</div>
 			</div>

@@ -26,6 +26,7 @@
 		AbsenceTypeDefinitionResponse,
 		EffectivePermissionsResponse
 	} from '$lib/api';
+	import type { BalanceMinutes } from '$lib/utils/balance';
 
 	const orgSlug = $derived(page.params.slug ?? '');
 	const memberId = $derived(parseInt(page.params.memberId ?? '0', 10));
@@ -37,7 +38,7 @@
 
 	let overview = $state<MemberTimeOverviewResponse | null>(null);
 	let overviewLoading = $state(false);
-	let firstEntryDate = $state<Date | null>(null);
+	let balance = $state<BalanceMinutes | null>(null);
 	let absenceTypes = $state<AbsenceTypeDefinitionResponse[]>([]);
 	let memberPerms = $state<EffectivePermissionsResponse | null>(null);
 	let schedule = $state<WorkScheduleResponse | null>(null);
@@ -70,7 +71,7 @@
 		loading = true;
 		error = '';
 		overview = null;
-		firstEntryDate = null;
+		balance = null;
 		memberPerms = null;
 		try {
 			await loadOrg();
@@ -123,19 +124,11 @@
 
 	async function loadOverview() {
 		overviewLoading = true;
-		// TODO(backend): replace both all-time fetches with the GET cumulative-overtime balance endpoint once available.
 		try {
 			const { data } = await organizationsApi.apiV1OrganizationsSlugTimeOverviewGet(orgSlug, '2000-01-01T00:00:00.000Z', '2099-12-31T23:59:59.999Z');
 			overview = data.find((m) => m.userId === memberId) ?? null;
 		} catch (err) {
 			reportUnlessForbidden(err, t('memberDetail.overviewFailed'));
-		}
-		try {
-			const { data } = await organizationsApi.apiV1OrganizationsSlugMemberEntriesMemberIdGet(orgSlug, memberId, '2000-01-01T00:00:00.000Z', '2099-12-31T23:59:59.999Z');
-			const starts = (data.items ?? []).filter((e) => e.startTime).map((e) => new Date(e.startTime!).getTime());
-			firstEntryDate = starts.length > 0 ? new Date(Math.min(...starts)) : null;
-		} catch (err) {
-			reportUnlessForbidden(err, t('memberDetail.entriesFailed'));
 		}
 		overviewLoading = false;
 	}
@@ -179,11 +172,11 @@
 			<section class="card bg-base-100 border border-base-300 p-5 mb-5">
 				<h2 class="text-base font-bold text-base-content m-0 mb-4">{t('memberDetail.calendar')}</h2>
 				{#key `${orgSlug}-${memberId}`}
-					<MemberCalendar {orgSlug} orgId={org?.id} userId={memberId} {isSelf} orgDetail={org} />
+					<MemberCalendar {orgSlug} orgId={org?.id} userId={memberId} {isSelf} orgDetail={org} onbalance={(b) => (balance = b)} />
 				{/key}
 			</section>
 
-			<MemberSummary {member} {overview} initialOvertimeHours={schedule?.initialOvertimeHours ?? 0} {firstEntryDate} loading={overviewLoading} />
+			<MemberSummary {member} {overview} initialOvertimeHours={schedule?.initialOvertimeHours ?? 0} {balance} loading={overviewLoading} />
 		{/if}
 
 		{#if canGenerateReport}
