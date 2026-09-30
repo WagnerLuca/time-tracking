@@ -1,3 +1,4 @@
+using TimeTracking.Api.Models.Dtos;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,6 +33,18 @@ public class ReportsController : OrganizationBaseController
     /// <param name="memberId">Target member user ID.</param>
     /// <param name="year">Report year.</param>
     /// <param name="month">Report month (1-12).</param>
+    [HttpGet("{slug}/members/{memberId}/balance")]
+    [RequireOrgRole]
+    [ProducesResponseType(typeof(BalanceResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetBalance(string slug, int memberId)
+    {
+        if (GetCurrentUserId() is not int callerId) return Unauthorized();
+        return ToResponse(await _reportService.GetBalanceAsync(slug, callerId, memberId));
+    }
+
+    /// <summary>
+    /// Downloads a day-by-day PDF report for one calendar month.
+    /// </summary>
     [HttpGet("{slug}/members/{memberId}/reports/monthly")]
     [RequireOrgRole]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]

@@ -1,0 +1,67 @@
+using System.Globalization;
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using FluentAssertions;
+using TimeTracking.Api.Services;
+using TimeTracking.Api.Tests.Infrastructure;
+
+namespace TimeTracking.Api.Tests.Controllers;
+
+/// <summary>The balance endpoint uses the report rules, so the dashboard and the reports agree.</summary>
+public class BalanceTests : IClassFixture<TimeTrackingApiFactory>
+{
+    private readonly TimeTrackingApiFactory _factory;
+
+    public BalanceTests(TimeTrackingApiFactory factory) => _factory = factory;
+
+    [Fact]
+    public async Task Balance_MatchesDailyReport_AndIncludesInitialOvertime()
+    {
+        var (owner, login) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "balance@bal.test");
+        var org = await TestHelpers.CreateOrganizationAsync(owner, "Balance Org", "balance-org");
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/settings", new { csvImportMode = 2 })).EnsureSuccessStatusCode();
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members/{login.User.Id}/initial-overtime",
+            new { initialOvertimeHours = 5.5 })).EnsureSuccessStatusCode();
+
+        var today = OrgClock.For("Europe/Berlin").Today();
+        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedules",
+            new { validFrom = monthStart.AddMonths(-1).ToString("yyyy-MM-dd"), weeklyWorkHours = 40, distributeEvenly = true })).EnsureSuccessStatusCode();
+        var rows = new List<object> { new { date = today.ToString("yyyy-MM-dd"), startTime = "08:00", endTime = "12:00", pauseMinutes = 0, description = "today" } };
+        if (monthStart < today)   // on the 1st, "today" already is the month start
+            rows.Add(new { date = monthStart.ToString("yyyy-MM-dd"), startTime = "08:00", endTime = "18:00", pauseMinutes = 30, description = "long day" });
+        (await owner.PostAsJsonAsync($"/api/v1/ExportImport/import/confirm?orgSlug={org.Slug}", rows)).EnsureSuccessStatusCode();
+
+        var balance = await owner.GetFromJsonAsync<JsonElement>($"/api/v1/organizations/{org.Slug}/members/{login.User.Id}/balance");
+        balance.GetProperty("today").GetProperty("workedHours").GetDouble().Should().Be(4);
+        balance.GetProperty("initialOvertimeHours").GetDouble().Should().Be(5.5);
+
+        // Same figures as the daily report for the month so far
+        var csv = await (await owner.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily", organizationSlug = org.Slug,
+            from = monthStart.ToString("yyyy-MM-dd"), to = today.ToString("yyyy-MM-dd")
+        })).Content.ReadAsStringAsync();
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries).Skip(1).Select(l => l.Split(',')).ToList();
+        var reportOvertime = lines.Sum(c => double.Parse(c[6], CultureInfo.InvariantCulture));
+        var reportCumulative = double.Parse(lines[^1][7], CultureInfo.InvariantCulture);
+
+        balance.GetProperty("month").GetProperty("overtimeHours").GetDouble().Should().BeApproximately(reportOvertime, 0.01);
+        balance.GetProperty("cumulativeOvertimeHours").GetDouble().Should().BeApproximately(reportCumulative, 0.01);
+    }
+
+    [Fact]
+    public async Task Balance_OfAnotherMember_IsForbiddenForPlainMembers()
+    {
+        var (owner, ownerLogin) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "balance-owner@bal.test");
+        var org = await TestHelpers.CreateOrganizationAsync(owner, "Balance Org 2", "balance-org-2");
+        var (member, m) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "balance-m@bal.test");
+        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members", new { userId = m.User.Id })).EnsureSuccessStatusCode();
+
+        (await member.GetAsync($"/api/v1/organizations/{org.Slug}/members/{ownerLogin.User.Id}/balance"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await member.GetAsync($"/api/v1/organizations/{org.Slug}/members/{m.User.Id}/balance")).EnsureSuccessStatusCode();
+        (await owner.GetAsync($"/api/v1/organizations/{org.Slug}/members/{m.User.Id}/balance")).EnsureSuccessStatusCode();
+    }
+}

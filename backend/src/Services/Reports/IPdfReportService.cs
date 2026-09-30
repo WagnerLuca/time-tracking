@@ -1,3 +1,5 @@
+using TimeTracking.Api.Models.Dtos;
+
 namespace TimeTracking.Api.Services;
 
 /// <summary>
@@ -18,4 +20,10 @@ public interface IPdfReportService
     /// </summary>
     Task<ServiceResult<byte[]>> GenerateYearlyReportAsync(
         string slug, int callerUserId, int targetUserId, int year);
+
+    /// <summary>
+    /// Current balance (cumulative overtime, today / this week / this month) using the report
+    /// rules, so the dashboard and the PDF can never disagree. Same permissions as the reports.
+    /// </summary>
+    Task<ServiceResult<BalanceResponse>> GetBalanceAsync(string slug, int callerUserId, int targetUserId);
 }

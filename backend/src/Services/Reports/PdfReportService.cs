@@ -1,3 +1,4 @@
+using TimeTracking.Api.Models.Dtos;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Fluent;
@@ -93,6 +94,48 @@ public class PdfReportService : IPdfReportService
     //  Shared context resolution (org, membership, permission)
     // ────────────────────────────────────────────────────
 
+    public async Task<ServiceResult<BalanceResponse>> GetBalanceAsync(string slug, int callerUserId, int targetUserId)
+    {
+        var context = await ResolveReportContextAsync(slug, callerUserId, targetUserId);
+        if (context.Error != null)
+            return ServiceResult.Fail<BalanceResponse>(context.Error.Value, context.ErrorMessage!);
+
+        var clock = OrgClock.For(context.Org);
+        var today = clock.Today();
+        var weekStart = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        var periodStart = weekStart < monthStart ? weekStart : monthStart;
+
+        var (rows, cumulative) = await BuildDisplayRowsAsync(
+            _context, targetUserId, context.Org!.Id, periodStart, today, context.Membership!.InitialOvertimeHours);
+
+        PeriodBalance Period(DateOnly from)
+        {
+            var inPeriod = rows.Where(r => r.Date >= from && r.Date <= today).ToList();
+            return new PeriodBalance
+            {
+                From = from,
+                To = today,
+                TargetHours = Math.Round(inPeriod.Sum(r => r.TargetHours), 2),
+                WorkedHours = Math.Round(inPeriod.Sum(r => r.NetWorkedHours), 2),
+                OvertimeHours = Math.Round(inPeriod.Sum(r => r.Overtime), 2)
+            };
+        }
+
+        var failures = await _context.TimeEntries.AsNoTracking()
+            .CountAsync(e => e.UserId == targetUserId && e.OrganizationId == context.Org.Id && e.IsFailure);
+
+        return ServiceResult.Ok(new BalanceResponse
+        {
+            CumulativeOvertimeHours = Math.Round(cumulative, 2),
+            InitialOvertimeHours = context.Membership.InitialOvertimeHours,
+            Today = Period(today),
+            Week = Period(weekStart),
+            Month = Period(monthStart),
+            FailureEntryCount = failures
+        });
+    }
+
     private record ReportContext(
         Organization? Org, UserOrganization? Membership, User? TargetUser,
         ServiceErrorType? Error, string? ErrorMessage);
@@ -138,7 +181,9 @@ public class PdfReportService : IPdfReportService
         var loopFrom = dateFrom;
         if (firstEntry != null)
         {
-            var firstEntryDate = DateOnly.FromDateTime(firstEntry.Value);
+            var timeZone = await context.Organizations.AsNoTracking()
+                .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
+            var firstEntryDate = OrgClock.For(timeZone).LocalDate(firstEntry.Value);
             if (firstEntryDate < loopFrom) loopFrom = firstEntryDate;
         }
 
@@ -158,7 +203,7 @@ public class PdfReportService : IPdfReportService
         var totalTarget = rows.Sum(r => r.TargetHours);
         var totalNet = rows.Sum(r => r.NetWorkedHours);
         var totalOvertime = rows.Sum(r => r.Overtime);
-        var vacationDays = rows.Count(r => r.AbsenceType == AbsenceType.Vacation);
+        var vacationDays = rows.Count(r => r.CountsAsVacation);
         var sickDays = rows.Count(r => r.AbsenceType == AbsenceType.SickDay);
         var holidayDays = rows.Count(r => r.HolidayName != null);
 
