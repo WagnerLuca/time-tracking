@@ -4,6 +4,7 @@
 	import { organizationsApi } from '$lib/apiClient';
 	import { goto } from '$app/navigation';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { t } from '$lib/i18n';
 	import type { CreateOrganizationRequest } from '$lib/api';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 
@@ -68,10 +69,10 @@
 				await orgContext.loadOrganizations(auth.user.id);
 				orgContext.select(created.id!);
 			}
-			toast.success(`Organization "${created.name}" created.`);
+			toast.success(t('orgs.create.created', { name: created.name ?? '' }));
 			goto(`/organizations/${created.slug}`);
 		} catch (err) {
-			error = extractErrorMessage(err, 'Failed to create organization.');
+			error = extractErrorMessage(err, t('orgs.create.failed'));
 		} finally {
 			submitting = false;
 		}
@@ -79,12 +80,12 @@
 </script>
 
 <svelte:head>
-	<title>New Organization - Time Tracking</title>
+	<title>{t('common.pageTitle', { page: t('orgs.create.pageTitle') })}</title>
 </svelte:head>
 
 <div class="page">
-	<a href="/organizations" class="text-base-content/60 text-sm inline-block mb-3 no-underline hover:text-primary">&larr; Back to Organizations</a>
-	<h1 class="text-2xl font-bold mb-6">Create Organization</h1>
+	<a href="/organizations" class="text-base-content/60 text-sm inline-block mb-3 no-underline hover:text-primary">{t('orgs.create.back')}</a>
+	<h1 class="text-2xl font-bold mb-6">{t('orgs.create.title')}</h1>
 
 	{#if error}
 		<div class="alert alert-error text-sm mb-4 max-w-xl" role="alert">{error}</div>
@@ -93,7 +94,7 @@
 	<form class="card bg-base-100 border border-base-300 max-w-xl" onsubmit={handleCreate} novalidate>
 		<div class="card-body">
 			<div class="mb-5">
-				<label for="name" class="block font-medium mb-1.5 text-base-content/80 text-sm">Name <span class="text-error">*</span></label>
+				<label for="name" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('orgs.create.name')} <span class="text-error" aria-hidden="true">*</span></label>
 				<input
 					id="name"
 					type="text"
@@ -101,7 +102,7 @@
 					class:input-error={nameError}
 					bind:value={name}
 					oninput={handleNameInput}
-					placeholder="My Organization"
+					placeholder={t('orgs.create.namePlaceholder')}
 					maxlength="200"
 					required
 					aria-invalid={nameError}
@@ -109,12 +110,12 @@
 					disabled={submitting}
 				/>
 				{#if nameError}
-					<p id="nameError" class="text-xs text-error mt-1">Name is required.</p>
+					<p id="nameError" class="text-xs text-error mt-1">{t('orgs.create.nameRequired')}</p>
 				{/if}
 			</div>
 
 			<div class="mb-5">
-				<label for="slug" class="block font-medium mb-1.5 text-base-content/80 text-sm">Slug</label>
+				<label for="slug" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('orgs.create.slug')}</label>
 				<input
 					id="slug"
 					type="text"
@@ -122,7 +123,7 @@
 					class:input-error={slugError || slugMissing}
 					bind:value={slug}
 					oninput={handleSlugInput}
-					placeholder={generateSlug(name) || 'my-organization'}
+					placeholder={generateSlug(name) || t('orgs.join.placeholder')}
 					maxlength="100"
 					autocapitalize="none"
 					spellcheck="false"
@@ -131,24 +132,24 @@
 					disabled={submitting}
 				/>
 				<span id="slugHint" class="block text-xs mt-1 {slugError || slugMissing ? 'text-error' : 'text-base-content/60'}">
-					{slugMissing ? 'Enter a slug (the name contains no usable characters).' : 'Used in URLs. Only lowercase letters, numbers and hyphens. Derived from the name if left empty.'}
+					{slugMissing ? t('orgs.create.slugMissing') : t('orgs.create.slugHint')}
 				</span>
 			</div>
 
 			<div class="mb-5">
-				<label for="description" class="block font-medium mb-1.5 text-base-content/80 text-sm">Description</label>
+				<label for="description" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('orgs.create.description')} <span class="text-base-content/50 font-normal">({t('common.optional')})</span></label>
 				<textarea
 					id="description"
 					class="textarea textarea-bordered w-full"
 					bind:value={description}
-					placeholder="A short description of the organization..."
+					placeholder={t('orgs.create.descriptionPlaceholder')}
 					rows="3"
 					disabled={submitting}
 				></textarea>
 			</div>
 
 			<div class="mb-5">
-				<label for="website" class="block font-medium mb-1.5 text-base-content/80 text-sm">Website</label>
+				<label for="website" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('orgs.create.website')} <span class="text-base-content/50 font-normal">({t('common.optional')})</span></label>
 				<input
 					id="website"
 					type="url"
@@ -161,14 +162,14 @@
 					disabled={submitting}
 				/>
 				{#if websiteError}
-					<p id="websiteError" class="text-xs text-error mt-1">Enter a full URL starting with https://.</p>
+					<p id="websiteError" class="text-xs text-error mt-1">{t('orgs.create.websiteInvalid')}</p>
 				{/if}
 			</div>
 
 			<div class="flex flex-wrap gap-3 justify-end mt-6">
-				<a href="/organizations" class="btn btn-ghost border border-base-300">Cancel</a>
+				<a href="/organizations" class="btn btn-ghost border border-base-300">{t('common.cancel')}</a>
 				<button type="submit" class="btn btn-primary" disabled={submitting}>
-					{submitting ? 'Creating…' : 'Create organization'}
+					{submitting ? t('common.creating') : t('orgs.create.submit')}
 				</button>
 			</div>
 		</div>

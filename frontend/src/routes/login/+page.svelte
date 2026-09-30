@@ -4,6 +4,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import { t } from '$lib/i18n';
+	import AuthLanguageToggle from '$lib/components/AuthLanguageToggle.svelte';
 
 	let email = $state('');
 	let password = $state('');
@@ -49,7 +51,7 @@
 			if (result === '2fa') return; // 2FA step — stay on page, show code input
 			await navigateAfterLogin();
 		} catch (err) {
-			error = extractErrorMessage(err, 'Login failed. Please check your credentials.');
+			error = extractErrorMessage(err, t('auth.login.failed'));
 		} finally {
 			submitting = false;
 		}
@@ -63,7 +65,7 @@
 			await auth.verifyTwoFactor(twoFactorCode.replace(/\s/g, ''));
 			await navigateAfterLogin();
 		} catch (err) {
-			error = extractErrorMessage(err, 'Invalid verification code. Please try again.');
+			error = extractErrorMessage(err, t('auth.twoFactor.failed'));
 		} finally {
 			submitting = false;
 		}
@@ -77,15 +79,16 @@
 </script>
 
 <svelte:head>
-	<title>Login - Time Tracking</title>
+	<title>{t('common.pageTitle', { page: auth.twoFactorRequired ? t('auth.twoFactor.title') : t('auth.login.pageTitle') })}</title>
 </svelte:head>
 
-<div class="min-h-screen flex items-center justify-center bg-base-200 p-4">
+<div class="min-h-screen flex flex-col items-center justify-center gap-4 bg-base-200 p-4">
+	<AuthLanguageToggle />
 	<div class="card bg-base-100 shadow-lg w-full max-w-[420px]">
 		<div class="card-body p-6 sm:p-10">
 			{#if auth.twoFactorRequired}
-				<h1 class="text-2xl font-bold mb-1">Two-Factor Authentication</h1>
-				<p class="text-base-content/60 mb-6">Enter the 6-digit code from your authenticator app</p>
+				<h1 class="text-2xl font-bold mb-1">{t('auth.twoFactor.title')}</h1>
+				<p class="text-base-content/60 mb-6">{t('auth.twoFactor.subtitle')}</p>
 
 				{#if error}
 					<div id="loginError" class="alert alert-error text-sm mb-4" role="alert">{error}</div>
@@ -93,7 +96,7 @@
 
 				<form onsubmit={handleTwoFactor}>
 					<div class="mb-5">
-						<label for="twoFactorCode" class="block font-medium mb-1.5 text-base-content/80 text-sm">Verification Code</label>
+						<label for="twoFactorCode" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.twoFactor.code')}</label>
 						<input
 							bind:this={codeInput}
 							id="twoFactorCode"
@@ -109,20 +112,20 @@
 							aria-describedby="twoFactorHint{error ? ' loginError' : ''}"
 							disabled={submitting}
 						/>
-						<p id="twoFactorHint" class="text-xs text-base-content/60 mt-2">You can also use a backup code.</p>
+						<p id="twoFactorHint" class="text-xs text-base-content/60 mt-2">{t('auth.twoFactor.backupHint')}</p>
 					</div>
 
 					<button type="submit" class="btn btn-primary w-full" disabled={submitting || !twoFactorCode}>
-						{submitting ? 'Verifying…' : 'Verify'}
+						{submitting ? t('auth.twoFactor.verifying') : t('auth.twoFactor.verify')}
 					</button>
 				</form>
 
 				<button type="button" class="btn btn-ghost btn-sm mt-3 w-full" onclick={cancelTwoFactor} disabled={submitting}>
-					Back to Login
+					{t('auth.twoFactor.back')}
 				</button>
 			{:else}
-				<h1 class="text-2xl font-bold mb-1">Sign In</h1>
-				<p class="text-base-content/60 mb-6">Welcome back to Time Tracking</p>
+				<h1 class="text-2xl font-bold mb-1">{t('auth.login.title')}</h1>
+				<p class="text-base-content/60 mb-6">{t('auth.login.subtitle')}</p>
 
 				{#if error}
 					<div id="loginError" class="alert alert-error text-sm mb-4" role="alert">{error}</div>
@@ -130,14 +133,14 @@
 
 				<form onsubmit={handleLogin}>
 					<div class="mb-5">
-						<label for="email" class="block font-medium mb-1.5 text-base-content/80 text-sm">Email</label>
+						<label for="email" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.email')}</label>
 						<input
 							id="email"
 							type="email"
 							autocomplete="email"
 							class="input input-bordered w-full"
 							bind:value={email}
-							placeholder="you@example.com"
+							placeholder={t('auth.emailPlaceholder')}
 							required
 							disabled={submitting}
 						/>
@@ -145,7 +148,7 @@
 
 					<div class="mb-5">
 						<!-- TODO(backend): link "Passwort vergessen?" to the password-reset flow once the endpoints exist -->
-						<label for="password" class="block font-medium mb-1.5 text-base-content/80 text-sm">Password</label>
+						<label for="password" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.password')}</label>
 						<input
 							id="password"
 							type="password"
@@ -159,12 +162,12 @@
 					</div>
 
 					<button type="submit" class="btn btn-primary w-full" disabled={submitting || !email || !password}>
-						{submitting ? 'Signing in…' : 'Sign in'}
+						{submitting ? t('auth.login.submitting') : t('auth.login.submit')}
 					</button>
 				</form>
 
 				<p class="text-center mt-6 text-sm text-base-content/60">
-					Don't have an account? <a href="/register" class="link link-primary">Create one</a>
+					{t('auth.login.noAccount')} <a href="/register" class="link link-primary">{t('auth.login.register')}</a>
 				</p>
 			{/if}
 		</div>

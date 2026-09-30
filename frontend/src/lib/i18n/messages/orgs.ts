@@ -1,4 +1,142 @@
 /** Strings for the orgs area. Add keys to both objects; `en` is typed against `de`. */
-export const de = {};
+export const de = {
+	title: 'Organisationen',
+	loading: 'Organisationen werden geladen…',
+	loadFailed: 'Die Organisationen konnten nicht geladen werden.',
+	pendingLoadFailed: 'Offene Beitrittsanträge konnten nicht geladen werden.',
+	newOrg: '+ Neue Organisation',
+	members: { one: '{count} Mitglied', other: '{count} Mitglieder' },
+	selected: 'Ausgewählt',
+	welcome: {
+		title: 'Mit einer Organisation starten',
+		text: 'Zeiteinträge, Arbeitszeitmodelle, Abwesenheiten und Berichte gehören zu einer Organisation – deiner Firma, deinem Team oder Verein. Eigene Organisation erstellen oder einer bestehenden beitreten.',
+		createTitle: 'Organisation erstellen',
+		createText: 'Du wirst Inhaber und kannst Mitglieder einladen und Regeln festlegen.',
+		create: 'Organisation erstellen'
+	},
+	mine: 'Meine Organisationen',
+	others: 'Weitere Organisationen',
+	join: {
+		title: 'Organisation beitreten',
+		text: 'Die Kennung der Organisation eingeben (der Teil nach /organizations/ in ihrem Link). Je nach Einstellung muss ein Admin den Beitritt genehmigen.',
+		label: 'Kennung der Organisation',
+		placeholder: 'meine-firma',
+		invalid: 'Nur Kleinbuchstaben, Ziffern und Bindestriche.',
+		submit: 'Beitreten',
+		request: 'Beitritt beantragen',
+		joining: 'Wird beigetreten…',
+		joined: 'Der Organisation beigetreten.',
+		requested: 'Antrag gesendet. Ein Admin muss ihn genehmigen.',
+		alreadyMember: 'Du bist bereits Mitglied dieser Organisation.',
+		failed: 'Beitritt fehlgeschlagen.',
+		pending: 'Antrag offen',
+		inviteOnly: 'Nur auf Einladung'
+	},
+	create: {
+		pageTitle: 'Neue Organisation',
+		title: 'Organisation erstellen',
+		back: '← Zurück zu den Organisationen',
+		name: 'Name',
+		namePlaceholder: 'Meine Organisation',
+		nameRequired: 'Der Name ist ein Pflichtfeld.',
+		slug: 'Kennung (Slug)',
+		slugHint: 'Wird in Links verwendet. Nur Kleinbuchstaben, Ziffern und Bindestriche. Bleibt das Feld leer, wird sie aus dem Namen abgeleitet.',
+		slugMissing: 'Kennung eingeben (der Name enthält keine verwendbaren Zeichen).',
+		description: 'Beschreibung',
+		descriptionPlaceholder: 'Eine kurze Beschreibung der Organisation…',
+		website: 'Website',
+		websiteInvalid: 'Eine vollständige Adresse mit https:// eingeben.',
+		submit: 'Organisation erstellen',
+		created: 'Organisation „{name}“ erstellt.',
+		failed: 'Die Organisation konnte nicht erstellt werden.'
+	},
+	select: {
+		pageTitle: 'Organisation auswählen',
+		title: 'Organisation auswählen',
+		subtitle: 'Mit welcher Organisation möchtest du arbeiten?',
+		none: 'Du bist noch in keiner Organisation Mitglied.',
+		createOrJoin: 'Organisation erstellen oder beitreten',
+		withoutOrg: 'Ohne Organisation fortfahren'
+	},
+	tabs: {
+		label: 'Organisation',
+		back: '← Zurück zu den Organisationen',
+		schedule: 'Mein Arbeitszeitmodell',
+		members: 'Mitglieder',
+		groups: 'Gruppen',
+		absences: 'Abwesenheiten',
+		holidays: 'Feiertage',
+		settings: 'Einstellungen'
+	}
+};
 
-export const en: typeof de = {};
+export const en: typeof de = {
+	title: 'Organizations',
+	loading: 'Loading organizations…',
+	loadFailed: 'Could not load organizations.',
+	pendingLoadFailed: 'Could not load your pending join requests.',
+	newOrg: '+ New organization',
+	members: { one: '{count} member', other: '{count} members' },
+	selected: 'Selected',
+	welcome: {
+		title: 'Get started with an organization',
+		text: 'Time entries, work schedules, absences and reports belong to an organization – your company, team or club. Create your own or join an existing one.',
+		createTitle: 'Create an organization',
+		createText: 'You become its owner and can invite members and configure rules.',
+		create: 'Create organization'
+	},
+	mine: 'My organizations',
+	others: 'Other organizations',
+	join: {
+		title: 'Join an organization',
+		text: "Enter the organization's ID (the part after /organizations/ in its link). Depending on its settings an admin may have to approve.",
+		label: 'Organization ID',
+		placeholder: 'my-company',
+		invalid: 'Only lowercase letters, numbers and hyphens.',
+		submit: 'Join',
+		request: 'Request to join',
+		joining: 'Joining…',
+		joined: 'Joined the organization.',
+		requested: 'Request sent. An admin has to approve it.',
+		alreadyMember: 'You are already a member of this organization.',
+		failed: 'Could not join the organization.',
+		pending: 'Request pending',
+		inviteOnly: 'Invite only'
+	},
+	create: {
+		pageTitle: 'New organization',
+		title: 'Create organization',
+		back: '← Back to organizations',
+		name: 'Name',
+		namePlaceholder: 'My organization',
+		nameRequired: 'Name is required.',
+		slug: 'ID (slug)',
+		slugHint: 'Used in links. Only lowercase letters, numbers and hyphens. Derived from the name if left empty.',
+		slugMissing: 'Enter an ID (the name contains no usable characters).',
+		description: 'Description',
+		descriptionPlaceholder: 'A short description of the organization…',
+		website: 'Website',
+		websiteInvalid: 'Enter a full URL starting with https://.',
+		submit: 'Create organization',
+		created: 'Organization "{name}" created.',
+		failed: 'Could not create the organization.'
+	},
+	select: {
+		pageTitle: 'Select organization',
+		title: 'Choose organization',
+		subtitle: 'Which organization would you like to work with?',
+		none: "You're not a member of any organization yet.",
+		createOrJoin: 'Create or join an organization',
+		withoutOrg: 'Continue without organization'
+	},
+	tabs: {
+		label: 'Organization',
+		back: '← Back to organizations',
+		schedule: 'My schedule',
+		members: 'Members',
+		groups: 'Groups',
+		absences: 'Absences',
+		holidays: 'Holidays',
+		settings: 'Settings'
+	}
+};

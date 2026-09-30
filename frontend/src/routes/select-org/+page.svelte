@@ -2,6 +2,7 @@
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { goto } from '$app/navigation';
 	import { roleLabel } from '$lib/utils/formatters';
+	import { t } from '$lib/i18n';
 
 	function selectOrg(orgId: number) {
 		orgContext.select(orgId);
@@ -22,22 +23,22 @@
 </script>
 
 <svelte:head>
-	<title>Select Organization - Time Tracking</title>
+	<title>{t('common.pageTitle', { page: t('orgs.select.pageTitle') })}</title>
 </svelte:head>
 
 <div class="min-h-[80vh] flex items-center justify-center p-4 sm:p-8">
 	<div class="card bg-base-100 shadow-lg w-full max-w-[480px] text-center">
 		<div class="card-body p-6 sm:p-10">
-			<h1 class="text-xl font-bold mb-2">Choose Organization</h1>
-			<p class="text-base-content/60 text-sm mb-8">Select which organization you'd like to work with</p>
+			<h1 class="text-xl font-bold mb-2">{t('orgs.select.title')}</h1>
+			<p class="text-base-content/60 text-sm mb-8">{t('orgs.select.subtitle')}</p>
 
 			{#if orgContext.loading}
-				<p class="text-base-content/60 text-sm my-4">Loading organizations…</p>
+				<p class="text-base-content/60 text-sm my-4">{t('orgs.loading')}</p>
 			{:else if orgContext.organizations.length === 0}
-				<p class="text-base-content/60 text-sm my-4">You're not a member of any organization yet.</p>
+				<p class="text-base-content/60 text-sm my-4">{t('orgs.select.none')}</p>
 				<div class="flex flex-col gap-2">
-					<a href="/organizations" class="btn btn-primary">Create or join an organization</a>
-					<button type="button" class="btn btn-ghost btn-sm text-base-content/60" onclick={continuePersonal}>Continue without organization</button>
+					<a href="/organizations" class="btn btn-primary">{t('orgs.select.createOrJoin')}</a>
+					<button type="button" class="btn btn-ghost btn-sm text-base-content/60" onclick={continuePersonal}>{t('orgs.select.withoutOrg')}</button>
 				</div>
 			{:else}
 				<div class="flex flex-col gap-2 mb-6">
@@ -52,7 +53,7 @@
 					{/each}
 				</div>
 				<button type="button" class="btn btn-ghost btn-sm text-base-content/60" onclick={continuePersonal}>
-					Continue without organization
+					{t('orgs.select.withoutOrg')}
 				</button>
 			{/if}
 		</div>

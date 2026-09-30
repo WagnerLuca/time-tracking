@@ -2,6 +2,8 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { goto } from '$app/navigation';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import { t } from '$lib/i18n';
+	import AuthLanguageToggle from '$lib/components/AuthLanguageToggle.svelte';
 
 	let email = $state('');
 	let password = $state('');
@@ -33,7 +35,7 @@
 			// TODO(backend): email verification step once available
 			goto('/organizations');
 		} catch (err) {
-			error = extractErrorMessage(err, 'Registration failed. Please try again.');
+			error = extractErrorMessage(err, t('auth.register.failed'));
 		} finally {
 			submitting = false;
 		}
@@ -41,14 +43,15 @@
 </script>
 
 <svelte:head>
-	<title>Register - Time Tracking</title>
+	<title>{t('common.pageTitle', { page: t('auth.register.pageTitle') })}</title>
 </svelte:head>
 
-<div class="min-h-screen flex items-center justify-center bg-base-200 p-4">
+<div class="min-h-screen flex flex-col items-center justify-center gap-4 bg-base-200 p-4">
+	<AuthLanguageToggle />
 	<div class="card bg-base-100 shadow-lg w-full max-w-[420px]">
 		<div class="card-body p-6 sm:p-10">
-			<h1 class="text-2xl font-bold mb-1">Create Account</h1>
-			<p class="text-base-content/60 mb-6">Get started with Time Tracking</p>
+			<h1 class="text-2xl font-bold mb-1">{t('auth.register.title')}</h1>
+			<p class="text-base-content/60 mb-6">{t('auth.register.subtitle')}</p>
 
 			{#if error}
 				<div class="alert alert-error text-sm mb-4" role="alert">{error}</div>
@@ -57,7 +60,7 @@
 			<form onsubmit={handleRegister} novalidate>
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
 					<div class="mb-5">
-						<label for="firstName" class="block font-medium mb-1.5 text-base-content/80 text-sm">First name</label>
+						<label for="firstName" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.register.firstName')}</label>
 						<input
 							id="firstName"
 							type="text"
@@ -65,13 +68,13 @@
 							class="input input-bordered w-full"
 							class:input-error={attempted && !firstName.trim()}
 							bind:value={firstName}
-							placeholder="Max"
+							placeholder={t('auth.register.firstNamePlaceholder')}
 							required
 							disabled={submitting}
 						/>
 					</div>
 					<div class="mb-5">
-						<label for="lastName" class="block font-medium mb-1.5 text-base-content/80 text-sm">Last name</label>
+						<label for="lastName" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.register.lastName')}</label>
 						<input
 							id="lastName"
 							type="text"
@@ -79,7 +82,7 @@
 							class="input input-bordered w-full"
 							class:input-error={attempted && !lastName.trim()}
 							bind:value={lastName}
-							placeholder="Mustermann"
+							placeholder={t('auth.register.lastNamePlaceholder')}
 							required
 							disabled={submitting}
 						/>
@@ -87,7 +90,7 @@
 				</div>
 
 				<div class="mb-5">
-					<label for="email" class="block font-medium mb-1.5 text-base-content/80 text-sm">Email</label>
+					<label for="email" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.email')}</label>
 					<input
 						id="email"
 						type="email"
@@ -95,14 +98,14 @@
 						class="input input-bordered w-full"
 						class:input-error={attempted && !emailValid}
 						bind:value={email}
-						placeholder="you@example.com"
+						placeholder={t('auth.emailPlaceholder')}
 						required
 						disabled={submitting}
 					/>
 				</div>
 
 				<div class="mb-5">
-					<label for="password" class="block font-medium mb-1.5 text-base-content/80 text-sm">Password</label>
+					<label for="password" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.password')}</label>
 					<input
 						id="password"
 						type="password"
@@ -118,12 +121,12 @@
 						disabled={submitting}
 					/>
 					<p id="passwordHint" class="text-xs mt-1 {attempted && passwordTooShort ? 'text-error' : 'text-base-content/60'}">
-						At least {MIN_PASSWORD} characters.
+						{t('auth.register.passwordHint', { min: MIN_PASSWORD })}
 					</p>
 				</div>
 
 				<div class="mb-5">
-					<label for="confirmPassword" class="block font-medium mb-1.5 text-base-content/80 text-sm">Confirm password</label>
+					<label for="confirmPassword" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.register.confirmPassword')}</label>
 					<input
 						id="confirmPassword"
 						type="password"
@@ -138,17 +141,17 @@
 						disabled={submitting}
 					/>
 					{#if passwordMismatch}
-						<p id="confirmError" class="text-xs mt-1 text-error">Passwords do not match.</p>
+						<p id="confirmError" class="text-xs mt-1 text-error">{t('auth.register.mismatch')}</p>
 					{/if}
 				</div>
 
 				<button type="submit" class="btn btn-primary w-full" disabled={submitting || (attempted && !formValid)}>
-					{submitting ? 'Creating account…' : 'Create account'}
+					{submitting ? t('auth.register.submitting') : t('auth.register.submit')}
 				</button>
 			</form>
 
 			<p class="text-center mt-6 text-sm text-base-content/60">
-				Already have an account? <a href="/login" class="link link-primary">Sign in</a>
+				{t('auth.register.haveAccount')} <a href="/login" class="link link-primary">{t('auth.register.login')}</a>
 			</p>
 		</div>
 	</div>

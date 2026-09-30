@@ -15,6 +15,9 @@
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import { csvImportEnabled, canImportCsv, isOrgAdmin, isRequiresApproval, ruleMode } from '$lib/utils/orgRules';
+	import { formatDate, getMonthName } from '$lib/utils/formatters';
+	import { t, tp } from '$lib/i18n';
+	import type * as ExportMessages from '$lib/i18n/messages/export';
 	import Modal from '$lib/components/Modal.svelte';
 
 	// ── Tab state ──
@@ -62,7 +65,7 @@
 		} catch (err) {
 			orgDetail = null;
 			perms = null;
-			orgLoadError = extractErrorMessage(err, 'Could not load the organization.');
+			orgLoadError = extractErrorMessage(err, t('export.loadOrgFailed'));
 		} finally {
 			orgLoading = false;
 		}
@@ -77,32 +80,38 @@
 	let exporting = $state(false);
 	let exportError = $state('');
 
-	// Column selection
-	const entryColumns = [
+	// Column selection: `key` is what the backend expects, `label` the key under export.columns
+	type ColumnLabel = Exclude<keyof typeof ExportMessages.de.columns, 'title' | 'selectAll' | 'deselectAll' | 'none'>;
+	interface Column {
+		key: string;
+		label: ColumnLabel;
+		default: boolean;
+	}
+	const entryColumns: Column[] = [
 		{ key: 'Date', label: 'Date', default: true },
-		{ key: 'DayOfWeek', label: 'Day of week', default: true },
-		{ key: 'StartTime', label: 'Start time', default: true },
-		{ key: 'EndTime', label: 'End time', default: true },
-		{ key: 'Duration', label: 'Duration (h)', default: true },
-		{ key: 'Pause', label: 'Pause (min)', default: true },
-		{ key: 'NetDuration', label: 'Net duration (h)', default: true },
+		{ key: 'DayOfWeek', label: 'DayOfWeek', default: true },
+		{ key: 'StartTime', label: 'StartTime', default: true },
+		{ key: 'EndTime', label: 'EndTime', default: true },
+		{ key: 'Duration', label: 'Duration', default: true },
+		{ key: 'Pause', label: 'Pause', default: true },
+		{ key: 'NetDuration', label: 'NetDuration', default: true },
 		{ key: 'Description', label: 'Description', default: true },
 		{ key: 'Organization', label: 'Organization', default: false }
 	];
 
-	const dailyColumns = [
+	const dailyColumns: Column[] = [
 		{ key: 'Date', label: 'Date', default: true },
-		{ key: 'DayOfWeek', label: 'Day of week', default: true },
-		{ key: 'TargetHours', label: 'Target hours', default: true },
-		{ key: 'WorkedHours', label: 'Worked hours', default: true },
-		{ key: 'Pause', label: 'Pause (min)', default: true },
-		{ key: 'NetWorkedHours', label: 'Net worked (h)', default: true },
+		{ key: 'DayOfWeek', label: 'DayOfWeek', default: true },
+		{ key: 'TargetHours', label: 'TargetHours', default: true },
+		{ key: 'WorkedHours', label: 'WorkedHours', default: true },
+		{ key: 'Pause', label: 'Pause', default: true },
+		{ key: 'NetWorkedHours', label: 'NetWorkedHours', default: true },
 		{ key: 'Overtime', label: 'Overtime', default: true },
-		{ key: 'CumulativeOvertime', label: 'Cumulative overtime', default: true },
+		{ key: 'CumulativeOvertime', label: 'CumulativeOvertime', default: true },
 		{ key: 'Status', label: 'Status', default: true },
-		{ key: 'HolidayName', label: 'Holiday name', default: false },
-		{ key: 'AbsenceType', label: 'Absence type', default: false },
-		{ key: 'AbsenceNote', label: 'Absence note', default: false },
+		{ key: 'HolidayName', label: 'HolidayName', default: false },
+		{ key: 'AbsenceType', label: 'AbsenceType', default: false },
+		{ key: 'AbsenceNote', label: 'AbsenceNote', default: false },
 		{ key: 'Description', label: 'Entries', default: true },
 		{ key: 'Organization', label: 'Organization', default: false }
 	];
@@ -160,8 +169,8 @@
 	let exportBlockedReason = $derived(
 		forceOrgScope && !orgContext.selectedOrgSlug
 			? targetUserId !== null
-				? 'Exporting for another member requires an organization.'
-				: 'The daily summary requires an organization.'
+				? t('export.blocked.member')
+				: t('export.blocked.daily')
 			: ''
 	);
 
@@ -200,9 +209,9 @@
 			const targetSuffix = targetUserId !== null ? `-member${targetUserId}` : '';
 			const label = exportType === 'daily' ? `daily-report-${orgSlug}${targetSuffix}` : `time-entries${targetSuffix}`;
 			downloadBlob(response.data as unknown as BlobPart, 'text/csv', `${label}-${dateKey(new Date())}.csv`);
-			toast.success('CSV file downloaded.');
+			toast.success(t('export.downloaded'));
 		} catch (err) {
-			exportError = extractErrorMessage(err, 'Export failed.');
+			exportError = extractErrorMessage(err, t('export.failed'));
 		} finally {
 			exporting = false;
 		}
@@ -228,10 +237,10 @@
 		importError = '';
 		fileError = '';
 		if (file && !file.name.toLowerCase().endsWith('.csv')) {
-			fileError = 'Please choose a .csv file.';
+			fileError = t('export.import.wrongType');
 			importFile = null;
 		} else if (file && file.size === 0) {
-			fileError = 'The file is empty.';
+			fileError = t('export.import.empty');
 			importFile = null;
 		} else {
 			importFile = file;
@@ -276,7 +285,7 @@
 			);
 			showPreview = true;
 		} catch (err) {
-			importError = extractErrorMessage(err, 'Could not read the CSV file.');
+			importError = extractErrorMessage(err, t('export.import.previewFailed'));
 		} finally {
 			importPreviewing = false;
 		}
@@ -320,7 +329,8 @@
 			);
 
 			toast.success(
-				`Imported ${data.importedCount ?? 0} entries.` + (data.skippedCount ? ` Skipped ${data.skippedCount}.` : '')
+				tp('export.import.imported', data.importedCount ?? 0) +
+					(data.skippedCount ? ' ' + t('export.import.skipped', { count: data.skippedCount }) : '')
 			);
 
 			if (data.errors && data.errors.length > 0) {
@@ -329,7 +339,7 @@
 
 			resetImport();
 		} catch (err) {
-			importError = extractErrorMessage(err, 'Import failed.');
+			importError = extractErrorMessage(err, t('export.import.failed'));
 		} finally {
 			importConfirming = false;
 		}
@@ -370,9 +380,9 @@
 				orgSlug, memberId, reportMonthYear, reportMonth, { responseType: 'blob' }
 			);
 			downloadBlob(response.data as unknown as BlobPart, 'application/pdf', `time-report-${orgSlug}-${reportMonthYear}-${String(reportMonth).padStart(2, '0')}.pdf`);
-			toast.success('PDF report downloaded.');
+			toast.success(t('export.report.downloaded'));
 		} catch (e) {
-			reportError = extractErrorMessage(e, 'Could not generate the monthly report.');
+			reportError = extractErrorMessage(e, t('export.report.monthlyFailed'));
 		} finally {
 			monthlyReportDownloading = false;
 		}
@@ -390,9 +400,9 @@
 				orgSlug, memberId, reportYear, { responseType: 'blob' }
 			);
 			downloadBlob(response.data as unknown as BlobPart, 'application/pdf', `time-report-${orgSlug}-${reportYear}.pdf`);
-			toast.success('PDF report downloaded.');
+			toast.success(t('export.report.downloaded'));
 		} catch (e) {
-			reportError = extractErrorMessage(e, 'Could not generate the yearly report.');
+			reportError = extractErrorMessage(e, t('export.report.yearlyFailed'));
 		} finally {
 			yearlyReportDownloading = false;
 		}
@@ -440,14 +450,14 @@
 			});
 			await requestsApi.apiV1OrganizationsSlugRequestsPost(orgContext.selectedOrgSlug, {
 				type: RequestType.NUMBER_5,
-				message: requestMessage.trim() || `Request to import ${entries.length} entries from CSV (${previewRows.length} parsed)`,
+				message: requestMessage.trim() || t('export.request.defaultMessage', { count: entries.length, total: previewRows.length }),
 				requestData
 			});
-			toast.success('Import request submitted. An admin will review it.');
+			toast.success(t('export.request.submitted'));
 			showRequestModal = false;
 			resetImport();
 		} catch (err) {
-			requestError = extractErrorMessage(err, 'Could not submit the request.');
+			requestError = extractErrorMessage(err, t('export.request.failed'));
 		} finally {
 			requestSending = false;
 		}
@@ -455,19 +465,19 @@
 </script>
 
 <svelte:head>
-	<title>Export & Import | Time Tracking</title>
+	<title>{t('common.pageTitle', { page: t('export.title') })}</title>
 </svelte:head>
 
 {#snippet noOrgState(text: string)}
 	<div class="card bg-base-100 border border-base-300 shadow-sm">
 		<div class="card-body p-5 items-start gap-3">
-			<h2 class="text-base font-semibold">No organization selected</h2>
+			<h2 class="text-base font-semibold">{t('export.noOrg.title')}</h2>
 			<p class="text-sm text-base-content/60">{text}</p>
 			<div class="flex flex-wrap gap-2">
 				{#if orgContext.organizations.length > 0}
-					<a href="/select-org" class="btn btn-primary btn-sm">Select organization</a>
+					<a href="/select-org" class="btn btn-primary btn-sm">{t('export.noOrg.select')}</a>
 				{:else}
-					<a href="/organizations" class="btn btn-primary btn-sm">Create or join an organization</a>
+					<a href="/organizations" class="btn btn-primary btn-sm">{t('export.noOrg.createOrJoin')}</a>
 				{/if}
 			</div>
 		</div>
@@ -475,11 +485,11 @@
 {/snippet}
 
 <div class="space-y-6">
-	<h1 class="text-2xl font-bold">Export & Import</h1>
+	<h1 class="text-2xl font-bold">{t('export.title')}</h1>
 
 	<!-- Tab buttons -->
-	<div class="flex gap-1 rounded-lg border border-base-300 bg-base-200 p-1 w-fit max-w-full overflow-x-auto">
-		{#each [['export', 'Export'], ['import', 'Import'], ['report', 'PDF report']] as const as [tab, label] (tab)}
+	<div class="flex gap-1 rounded-lg border border-base-300 bg-base-200 p-1 w-fit max-w-full overflow-x-auto" role="group" aria-label={t('export.tabsLabel')}>
+		{#each ['export', 'import', 'report'] as const as tab (tab)}
 			<button
 				type="button"
 				class="rounded-md px-4 py-1.5 text-sm font-medium whitespace-nowrap transition-colors {activeTab === tab
@@ -488,7 +498,7 @@
 				aria-pressed={activeTab === tab}
 				onclick={() => (activeTab = tab)}
 			>
-				{label}
+				{t(`export.tabs.${tab}`)}
 			</button>
 		{/each}
 	</div>
@@ -497,7 +507,7 @@
 		<div class="alert alert-error text-sm">
 			<span>{orgLoadError}</span>
 			{#if orgContext.selectedOrgSlug}
-				<button type="button" class="btn btn-sm" onclick={() => loadOrgDetail(orgContext.selectedOrgSlug!)}>Try again</button>
+				<button type="button" class="btn btn-sm" onclick={() => loadOrgDetail(orgContext.selectedOrgSlug!)}>{t('common.retry')}</button>
 			{/if}
 		</div>
 	{/if}
@@ -507,18 +517,15 @@
 		{#if canExportOthers}
 			<div class="card bg-base-100 border border-base-300 shadow-sm">
 				<div class="card-body p-5 space-y-2">
-					<label for="targetMember" class="text-base font-semibold">Exporting for</label>
+					<label for="targetMember" class="text-base font-semibold">{t('export.member.label')}</label>
 					<select id="targetMember" class="select select-bordered select-sm w-full sm:w-72" bind:value={targetUserId}>
-						<option value={null}>Myself</option>
+						<option value={null}>{t('export.member.myself')}</option>
 						{#each exportableMembers as m (m.id)}
 							<option value={m.id}>{m.firstName} {m.lastName}</option>
 						{/each}
 					</select>
 					{#if targetUserId !== null}
-						<p class="text-xs text-base-content/60">
-							Scoped to {orgContext.selectedOrg?.name}. Requires export permission for this member — org admins
-							always have it; group admins need the export-data capability enabled for a shared group.
-						</p>
+						<p class="text-xs text-base-content/60">{t('export.member.scopeHint', { org: orgContext.selectedOrg?.name ?? '' })}</p>
 					{/if}
 				</div>
 			</div>
@@ -530,7 +537,7 @@
 		<div class="space-y-5">
 			{#if !orgContext.selectedOrg}
 				<div class="alert alert-info text-sm">
-					<span>No organization selected — only your entries across all organizations can be exported. <a href="/select-org" class="link">Select an organization</a> for the daily summary.</span>
+					<span>{t('export.noOrg.exportHint')} <a href="/select-org" class="link">{t('export.noOrg.select')}</a></span>
 				</div>
 			{/if}
 
@@ -539,15 +546,15 @@
 			<!-- Export Type -->
 			<div class="card bg-base-100 border border-base-300 shadow-sm">
 				<div class="card-body p-5 space-y-4">
-					<h2 id="exportTypeLabel" class="text-base font-semibold">Export type</h2>
+					<h2 id="exportTypeLabel" class="text-base font-semibold">{t('export.type.label')}</h2>
 					<div class="flex flex-wrap gap-x-4 gap-y-2" role="radiogroup" aria-labelledby="exportTypeLabel">
 						<label class="flex items-center gap-2 cursor-pointer">
 							<input type="radio" name="exportType" class="radio radio-sm radio-primary" value="entries" bind:group={exportType} />
-							<span class="text-sm">Individual entries</span>
+							<span class="text-sm">{t('export.type.entries')}</span>
 						</label>
 						<label class="flex items-center gap-2 cursor-pointer">
 							<input type="radio" name="exportType" class="radio radio-sm radio-primary" value="daily" bind:group={exportType} />
-							<span class="text-sm">Daily summary</span>
+							<span class="text-sm">{t('export.type.daily')}</span>
 						</label>
 					</div>
 				</div>
@@ -556,12 +563,12 @@
 			<!-- Scope & Time Range -->
 			<div class="card bg-base-100 border border-base-300 shadow-sm">
 				<div class="card-body p-5 space-y-4">
-					<h2 class="text-base font-semibold">Filters</h2>
+					<h2 class="text-base font-semibold">{t('export.filters.title')}</h2>
 
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<!-- Scope -->
 						<div>
-							<label class="label text-xs font-medium text-base-content/60" for="exportScope">Organization scope</label>
+							<label class="label text-xs font-medium text-base-content/60" for="exportScope">{t('export.filters.scope')}</label>
 							<select
 								id="exportScope"
 								class="select select-bordered select-sm w-full"
@@ -569,26 +576,24 @@
 								disabled={forceOrgScope || !orgContext.selectedOrg}
 							>
 								{#if orgContext.selectedOrg}
-									<option value="org">Current organization ({orgContext.selectedOrg.name})</option>
+									<option value="org">{t('export.filters.scopeCurrent', { name: orgContext.selectedOrg.name ?? '' })}</option>
 								{/if}
-								<option value="all">All organizations</option>
+								<option value="all">{t('export.filters.scopeAll')}</option>
 							</select>
 							{#if exportType === 'daily'}
-								<p class="text-xs text-base-content/60 mt-1">The daily summary always uses the current organization.</p>
+								<p class="text-xs text-base-content/60 mt-1">{t('export.filters.dailyHint')}</p>
 							{:else if targetUserId !== null}
-								<p class="text-xs text-base-content/60 mt-1">Exporting for another member always uses the current organization.</p>
+								<p class="text-xs text-base-content/60 mt-1">{t('export.filters.memberHint')}</p>
 							{/if}
 						</div>
 
 						<!-- Time Range -->
 						<div>
-							<label class="label text-xs font-medium text-base-content/60" for="exportRange">Time range</label>
+							<label class="label text-xs font-medium text-base-content/60" for="exportRange">{t('export.filters.range')}</label>
 							<select id="exportRange" class="select select-bordered select-sm w-full" bind:value={exportRange}>
-								<option value="week">This week</option>
-								<option value="month">This month</option>
-								<option value="year">This year</option>
-								<option value="all">All time</option>
-								<option value="custom">Custom range</option>
+								{#each ['week', 'month', 'year', 'all', 'custom'] as const as r (r)}
+									<option value={r}>{t(`export.filters.ranges.${r}`)}</option>
+								{/each}
 							</select>
 						</div>
 					</div>
@@ -596,7 +601,7 @@
 					{#if exportRange === 'custom'}
 						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 							<div>
-								<label class="label text-xs font-medium text-base-content/60" for="customFrom">From</label>
+								<label class="label text-xs font-medium text-base-content/60" for="customFrom">{t('export.filters.from')}</label>
 								<input
 									id="customFrom"
 									type="date"
@@ -607,7 +612,7 @@
 								/>
 							</div>
 							<div>
-								<label class="label text-xs font-medium text-base-content/60" for="customTo">To</label>
+								<label class="label text-xs font-medium text-base-content/60" for="customTo">{t('export.filters.to')}</label>
 								<input
 									id="customTo"
 									type="date"
@@ -621,7 +626,7 @@
 							</div>
 						</div>
 						{#if customRangeInvalid}
-							<p id="customRangeError" class="text-xs text-error">The start date must not be after the end date.</p>
+							<p id="customRangeError" class="text-xs text-error">{t('export.filters.rangeInvalid')}</p>
 						{/if}
 					{/if}
 				</div>
@@ -631,7 +636,7 @@
 			<div class="card bg-base-100 border border-base-300 shadow-sm">
 				<div class="card-body p-5 space-y-3">
 					<div class="flex flex-wrap items-center justify-between gap-2">
-						<h2 class="text-base font-semibold">Columns</h2>
+						<h2 class="text-base font-semibold">{t('export.columns.title')}</h2>
 						<div class="flex gap-2">
 							<button
 								type="button"
@@ -640,7 +645,7 @@
 									if (exportType === 'entries')
 										selectedEntryColumns = new Set(entryColumns.map((c) => c.key));
 									else selectedDailyColumns = new Set(dailyColumns.map((c) => c.key));
-								}}>Select all</button
+								}}>{t('export.columns.selectAll')}</button
 							>
 							<button
 								type="button"
@@ -648,7 +653,7 @@
 								onclick={() => {
 									if (exportType === 'entries') selectedEntryColumns = new Set();
 									else selectedDailyColumns = new Set();
-								}}>Deselect all</button
+								}}>{t('export.columns.deselectAll')}</button
 							>
 						</div>
 					</div>
@@ -669,12 +674,12 @@
 											selectedDailyColumns = toggleColumn(selectedDailyColumns, col.key);
 									}}
 								/>
-								{col.label}
+								{t(`export.columns.${col.label}`)}
 							</label>
 						{/each}
 					</div>
 					{#if activeColumnSet.size === 0}
-						<p class="text-xs text-error">Select at least one column.</p>
+						<p class="text-xs text-error">{t('export.columns.none')}</p>
 					{/if}
 				</div>
 			</div>
@@ -685,7 +690,7 @@
 			{/if}
 			{#if exportBlockedReason}
 				<div class="alert alert-warning text-sm">
-					<span>{exportBlockedReason} <a href="/select-org" class="link">Select an organization</a></span>
+					<span>{exportBlockedReason} <a href="/select-org" class="link">{t('export.noOrg.select')}</a></span>
 				</div>
 			{/if}
 			<button
@@ -696,9 +701,9 @@
 			>
 				{#if exporting}
 					<span class="loading loading-spinner loading-sm"></span>
-					Exporting…
+					{t('export.exporting')}
 				{:else}
-					Download CSV
+					{t('export.download')}
 				{/if}
 			</button>
 		</div>
@@ -708,40 +713,39 @@
 	{#if activeTab === 'import'}
 		<div class="space-y-5">
 			{#if !orgContext.selectedOrg}
-				{@render noOrgState('Time entries are always imported into an organization. Select one first.')}
+				{@render noOrgState(t('export.noOrg.importText'))}
 			{:else if orgLoading && !perms}
 				<div class="flex items-center gap-2 text-sm text-base-content/60">
-					<span class="loading loading-spinner loading-sm"></span> Loading…
+					<span class="loading loading-spinner loading-sm"></span> {t('common.loading')}
 				</div>
 			{:else if !canImport}
-				<div class="alert alert-warning text-sm">CSV import is disabled for you in this organization.</div>
+				<div class="alert alert-warning text-sm">{t('export.import.disabled')}</div>
 			{:else}
 				<!-- Import info -->
 				<div class="card bg-base-100 border border-base-300 shadow-sm">
 					<div class="card-body p-5 space-y-3">
-						<h2 class="text-base font-semibold">Import CSV file</h2>
+						<h2 class="text-base font-semibold">{t('export.import.title')}</h2>
+						<!-- Column names stay English: they are the CSV headers the backend parser matches -->
 						<p class="text-sm text-base-content/60">
-							Upload a CSV file with time entries. The file must contain <strong>Date</strong>,
-							<strong>Start Time</strong>, and <strong>End Time</strong> columns.
-							Optional columns: <em>Pause (min)</em>, <em>Description</em>.
+							{t('export.import.description', { required: 'Date, Start Time, End Time', optional: 'Pause (min), Description' })}
 						</p>
 
 						{#if !importAllowed}
 							<div class="alert alert-info text-sm py-2">
-								CSV import requires admin approval. Preview your file, then request approval for the selected rows.
+								{t('export.import.needsApproval')}
 							</div>
 						{/if}
 
 						<!-- File picker -->
 						<div class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
 							<label class="flex flex-col gap-1.5 cursor-pointer w-full sm:w-auto min-w-0">
-								<span class="text-xs font-medium text-base-content/60">CSV file</span>
+								<span class="text-xs font-medium text-base-content/60">{t('export.import.file')}</span>
 								<div class="flex items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 transition-colors focus-within:border-primary {fileError ? 'border-error' : importFile ? 'border-primary/40 bg-primary/5' : 'border-base-300 hover:border-primary/50'}">
 									<svg class="w-5 h-5 text-base-content/40 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
 									</svg>
 									<span class="text-sm truncate {importFile ? 'text-primary font-medium' : 'text-base-content/60'}">
-										{importFile ? importFile.name : 'Choose a .csv file…'}
+										{importFile ? importFile.name : t('export.import.choose')}
 									</span>
 									<input
 										bind:this={fileInput}
@@ -763,9 +767,9 @@
 							>
 								{#if importPreviewing}
 									<span class="loading loading-spinner loading-xs"></span>
-									Reading…
+									{t('export.import.reading')}
 								{:else}
-									Preview file
+									{t('export.import.preview')}
 								{/if}
 							</button>
 						</div>
@@ -781,15 +785,15 @@
 						<div class="card-body p-5 space-y-3">
 							<div class="flex flex-wrap items-center justify-between gap-2">
 								<h2 class="text-base font-semibold">
-									Preview ({previewRows.length} rows)
+									{tp('export.import.previewTitle', previewRows.length)}
 								</h2>
 								<div class="flex flex-wrap items-center gap-3 text-sm">
 									{#if previewDuplicateCount > 0}
-										<span class="badge badge-warning badge-sm">{previewDuplicateCount} duplicates</span>
+										<span class="badge badge-warning badge-sm">{tp('export.import.duplicates', previewDuplicateCount)}</span>
 									{/if}
-									<span class="text-base-content/60">{selectedRows.size} selected</span>
-									<button type="button" class="btn btn-ghost btn-xs" onclick={selectAll}>All</button>
-									<button type="button" class="btn btn-ghost btn-xs" onclick={deselectAll}>None</button>
+									<span class="text-base-content/60">{t('export.import.selected', { count: selectedRows.size })}</span>
+									<button type="button" class="btn btn-ghost btn-xs" onclick={selectAll}>{t('export.import.all')}</button>
+									<button type="button" class="btn btn-ghost btn-xs" onclick={deselectAll}>{t('export.import.none')}</button>
 								</div>
 							</div>
 
@@ -809,7 +813,7 @@
 												<input
 													type="checkbox"
 													class="checkbox checkbox-xs"
-													aria-label="Select all rows"
+													aria-label={t('export.import.selectAllRows')}
 													checked={previewRows.length > 0 && selectedRows.size === previewRows.length}
 													onchange={() =>
 														selectedRows.size === previewRows.length
@@ -817,12 +821,12 @@
 															: selectAll()}
 												/>
 											</th>
-											<th>Date</th>
-											<th>Start</th>
-											<th>End</th>
-											<th>Pause</th>
-											<th>Description</th>
-											<th>Status</th>
+											<th>{t('export.import.col.date')}</th>
+											<th>{t('export.import.col.start')}</th>
+											<th>{t('export.import.col.end')}</th>
+											<th>{t('export.import.col.pause')}</th>
+											<th>{t('export.import.col.description')}</th>
+											<th>{t('export.import.col.status')}</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -832,23 +836,23 @@
 													<input
 														type="checkbox"
 														class="checkbox checkbox-xs"
-														aria-label="Select row {row.rowNumber}"
+														aria-label={t('export.import.selectRow', { row: row.rowNumber ?? '' })}
 														checked={selectedRows.has(row.rowNumber!)}
 														onchange={() => toggleRow(row.rowNumber!)}
 													/>
 												</td>
-												<td class="font-mono text-xs whitespace-nowrap">{row.date}</td>
+												<td class="font-mono text-xs whitespace-nowrap">{row.date ? formatDate(row.date) : '—'}</td>
 												<td class="font-mono text-xs">{row.startTime}</td>
 												<td class="font-mono text-xs">{row.endTime}</td>
-												<td class="text-xs whitespace-nowrap">{row.pauseMinutes} min</td>
+												<td class="text-xs whitespace-nowrap">{t('export.import.minutes', { value: row.pauseMinutes ?? 0 })}</td>
 												<td class="text-xs max-w-32 truncate">{row.description || '—'}</td>
 												<td>
 													{#if row.isDuplicate}
-														<span class="badge badge-warning badge-xs">Duplicate</span>
+														<span class="badge badge-warning badge-xs">{t('export.import.status.duplicate')}</span>
 													{:else if row.warning}
-														<span class="badge badge-error badge-xs" title={row.warning}>Error</span>
+														<span class="badge badge-error badge-xs" title={row.warning}>{t('export.import.status.error')}</span>
 													{:else}
-														<span class="badge badge-success badge-xs">OK</span>
+														<span class="badge badge-success badge-xs">{t('export.import.status.ok')}</span>
 													{/if}
 												</td>
 											</tr>
@@ -867,9 +871,9 @@
 									>
 										{#if importConfirming}
 											<span class="loading loading-spinner loading-sm"></span>
-											Importing…
+											{t('export.import.importing')}
 										{:else}
-											Import {selectedRows.size} entries
+											{tp('export.import.importCount', selectedRows.size)}
 										{/if}
 									</button>
 								{:else if importNeedsApproval}
@@ -879,12 +883,12 @@
 										onclick={openRequestModal}
 										disabled={selectedRows.size === 0}
 									>
-										Request import approval
+										{t('export.import.requestApproval')}
 									</button>
-									<span class="text-xs text-base-content/60">An admin must approve before the entries are imported.</span>
+									<span class="text-xs text-base-content/60">{t('export.import.approvalHint')}</span>
 								{/if}
 								<button type="button" class="btn btn-ghost btn-sm" onclick={resetPreview} disabled={importConfirming}>
-									Cancel
+									{t('common.cancel')}
 								</button>
 							</div>
 						</div>
@@ -902,28 +906,26 @@
 	{#if activeTab === 'report'}
 		<div class="space-y-5">
 			{#if !orgContext.selectedOrg}
-				{@render noOrgState('PDF reports are generated per organization. Select one first.')}
+				{@render noOrgState(t('export.noOrg.reportText'))}
 			{:else}
 				{@render memberSelector()}
 
 				<div class="card bg-base-100 border border-base-300 shadow-sm">
 					<div class="card-body p-5 space-y-3">
-						<h2 class="text-base font-semibold">Monthly report</h2>
-						<p class="text-sm text-base-content/60">
-							Day-by-day working hours, target, overtime and status for one calendar month.
-						</p>
+						<h2 class="text-base font-semibold">{t('export.report.monthlyTitle')}</h2>
+						<p class="text-sm text-base-content/60">{t('export.report.monthlyText')}</p>
 						<div class="flex items-center gap-2 flex-wrap">
-							<select class="select select-bordered select-sm" bind:value={reportMonth} aria-label="Report month">
+							<select class="select select-bordered select-sm" bind:value={reportMonth} aria-label={t('export.report.month')}>
 								{#each Array.from({ length: 12 }, (_, i) => i + 1) as m (m)}
-									<option value={m}>{new Date(2000, m - 1).toLocaleDateString('en-US', { month: 'long' })}</option>
+									<option value={m}>{getMonthName(new Date(2000, m - 1))}</option>
 								{/each}
 							</select>
-							<input type="number" class="input input-bordered input-sm w-24" class:input-error={!validYear(reportMonthYear)} bind:value={reportMonthYear} min="2000" max="2100" aria-label="Report year" aria-invalid={!validYear(reportMonthYear)} />
+							<input type="number" class="input input-bordered input-sm w-24" class:input-error={!validYear(reportMonthYear)} bind:value={reportMonthYear} min="2000" max="2100" aria-label={t('export.report.year')} aria-invalid={!validYear(reportMonthYear)} />
 							<button type="button" class="btn btn-primary btn-sm" onclick={downloadMonthlyReport} disabled={monthlyReportDownloading || !validYear(reportMonthYear)}>
 								{#if monthlyReportDownloading}
-									<span class="loading loading-spinner loading-xs"></span> Generating…
+									<span class="loading loading-spinner loading-xs"></span> {t('export.report.generating')}
 								{:else}
-									Download PDF
+									{t('export.report.download')}
 								{/if}
 							</button>
 						</div>
@@ -932,17 +934,15 @@
 
 				<div class="card bg-base-100 border border-base-300 shadow-sm">
 					<div class="card-body p-5 space-y-3">
-						<h2 class="text-base font-semibold">Yearly report</h2>
-						<p class="text-sm text-base-content/60">
-							Month-by-month summary for one calendar year, with running overall cumulative overtime.
-						</p>
+						<h2 class="text-base font-semibold">{t('export.report.yearlyTitle')}</h2>
+						<p class="text-sm text-base-content/60">{t('export.report.yearlyText')}</p>
 						<div class="flex items-center gap-2 flex-wrap">
-							<input type="number" class="input input-bordered input-sm w-24" class:input-error={!validYear(reportYear)} bind:value={reportYear} min="2000" max="2100" aria-label="Report year" aria-invalid={!validYear(reportYear)} />
+							<input type="number" class="input input-bordered input-sm w-24" class:input-error={!validYear(reportYear)} bind:value={reportYear} min="2000" max="2100" aria-label={t('export.report.year')} aria-invalid={!validYear(reportYear)} />
 							<button type="button" class="btn btn-primary btn-sm" onclick={downloadYearlyReport} disabled={yearlyReportDownloading || !validYear(reportYear)}>
 								{#if yearlyReportDownloading}
-									<span class="loading loading-spinner loading-xs"></span> Generating…
+									<span class="loading loading-spinner loading-xs"></span> {t('export.report.generating')}
 								{:else}
-									Download PDF
+									{t('export.report.download')}
 								{/if}
 							</button>
 						</div>
@@ -958,17 +958,15 @@
 </div>
 
 <!-- Request Approval Modal -->
-<Modal open={showRequestModal} onclose={() => { if (!requestSending) showRequestModal = false; }} title="Request CSV import approval">
-	<p class="text-sm text-base-content/70 mb-3">
-		This organization requires admin approval for CSV imports. Submit a request to import {selectedRows.size} entries.
-	</p>
+<Modal open={showRequestModal} onclose={() => { if (!requestSending) showRequestModal = false; }} title={t('export.request.title')}>
+	<p class="text-sm text-base-content/70 mb-3">{tp('export.request.text', selectedRows.size)}</p>
 	<label class="label" for="request-message">
-		<span class="label-text">Message (optional)</span>
+		<span class="label-text">{t('export.request.message')} ({t('common.optional')})</span>
 	</label>
 	<textarea
 		id="request-message"
 		class="textarea textarea-bordered h-24 w-full"
-		placeholder="Add a note for the admin…"
+		placeholder={t('export.request.placeholder')}
 		bind:value={requestMessage}
 		disabled={requestSending}
 	></textarea>
@@ -977,14 +975,14 @@
 	{/if}
 	{#snippet actions()}
 		<button type="button" class="btn btn-ghost" onclick={() => (showRequestModal = false)} disabled={requestSending}>
-			Cancel
+			{t('common.cancel')}
 		</button>
 		<button type="button" class="btn btn-primary" onclick={submitImportRequest} disabled={requestSending}>
 			{#if requestSending}
 				<span class="loading loading-spinner loading-sm"></span>
-				Sending…
+				{t('common.sending')}
 			{:else}
-				Submit request
+				{t('export.request.submit')}
 			{/if}
 		</button>
 	{/snippet}
