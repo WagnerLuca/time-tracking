@@ -1,13 +1,17 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth.svelte';
 	import { absenceDayApi, requestsApi } from '$lib/apiClient';
-	import { absenceTypeLabel } from '$lib/utils/formatters';
+	import { formatDate, getInitials } from '$lib/utils/formatters';
+	import { dateKey } from '$lib/utils/dateHelpers';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import Modal from '$lib/components/Modal.svelte';
+	import AbsenceTypeBadge from '$lib/components/AbsenceTypeBadge.svelte';
 	import type {
 		AbsenceType,
 		AbsenceDayResponse,
 		AbsenceTypeDefinitionResponse,
-		OrganizationMemberResponse
+		OrganizationMemberResponse,
+		RequestType
 	} from '$lib/api';
 
 	/**
@@ -46,6 +50,9 @@
 		dayAbsences = [], onclose, onsaved
 	}: Props = $props();
 
+	const RequestAbsence = 6 as RequestType;
+	const fieldId = $props.id();
+
 	let fromDate = $state('');
 	let toDate = $state('');
 	let selectedUserId = $state<number | null>(null);
@@ -53,6 +60,7 @@
 	let note = $state('');
 	let halfDay = $state(false);
 	let saving = $state(false);
+	let submitted = $state(false);
 	let errorMsg = $state('');
 
 	// Reset the form whenever the dialog (re)opens for a date
@@ -64,6 +72,7 @@
 			typeValue = '1';
 			note = '';
 			halfDay = false;
+			submitted = false;
 			errorMsg = '';
 		}
 	});
@@ -73,21 +82,27 @@
 	/** Self-targeted adds under RequiresApproval become requests (admins bypass). */
 	let willRequest = $derived(!isAdmin && targetIsSelf && mustRequest);
 
+	let toBeforeFrom = $derived(!!fromDate && !!toDate && toDate < fromDate);
+	let memberMissing = $derived(!!members && selectedUserId == null);
+	let workdays = $derived(fromDate && !toBeforeFrom ? workdaysInRange(fromDate, toDate) : []);
+	let noWorkdays = $derived(!!fromDate && !toBeforeFrom && workdays.length === 0);
+	let invalid = $derived(!fromDate || toBeforeFrom || memberMissing || noWorkdays);
+
+	let selectedCustomType = $derived(typeValue.startsWith('c') ? absenceTypes.find((at) => 'c' + at.id === typeValue) : undefined);
+
 	function parseTypeSelection(value: string): { type: AbsenceType; customTypeId?: number } {
 		if (value.startsWith('c')) return { type: 2 as AbsenceType, customTypeId: parseInt(value.slice(1), 10) };
 		return { type: parseInt(value, 10) as AbsenceType };
 	}
 
-	function workdaysInRange(): string[] {
-		const from = new Date(fromDate + 'T00:00:00');
-		const to = toDate ? new Date(toDate + 'T00:00:00') : from;
+	/** Mon–Fri dates (yyyy-MM-dd) between from and to (inclusive; to defaults to from). */
+	function workdaysInRange(from: string, to: string): string[] {
+		const cursor = new Date(from + 'T00:00:00');
+		const end = to ? new Date(to + 'T00:00:00') : new Date(cursor);
 		const days: string[] = [];
-		const cursor = new Date(from);
-		while (cursor <= to) {
+		while (cursor <= end) {
 			const dow = cursor.getDay();
-			if (dow >= 1 && dow <= 5) {
-				days.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`);
-			}
+			if (dow >= 1 && dow <= 5) days.push(dateKey(cursor));
 			cursor.setDate(cursor.getDate() + 1);
 		}
 		return days;
@@ -95,21 +110,16 @@
 
 	async function submit(e: Event) {
 		e.preventDefault();
-		if (!fromDate || targetUserId == null) return;
+		submitted = true;
+		if (invalid || targetUserId == null) return;
 		saving = true;
 		errorMsg = '';
 		try {
-			const workdays = workdaysInRange();
-			if (workdays.length === 0) {
-				errorMsg = 'No workdays in selected range.';
-				saving = false;
-				return;
-			}
 			const { type, customTypeId } = parseTypeSelection(typeValue);
 
 			if (willRequest) {
 				await requestsApi.apiV1OrganizationsSlugRequestsPost(orgSlug, {
-					type: 6 as any, // RequestAbsence
+					type: RequestAbsence,
 					message: note || undefined,
 					requestData: JSON.stringify({ dates: workdays, type, customTypeId, isHalfDay: halfDay, note: note || undefined })
 				});
@@ -135,119 +145,99 @@
 			saving = false;
 		}
 	}
-
-	function absenceColor(type: string | null | undefined): string {
-		switch (type) {
-			case 'Vacation': return 'bg-info/20 text-info border-info/30';
-			case 'SickDay': return 'bg-error/20 text-error border-error/30';
-			default: return 'bg-warning/20 text-warning border-warning/30';
-		}
-	}
 </script>
 
-{#if open}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onclick={onclose}>
-		<!-- svelte-ignore a11y_click_events_have_key_events -->
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="bg-base-100 rounded-xl shadow-xl p-6 w-full max-w-md mx-4 border border-base-300 max-h-[90vh] overflow-y-auto" onclick={(e) => e.stopPropagation()}>
-			<div class="flex items-center justify-between mb-4">
-				<h3 class="text-lg font-bold text-base-content">
-					{new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-				</h3>
-				<button class="btn btn-ghost btn-sm btn-circle" onclick={onclose}>✕</button>
-			</div>
-
-			<!-- Existing absences on this day -->
-			{#if dayAbsences.length > 0}
-				<div class="mb-4">
-					<h4 class="text-sm font-semibold text-base-content/60 mb-2">Absences on this day</h4>
-					<div class="flex flex-col gap-1">
-						{#each dayAbsences as ab}
-							<div class="flex items-center gap-2 p-2 bg-base-200/50 rounded-lg text-sm">
-								<div class="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-[10px] font-semibold shrink-0">
-									{(ab.userFirstName?.[0] ?? '').toUpperCase()}{(ab.userLastName?.[0] ?? '').toUpperCase()}
-								</div>
-								<span class="font-medium">{ab.userFirstName} {ab.userLastName}</span>
-								<span class="badge badge-xs {absenceColor(ab.type)}">{ab.customTypeName ?? absenceTypeLabel(ab.type ?? '')}</span>
-								{#if ab.isHalfDay}<span class="badge badge-xs badge-outline">½</span>{/if}
-								{#if ab.note}<span class="text-base-content/40 text-xs truncate">{ab.note}</span>{/if}
-							</div>
-						{/each}
-					</div>
-				</div>
-				<div class="divider my-2 text-xs text-base-content/40">{willRequest ? 'Request absence' : 'Add new absence'}</div>
-			{/if}
-
-			{#if willRequest}
-				<div class="alert alert-info text-sm py-1.5 px-2.5 mb-3">
-					This will be sent as a request and needs approval by your group admin or an organization admin.
-				</div>
-			{/if}
-			{#if errorMsg}
-				<div class="alert alert-error text-sm py-1.5 px-2.5 mb-3">{errorMsg}</div>
-			{/if}
-
-			<form onsubmit={submit} class="flex flex-col gap-3">
-				{#if members}
-					<div class="flex flex-col gap-1">
-						<span class="text-sm font-medium text-base-content/70">Member</span>
-						<select bind:value={selectedUserId} class="select select-bordered select-sm" required>
-							<option value={null}>Select member...</option>
-							{#each members as m}
-								<option value={m.id}>{m.firstName} {m.lastName}{m.id === auth.user?.id ? ' (You)' : ''}</option>
-							{/each}
-						</select>
-					</div>
-				{/if}
-				<div class="grid grid-cols-2 gap-3">
-					<div class="flex flex-col gap-1">
-						<span class="text-sm font-medium text-base-content/70">From</span>
-						<input type="date" class="input input-bordered input-sm" bind:value={fromDate} required />
-					</div>
-					<div class="flex flex-col gap-1">
-						<span class="text-sm font-medium text-base-content/70">To (optional)</span>
-						<input type="date" class="input input-bordered input-sm" bind:value={toDate} min={fromDate} />
-					</div>
-				</div>
-				<div class="flex flex-col gap-1">
-					<span class="text-sm font-medium text-base-content/70">Type</span>
-					<select bind:value={typeValue} class="select select-bordered select-sm">
-						<option value="0">Sick Day</option>
-						<option value="1">Vacation</option>
-						<option value="2">Other</option>
-						{#each absenceTypes as t}
-							<option value={'c' + t.id}>{t.name}</option>
-						{/each}
-					</select>
-					{#if typeValue.startsWith('c')}
-						{@const selected = absenceTypes.find(t => 'c' + t.id === typeValue)}
-						{#if selected}
-							<span class="text-xs text-base-content/40">
-								{selected.creditMode === 'FillToTarget' ? 'Hours are filled up to the expected daily target.'
-								: selected.creditMode === 'FullCredit' ? 'The full daily target is credited.'
-								: 'Hours are kept as tracked — no credit.'}
-							</span>
-						{/if}
-					{/if}
-				</div>
-				<div class="flex flex-col gap-1">
-					<span class="text-sm font-medium text-base-content/70">Note (optional)</span>
-					<input type="text" class="input input-bordered input-sm" bind:value={note} placeholder="e.g. Doctor's appointment" />
-				</div>
-				<label class="label cursor-pointer flex items-center gap-2 text-sm">
-					<input type="checkbox" class="checkbox checkbox-sm" bind:checked={halfDay} />
-					Half day
-				</label>
-				<p class="text-xs text-base-content/40 m-0">Only workdays (Mon–Fri) in the range are counted.</p>
-				<div class="flex justify-end gap-2 mt-2">
-					<button type="button" class="btn btn-ghost btn-sm" onclick={onclose}>Cancel</button>
-					<button type="submit" class="btn btn-primary btn-sm" disabled={saving}>
-						{saving ? (willRequest ? 'Sending...' : 'Adding...') : willRequest ? 'Send Request' : 'Add Absence'}
-					</button>
-				</div>
-			</form>
+<Modal {open} {onclose} title={date ? formatDate(date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : undefined}>
+	<!-- Existing absences on this day -->
+	{#if dayAbsences.length > 0}
+		<div class="mb-4">
+			<h4 class="text-sm font-semibold text-base-content/60 mb-2">Absences on this day</h4>
+			<ul class="flex flex-col gap-1">
+				{#each dayAbsences as ab (ab.id)}
+					<li class="flex items-center gap-2 p-2 bg-base-200/50 rounded-lg text-sm flex-wrap">
+						<span class="w-6 h-6 rounded-full bg-primary text-primary-content flex items-center justify-center text-[10px] font-semibold shrink-0" aria-hidden="true">
+							{getInitials(ab.userFirstName, ab.userLastName)}
+						</span>
+						<span class="font-medium">{ab.userFirstName} {ab.userLastName}</span>
+						<AbsenceTypeBadge type={ab.type} customTypeName={ab.customTypeName} customTypeColor={ab.customTypeColor} size="xs" />
+						{#if ab.isHalfDay}<span class="badge badge-xs badge-outline" title="Half day">½</span>{/if}
+						{#if ab.note}<span class="text-base-content/50 text-xs truncate">{ab.note}</span>{/if}
+					</li>
+				{/each}
+			</ul>
 		</div>
-	</div>
-{/if}
+		<div class="divider my-2 text-xs text-base-content/50">{willRequest ? 'Request absence' : 'Add new absence'}</div>
+	{/if}
+
+	{#if willRequest}
+		<div class="alert alert-info text-sm py-1.5 px-2.5 mb-3">
+			This will be sent as a request and needs approval by your group admin or an organization admin.
+		</div>
+	{/if}
+	{#if errorMsg}
+		<div class="alert alert-error text-sm py-1.5 px-2.5 mb-3" role="alert">{errorMsg}</div>
+	{/if}
+
+	<form onsubmit={submit} class="flex flex-col gap-3" novalidate>
+		{#if members}
+			<div class="flex flex-col gap-1">
+				<label for="{fieldId}-member" class="text-sm font-medium text-base-content/70">Member</label>
+				<select id="{fieldId}-member" bind:value={selectedUserId} class="select select-bordered select-sm w-full" class:select-error={submitted && memberMissing} aria-invalid={submitted && memberMissing} disabled={saving}>
+					<option value={null}>Select member…</option>
+					{#each members as m (m.id)}
+						<option value={m.id}>{m.firstName} {m.lastName}{m.id === auth.user?.id ? ' (you)' : ''}</option>
+					{/each}
+				</select>
+				{#if submitted && memberMissing}<span class="text-xs text-error">Select a member.</span>{/if}
+			</div>
+		{/if}
+		<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+			<div class="flex flex-col gap-1">
+				<label for="{fieldId}-from" class="text-sm font-medium text-base-content/70">From</label>
+				<input id="{fieldId}-from" type="date" class="input input-bordered input-sm w-full" class:input-error={submitted && !fromDate} bind:value={fromDate} required disabled={saving} />
+				{#if submitted && !fromDate}<span class="text-xs text-error">Required</span>{/if}
+			</div>
+			<div class="flex flex-col gap-1">
+				<label for="{fieldId}-to" class="text-sm font-medium text-base-content/70">To (optional)</label>
+				<input id="{fieldId}-to" type="date" class="input input-bordered input-sm w-full" class:input-error={toBeforeFrom} aria-invalid={toBeforeFrom} bind:value={toDate} min={fromDate} disabled={saving} />
+				{#if toBeforeFrom}<span class="text-xs text-error">The end date must not be before the start date.</span>{/if}
+			</div>
+		</div>
+		{#if noWorkdays}
+			<p class="text-xs text-warning m-0" role="status">No workdays (Mon–Fri) in the selected range.</p>
+		{/if}
+		<div class="flex flex-col gap-1">
+			<label for="{fieldId}-type" class="text-sm font-medium text-base-content/70">Type</label>
+			<select id="{fieldId}-type" bind:value={typeValue} class="select select-bordered select-sm w-full" disabled={saving}>
+				<option value="0">Sick day</option>
+				<option value="1">Vacation</option>
+				<option value="2">Other</option>
+				{#each absenceTypes as at (at.id)}
+					<option value={'c' + at.id}>{at.name}</option>
+				{/each}
+			</select>
+			{#if selectedCustomType}
+				<span class="text-xs text-base-content/50">
+					{selectedCustomType.creditMode === 'FillToTarget' ? 'Hours are filled up to the expected daily target.'
+					: selectedCustomType.creditMode === 'FullCredit' ? 'The full daily target is credited.'
+					: 'Hours are kept as tracked — no credit.'}
+				</span>
+			{/if}
+		</div>
+		<div class="flex flex-col gap-1">
+			<label for="{fieldId}-note" class="text-sm font-medium text-base-content/70">Note (optional)</label>
+			<input id="{fieldId}-note" type="text" class="input input-bordered input-sm w-full" bind:value={note} placeholder="e.g. Doctor's appointment" disabled={saving} />
+		</div>
+		<label class="label cursor-pointer flex items-center gap-2 text-sm">
+			<input type="checkbox" class="checkbox checkbox-sm" bind:checked={halfDay} disabled={saving} />
+			Half day
+		</label>
+		<p class="text-xs text-base-content/50 m-0">Only workdays (Mon–Fri) in the range are counted.</p>
+		<div class="flex justify-end gap-2 mt-2">
+			<button type="button" class="btn btn-ghost btn-sm" onclick={onclose}>Cancel</button>
+			<button type="submit" class="btn btn-primary btn-sm" disabled={saving}>
+				{saving ? (willRequest ? 'Sending…' : 'Adding…') : willRequest ? 'Send request' : 'Add absence'}
+			</button>
+		</div>
+	</form>
+</Modal>

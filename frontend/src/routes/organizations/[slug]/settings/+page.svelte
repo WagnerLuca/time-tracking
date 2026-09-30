@@ -2,14 +2,17 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
+	import { toast } from '$lib/stores/toast.svelte';
+	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { organizationsApi, pauseRulesApi, requestsApi, absenceDayApi, groupApi } from '$lib/apiClient';
-	import { formatRequestType, formatTimeAgo, statusBadgeClass, parseRequestData } from '$lib/utils/formatters';
+	import { formatRequestType, formatRequestStatus, formatTimeAgo, formatNumber, statusBadgeClass, parseRequestData } from '$lib/utils/formatters';
+	import { DEFAULT_GROUP_COLOR, GROUP_COLOR_PRESETS, safeColor } from '$lib/utils/colors';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import {
-		parseRuleMode, ruleModeLabel, joinPolicyLabel, ruleModeButtonClass,
+		isOrgAdmin, parseRuleMode, ruleModeLabel, ruleModeButtonClass,
 		ruleSettings, toggleSettings,
 		visibilitySettings, parseVisibilityMode, visibilityModeLabel, visibilityModeButtonClass,
-		ruleModeOptions, joinPolicyOptions, visibilityModeOptions, withInherit
+		ruleModeOptions, joinPolicyOptions, visibilityModeOptions
 	} from '$lib/utils/orgRules';
 	import ModeSelector from '$lib/components/ModeSelector.svelte';
 	import ApiKeysPanel from '$lib/components/ApiKeysPanel.svelte';
@@ -17,9 +20,6 @@
 		OrganizationDetailResponse,
 		UpdateOrganizationSettingsRequest,
 		PauseRuleResponse,
-		CreatePauseRuleRequest,
-		RuleMode,
-		VisibilityMode,
 		OrgRequestResponse,
 		AbsenceTypeDefinitionResponse,
 		AbsenceCreditMode,
@@ -30,17 +30,14 @@
 	let org = $state<OrganizationDetailResponse | null>(null);
 	let loading = $state(true);
 	let error = $state('');
-	let actionError = $state('');
 
 	let myRole = $derived(
 		org?.members?.find((m) => m.id === auth.user?.id)?.role ?? null
 	);
-	let canEdit = $derived(myRole === 'Owner' || myRole === 'Admin');
-	let isOwner = $derived(myRole === 'Owner');
+	let canEdit = $derived(isOrgAdmin(myRole));
 
 	// Settings
 	let settingsSaving = $state(false);
-	let settingsError = $state('');
 
 	// Pause Rules
 	let showAddRule = $state(false);
@@ -57,8 +54,9 @@
 	// Request history
 	let requestHistory = $state<OrgRequestResponse[]>([]);
 	let requestHistoryLoading = $state(false);
-	let requestHistoryLoaded = $state(false);
+	let requestHistoryError = $state('');
 	let requestHistoryFilter = $state<string>('all');
+	let respondingId = $state<number | null>(null);
 
 	const orgSlug = $derived(page.params.slug ?? '');
 
@@ -76,47 +74,68 @@
 		try {
 			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			org = data;
-			loadRequestHistory();
-			loadAbsenceTypes();
-			loadPermGroups();
+			if (isOrgAdmin(data.members?.find((m) => m.id === auth.user?.id)?.role)) {
+				loadRequestHistory();
+				loadAbsenceTypes();
+				loadPermGroups();
+			}
 		} catch (err) {
-			if (getErrorStatus(err) === 404) { error = 'Organization not found.'; }
-			else { error = 'Failed to load organization.'; }
+			error = getErrorStatus(err) === 404 ? 'Organization not found.' : extractErrorMessage(err, 'Failed to load organization.');
 		} finally {
 			loading = false;
 		}
 	}
 
-	async function reloadOrg() {
+	/** Refreshes the settings in place (no page spinner); returns false when that failed. */
+	async function reloadOrg(): Promise<boolean> {
 		try {
 			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			org = data;
-		} catch {}
+			return true;
+		} catch (err) {
+			toast.error(err, 'Failed to reload the settings.');
+			return false;
+		}
 	}
 
 	async function loadRequestHistory() {
-		if (requestHistoryLoaded) return;
 		requestHistoryLoading = true;
+		requestHistoryError = '';
 		try {
 			const { data } = await requestsApi.apiV1OrganizationsSlugRequestsGet(orgSlug);
 			requestHistory = data.items ?? [];
-			requestHistoryLoaded = true;
-		} catch {
-			requestHistory = [];
+		} catch (err) {
+			requestHistoryError = extractErrorMessage(err, 'Failed to load requests.');
 		} finally {
 			requestHistoryLoading = false;
 		}
 	}
 
+	async function respondToRequest(req: OrgRequestResponse, accept: boolean) {
+		if (!req.id) return;
+		respondingId = req.id;
+		try {
+			await requestsApi.apiV1OrganizationsSlugRequestsIdPut(orgSlug, req.id, { accept });
+			toast.success(accept ? 'Request accepted.' : 'Request declined.');
+			await loadRequestHistory();
+		} catch (err) {
+			toast.error(err, accept ? 'Failed to accept the request.' : 'Failed to decline the request.');
+		} finally {
+			respondingId = null;
+		}
+	}
+
 	// ── Custom absence types ──
 	let absenceTypes = $state<AbsenceTypeDefinitionResponse[]>([]);
+	let absenceTypesError = $state('');
 	let showAddType = $state(false);
 	let newTypeName = $state('');
-	let newTypeColor = $state('#0ea5e9');
+	let newTypeColor = $state(DEFAULT_GROUP_COLOR);
 	let newTypeCreditMode = $state(1);
 	let newTypeCountsAsVacation = $state(false);
+	let newTypeSubmitted = $state(false);
+	let addTypeError = $state('');
 	let typeSaving = $state(false);
-	let typeError = $state('');
 
 	const creditModeOptions = [
 		{ value: 0, label: 'Keep hours as is', hint: 'Informational only — no time credit.' },
@@ -125,17 +144,27 @@
 	];
 
 	async function loadAbsenceTypes() {
+		absenceTypesError = '';
 		try {
 			const { data } = await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesGet(orgSlug);
 			absenceTypes = data;
-		} catch { absenceTypes = []; }
+		} catch (err) {
+			absenceTypesError = extractErrorMessage(err, 'Failed to load absence types.');
+		}
+	}
+
+	function toggleAddType() {
+		showAddType = !showAddType;
+		newTypeSubmitted = false;
+		addTypeError = '';
 	}
 
 	async function addAbsenceType(e: Event) {
 		e.preventDefault();
+		newTypeSubmitted = true;
 		if (!newTypeName.trim()) return;
 		typeSaving = true;
-		typeError = '';
+		addTypeError = '';
 		try {
 			await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesPost(orgSlug, {
 				name: newTypeName.trim(),
@@ -143,44 +172,57 @@
 				creditMode: newTypeCreditMode as AbsenceCreditMode,
 				countsAsVacation: newTypeCountsAsVacation
 			});
+			toast.success('Absence type added.');
 			newTypeName = '';
+			newTypeColor = DEFAULT_GROUP_COLOR;
 			newTypeCountsAsVacation = false;
+			newTypeSubmitted = false;
 			showAddType = false;
 			await loadAbsenceTypes();
 		} catch (err) {
-			typeError = extractErrorMessage(err, 'Failed to add absence type.');
+			addTypeError = extractErrorMessage(err, 'Failed to add absence type.');
+		} finally {
+			typeSaving = false;
 		}
-		typeSaving = false;
 	}
 
-	async function updateAbsenceType(t: AbsenceTypeDefinitionResponse, patch: Partial<{ creditMode: number; countsAsVacation: boolean }>) {
+	async function updateAbsenceType(at: AbsenceTypeDefinitionResponse, patch: Partial<{ creditMode: number; countsAsVacation: boolean }>) {
 		typeSaving = true;
-		typeError = '';
 		try {
-			await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesTypeIdPut(orgSlug, t.id!, {
-				name: t.name!,
-				color: t.color ?? undefined,
-				creditMode: (patch.creditMode ?? parseCreditMode(t.creditMode)) as AbsenceCreditMode,
-				countsAsVacation: patch.countsAsVacation ?? t.countsAsVacation ?? false
+			await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesTypeIdPut(orgSlug, at.id!, {
+				name: at.name!,
+				color: at.color ?? undefined,
+				creditMode: (patch.creditMode ?? parseCreditMode(at.creditMode)) as AbsenceCreditMode,
+				countsAsVacation: patch.countsAsVacation ?? at.countsAsVacation ?? false
 			});
-			await loadAbsenceTypes();
+			toast.success('Absence type saved.');
 		} catch (err) {
-			typeError = extractErrorMessage(err, 'Failed to update absence type.');
+			toast.error(err, 'Failed to update absence type.');
+		} finally {
+			// Reload either way so the controls show the stored values again after an error
+			await loadAbsenceTypes();
+			typeSaving = false;
 		}
-		typeSaving = false;
 	}
 
-	async function deleteAbsenceType(typeId: number) {
-		if (!confirm('Deactivate this absence type? Existing absences keep it.')) return;
+	async function deleteAbsenceType(at: AbsenceTypeDefinitionResponse) {
+		const ok = await confirmDialog({
+			title: `Deactivate "${at.name}"?`,
+			message: 'Existing absences keep this type; it can no longer be chosen for new ones.',
+			confirmLabel: 'Deactivate',
+			danger: true
+		});
+		if (!ok) return;
 		typeSaving = true;
-		typeError = '';
 		try {
-			await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesTypeIdDelete(orgSlug, typeId);
+			await absenceDayApi.apiV1OrganizationsSlugAbsenceTypesTypeIdDelete(orgSlug, at.id!);
+			toast.success('Absence type deactivated.');
 			await loadAbsenceTypes();
 		} catch (err) {
-			typeError = extractErrorMessage(err, 'Failed to delete absence type.');
+			toast.error(err, 'Failed to deactivate absence type.');
+		} finally {
+			typeSaving = false;
 		}
-		typeSaving = false;
 	}
 
 	function parseCreditMode(mode: string | null | undefined): number {
@@ -193,7 +235,8 @@
 	interface GroupPermsColumn { group: GroupResponse; perms: GroupPermissionsResponse }
 	let permGroups = $state<GroupPermsColumn[]>([]);
 	let permGroupsLoading = $state(false);
-	let permMatrixError = $state('');
+	let permGroupsError = $state('');
+	let permSaving = $state(false);
 
 	const matrixRuleRows = [
 		{ key: 'editPastEntriesMode', label: 'Edit past entries' },
@@ -219,17 +262,21 @@
 
 	async function loadPermGroups() {
 		permGroupsLoading = true;
+		permGroupsError = '';
 		try {
 			const { data: groups } = await groupApi.apiV1OrganizationsSlugGroupsGet(orgSlug);
 			const columns = await Promise.all(
-				(groups as GroupResponse[]).map(async (group) => {
+				groups.map(async (group) => {
 					const { data: perms } = await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(orgSlug, group.id!);
 					return { group, perms };
 				})
 			);
 			permGroups = columns.sort((a, b) => (a.group.name ?? '').localeCompare(b.group.name ?? ''));
-		} catch { permGroups = []; }
-		permGroupsLoading = false;
+		} catch (err) {
+			permGroupsError = extractErrorMessage(err, 'Failed to load group permissions.');
+		} finally {
+			permGroupsLoading = false;
+		}
 	}
 
 	/** Cycles an org-level mode (3 states) from the matrix. */
@@ -264,14 +311,17 @@
 	}
 
 	async function saveGroupPerm(col: GroupPermsColumn, key: string, value: number | boolean) {
-		permMatrixError = '';
+		permSaving = true;
 		try {
 			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, col.group.id!, { [key]: value } as any);
 			const { data } = await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(orgSlug, col.group.id!);
 			col.perms = data;
 			permGroups = [...permGroups];
+			toast.success('Permission saved.');
 		} catch (err) {
-			permMatrixError = extractErrorMessage(err, 'Failed to update permission.');
+			toast.error(err, 'Failed to update permission.');
+		} finally {
+			permSaving = false;
 		}
 	}
 
@@ -288,54 +338,77 @@
 		return { label: 'Allowed', cls: 'badge-success' };
 	}
 
-	function filteredRequests(): OrgRequestResponse[] {
-		if (requestHistoryFilter === 'all') return requestHistory;
-		return requestHistory.filter(r => r.status === requestHistoryFilter);
-	}
+	let filteredRequests = $derived(requestHistoryFilter === 'all' ? requestHistory : requestHistory.filter((r) => r.status === requestHistoryFilter));
 
-	async function setSetting(key: string, value: number) {
+	/** Saves one setting, then refreshes the page's copy of the org. */
+	async function saveSettings(patch: UpdateOrganizationSettingsRequest, failMessage = 'Failed to update setting.') {
 		if (!org) return;
 		settingsSaving = true;
-		settingsError = '';
 		try {
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { [key]: value } as UpdateOrganizationSettingsRequest);
-			await reloadOrg();
+			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, patch);
+			if (await reloadOrg()) toast.success('Saved.');
 		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to update setting.');
+			toast.error(err, failMessage);
 		} finally {
 			settingsSaving = false;
 		}
 	}
 
-	async function toggleSetting(key: string) {
-		if (!org) return;
-		settingsSaving = true;
-		settingsError = '';
-		try {
-			const current = (org as Record<string, any>)[key];
-			await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { [key]: !current } as UpdateOrganizationSettingsRequest);
-			await reloadOrg();
-		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to update setting.');
-		} finally {
-			settingsSaving = false;
-		}
+	function setSetting(key: string, value: number) {
+		return saveSettings({ [key]: value } as UpdateOrganizationSettingsRequest);
 	}
 
-	function getPauseRules(): PauseRuleResponse[] {
-		return org?.pauseRules ? [...org.pauseRules].sort((a, b) => (a.minHours ?? 0) - (b.minHours ?? 0)) : [];
+	function toggleSetting(key: string) {
+		return saveSettings({ [key]: !(org as Record<string, any>)[key] } as UpdateOrganizationSettingsRequest);
+	}
+
+	function saveDefaultVacationDays(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const val = parseFloat(input.value);
+		if (isNaN(val) || val < 0 || val > 365) {
+			toast.error('Enter a number of days between 0 and 365.');
+			return;
+		}
+		saveSettings({ defaultVacationDays: val });
+	}
+
+	function saveBusinessDayEnd(e: Event) {
+		const val = (e.currentTarget as HTMLInputElement).value;
+		if (!val) {
+			toast.error('Enter a time.');
+			return;
+		}
+		saveSettings({ businessDayEnd: val }, 'Failed to update business day end.');
+	}
+
+	function saveTimeZone(e: Event) {
+		saveSettings({ timeZone: (e.currentTarget as HTMLSelectElement).value }, 'Failed to update time zone.');
+	}
+
+	let pauseRules = $derived(org?.pauseRules ? [...org.pauseRules].sort((a, b) => (a.minHours ?? 0) - (b.minHours ?? 0)) : []);
+
+	function ruleInvalid(minHours: number, pauseMinutes: number): string {
+		if (!(minHours > 0) || minHours > 24) return 'Hours must be between 0.5 and 24.';
+		if (!(pauseMinutes >= 1) || !Number.isInteger(pauseMinutes)) return 'Pause must be a whole number of minutes (at least 1).';
+		return '';
+	}
+
+	function toggleAddRule() {
+		showAddRule = !showAddRule;
+		addRuleError = '';
 	}
 
 	async function addPauseRule(e: Event) {
 		e.preventDefault();
-		addRuleError = '';
+		addRuleError = ruleInvalid(newRuleMinHours, newRulePauseMinutes);
+		if (addRuleError) return;
 		addingRule = true;
 		try {
-			const payload: CreatePauseRuleRequest = {
+			await pauseRulesApi.apiV1OrganizationsSlugPauseRulesPost(orgSlug, {
 				minHours: newRuleMinHours,
 				pauseMinutes: newRulePauseMinutes
-			};
-			await pauseRulesApi.apiV1OrganizationsSlugPauseRulesPost(orgSlug, payload);
+			});
+			toast.success('Pause rule added.');
 			await reloadOrg();
 			showAddRule = false;
 			newRuleMinHours = 6;
@@ -354,18 +427,17 @@
 		editRuleError = '';
 	}
 
-	function cancelEditRule() {
-		editingRuleId = null;
-	}
-
-	async function saveEditRule(ruleId: number) {
-		editRuleError = '';
+	async function saveEditRule(e: Event, ruleId: number) {
+		e.preventDefault();
+		editRuleError = ruleInvalid(editRuleMinHours, editRulePauseMinutes);
+		if (editRuleError) return;
 		editingRuleSaving = true;
 		try {
 			await pauseRulesApi.apiV1OrganizationsSlugPauseRulesRuleIdPut(orgSlug, ruleId, {
 				minHours: editRuleMinHours,
 				pauseMinutes: editRulePauseMinutes
 			});
+			toast.success('Pause rule saved.');
 			await reloadOrg();
 			editingRuleId = null;
 		} catch (err) {
@@ -375,77 +447,83 @@
 		}
 	}
 
-	async function deleteRule(ruleId: number) {
-		if (!confirm('Delete this pause rule?')) return;
+	async function deleteRule(rule: PauseRuleResponse) {
+		const ok = await confirmDialog({
+			title: 'Delete pause rule?',
+			message: `≥ ${formatNumber(rule.minHours ?? 0)} h tracked → ${rule.pauseMinutes} min pause`,
+			confirmLabel: 'Delete',
+			danger: true
+		});
+		if (!ok) return;
 		try {
-			await pauseRulesApi.apiV1OrganizationsSlugPauseRulesRuleIdDelete(orgSlug, ruleId);
+			await pauseRulesApi.apiV1OrganizationsSlugPauseRulesRuleIdDelete(orgSlug, rule.id!);
+			toast.success('Pause rule deleted.');
 			await reloadOrg();
 		} catch (err) {
-			settingsError = extractErrorMessage(err, 'Failed to delete rule.');
+			toast.error(err, 'Failed to delete rule.');
 		}
 	}
-
 </script>
 
 <svelte:head>
 	<title>{org ? `Settings - ${org.name}` : 'Settings'} - Time Tracking</title>
 </svelte:head>
 
-<div class="max-w-5xl mx-auto px-6 pb-6">
+{#snippet settingInfo(label: string, description: string)}
+	<div class="min-w-0 flex-1 basis-60">
+		<div class="font-semibold text-base-content mb-0.5">{label}</div>
+		<div class="text-sm text-base-content/60 max-w-[400px]">{description}</div>
+	</div>
+{/snippet}
+
+{#snippet pauseRuleText(rule: PauseRuleResponse)}
+	<strong>&ge; {formatNumber(rule.minHours ?? 0)} h</strong> tracked &rarr; <strong>{rule.pauseMinutes} min</strong> pause deducted
+{/snippet}
+
+<div class="max-w-5xl mx-auto sm:px-6 pb-6">
 	<div class="flex items-center gap-2 mb-6">
 		<a href="/organizations/{orgSlug}" class="text-base-content/60 no-underline text-sm hover:text-primary">&larr; {org?.name ?? 'Organization'}</a>
 	</div>
 
 	{#if loading}
-		<div class="flex items-center gap-3 justify-center py-12 text-base-content/40"><span class="loading loading-spinner loading-sm"></span><span>Loading...</span></div>
+		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>Loading…</span></div>
 	{:else if error}
 		<div class="alert alert-error">{error}</div>
 	{:else if org}
 		<h1 class="text-2xl font-bold text-base-content mb-1">{canEdit ? 'Settings' : 'Rules'}</h1>
-		<p class="text-base-content/50 text-sm mb-6 leading-relaxed">
+		<p class="text-base-content/60 text-sm mb-6 leading-relaxed">
 			{canEdit ? 'Organization-wide rules, permissions, and approval workflows.' : 'Current organization rules and policies. Only admins can change these settings.'}
 		</p>
-
-		{#if actionError}
-			<div class="alert alert-error mb-4 text-sm">{actionError}</div>
-		{/if}
 
 		{#if canEdit}
 			<!-- ==================== Admin Settings ==================== -->
 			<section>
-				<h2 class="text-xl text-base-content/70 mb-4">Organization Settings</h2>
-				{#if settingsError}
-					<div class="alert alert-error mb-4 text-sm">{settingsError}</div>
-				{/if}
+				<h2 class="text-xl text-base-content/70 mb-4">Organization settings</h2>
 
 				<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
 					<!-- Toggle settings (booleans) -->
-					{#each toggleSettings() as ts}
-						{@const value = (org as Record<string, any>)[ts.key]}
-						<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-							<div class="setting-info">
-								<div class="font-semibold text-base-content mb-0.5">{ts.label}</div>
-								<div class="text-sm text-base-content/60 max-w-[400px]">{ts.description}</div>
-							</div>
-							<button
-								class="relative w-12 h-[26px] {value ? 'bg-primary' : 'bg-base-300'} rounded-full border-none cursor-pointer transition-colors shrink-0 p-0"
-								onclick={() => toggleSetting(ts.key)}
+					{#each toggleSettings() as ts (ts.key)}
+						{@const value = !!(org as Record<string, any>)[ts.key]}
+						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0">
+							{@render settingInfo(ts.label, ts.description)}
+							<input
+								type="checkbox"
+								class="toggle toggle-primary shrink-0"
+								role="switch"
+								checked={value}
+								aria-checked={value}
+								aria-label={ts.label}
 								disabled={settingsSaving}
-								aria-label="Toggle {ts.label}"
-							>
-								<span class="absolute top-[3px] {value ? 'translate-x-[22px]' : 'translate-x-0'} left-[3px] w-5 h-5 bg-base-100 rounded-full transition-transform shadow-sm"></span>
-							</button>
+								onchange={(e) => { e.currentTarget.checked = value; toggleSetting(ts.key); }}
+							/>
 						</div>
 					{/each}
 
 					<!-- Rule mode settings (segmented: click an option) -->
-					{#each ruleSettings() as rs}
+					{#each ruleSettings() as rs (rs.key)}
 						{@const mode = (org as Record<string, any>)[rs.key] as string | null}
 						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
-							<div class="setting-info">
-								<div class="font-semibold text-base-content mb-0.5">{rs.label}</div>
-								<div class="text-sm text-base-content/60 max-w-[400px]">{rs.description}</div>
-							</div>
+							{@render settingInfo(rs.label, rs.description)}
 							<ModeSelector
 								options={rs.key === 'joinPolicy' ? joinPolicyOptions() : ruleModeOptions()}
 								value={parseRuleMode(mode)}
@@ -456,13 +534,10 @@
 					{/each}
 
 					<!-- Visibility settings -->
-					{#each visibilitySettings() as vs}
+					{#each visibilitySettings() as vs (vs.key)}
 						{@const mode = (org as Record<string, any>)[vs.key] as string | null}
 						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
-							<div class="setting-info">
-								<div class="font-semibold text-base-content mb-0.5">{vs.label}</div>
-								<div class="text-sm text-base-content/60 max-w-[400px]">{vs.description}</div>
-							</div>
+							{@render settingInfo(vs.label, vs.description)}
 							<ModeSelector
 								options={visibilityModeOptions()}
 								value={parseVisibilityMode(mode)}
@@ -475,29 +550,19 @@
 
 				<!-- Default Vacation Days -->
 				<div class="bg-base-200/50 rounded-lg p-4 mt-4 border border-base-300">
-					<div class="flex items-center justify-between">
-						<div class="setting-info">
-							<div class="font-semibold text-base-content mb-0.5">Default Vacation Days</div>
-							<div class="text-sm text-base-content/60 max-w-[400px]">Default number of vacation days per year for new members. Existing members can be set individually.</div>
-						</div>
+					<div class="flex items-center justify-between gap-4 flex-wrap">
+						{@render settingInfo('Default vacation days', 'Default number of vacation days per year for new members. Existing members can be set individually.')}
 						<div class="flex items-center gap-2">
 							<input
+								id="default-vacation-days"
 								type="number"
 								class="input input-bordered input-sm w-20 text-center"
 								step="0.5"
 								min="0"
 								max="365"
 								value={org.defaultVacationDays ?? 0}
-								onchange={async (e) => {
-									const val = parseFloat((e.target as HTMLInputElement).value);
-									if (isNaN(val) || val < 0 || !org) return;
-									settingsSaving = true;
-									try {
-										await organizationsApi.apiV1OrganizationsSlugSettingsPut(org.slug!, { defaultVacationDays: val });
-										await loadOrg();
-									} catch { /* ignore */ }
-									settingsSaving = false;
-								}}
+								aria-label="Default vacation days"
+								onchange={saveDefaultVacationDays}
 								disabled={settingsSaving}
 							/>
 							<span class="text-sm text-base-content/60">days/year</span>
@@ -507,44 +572,20 @@
 
 				<div class="bg-base-200/50 rounded-lg p-4 mt-4 border border-base-300">
 					<div class="flex items-center justify-between gap-4 flex-wrap">
-						<div class="setting-info">
-							<div class="font-semibold text-base-content mb-0.5">Business Day End</div>
-							<div class="text-sm text-base-content/60 max-w-[400px]">A timer still running at this local time is stopped automatically and marked as a failure entry, which counts as 0 until the member corrects it. Midnight (00:00) by default; set e.g. 04:00 for late-night shifts.</div>
-						</div>
+						{@render settingInfo('Business day end', 'A timer still running at this local time is stopped automatically and marked as a failure entry, which counts as 0 until the member corrects it. Midnight (00:00) by default; set e.g. 04:00 for late-night shifts.')}
 						<div class="flex items-center gap-2 flex-wrap">
 							<input
 								type="time"
 								class="input input-bordered input-sm w-28"
 								value={org.businessDayEnd ?? '00:00'}
-								onchange={async (e) => {
-									const val = (e.target as HTMLInputElement).value;
-									if (!val || !org) return;
-									settingsSaving = true;
-									try {
-										await organizationsApi.apiV1OrganizationsSlugSettingsPut(org.slug!, { businessDayEnd: val });
-										await loadOrg();
-									} catch (err) {
-										settingsError = extractErrorMessage(err, 'Failed to update business day end.');
-									}
-									settingsSaving = false;
-								}}
+								aria-label="Business day end"
+								onchange={saveBusinessDayEnd}
 								disabled={settingsSaving}
 							/>
 							<select
-								class="select select-bordered select-sm w-52"
+								class="select select-bordered select-sm w-52 max-w-full"
 								value={org.timeZone ?? 'Europe/Berlin'}
-								onchange={async (e) => {
-									const val = (e.target as HTMLSelectElement).value;
-									if (!org) return;
-									settingsSaving = true;
-									try {
-										await organizationsApi.apiV1OrganizationsSlugSettingsPut(org.slug!, { timeZone: val });
-										await loadOrg();
-									} catch (err) {
-										settingsError = extractErrorMessage(err, 'Failed to update time zone.');
-									}
-									settingsSaving = false;
-								}}
+								onchange={saveTimeZone}
 								disabled={settingsSaving}
 								aria-label="Time zone"
 							>
@@ -558,101 +599,127 @@
 
 				<!-- Custom Absence Types -->
 				<div class="mt-6">
-					<div class="flex items-center justify-between mb-4">
-						<div>
-							<h3 class="text-base font-bold text-base-content/70 m-0">Absence Types</h3>
-							<p class="text-sm text-base-content/50 m-0">Org-defined absence types like "Business Trip" with configurable effect on expected hours.</p>
+					<div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
+						<div class="min-w-0 flex-1 basis-60">
+							<h3 class="text-base font-bold text-base-content/70 m-0">Absence types</h3>
+							<p class="text-sm text-base-content/60 m-0">Org-defined absence types like "Business Trip" with configurable effect on expected hours.</p>
 						</div>
-						<button class="btn btn-primary btn-sm" onclick={() => (showAddType = !showAddType)}>
-							{showAddType ? 'Cancel' : '+ Add Type'}
+						<button class="btn btn-primary btn-sm" onclick={toggleAddType} aria-expanded={showAddType}>
+							{showAddType ? 'Cancel' : '+ Add type'}
 						</button>
 					</div>
 
-					{#if typeError}
-						<div class="alert alert-error mb-4 text-sm">{typeError}</div>
+					{#if absenceTypesError}
+						<div class="alert alert-error mb-4 text-sm" role="alert">
+							<span>{absenceTypesError}</span>
+							<button class="btn btn-sm" onclick={loadAbsenceTypes}>Try again</button>
+						</div>
 					{/if}
 
 					{#if showAddType}
-						<form onsubmit={addAbsenceType} class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300 flex gap-3 items-end flex-wrap">
-							<div class="flex flex-col gap-1">
-								<span class="text-xs font-medium text-base-content/60">Name</span>
-								<input type="text" class="input input-bordered input-sm w-44" placeholder="e.g. Business Trip" bind:value={newTypeName} required disabled={typeSaving} />
+						<form onsubmit={addAbsenceType} class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300 flex gap-3 items-end flex-wrap" novalidate>
+							{#if addTypeError}
+								<div class="alert alert-error text-sm w-full" role="alert">{addTypeError}</div>
+							{/if}
+							<div class="flex flex-col gap-1 w-full sm:w-auto">
+								<label for="new-type-name" class="text-xs font-medium text-base-content/60">Name</label>
+								<input id="new-type-name" type="text" class="input input-bordered input-sm w-full sm:w-44" class:input-error={newTypeSubmitted && !newTypeName.trim()} placeholder="e.g. Business Trip" bind:value={newTypeName} required disabled={typeSaving} />
+								{#if newTypeSubmitted && !newTypeName.trim()}<span class="text-xs text-error">Required</span>{/if}
 							</div>
-							<div class="flex flex-col gap-1">
-								<span class="text-xs font-medium text-base-content/60">Hours handling</span>
-								<select class="select select-bordered select-sm" bind:value={newTypeCreditMode} disabled={typeSaving}>
-									{#each creditModeOptions as o}
+							<div class="flex flex-col gap-1 w-full sm:w-auto">
+								<label for="new-type-credit" class="text-xs font-medium text-base-content/60">Hours handling</label>
+								<select id="new-type-credit" class="select select-bordered select-sm w-full" bind:value={newTypeCreditMode} disabled={typeSaving}>
+									{#each creditModeOptions as o (o.value)}
 										<option value={o.value}>{o.label}</option>
 									{/each}
 								</select>
 							</div>
 							<div class="flex flex-col gap-1">
 								<span class="text-xs font-medium text-base-content/60">Color</span>
-								<input type="color" class="input input-bordered input-sm w-14 p-1" bind:value={newTypeColor} disabled={typeSaving} />
+								<div class="flex items-center gap-1.5 flex-wrap min-h-8">
+									{#each GROUP_COLOR_PRESETS as c (c)}
+										<button
+											type="button"
+											class="w-6 h-6 rounded-full border-2 transition-transform {newTypeColor.toLowerCase() === c.toLowerCase() ? 'border-base-content scale-110' : 'border-transparent'}"
+											style="background-color: {c}"
+											aria-label={`Colour ${c}`}
+											aria-pressed={newTypeColor.toLowerCase() === c.toLowerCase()}
+											disabled={typeSaving}
+											onclick={() => (newTypeColor = c)}
+										></button>
+									{/each}
+									<input type="color" class="w-6 h-6 rounded cursor-pointer border-0 p-0" aria-label="Custom colour" bind:value={newTypeColor} disabled={typeSaving} />
+								</div>
 							</div>
 							<label class="label cursor-pointer flex items-center gap-2 text-sm pb-1.5">
 								<input type="checkbox" class="checkbox checkbox-sm" bind:checked={newTypeCountsAsVacation} disabled={typeSaving} />
 								Counts against vacation budget
 							</label>
 							<button type="submit" class="btn btn-primary btn-sm" disabled={typeSaving}>
-								{typeSaving ? 'Adding...' : 'Add Type'}
+								{typeSaving ? 'Adding…' : 'Add type'}
 							</button>
-							<p class="text-xs text-base-content/40 w-full m-0">{creditModeOptions.find(o => o.value === newTypeCreditMode)?.hint}</p>
+							<p class="text-xs text-base-content/50 w-full m-0">{creditModeOptions.find((o) => o.value === newTypeCreditMode)?.hint}</p>
 						</form>
 					{/if}
 
 					{#if absenceTypes.length === 0}
-						<p class="text-base-content/40">No custom absence types defined. Sick Day, Vacation and Other are always available.</p>
+						{#if !absenceTypesError}
+							<p class="text-base-content/50">No custom absence types defined. Sick day, Vacation and Other are always available.</p>
+						{/if}
 					{:else}
-						<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-							{#each absenceTypes as t}
-								<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0 flex-wrap gap-2">
+						<ul class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+							{#each absenceTypes as at (at.id)}
+								<li class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0 flex-wrap gap-2">
 									<div class="flex items-center gap-2 min-w-[160px]">
-										<span class="w-3 h-3 rounded-full shrink-0" style="background: {t.color ?? '#888'}"></span>
-										<span class="font-semibold text-sm">{t.name}</span>
-										{#if t.countsAsVacation}<span class="badge badge-xs badge-info badge-outline">vacation budget</span>{/if}
+										<span class="w-3 h-3 rounded-full shrink-0" style="background: {safeColor(at.color)}" aria-hidden="true"></span>
+										<span class="font-semibold text-sm">{at.name}</span>
+										{#if at.countsAsVacation}<span class="badge badge-xs badge-info badge-outline">vacation budget</span>{/if}
 									</div>
-									<div class="flex items-center gap-2">
+									<div class="flex items-center gap-2 flex-wrap">
 										<select
 											class="select select-bordered select-xs"
-											value={parseCreditMode(t.creditMode)}
-											onchange={(e) => updateAbsenceType(t, { creditMode: parseInt((e.target as HTMLSelectElement).value) })}
+											value={parseCreditMode(at.creditMode)}
+											onchange={(e) => updateAbsenceType(at, { creditMode: parseInt(e.currentTarget.value) })}
 											disabled={typeSaving}
-											title={creditModeOptions.find(o => o.value === parseCreditMode(t.creditMode))?.hint}
+											aria-label="Hours handling for {at.name}"
+											title={creditModeOptions.find((o) => o.value === parseCreditMode(at.creditMode))?.hint}
 										>
-											{#each creditModeOptions as o}
+											{#each creditModeOptions as o (o.value)}
 												<option value={o.value}>{o.label}</option>
 											{/each}
 										</select>
 										<label class="flex items-center gap-1 text-xs text-base-content/60 cursor-pointer" title="Deduct days of this type from the vacation budget">
-											<input type="checkbox" class="checkbox checkbox-xs" checked={t.countsAsVacation ?? false}
-												onchange={(e) => updateAbsenceType(t, { countsAsVacation: (e.target as HTMLInputElement).checked })}
+											<input type="checkbox" class="checkbox checkbox-xs" checked={at.countsAsVacation ?? false}
+												onchange={(e) => updateAbsenceType(at, { countsAsVacation: e.currentTarget.checked })}
 												disabled={typeSaving} />
 											vac. budget
 										</label>
-										<button class="btn btn-ghost btn-xs text-error" title="Deactivate type" onclick={() => deleteAbsenceType(t.id!)}>&times;</button>
+										<button class="btn btn-ghost btn-xs text-error" title="Deactivate type" aria-label="Deactivate {at.name}" disabled={typeSaving} onclick={() => deleteAbsenceType(at)}>&times;</button>
 									</div>
-								</div>
+								</li>
 							{/each}
-						</div>
+						</ul>
 					{/if}
 				</div>
 
 				<!-- Unified Permissions Overview -->
 				<div class="mt-6">
-					<div class="flex items-center justify-between mb-1">
-						<h3 class="text-base font-bold text-base-content/70 m-0">Permissions Overview</h3>
+					<div class="flex items-center justify-between gap-2 mb-1 flex-wrap">
+						<h3 class="text-base font-bold text-base-content/70 m-0">Permissions overview</h3>
 						<a href="/organizations/{orgSlug}/groups" class="btn btn-ghost btn-xs">Open groups →</a>
 					</div>
-					<p class="text-sm text-base-content/50 mb-3">
+					<p class="text-sm text-base-content/60 mb-3">
 						Organization defaults and per-group overrides in one place. Click a cell to change it —
 						group cells cycle <span class="italic">Inherit → Disabled → Approval → Allowed</span>.
 					</p>
-					{#if permMatrixError}
-						<div class="alert alert-error text-sm mb-3">{permMatrixError}</div>
+					{#if permGroupsError}
+						<div class="alert alert-error text-sm mb-3" role="alert">
+							<span>{permGroupsError}</span>
+							<button class="btn btn-sm" onclick={loadPermGroups}>Try again</button>
+						</div>
 					{/if}
 					{#if permGroupsLoading}
-						<p class="text-base-content/40 text-sm">Loading groups...</p>
+						<p class="text-base-content/50 text-sm">Loading groups…</p>
 					{:else}
 						<div class="overflow-x-auto bg-base-100 border border-base-300 rounded-xl">
 							<table class="table table-sm">
@@ -660,10 +727,10 @@
 									<tr>
 										<th class="bg-base-200/50 text-xs">Permission</th>
 										<th class="bg-base-200/50 text-center text-xs">Organization</th>
-										{#each permGroups as col}
+										{#each permGroups as col (col.group.id)}
 											<th class="bg-base-200/50 text-center text-xs">
 												<span class="inline-flex items-center gap-1.5">
-													<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background: {col.group.color ?? '#888'}"></span>
+													<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background: {safeColor(col.group.color)}" aria-hidden="true"></span>
 													{col.group.name}
 												</span>
 											</th>
@@ -671,24 +738,26 @@
 									</tr>
 								</thead>
 								<tbody>
-									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/40 bg-base-200/30 py-1">Rules — what members may do</td></tr>
-									{#each matrixRuleRows as row}
+									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 bg-base-200/30 py-1">Rules — what members may do</td></tr>
+									{#each matrixRuleRows as row (row.key)}
+										{@const orgBadge = matrixBadge((org as Record<string, any>)[row.key], false)}
 										<tr>
 											<td class="font-medium text-sm whitespace-nowrap">{row.label}</td>
 											<td class="text-center">
-												<button class="badge badge-sm cursor-pointer {matrixBadge((org as Record<string, any>)[row.key], false).cls}" title="Organization default — click to change" onclick={() => cycleOrgMatrixCell(row.key, false)} disabled={settingsSaving}>
-													{matrixBadge((org as Record<string, any>)[row.key], false).label}
+												<button class="badge badge-sm cursor-pointer {orgBadge.cls}" title="Organization default — click to change" onclick={() => cycleOrgMatrixCell(row.key, false)} disabled={settingsSaving}>
+													{orgBadge.label}
 												</button>
 											</td>
-											{#each permGroups as col}
+											{#each permGroups as col (col.group.id)}
+												{@const raw = (col.perms as Record<string, any>)[row.key]}
 												<td class="text-center">
-													{#if (col.perms as Record<string, any>)[row.key] == null}
-														<button class="badge badge-sm badge-ghost opacity-60 cursor-pointer" title="Inherits the org default — click to override" onclick={() => cycleGroupMatrixCell(col, row.key, false)}>
-															↳ {matrixBadge((org as Record<string, any>)[row.key], false).label}
+													{#if raw == null}
+														<button class="badge badge-sm badge-ghost opacity-60 cursor-pointer" title="Inherits the org default — click to override" onclick={() => cycleGroupMatrixCell(col, row.key, false)} disabled={permSaving}>
+															↳ {orgBadge.label}
 														</button>
 													{:else}
-														<button class="badge badge-sm cursor-pointer {matrixBadge((col.perms as Record<string, any>)[row.key], false).cls}" title="Group override — click to change (cycles back to Inherit)" onclick={() => cycleGroupMatrixCell(col, row.key, false)}>
-															{matrixBadge((col.perms as Record<string, any>)[row.key], false).label}
+														<button class="badge badge-sm cursor-pointer {matrixBadge(raw, false).cls}" title="Group override — click to change (cycles back to Inherit)" onclick={() => cycleGroupMatrixCell(col, row.key, false)} disabled={permSaving}>
+															{matrixBadge(raw, false).label}
 														</button>
 													{/if}
 												</td>
@@ -696,25 +765,27 @@
 										</tr>
 									{/each}
 
-									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/40 bg-base-200/30 py-1">Visibility — who sees members' data</td></tr>
-									{#each matrixVisibilityRows as row}
+									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 bg-base-200/30 py-1">Visibility — who sees members' data</td></tr>
+									{#each matrixVisibilityRows as row (row.key)}
 										{@const orgMode = row.key === 'timeEntryVisibility' ? (org.memberTimeEntryVisibility ? 'AdminOnly' : 'Private') : (org as Record<string, any>)[row.key]}
+										{@const orgBadge = matrixBadge(orgMode, true)}
 										<tr>
 											<td class="font-medium text-sm whitespace-nowrap">{row.label}</td>
 											<td class="text-center">
-												<button class="badge badge-sm cursor-pointer {matrixBadge(orgMode, true).cls}" title="Organization default — click to change" onclick={() => cycleOrgMatrixCell(row.key, true)} disabled={settingsSaving}>
-													{matrixBadge(orgMode, true).label}
+												<button class="badge badge-sm cursor-pointer {orgBadge.cls}" title="Organization default — click to change" onclick={() => cycleOrgMatrixCell(row.key, true)} disabled={settingsSaving}>
+													{orgBadge.label}
 												</button>
 											</td>
-											{#each permGroups as col}
+											{#each permGroups as col (col.group.id)}
+												{@const raw = (col.perms as Record<string, any>)[row.key]}
 												<td class="text-center">
-													{#if (col.perms as Record<string, any>)[row.key] == null}
-														<button class="badge badge-sm badge-ghost opacity-60 cursor-pointer" title="Inherits the org default — click to override" onclick={() => cycleGroupMatrixCell(col, row.key, true)}>
-															↳ {matrixBadge(orgMode, true).label}
+													{#if raw == null}
+														<button class="badge badge-sm badge-ghost opacity-60 cursor-pointer" title="Inherits the org default — click to override" onclick={() => cycleGroupMatrixCell(col, row.key, true)} disabled={permSaving}>
+															↳ {orgBadge.label}
 														</button>
 													{:else}
-														<button class="badge badge-sm cursor-pointer {matrixBadge((col.perms as Record<string, any>)[row.key], true).cls}" title="Group override — click to change (cycles back to Inherit)" onclick={() => cycleGroupMatrixCell(col, row.key, true)}>
-															{matrixBadge((col.perms as Record<string, any>)[row.key], true).label}
+														<button class="badge badge-sm cursor-pointer {matrixBadge(raw, true).cls}" title="Group override — click to change (cycles back to Inherit)" onclick={() => cycleGroupMatrixCell(col, row.key, true)} disabled={permSaving}>
+															{matrixBadge(raw, true).label}
 														</button>
 													{/if}
 												</td>
@@ -722,19 +793,22 @@
 										</tr>
 									{/each}
 
-									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/40 bg-base-200/30 py-1">Group admin capabilities — what group admins may approve/see</td></tr>
-									{#each matrixCapabilityRows as row}
+									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 bg-base-200/30 py-1">Group admin capabilities — what group admins may approve/see</td></tr>
+									{#each matrixCapabilityRows as row (row.key)}
 										<tr>
 											<td class="font-medium text-sm whitespace-nowrap">{row.label}</td>
-											<td class="text-center text-xs text-base-content/40" title="Organization admins can always do this">always</td>
-											{#each permGroups as col}
+											<td class="text-center text-xs text-base-content/50" title="Organization admins can always do this">always</td>
+											{#each permGroups as col (col.group.id)}
+												{@const enabled = (col.perms as Record<string, any>)[row.key] === true}
 												<td class="text-center">
 													<button
-														class="badge badge-sm cursor-pointer {(col.perms as Record<string, any>)[row.key] === true ? 'badge-success' : 'badge-ghost opacity-60'}"
+														class="badge badge-sm cursor-pointer {enabled ? 'badge-success' : 'badge-ghost opacity-60'}"
 														title="Click to toggle for this group's admins"
+														aria-pressed={enabled}
 														onclick={() => toggleGroupCapability(col, row.key)}
+														disabled={permSaving}
 													>
-														{(col.perms as Record<string, any>)[row.key] === true ? '✓ enabled' : 'off'}
+														{enabled ? '✓ enabled' : 'off'}
 													</button>
 												</td>
 											{/each}
@@ -743,8 +817,8 @@
 								</tbody>
 							</table>
 						</div>
-						{#if permGroups.length === 0}
-							<p class="text-base-content/40 text-sm mt-2">No groups yet — create groups to set per-team overrides.</p>
+						{#if permGroups.length === 0 && !permGroupsError}
+							<p class="text-base-content/50 text-sm mt-2">No groups yet — create groups to set per-team overrides.</p>
 						{/if}
 					{/if}
 				</div>
@@ -752,78 +826,72 @@
 				<!-- Pause Rules -->
 				{#if org.autoPauseEnabled}
 					<div class="mt-6">
-						<div class="flex items-center justify-between mb-4">
-							<h3 class="text-base font-bold text-base-content/70">Pause Rules</h3>
-							<button class="btn btn-primary btn-sm" onclick={() => (showAddRule = !showAddRule)}>
-								{showAddRule ? 'Cancel' : '+ Add Rule'}
+						<div class="flex items-center justify-between gap-2 mb-4 flex-wrap">
+							<h3 class="text-base font-bold text-base-content/70 m-0">Pause rules</h3>
+							<button class="btn btn-primary btn-sm" onclick={toggleAddRule} aria-expanded={showAddRule}>
+								{showAddRule ? 'Cancel' : '+ Add rule'}
 							</button>
 						</div>
 
 						{#if showAddRule}
 							<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
 								{#if addRuleError}
-									<div class="alert alert-error mb-4 text-sm">{addRuleError}</div>
+									<div class="alert alert-error mb-4 text-sm" role="alert">{addRuleError}</div>
 								{/if}
-								<form onsubmit={addPauseRule} class="flex gap-2 items-center flex-wrap">
+								<form onsubmit={addPauseRule} class="flex gap-2 items-center flex-wrap" novalidate>
 									<div class="flex items-center gap-1.5">
-										<!-- svelte-ignore a11y_label_has_associated_control -->
-										<label class="text-sm text-base-content/70 font-medium whitespace-nowrap">When tracked &ge;</label>
-										<input type="number" class="input input-bordered input-xs w-[70px] text-center" step="0.5" min="0.5" bind:value={newRuleMinHours} required disabled={addingRule} />
+										<label for="new-rule-hours" class="text-sm text-base-content/70 font-medium whitespace-nowrap">When tracked &ge;</label>
+										<input id="new-rule-hours" type="number" class="input input-bordered input-xs w-[70px] text-center" step="0.5" min="0.5" max="24" bind:value={newRuleMinHours} required disabled={addingRule} />
 										<span class="text-sm text-base-content/60 whitespace-nowrap">hours</span>
 									</div>
 									<div class="flex items-center gap-1.5">
-										<!-- svelte-ignore a11y_label_has_associated_control -->
-										<label class="text-sm text-base-content/70 font-medium whitespace-nowrap">deduct</label>
-										<input type="number" class="input input-bordered input-xs w-[70px] text-center" min="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
+										<label for="new-rule-pause" class="text-sm text-base-content/70 font-medium whitespace-nowrap">deduct</label>
+										<input id="new-rule-pause" type="number" class="input input-bordered input-xs w-[70px] text-center" min="1" step="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
 										<span class="text-sm text-base-content/60 whitespace-nowrap">min pause</span>
 									</div>
 									<button type="submit" class="btn btn-primary btn-sm" disabled={addingRule}>
-										{addingRule ? 'Adding...' : 'Add Rule'}
+										{addingRule ? 'Adding…' : 'Add rule'}
 									</button>
 								</form>
 							</div>
 						{/if}
 
-						{#if getPauseRules().length === 0}
-							<p class="text-base-content/40">No pause rules configured. Add rules to automatically deduct break time.</p>
+						{#if pauseRules.length === 0}
+							<p class="text-base-content/50">No pause rules configured. Add rules to automatically deduct break time.</p>
 						{:else}
-							<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-								{#each getPauseRules() as rule}
-									<div class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0 flex-wrap gap-2">
+							<ul class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+								{#each pauseRules as rule (rule.id)}
+									<li class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0 flex-wrap gap-2">
 										{#if editingRuleId === rule.id}
-											{#if editRuleError}
-												<div class="alert alert-error mb-4 text-sm" style="width:100%">{editRuleError}</div>
-											{/if}
-											<div class="flex items-center gap-3 flex-wrap w-full">
+											<form onsubmit={(e) => saveEditRule(e, rule.id!)} class="flex items-center gap-3 flex-wrap w-full" novalidate>
+												{#if editRuleError}
+													<div class="alert alert-error text-sm w-full" role="alert">{editRuleError}</div>
+												{/if}
 												<div class="flex items-center gap-1.5">
-													<!-- svelte-ignore a11y_label_has_associated_control -->
-													<label class="text-sm text-base-content/70 font-medium whitespace-nowrap">&ge;</label>
-													<input type="number" class="input input-bordered input-xs w-[70px] text-center" step="0.5" min="0.5" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
+													<label for="edit-rule-hours" class="text-sm text-base-content/70 font-medium whitespace-nowrap">When tracked &ge;</label>
+													<input id="edit-rule-hours" type="number" class="input input-bordered input-xs w-[70px] text-center" step="0.5" min="0.5" max="24" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
 													<span class="text-sm text-base-content/60 whitespace-nowrap">h</span>
 												</div>
 												<div class="flex items-center gap-1.5">
-													<!-- svelte-ignore a11y_label_has_associated_control -->
-													<label class="text-sm text-base-content/70 font-medium whitespace-nowrap">&rarr;</label>
-													<input type="number" class="input input-bordered input-xs w-[70px] text-center" min="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
+													<label for="edit-rule-pause" class="text-sm text-base-content/70 font-medium whitespace-nowrap">deduct</label>
+													<input id="edit-rule-pause" type="number" class="input input-bordered input-xs w-[70px] text-center" min="1" step="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
 													<span class="text-sm text-base-content/60 whitespace-nowrap">min</span>
 												</div>
 												<div class="flex items-center gap-1.5">
-													<button class="btn btn-primary btn-sm" onclick={() => saveEditRule(rule.id!)} disabled={editingRuleSaving}>Save</button>
-													<button class="btn btn-ghost btn-sm" onclick={cancelEditRule}>Cancel</button>
+													<button type="submit" class="btn btn-primary btn-sm" disabled={editingRuleSaving}>{editingRuleSaving ? 'Saving…' : 'Save'}</button>
+													<button type="button" class="btn btn-ghost btn-sm" onclick={() => (editingRuleId = null)}>Cancel</button>
 												</div>
-											</div>
+											</form>
 										{:else}
-											<div class="text-[0.9375rem] text-base-content/70">
-												<strong>&ge; {rule.minHours}h</strong> tracked &rarr; <strong>{rule.pauseMinutes} min</strong> pause deducted
-											</div>
+											<div class="text-[0.9375rem] text-base-content/70">{@render pauseRuleText(rule)}</div>
 											<div class="flex items-center gap-1.5">
 												<button class="btn btn-ghost btn-sm" onclick={() => startEditRule(rule)}>Edit</button>
-												<button class="btn btn-ghost btn-xs text-error" title="Delete rule" onclick={() => deleteRule(rule.id!)}>&times;</button>
+												<button class="btn btn-ghost btn-xs text-error" title="Delete rule" aria-label="Delete rule" onclick={() => deleteRule(rule)}>&times;</button>
 											</div>
 										{/if}
-									</div>
+									</li>
 								{/each}
-							</div>
+							</ul>
 						{/if}
 					</div>
 				{/if}
@@ -831,47 +899,57 @@
 
 			<ApiKeysPanel {orgSlug} />
 
-<!-- Request History -->
+			<!-- Request History -->
 			<section class="mt-8">
-				<div class="flex items-center justify-between mb-4">
-					<h2 class="text-xl font-bold text-base-content">Request History</h2>
-				</div>
+				<h2 class="text-xl font-bold text-base-content mb-4">Request history</h2>
 
-				{#if requestHistoryLoading}
-					<p class="text-base-content/40">Loading requests...</p>
-				{:else if requestHistoryLoaded}
+				{#if requestHistoryError}
+					<div class="alert alert-error text-sm mb-4" role="alert">
+						<span>{requestHistoryError}</span>
+						<button class="btn btn-sm" onclick={loadRequestHistory}>Try again</button>
+					</div>
+				{/if}
+
+				{#if requestHistoryLoading && requestHistory.length === 0}
+					<p class="text-base-content/50">Loading requests…</p>
+				{:else if !requestHistoryError}
 					<div class="flex gap-1.5 mb-4 flex-wrap">
-						<button class="btn btn-sm rounded-full {requestHistoryFilter === 'all' ? 'btn-neutral' : 'btn-outline'}" onclick={() => (requestHistoryFilter = 'all')}>All ({requestHistory.length})</button>
-						<button class="btn btn-sm rounded-full {requestHistoryFilter === 'Pending' ? 'btn-neutral' : 'btn-outline'}" onclick={() => (requestHistoryFilter = 'Pending')}>Pending ({requestHistory.filter(r => r.status === 'Pending').length})</button>
-						<button class="btn btn-sm rounded-full {requestHistoryFilter === 'Accepted' ? 'btn-neutral' : 'btn-outline'}" onclick={() => (requestHistoryFilter = 'Accepted')}>Accepted ({requestHistory.filter(r => r.status === 'Accepted').length})</button>
-						<button class="btn btn-sm rounded-full {requestHistoryFilter === 'Declined' ? 'btn-neutral' : 'btn-outline'}" onclick={() => (requestHistoryFilter = 'Declined')}>Declined ({requestHistory.filter(r => r.status === 'Declined').length})</button>
+						{#each ['all', 'Pending', 'Accepted', 'Declined'] as f (f)}
+							<button
+								class="btn btn-sm rounded-full {requestHistoryFilter === f ? 'btn-neutral' : 'btn-outline'}"
+								aria-pressed={requestHistoryFilter === f}
+								onclick={() => (requestHistoryFilter = f)}
+							>
+								{f === 'all' ? 'All' : formatRequestStatus(f)} ({f === 'all' ? requestHistory.length : requestHistory.filter((r) => r.status === f).length})
+							</button>
+						{/each}
 					</div>
 
-					{#if filteredRequests().length === 0}
-						<p class="text-base-content/40">No requests found.</p>
+					{#if filteredRequests.length === 0}
+						<p class="text-base-content/50">No requests found.</p>
 					{:else}
-						<div class="flex flex-col gap-3">
-							{#each filteredRequests() as req}
-								<div class="bg-base-200/30 border border-base-300 rounded-lg p-4">
-									<div class="flex items-center gap-2 mb-2">
+						<ul class="flex flex-col gap-3">
+							{#each filteredRequests as req (req.id)}
+								<li class="bg-base-200/30 border border-base-300 rounded-lg p-4">
+									<div class="flex items-center gap-2 mb-2 flex-wrap">
 										<span class="badge badge-primary badge-sm">{formatRequestType(req.type)}</span>
-										<span class="badge badge-sm {statusBadgeClass(req.status) === 'status-pending' ? 'badge-warning' : statusBadgeClass(req.status) === 'status-accepted' ? 'badge-success' : 'badge-error'}">{req.status}</span>
+										<span class="badge badge-sm {statusBadgeClass(req.status)}">{formatRequestStatus(req.status)}</span>
 									</div>
 									<div class="text-sm">
-										<div class="mb-1">
+										<div class="mb-1 break-words">
 											<strong>{req.userFirstName} {req.userLastName}</strong>
-											<span class="text-base-content/40 text-sm ml-1.5">{req.userEmail}</span>
+											<span class="text-base-content/50 text-sm ml-1.5">{req.userEmail}</span>
 										</div>
 										{#if req.requestData}
-											<div class="text-primary text-sm my-1 py-1 px-2 bg-primary/10 rounded-md inline-block">{parseRequestData(req.type, req.requestData).join(', ')}</div>
+											<div class="text-sm my-1 py-1 px-2 bg-primary/10 rounded-md inline-block">{parseRequestData(req.type, req.requestData).join(', ')}</div>
 										{/if}
 										{#if req.message}
 											<div class="text-base-content/60 italic text-sm my-1">"{req.message}"</div>
 										{/if}
-										<div class="text-base-content/40 text-xs mt-1.5">
+										<div class="text-base-content/50 text-xs mt-1.5">
 											<span>Created {formatTimeAgo(req.createdAt)}</span>
 											{#if req.respondedAt}
-												<span>&middot; {req.status === 'Accepted' ? 'Accepted' : 'Declined'} by {req.respondedByName ?? 'Unknown'} {formatTimeAgo(req.respondedAt)}</span>
+												<span>&middot; {formatRequestStatus(req.status)} by {req.respondedByName ?? 'Unknown'} {formatTimeAgo(req.respondedAt)}</span>
 											{/if}
 											{#if req.relatedEntityId}
 												<span>&middot; Entry #{req.relatedEntityId}</span>
@@ -880,86 +958,59 @@
 									</div>
 									{#if req.status === 'Pending'}
 										<div class="flex gap-1.5 mt-3 pt-3 border-t border-base-300">
-											<button class="btn btn-success btn-sm" onclick={async () => {
-												try {
-													await requestsApi.apiV1OrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: true });
-													requestHistoryLoaded = false;
-													await loadRequestHistory();
-												} catch (e) {
-													actionError = extractErrorMessage(e, 'Failed to accept');
-												}
-											}}>Accept</button>
-											<button class="btn btn-outline btn-error btn-sm" onclick={async () => {
-												try {
-													await requestsApi.apiV1OrganizationsSlugRequestsIdPut(orgSlug, req.id!, { accept: false });
-													requestHistoryLoaded = false;
-													await loadRequestHistory();
-												} catch (e) {
-													actionError = extractErrorMessage(e, 'Failed to decline');
-												}
-											}}>Decline</button>
+											<button class="btn btn-success btn-sm" disabled={respondingId === req.id} onclick={() => respondToRequest(req, true)}>Accept</button>
+											<button class="btn btn-outline btn-error btn-sm" disabled={respondingId === req.id} onclick={() => respondToRequest(req, false)}>Decline</button>
 										</div>
 									{/if}
-								</div>
+								</li>
 							{/each}
-						</div>
+						</ul>
 					{/if}
 				{/if}
 			</section>
 		{:else}
 			<!-- ==================== Member read-only Rules view ==================== -->
 			<section>
-				<h2 class="text-xl text-base-content/70 mb-4">Organization Rules</h2>
+				<h2 class="text-xl text-base-content/70 mb-4">Organization rules</h2>
 
 				<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-					{#each toggleSettings() as ts}
+					{#each toggleSettings() as ts (ts.key)}
 						{@const value = (org as Record<string, any>)[ts.key]}
-						<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-							<div class="setting-info">
-								<div class="font-semibold text-base-content mb-0.5">{ts.label}</div>
-								<div class="text-sm text-base-content/60 max-w-[400px]">{ts.description}</div>
-							</div>
+						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
+							{@render settingInfo(ts.label, ts.description)}
 							<span class="badge {value ? 'badge-success' : 'badge-ghost'}">{value ? 'On' : 'Off'}</span>
 						</div>
 					{/each}
 
-					{#each ruleSettings() as rs}
+					{#each ruleSettings() as rs (rs.key)}
 						{@const mode = (org as Record<string, any>)[rs.key] as string | null}
 						{@const label = rs.labelFn ? rs.labelFn(mode) : ruleModeLabel(mode)}
-						<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-							<div class="setting-info">
-								<div class="font-semibold text-base-content mb-0.5">{rs.label}</div>
-								<div class="text-sm text-base-content/60 max-w-[400px]">{rs.description}</div>
-							</div>
-							<span class="badge {ruleModeButtonClass(mode)}">{label}</span>
+						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
+							{@render settingInfo(rs.label, rs.description)}
+							<span class="badge {ruleModeButtonClass(mode).replace('btn-', 'badge-')}">{label}</span>
 						</div>
 					{/each}
 
-					{#each visibilitySettings() as vs}
+					{#each visibilitySettings() as vs (vs.key)}
 						{@const mode = (org as Record<string, any>)[vs.key] as string | null}
-						<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
-							<div class="setting-info">
-								<div class="font-semibold text-base-content mb-0.5">{vs.label}</div>
-								<div class="text-sm text-base-content/60 max-w-[400px]">{vs.description}</div>
-							</div>
-							<span class="badge {visibilityModeButtonClass(mode)}">{visibilityModeLabel(mode)}</span>
+						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
+							{@render settingInfo(vs.label, vs.description)}
+							<span class="badge {visibilityModeButtonClass(mode).replace('btn-', 'badge-')}">{visibilityModeLabel(mode)}</span>
 						</div>
 					{/each}
 				</div>
 
 				{#if org.autoPauseEnabled}
 					<div class="mt-6 pt-4 border-t border-base-300">
-						<h3 class="text-base font-bold text-base-content mb-3">Pause Rules</h3>
-						{#if (org.pauseRules ?? []).length === 0}
-							<p class="text-base-content/40">No pause rules configured.</p>
+						<h3 class="text-base font-bold text-base-content mb-3">Pause rules</h3>
+						{#if pauseRules.length === 0}
+							<p class="text-base-content/50">No pause rules configured.</p>
 						{:else}
-							<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-								{#each (org.pauseRules ?? []) as rule}
-									<div class="p-2 bg-base-200/50 border border-base-300 rounded-lg text-sm text-base-content/70 mb-2">
-										<strong>&ge; {rule.minHours}h</strong> tracked &rarr; <strong>{rule.pauseMinutes} min</strong> pause deducted
-									</div>
+							<ul class="flex flex-col gap-2">
+								{#each pauseRules as rule (rule.id)}
+									<li class="p-2 bg-base-200/50 border border-base-300 rounded-lg text-sm text-base-content/70">{@render pauseRuleText(rule)}</li>
 								{/each}
-							</div>
+							</ul>
 						{/if}
 					</div>
 				{/if}
