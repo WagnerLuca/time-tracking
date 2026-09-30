@@ -32,6 +32,7 @@
 	const memberId = $derived(parseInt(page.params.memberId ?? '0', 10));
 
 	let org = $state<OrganizationDetailResponse | null>(null);
+	let calendar = $state<ReturnType<typeof MemberCalendar> | undefined>();
 	let member = $state<OrganizationMemberResponse | null>(null);
 	let loading = $state(true);
 	let error = $state('');
@@ -172,7 +173,7 @@
 			<section class="card bg-base-100 border border-base-300 p-5 mb-5">
 				<h2 class="text-base font-bold text-base-content m-0 mb-4">{t('memberDetail.calendar')}</h2>
 				{#key `${orgSlug}-${memberId}`}
-					<MemberCalendar {orgSlug} orgId={org?.id} userId={memberId} {isSelf} orgDetail={org} onbalance={(b) => (balance = b)} />
+					<MemberCalendar bind:this={calendar} {orgSlug} orgId={org?.id} userId={memberId} {isSelf} orgDetail={org} onbalance={(b) => (balance = b)} />
 				{/key}
 			</section>
 
@@ -203,7 +204,7 @@
 		{/if}
 
 		<MemberSchedule class="mb-5" {schedule} loading={scheduleLoading} error={scheduleError} />
-		<InitialOvertimeEditor class="mb-5" {orgSlug} {memberId} hours={schedule?.initialOvertimeHours ?? 0} editable={isAdmin} onsaved={loadSchedule} />
+		<InitialOvertimeEditor class="mb-5" {orgSlug} {memberId} hours={schedule?.initialOvertimeHours ?? 0} editable={isAdmin} onsaved={async () => { await loadSchedule(); await calendar?.reloadBalance(); }} />
 		<MemberVacation class="mb-5" {orgSlug} {member} canEdit={isAdmin} onchanged={reloadOrg} />
 		{#if isAdmin}
 			<MemberBadge {orgSlug} {member} onchanged={reloadOrg} />

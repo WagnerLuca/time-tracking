@@ -275,6 +275,11 @@
 		await loadCumulativeBalance();
 	}
 
+	/** Lets the parent refresh the balance after changes made outside the calendar (e.g. initial overtime). */
+	export function reloadBalance() {
+		return loadCumulativeBalance();
+	}
+
 	async function loadCumulativeBalance() {
 		try {
 			const { data } = await reportsApi.apiV1OrganizationsSlugMembersMemberIdBalanceGet(orgSlug, userId);
