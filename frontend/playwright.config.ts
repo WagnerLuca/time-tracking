@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test';
  *   backend  → http://localhost:7000 (Development, in-memory DB with seeded users)
  *   frontend → http://localhost:5179 (`npm run dev -- --port 5179`)
  * Run with `npm run test:e2e` (first time: `npx playwright install chromium`).
- * Override the frontend URL with E2E_BASE_URL.
+ * Override the frontend URL with E2E_BASE_URL, the browser with E2E_CHANNEL (e.g. msedge).
  */
 export default defineConfig({
 	testDir: 'tests/e2e',
@@ -19,5 +19,6 @@ export default defineConfig({
 		locale: 'de-DE',
 		timezoneId: 'Europe/Berlin'
 	},
-	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }]
+	// E2E_CHANNEL=msedge|chrome uses an installed browser instead of the downloaded Chromium
+	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], channel: process.env.E2E_CHANNEL || undefined } }]
 });
