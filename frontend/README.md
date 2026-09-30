@@ -1,126 +1,31 @@
-# Time Tracking Frontend
+# Time Tracking — Frontend
 
-A SvelteKit application that consumes the ASP.NET Core Web API.
+SvelteKit (Svelte 5 runes, TypeScript) with Tailwind CSS 4 + DaisyUI 5, styled with the
+Wagner Luca design system (`@wagnerluca/ui` tokens). German UI by default, English via the
+toggle in the nav or in Settings.
 
-## 🚀 Getting Started
+**Architecture, conventions and gotchas live in [`../CLAUDE.md`](../CLAUDE.md)** — read that
+first. This file only lists the commands.
 
-### Prerequisites
-- Node.js (v18 or higher)
-- .NET 9.0 SDK
-- Your backend API running
+## Setup
 
-### Installation
+`@wagnerluca/ui` is installed from GitHub Packages, which requires a token even for reads:
 
-1. Install dependencies:
 ```bash
+export NODE_AUTH_TOKEN=<classic PAT with read:packages>
 npm install
 ```
 
-2. Start the development server:
-```bash
-npm run dev
-```
+## Commands
 
-The application will be available at `http://localhost:5173`
+| Command | What it does |
+|---|---|
+| `npm run dev -- --port 5179` | Dev server with HMR on http://localhost:5179 (the backend runs on :7000; 5173 is used by another project) |
+| `npm run check` | svelte-check / TypeScript — must report 0 errors and 0 warnings |
+| `npm test` | Unit tests (Vitest; TZ pinned to Europe/Berlin) |
+| `npm run test:e2e` | Playwright smoke test against the running dev servers (frontend :5179, backend :7000 with seeded users); first run `npx playwright install chromium` |
+| `npm run build` / `npm run preview` | Production build (adapter-node) / preview it |
+| `npm run generate-api` | Regenerate `src/lib/api/` from the backend's Swagger (backend must run on :7000) — never hand-edit that folder |
 
-## 🔧 API Integration
-
-### Method 1: Manual API Calls (Currently Implemented)
-
-The project includes a manual API service (`src/lib/apiService.ts`) that handles:
-- HTTP client configuration with Axios
-- Request/response interceptors
-- Error handling
-- Authentication token management
-
-### Method 2: Auto-generated API Client (Swagger Codegen)
-
-Generate a TypeScript client from your API's Swagger specification:
-
-1. **Start your .NET API**:
-```bash
-cd ../backend
-dotnet run
-```
-
-2. **Generate the API client**:
-```bash
-npm run generate-api
-```
-
-This will:
-- Fetch the Swagger specification from your running API
-- Generate TypeScript interfaces and API client classes
-- Place the generated code in `src/lib/api/`
-
-3. **Use the generated client**:
-```typescript
-import { WeatherForecastApi, Configuration } from '$lib/api';
-
-// Create API configuration
-const config = new Configuration({
-    basePath: 'https://localhost:7000'
-});
-
-// Create API instance
-const weatherApi = new WeatherForecastApi(config);
-
-// Use the API
-const forecast = await weatherApi.weatherForecastGet();
-```
-
-### API Configuration
-
-Update the API base URL in `src/lib/apiService.ts`:
-```typescript
-const API_BASE_URL = 'https://localhost:7000'; // Update this to match your API
-```
-
-## 📁 Project Structure
-
-```
-src/
-├── lib/
-│   ├── apiService.ts       # Manual API service
-│   └── api/                # Generated API client (after running generate-api)
-├── routes/
-│   ├── +layout.svelte      # Global layout
-│   └── +page.svelte        # Home page with API demo
-└── app.html                # HTML template
-```
-
-## 🛠 Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production  
-- `npm run preview` - Preview production build
-- `npm run generate-api` - Generate API client from Swagger
-- `npm run check` - Run TypeScript type checking
-
-## 🔗 API Connection
-
-The frontend is configured to connect to your .NET Web API. Make sure:
-
-1. Your API is running (usually on `https://localhost:7000` or `http://localhost:5000`)
-2. CORS is configured in your API to allow requests from the frontend
-3. The API URL in `apiService.ts` matches your running API
-
-## 🎯 Next Steps
-
-1. **Add CORS support** to your .NET API for the frontend origin
-2. **Implement authentication** if needed
-3. **Create time tracking components** (timers, projects, reports)
-4. **Add more API endpoints** as your backend grows
-5. **Use the generated API client** for type-safe API calls
-
-## 🐛 Troubleshooting
-
-### API Connection Issues
-- Check if the API is running: `cd ../backend && dotnet run`
-- Verify the API URL in `src/lib/apiService.ts`
-- Check browser developer tools for CORS errors
-
-### Swagger Generation Issues
-- Ensure the API is running before generating the client
-- Check if Swagger UI is accessible at `http://localhost:7000/swagger`
-- Verify the Swagger JSON endpoint: `http://localhost:7000/swagger/v1/swagger.json`
+Seeded dev logins (in-memory backend): `max.mueller@example.com` (Owner),
+`anna.schmidt@example.com` (Admin), `tom.weber@example.com` (Member) — password `Password123`.
