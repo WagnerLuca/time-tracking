@@ -53,7 +53,7 @@ public class ExceptionHandlingMiddleware
         };
 
         context.Response.StatusCode = statusCode;
-        context.Response.ContentType = "application/problem+json";
-        await context.Response.WriteAsJsonAsync(problem);
+        // Pass the content type to WriteAsJsonAsync: setting Response.ContentType first gets overwritten by it
+        await context.Response.WriteAsJsonAsync(problem, (System.Text.Json.JsonSerializerOptions?)null, "application/problem+json");
     }
 }

@@ -90,4 +90,60 @@ public class GroupControllerTests : IClassFixture<TimeTrackingApiFactory>
         var leave = await member.DeleteAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/members/{me.GetProperty("id").GetInt32()}");
         leave.IsSuccessStatusCode.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task Admin_ManagesGroupLifecycle_MembersCanOnlyRead()
+    {
+        var (owner, groupAdmin, slug, groupId, memberA, memberB) = await SetupAsync("grp-life");
+
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}", new { name = "Renamed", description = "d", color = "#5A9188" }))
+            .EnsureSuccessStatusCode();
+        var detail = await groupAdmin.GetFromJsonAsync<JsonElement>($"/api/v1/Organizations/{slug}/groups/{groupId}");
+        detail.GetProperty("name").GetString().Should().Be("Renamed");
+
+        // Only org admins change roles, edit permissions, rename or delete
+        (await groupAdmin.PatchAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/members/{memberB}", new { role = "Admin" }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await groupAdmin.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/permissions", new { csvImportMode = 2 }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await groupAdmin.DeleteAsync($"/api/v1/Organizations/{slug}/groups/{groupId}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        (await owner.PatchAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/members/{memberB}", new { role = "Chief" }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await owner.PatchAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/members/{memberB}", new { role = "Admin" }))
+            .EnsureSuccessStatusCode();
+
+        var perms = await owner.GetFromJsonAsync<JsonElement>($"/api/v1/Organizations/{slug}/groups/{groupId}/permissions");
+        perms.ValueKind.Should().Be(JsonValueKind.Object);
+
+        (await owner.DeleteAsync($"/api/v1/Organizations/{slug}/groups/{groupId}")).EnsureSuccessStatusCode();
+        var groups = await owner.GetFromJsonAsync<List<JsonElement>>($"/api/v1/Organizations/{slug}/groups");
+        groups.Should().NotContain(g => g.GetProperty("id").GetInt32() == groupId);
+    }
+
+    [Fact]
+    public async Task EffectivePermissionsOfOthers_AreAdminOnly()
+    {
+        var (owner, groupAdmin, slug, _, memberA, _) = await SetupAsync("grp-effective");
+
+        (await groupAdmin.GetAsync($"/api/v1/Organizations/{slug}/members/{memberA}/effective-permissions"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await owner.GetAsync($"/api/v1/Organizations/{slug}/members/{memberA}/effective-permissions")).EnsureSuccessStatusCode();
+        (await owner.GetAsync($"/api/v1/Organizations/{slug}/members/999999/effective-permissions"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task AddingNonMembersOrDuplicates_IsRejected()
+    {
+        var (owner, _, slug, groupId, _, memberB) = await SetupAsync("grp-reject");
+        var (_, outsider) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "grp-reject-outsider@test.com");
+
+        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/members", new { userId = outsider.User.Id }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/members", new { userId = memberB }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{slug}/groups/999999/members", new { userId = memberB }))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }
