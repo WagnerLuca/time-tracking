@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 
 	let { children } = $props();
 
-	const slug = $derived($page.params.slug ?? '');
-	const currentPath = $derived($page.url.pathname);
+	const slug = $derived(page.params.slug ?? '');
+	const currentPath = $derived(page.url.pathname);
 
 	// Hide tabs on nested routes like /members/[id]
 	const showTabs = $derived(

@@ -292,16 +292,6 @@
 		}
 	}
 
-	async function deleteEntry(id: number) {
-		if (!confirm('Delete this time entry?')) return;
-		try {
-			await timeTrackingApi.apiV1TimeTrackingIdDelete(id);
-			weekEntries = weekEntries.filter((e) => e.id !== id);
-		} catch (err) {
-			editor.actionError = extractErrorMessage(err, 'Failed to delete entry.');
-		}
-	}
-
 	function changeWeek(dir: number) {
 		weekOffset += dir;
 		loadWeek();
@@ -312,8 +302,8 @@
 	const editor = createEntryEditor({
 		getOrgDetail: () => orgDetail,
 		getOrgSlug: () => orgContext.selectedOrgSlug,
-		onSaved: () => loadWeek(),
-		onDeleted: async () => { weekEntries = weekEntries.filter(e => e.id !== editor.editingEntryId); },
+		onSaved: async () => { await Promise.all([loadWeek(), loadCumulativeOvertime()]); },
+		onDeleted: async () => { await Promise.all([loadWeek(), loadCumulativeOvertime()]); },
 		findEntry: (id) => weekEntries.find(e => e.id === id)
 	});
 </script>
@@ -530,7 +520,7 @@
 										{:else if canRequestEditEntries(orgDetail)}
 											<button class="btn btn-ghost btn-xs text-warning opacity-50 hover:opacity-100" title="Request edit" onclick={() => editor.startRequest(entry.id!, 'edit')}>&#128233;</button>
 										{/if}
-										<button class="btn btn-ghost btn-xs text-error opacity-40 hover:opacity-100" title="Delete" onclick={() => deleteEntry(entry.id!)}>
+										<button class="btn btn-ghost btn-xs text-error opacity-40 hover:opacity-100" title="Delete" onclick={() => editor.deleteEntry(entry.id!)}>
 											&times;
 										</button>
 									{/if}

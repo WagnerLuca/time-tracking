@@ -1,13 +1,13 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { organizationsApi } from '$lib/apiClient';
 	import type { MemberTimeOverviewResponse, OrganizationDetailResponse, TimeEntryResponse } from '$lib/api';
 	import { formatHoursDecimal, formatTime, formatDateShort, formatWeekLabel, formatDuration } from '$lib/utils/formatters';
 	import { getWeekRange } from '$lib/utils/dateHelpers';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 
-	let orgSlug = $state('');
+	const orgSlug = $derived(page.params.slug ?? '');
 	let orgName = $state('');
 	let members = $state<MemberTimeOverviewResponse[]>([]);
 	let loading = $state(true);
@@ -22,10 +22,13 @@
 	let memberEntries = $state<TimeEntryResponse[]>([]);
 	let entriesLoading = $state(false);
 
-	onMount(() => {
-		orgSlug = $page.params.slug ?? '';
-		loadOrg();
-		loadOverview();
+	// (Re)load whenever the slug in the URL changes, so switching orgs never shows stale data
+	$effect(() => {
+		if (!orgSlug) return;
+		untrack(() => {
+			loadOrg();
+			loadOverview();
+		});
 	});
 
 	async function loadOrg() {

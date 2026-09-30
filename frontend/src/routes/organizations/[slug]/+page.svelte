@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { organizationsApi, workScheduleApi, absenceDayApi, notificationsApi } from '$lib/apiClient';
 	import { absenceTypeLabel, absenceTypeBadge } from '$lib/utils/formatters';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
+	import { dateKey } from '$lib/utils/dateHelpers';
 	import {
 		ruleModeLabel
 	} from '$lib/utils/orgRules';
@@ -114,11 +115,14 @@
 	let showSettingsChangedBanner = $state(false);
 	let settingsNotificationIds: number[] = $state([]);
 
-	let orgSlug = $state('');
+	const orgSlug = $derived(page.params.slug ?? '');
 
-	onMount(() => {
-		orgSlug = $page.params.slug ?? '';
-		loadOrg();
+	// (Re)load whenever the slug in the URL changes, so switching orgs never shows stale data
+	$effect(() => {
+		if (!orgSlug) return;
+		untrack(() => {
+			loadOrg();
+		});
 	});
 
 	async function loadOrg() {
@@ -319,7 +323,7 @@
 		}
 	}
 
-	// â”€â”€ Holidays â”€â”€
+	// ── Holidays ──
 	function formatDateDisplay(dateStr?: string): string {
 		if (!dateStr) return '';
 		try {
@@ -328,7 +332,7 @@
 		} catch { return dateStr; }
 	}
 
-	// â”€â”€ Absences â”€â”€
+	// ── Absences ──
 	async function loadAbsences() {
 		if (absencesLoaded) return;
 		absencesLoading = true;
@@ -403,7 +407,7 @@
 	}
 
 	// Admin absence
-	// â”€â”€ Schedule Periods â”€â”€
+	// ── Schedule Periods ──
 	async function loadSchedulePeriods() {
 		if (schedulePeriodsLoaded) return;
 		schedulePeriodsLoading = true;
@@ -603,7 +607,7 @@
 							<div class="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] gap-2">
 								<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
 									<span class="text-xs text-base-content/60 font-medium">Weekly Hours</span>
-									<span class="text-lg font-bold text-base-content">{workSchedule.weeklyWorkHours ?? 'â€”'}h</span>
+									<span class="text-lg font-bold text-base-content">{workSchedule.weeklyWorkHours ?? '—'}h</span>
 								</div>
 								<div class="flex flex-col items-center bg-base-100 p-2 rounded-lg border border-base-300">
 									<span class="text-xs text-base-content/60 font-medium">Mon</span>
@@ -764,7 +768,7 @@
 											<input type="date" class="input input-bordered input-sm flex-1" bind:value={newAbsenceToDate} min={newAbsenceDate} disabled={addingAbsence} />
 										</div>
 										{#if newAbsenceDate && newAbsenceToDate && newAbsenceDate !== newAbsenceToDate}
-											<p class="text-xs text-base-content/60 my-1 italic">Absences will be created for workdays (Monâ€“Fri) only.</p>
+											<p class="text-xs text-base-content/60 my-1 italic">Absences will be created for workdays (Mon–Fri) only.</p>
 										{/if}
 										<div class="flex items-center gap-2">
 											<!-- svelte-ignore a11y_label_has_associated_control -->
@@ -875,7 +879,7 @@
 										<div class="flex items-center gap-3">
 											<label class="label cursor-pointer flex items-center gap-1.5 text-sm text-base-content/70">
 												<input type="checkbox" class="checkbox checkbox-sm checkbox-primary" bind:checked={newPeriodDistributeEvenly} disabled={addingPeriod} />
-												Distribute evenly (Monâ€“Fri)
+												Distribute evenly (Mon–Fri)
 											</label>
 										</div>
 										{#if !newPeriodDistributeEvenly}
@@ -900,7 +904,7 @@
 								{:else}
 									<div class="flex flex-col gap-1.5">
 										{#each schedulePeriods as p}
-											{@const today = new Date().toISOString().slice(0, 10)}
+											{@const today = dateKey(new Date())}
 											{@const isActive = p.validFrom && p.validFrom <= today && (!p.validTo || p.validTo >= today)}
 											<div class="flex items-center gap-3 py-2 px-3 rounded-md text-sm {isActive ? 'bg-success/5 border border-success' : 'bg-base-200/30'}">
 												<div class="flex items-center gap-1.5 font-medium text-base-content/70">
@@ -911,7 +915,7 @@
 												{#if isActive}
 													<span class="badge badge-success badge-xs font-semibold">Active</span>
 												{/if}
-												<span class="text-primary font-semibold ml-auto">{p.weeklyWorkHours ?? 'â€”'}h/week</span>
+												<span class="text-primary font-semibold ml-auto">{p.weeklyWorkHours ?? '—'}h/week</span>
 												{#if workSchedule.workScheduleChangeMode === 'Allowed'}
 													<button class="btn btn-ghost btn-xs text-error" title="Delete" onclick={() => deleteSchedulePeriod(p.id!)}>&times;</button>
 												{/if}

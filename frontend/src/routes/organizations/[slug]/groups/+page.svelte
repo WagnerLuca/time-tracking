@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { groupApi, organizationsApi } from '$lib/apiClient';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
@@ -15,7 +15,7 @@
 		OrganizationDetailResponse
 	} from '$lib/api';
 
-	let orgSlug = $state('');
+	const orgSlug = $derived(page.params.slug ?? '');
 	let loading = $state(true);
 	let error = $state('');
 
@@ -66,13 +66,12 @@
 		'#f59e0b', '#10b981', '#06b6d4', '#3b82f6'
 	];
 
+	// (Re)load whenever the slug in the URL changes, so switching orgs never shows stale data
 	$effect(() => {
-		orgSlug = $page.params.slug ?? '';
-	});
-
-	onMount(() => {
-		orgSlug = $page.params.slug ?? '';
-		loadGroups();
+		if (!orgSlug) return;
+		untrack(() => {
+			loadGroups();
+		});
 	});
 
 	async function loadGroups() {
@@ -348,6 +347,8 @@
 										class="w-6 h-6 rounded-full border-2 transition-transform"
 										style="background-color: {c}; border-color: {createColor === c ? 'var(--bc)' : 'transparent'}"
 										class:scale-110={createColor === c}
+										aria-label={`Colour ${c}`}
+										aria-pressed={createColor === c}
 										onclick={() => (createColor = c)}
 									></button>
 								{/each}
@@ -422,6 +423,8 @@
 																	class="w-6 h-6 rounded-full border-2 transition-transform"
 																	style="background-color: {c}; border-color: {editColor === c ? 'var(--bc)' : 'transparent'}"
 																	class:scale-110={editColor === c}
+										aria-label={`Colour ${c}`}
+										aria-pressed={editColor === c}
 																	onclick={() => (editColor = c)}
 																></button>
 															{/each}

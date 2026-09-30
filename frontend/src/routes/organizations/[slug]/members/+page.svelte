@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
 	import GroupTags from '$lib/components/GroupTags.svelte';
 	import { organizationsApi } from '$lib/apiClient';
@@ -38,11 +38,14 @@
 	let teamOverviewLoading = $state(false);
 	let teamOverviewLoaded = $state(false);
 
-	let orgSlug = $state('');
+	const orgSlug = $derived(page.params.slug ?? '');
 
-	onMount(() => {
-		orgSlug = $page.params.slug ?? '';
-		loadOrg();
+	// (Re)load whenever the slug in the URL changes, so switching orgs never shows stale data
+	$effect(() => {
+		if (!orgSlug) return;
+		untrack(() => {
+			loadOrg();
+		});
 	});
 
 	async function loadOrg() {

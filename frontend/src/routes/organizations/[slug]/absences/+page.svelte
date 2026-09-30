@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { organizationsApi, holidayApi, absenceDayApi, groupApi } from '$lib/apiClient';
 	import { absenceTypeLabel } from '$lib/utils/formatters';
@@ -50,11 +50,14 @@
 	let dayDialogDate = $state('');
 	let requestSentMessage = $state('');
 
-	let orgSlug = $state('');
+	const orgSlug = $derived(page.params.slug ?? '');
 
-	onMount(() => {
-		orgSlug = $page.params.slug ?? '';
-		loadOrg();
+	// (Re)load whenever the slug in the URL changes, so switching orgs never shows stale data
+	$effect(() => {
+		if (!orgSlug) return;
+		untrack(() => {
+			loadOrg();
+		});
 	});
 
 	async function loadOrg() {

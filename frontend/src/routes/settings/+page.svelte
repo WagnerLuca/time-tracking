@@ -5,6 +5,7 @@
 	import { authApi, workScheduleApi } from '$lib/apiClient';
 	import type { WorkScheduleResponse, UpdateProfileRequest, TwoFactorSetupResponse } from '$lib/api';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import { dateKey } from '$lib/utils/dateHelpers';
 	import { theme } from '$lib/stores/theme.svelte';
 
 	let changePasswordError = $state('');
@@ -727,7 +728,7 @@
 						{:else}
 							<div class="flex flex-col gap-2">
 								{#each schedulePeriods as period}
-									{@const today = new Date().toISOString().slice(0, 10)}
+									{@const today = dateKey(new Date())}
 									{@const isActive = period.validFrom && period.validFrom <= today && (!period.validTo || period.validTo >= today)}
 									<div class="flex items-center gap-3 py-2 px-3 rounded-lg border text-sm {isActive ? 'border-success/40 bg-success/5' : 'border-base-300 bg-base-200/30'}">
 										<div class="flex items-center gap-1.5 flex-1 min-w-0">

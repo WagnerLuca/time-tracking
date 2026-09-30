@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { organizationsApi, holidayApi } from '$lib/apiClient';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
@@ -34,7 +34,7 @@
 	let editHolidayRecurring = $state(false);
 	let editHolidayHalfDay = $state(false);
 
-	let orgSlug = $state('');
+	const orgSlug = $derived(page.params.slug ?? '');
 	let selectedYear = $state(new Date().getFullYear());
 
 	function getAvailableYears(): number[] {
@@ -57,9 +57,12 @@
 		});
 	}
 
-	onMount(() => {
-		orgSlug = $page.params.slug ?? '';
-		loadOrg();
+	// (Re)load whenever the slug in the URL changes, so switching orgs never shows stale data
+	$effect(() => {
+		if (!orgSlug) return;
+		untrack(() => {
+			loadOrg();
+		});
 	});
 
 	async function loadOrg() {

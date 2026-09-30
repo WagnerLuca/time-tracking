@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { organizationsApi, workScheduleApi, absenceDayApi, groupApi, reportsApi, apiKeysApi } from '$lib/apiClient';
@@ -19,8 +19,8 @@
 		EffectivePermissionsResponse
 	} from '$lib/api';
 
-	let orgSlug = $state('');
-	let memberId = $state(0);
+	const orgSlug = $derived(page.params.slug ?? '');
+	const memberId = $derived(parseInt(page.params.memberId ?? '0', 10));
 	let org = $state<OrganizationDetailResponse | null>(null);
 	let member = $state<OrganizationMemberResponse | null>(null);
 	let loading = $state(true);
@@ -148,11 +148,12 @@
 		yearlyReportDownloading = false;
 	}
 
-	onMount(() => {
-		orgSlug = $page.params.slug ?? '';
-		memberId = parseInt($page.params.memberId ?? '0', 10);
-		if (!auth.isAuthenticated) { goto('/login'); return; }
-		loadAll();
+	// (Re)load whenever the slug or member id in the URL changes, so switching orgs never shows stale data
+	$effect(() => {
+		if (!orgSlug || !memberId) return;
+		untrack(() => {
+			loadAll();
+		});
 	});
 
 	async function loadAll() {
@@ -535,7 +536,7 @@
 				{@const cumulativeOT = (allTimeOverview.netTrackedMinutes ?? 0) - expectedMinutes + initialOTMinutes}
 				<div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4">
 					<div class="bg-base-200/50 border rounded-lg p-3 text-center border-2 {cumulativeOT >= 0 ? 'border-success/40 bg-success/5' : 'border-error/40 bg-error/5'}">
-						<span class="block text-xl font-bold {cumulativeOT >= 0 ? 'text-success' : 'text-error'}">{cumulativeOT >= 0 ? '+' : ''}{formatHoursDecimal(Math.abs(cumulativeOT))}</span>
+						<span class="block text-xl font-bold {cumulativeOT >= 0 ? 'text-success' : 'text-error'}">{cumulativeOT > 0 ? '+' : ''}{formatHoursDecimal(cumulativeOT)}</span>
 						<span class="block text-xs text-base-content/40 mt-0.5 uppercase tracking-wide">Cumulative Overtime</span>
 					</div>
 					<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">

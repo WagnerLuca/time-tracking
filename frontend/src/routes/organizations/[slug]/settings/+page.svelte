@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { organizationsApi, pauseRulesApi, requestsApi, absenceDayApi, groupApi } from '$lib/apiClient';
 	import { formatRequestType, formatTimeAgo, statusBadgeClass, parseRequestData } from '$lib/utils/formatters';
@@ -60,11 +60,14 @@
 	let requestHistoryLoaded = $state(false);
 	let requestHistoryFilter = $state<string>('all');
 
-	let orgSlug = $state('');
+	const orgSlug = $derived(page.params.slug ?? '');
 
-	onMount(() => {
-		orgSlug = $page.params.slug ?? '';
-		loadOrg();
+	// (Re)load whenever the slug in the URL changes, so switching orgs never shows stale data
+	$effect(() => {
+		if (!orgSlug) return;
+		untrack(() => {
+			loadOrg();
+		});
 	});
 
 	async function loadOrg() {

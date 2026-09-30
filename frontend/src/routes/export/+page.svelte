@@ -10,6 +10,7 @@
 	} from '$lib/api';
 	import { RequestType } from '$lib/api';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import { dateKey } from '$lib/utils/dateHelpers';
 	import { csvImportEnabled, canImportCsv, isAllowed, isDisabled, isRequiresApproval } from '$lib/utils/orgRules';
 
 	// ── Tab state ──
@@ -109,14 +110,14 @@
 				const end = new Date(start);
 				end.setDate(start.getDate() + 6);
 				return {
-					from: start.toISOString().split('T')[0],
-					to: end.toISOString().split('T')[0]
+					from: dateKey(start),
+					to: dateKey(end)
 				};
 			}
 			case 'month':
 				return {
 					from: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`,
-					to: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+					to: dateKey(new Date(now.getFullYear(), now.getMonth() + 1, 0))
 				};
 			case 'year':
 				return {
@@ -175,7 +176,7 @@
 			a.href = url;
 			const targetSuffix = targetUserId !== null ? `-member${targetUserId}` : '';
 			const label = exportType === 'daily' ? `daily-report-${orgSlug}${targetSuffix}` : `time-entries${targetSuffix}`;
-			a.download = `${label}-${new Date().toISOString().split('T')[0]}.csv`;
+			a.download = `${label}-${dateKey(new Date())}.csv`;
 			a.click();
 			URL.revokeObjectURL(url);
 

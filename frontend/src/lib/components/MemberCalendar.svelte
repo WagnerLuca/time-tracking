@@ -62,7 +62,8 @@
 	let cumulativeBalance = $state(0); // overall cumulative balance in minutes
 	let monthlyCumulativeBalances = $state<Map<string, number>>(new Map()); // "YYYY-MM" -> cumulative balance
 	let selectedDayKey = $state<string | null>(null);
-	let orgDetail = $state<OrganizationDetailResponse | null>(orgDetailProp);
+	let fetchedOrgDetail = $state<OrganizationDetailResponse | null>(null);
+	const orgDetail = $derived(orgDetailProp ?? fetchedOrgDetail);
 
 	// Day-click add-absence popup
 	let absenceTypes = $state<AbsenceTypeDefinitionResponse[]>([]);
@@ -154,8 +155,8 @@
 		if (orgDetail) return;
 		try {
 			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
-			orgDetail = data;
-		} catch { orgDetail = null; }
+			fetchedOrgDetail = data;
+		} catch { fetchedOrgDetail = null; }
 	}
 
 	async function loadEntries() {

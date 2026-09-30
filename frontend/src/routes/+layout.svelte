@@ -2,7 +2,7 @@
 	import '../app.css';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto, afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
@@ -44,7 +44,7 @@
 	});
 
 	// 2FA enforcement: check if selected org requires 2FA but user hasn't set it up
-	let requires2faSetup = $derived(() => {
+	let requires2faSetup = $derived.by(() => {
 		if (!auth.isAuthenticated || !auth.user) return false;
 		if (auth.user.twoFactorEnabled) return false;
 		const selectedOrg = orgContext.selectedOrg;
@@ -157,7 +157,7 @@
 	}
 
 	function navLinkClass(path: string) {
-		const current = $page.url.pathname;
+		const current = page.url.pathname;
 		const active = current === path || current.startsWith(`${path}/`);
 		return `rounded-lg px-3 py-1.5 text-sm font-medium no-underline transition-colors ${active ? 'bg-base-200 text-base-content' : 'text-base-content/70 hover:bg-base-200/60 hover:text-base-content'}`;
 	}
@@ -392,7 +392,7 @@
 	{/if}
 
 	<main class="max-w-5xl mx-auto px-6 py-8">
-		{#if requires2faSetup() && !$page.url.pathname.startsWith('/settings')}
+		{#if requires2faSetup && !page.url.pathname.startsWith('/settings')}
 			<div class="flex items-center justify-center min-h-[60vh]">
 				<div class="card bg-base-100 border border-warning shadow-lg w-full max-w-md">
 					<div class="card-body text-center">
@@ -414,7 +414,7 @@
 						<strong>{failureCount === 1 ? '1 timer was' : `${failureCount} timers were`} not stopped</strong>
 						and ended automatically at the end of the business day. {failureCount === 1 ? 'It does' : 'They do'} not count toward your hours until you correct the end time.
 					</span>
-					{#if !$page.url.pathname.startsWith('/history')}
+					{#if !page.url.pathname.startsWith('/history')}
 						<a href="/history" class="btn btn-sm">Correct in History</a>
 					{/if}
 				</div>
