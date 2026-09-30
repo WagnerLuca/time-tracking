@@ -119,9 +119,6 @@ export interface AddMemberRequest {
 }
 
 
-/**
- * Request payload for an admin to create an absence day for any member.
- */
 export interface AdminCreateAbsenceDayRequest {
     'userId'?: number;
     'date'?: string;
@@ -160,6 +157,23 @@ export interface AuthResponse {
     'message': string | null;
 }
 /**
+ * A member\'s working-time balance, computed by the same day-by-day rules as the reports.  Days are the organization\'s local days; periods end today.
+ */
+export interface BalanceResponse {
+    /**
+     * Running overtime since the first tracked entry, including the initial overtime.
+     */
+    'cumulativeOvertimeHours'?: number;
+    'initialOvertimeHours'?: number;
+    'today': PeriodBalance;
+    'week': PeriodBalance;
+    'month': PeriodBalance;
+    /**
+     * Uncorrected failure entries (not counted in any figure above).
+     */
+    'failureEntryCount'?: number;
+}
+/**
  * Request payload for changing the current user\'s password.
  */
 export interface ChangePasswordRequest {
@@ -182,6 +196,20 @@ export interface CreateAbsenceDayRequest {
     /**
      * Optional org-defined custom absence type.
      */
+    'customTypeId'?: number | null;
+    'note'?: string | null;
+}
+
+
+/**
+ * Request payload for an admin to create an absence day for any member.
+ */
+export interface CreateAbsenceRangeRequest {
+    'userId'?: number | null;
+    'from'?: string;
+    'to'?: string;
+    'type'?: AbsenceType;
+    'isHalfDay'?: boolean;
     'customTypeId'?: number | null;
     'note'?: string | null;
 }
@@ -275,6 +303,12 @@ export interface CreatedApiKeyResponse {
     'lastUsedAt'?: string | null;
     'key': string | null;
 }
+/**
+ * Request payload for deleting (anonymizing) the current account.
+ */
+export interface DeleteAccountRequest {
+    'password': string;
+}
 export interface EffectivePermissionsResponse {
     'editPastEntriesMode'?: string | null;
     'editPauseMode'?: string | null;
@@ -320,6 +354,12 @@ export interface ExportRequest {
      * Columns to include in the export. If empty/null, all columns are included.
      */
     'columns'?: Array<string> | null;
+}
+/**
+ * Request a password reset link for an email address.
+ */
+export interface ForgotPasswordRequest {
+    'email': string;
 }
 export interface GroupDetailResponse {
     'id'?: number;
@@ -734,6 +774,16 @@ export interface PauseRuleResponse {
     'minHours'?: number;
     'pauseMinutes'?: number;
 }
+/**
+ * Worked vs. target hours for a period (holidays and absences already credited).
+ */
+export interface PeriodBalance {
+    'from'?: string;
+    'to'?: string;
+    'targetHours'?: number;
+    'workedHours'?: number;
+    'overtimeHours'?: number;
+}
 export interface ProblemDetails {
     [key: string]: any;
 
@@ -829,6 +879,13 @@ export const RequestType = {
 export type RequestType = typeof RequestType[keyof typeof RequestType];
 
 
+/**
+ * Set a new password using the token from a reset link.
+ */
+export interface ResetPasswordRequest {
+    'token': string;
+    'newPassword': string;
+}
 export interface RespondToOrgRequestRequest {
     /**
      * true = Accept, false = Decline
@@ -1109,9 +1166,13 @@ export interface UpdateProfileRequest {
      */
     'lastName'?: string | null;
     /**
-     * Updated email address.
+     * New email address. Not applied directly: a confirmation link is mailed to it and the  address changes once that link is used. Requires TimeTracking.Api.Models.Dtos.UpdateProfileRequest.CurrentPassword.
      */
     'email'?: string | null;
+    /**
+     * Current password; required when changing the email address.
+     */
+    'currentPassword'?: string | null;
 }
 /**
  * Request payload to update an existing time entry.
@@ -1167,6 +1228,10 @@ export interface UpsertAbsenceTypeDefinitionRequest {
  * Authenticated user profile information.
  */
 export interface UserInfo {
+    /**
+     * New email address waiting for confirmation (the link was mailed to it), if any.
+     */
+    'pendingEmail'?: string | null;
     'id': number;
     'email': string | null;
     'firstName': string | null;
@@ -1194,6 +1259,12 @@ export interface UserOrganizationResponse {
     'joinedAt'?: string;
     'memberCount'?: number;
     'require2fa'?: boolean;
+}
+/**
+ * Confirm an email address (registration or email change) with the token from the link.
+ */
+export interface VerifyEmailRequest {
+    'token': string;
 }
 /**
  * Controls who can see certain data within an organization.
@@ -1445,6 +1516,48 @@ export const AbsenceDayApiAxiosParamCreator = function (configuration?: Configur
         },
         /**
          * 
+         * @summary Create absences for a member for every weekday of a range, all or nothing (admin only).
+         * @param {string} slug Organization URL slug.
+         * @param {CreateAbsenceRangeRequest} [createAbsenceRangeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsencesAdminRangePost: async (slug: string, createAbsenceRangeRequest?: CreateAbsenceRangeRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAbsencesAdminRangePost', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/absences/admin/range`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createAbsenceRangeRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary List absences for the organization with optional filters (members only).
          * @param {string} slug Organization URL slug.
          * @param {number} [userId] Filter by user ID.
@@ -1594,6 +1707,48 @@ export const AbsenceDayApiAxiosParamCreator = function (configuration?: Configur
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @summary Create own absences for every weekday of a range, all or nothing (members only).
+         * @param {string} slug Organization URL slug.
+         * @param {CreateAbsenceRangeRequest} [createAbsenceRangeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsencesRangePost: async (slug: string, createAbsenceRangeRequest?: CreateAbsenceRangeRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAbsencesRangePost', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/absences/range`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createAbsenceRangeRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -1675,6 +1830,20 @@ export const AbsenceDayApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Create absences for a member for every weekday of a range, all or nothing (admin only).
+         * @param {string} slug Organization URL slug.
+         * @param {CreateAbsenceRangeRequest} [createAbsenceRangeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAbsencesAdminRangePost(slug: string, createAbsenceRangeRequest?: CreateAbsenceRangeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<AbsenceDayResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAbsencesAdminRangePost(slug, createAbsenceRangeRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiV1OrganizationsSlugAbsencesAdminRangePost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary List absences for the organization with optional filters (members only).
          * @param {string} slug Organization URL slug.
          * @param {number} [userId] Filter by user ID.
@@ -1717,6 +1886,20 @@ export const AbsenceDayApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAbsencesPost(slug, createAbsenceDayRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiV1OrganizationsSlugAbsencesPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Create own absences for every weekday of a range, all or nothing (members only).
+         * @param {string} slug Organization URL slug.
+         * @param {CreateAbsenceRangeRequest} [createAbsenceRangeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAbsencesRangePost(slug: string, createAbsenceRangeRequest?: CreateAbsenceRangeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<AbsenceDayResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAbsencesRangePost(slug, createAbsenceRangeRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiV1OrganizationsSlugAbsencesRangePost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
     }
@@ -1785,6 +1968,17 @@ export const AbsenceDayApiFactory = function (configuration?: Configuration, bas
         },
         /**
          * 
+         * @summary Create absences for a member for every weekday of a range, all or nothing (admin only).
+         * @param {string} slug Organization URL slug.
+         * @param {CreateAbsenceRangeRequest} [createAbsenceRangeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsencesAdminRangePost(slug: string, createAbsenceRangeRequest?: CreateAbsenceRangeRequest, options?: RawAxiosRequestConfig): AxiosPromise<Array<AbsenceDayResponse>> {
+            return localVarFp.apiV1OrganizationsSlugAbsencesAdminRangePost(slug, createAbsenceRangeRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary List absences for the organization with optional filters (members only).
          * @param {string} slug Organization URL slug.
          * @param {number} [userId] Filter by user ID.
@@ -1819,6 +2013,17 @@ export const AbsenceDayApiFactory = function (configuration?: Configuration, bas
          */
         apiV1OrganizationsSlugAbsencesPost(slug: string, createAbsenceDayRequest?: CreateAbsenceDayRequest, options?: RawAxiosRequestConfig): AxiosPromise<AbsenceDayResponse> {
             return localVarFp.apiV1OrganizationsSlugAbsencesPost(slug, createAbsenceDayRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Create own absences for every weekday of a range, all or nothing (members only).
+         * @param {string} slug Organization URL slug.
+         * @param {CreateAbsenceRangeRequest} [createAbsenceRangeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsencesRangePost(slug: string, createAbsenceRangeRequest?: CreateAbsenceRangeRequest, options?: RawAxiosRequestConfig): AxiosPromise<Array<AbsenceDayResponse>> {
+            return localVarFp.apiV1OrganizationsSlugAbsencesRangePost(slug, createAbsenceRangeRequest, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -1889,6 +2094,18 @@ export class AbsenceDayApi extends BaseAPI {
 
     /**
      * 
+     * @summary Create absences for a member for every weekday of a range, all or nothing (admin only).
+     * @param {string} slug Organization URL slug.
+     * @param {CreateAbsenceRangeRequest} [createAbsenceRangeRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAbsencesAdminRangePost(slug: string, createAbsenceRangeRequest?: CreateAbsenceRangeRequest, options?: RawAxiosRequestConfig) {
+        return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsencesAdminRangePost(slug, createAbsenceRangeRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
      * @summary List absences for the organization with optional filters (members only).
      * @param {string} slug Organization URL slug.
      * @param {number} [userId] Filter by user ID.
@@ -1925,6 +2142,18 @@ export class AbsenceDayApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugAbsencesPost(slug: string, createAbsenceDayRequest?: CreateAbsenceDayRequest, options?: RawAxiosRequestConfig) {
         return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsencesPost(slug, createAbsenceDayRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Create own absences for every weekday of a range, all or nothing (members only).
+     * @param {string} slug Organization URL slug.
+     * @param {CreateAbsenceRangeRequest} [createAbsenceRangeRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAbsencesRangePost(slug: string, createAbsenceRangeRequest?: CreateAbsenceRangeRequest, options?: RawAxiosRequestConfig) {
+        return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsencesRangePost(slug, createAbsenceRangeRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -2513,12 +2742,13 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
         },
         /**
          * 
-         * @summary Delete the authenticated user\'s account and all associated data
+         * @summary Delete the authenticated user\'s account (requires the password). Personal data is  anonymized; time entries stay with the organization as required for working-time records.
+         * @param {DeleteAccountRequest} [deleteAccountRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1AuthAccountDelete: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/api/v1/Auth/account`;
+        apiV1AuthAccountDeletePost: async (deleteAccountRequest?: DeleteAccountRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Auth/account/delete`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -2526,7 +2756,7 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
                 baseOptions = configuration.baseOptions;
             }
 
-            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
 
@@ -2536,9 +2766,12 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
 
 
     
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(deleteAccountRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -2577,6 +2810,44 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
             localVarRequestOptions.data = serializeDataIfNeeded(changePasswordRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Mail a password reset link. Always answers the same, whether or not the account exists.
+         * @param {ForgotPasswordRequest} [forgotPasswordRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1AuthForgotPasswordPost: async (forgotPasswordRequest?: ForgotPasswordRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Auth/forgot-password`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(forgotPasswordRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -2807,6 +3078,116 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @summary Set a new password with the token from a reset link; ends all sessions.
+         * @param {ResetPasswordRequest} [resetPasswordRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1AuthResetPasswordPost: async (resetPasswordRequest?: ResetPasswordRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Auth/reset-password`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(resetPasswordRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Confirm an email address (after registration or an email change) with the token from the mail.
+         * @param {VerifyEmailRequest} [verifyEmailRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1AuthVerifyEmailPost: async (verifyEmailRequest?: VerifyEmailRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Auth/verify-email`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(verifyEmailRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Send the email confirmation link again.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1AuthVerifyEmailResendPost: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Auth/verify-email/resend`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -2869,14 +3250,15 @@ export const AuthApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Delete the authenticated user\'s account and all associated data
+         * @summary Delete the authenticated user\'s account (requires the password). Personal data is  anonymized; time entries stay with the organization as required for working-time records.
+         * @param {DeleteAccountRequest} [deleteAccountRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1AuthAccountDelete(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AuthResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1AuthAccountDelete(options);
+        async apiV1AuthAccountDeletePost(deleteAccountRequest?: DeleteAccountRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AuthResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1AuthAccountDeletePost(deleteAccountRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1AuthAccountDelete']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1AuthAccountDeletePost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -2890,6 +3272,19 @@ export const AuthApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1AuthChangePasswordPost(changePasswordRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1AuthChangePasswordPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Mail a password reset link. Always answers the same, whether or not the account exists.
+         * @param {ForgotPasswordRequest} [forgotPasswordRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1AuthForgotPasswordPost(forgotPasswordRequest?: ForgotPasswordRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AuthResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1AuthForgotPasswordPost(forgotPasswordRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1AuthForgotPasswordPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -2969,6 +3364,44 @@ export const AuthApiFp = function(configuration?: Configuration) {
             const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1AuthRegisterPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * 
+         * @summary Set a new password with the token from a reset link; ends all sessions.
+         * @param {ResetPasswordRequest} [resetPasswordRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1AuthResetPasswordPost(resetPasswordRequest?: ResetPasswordRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AuthResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1AuthResetPasswordPost(resetPasswordRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1AuthResetPasswordPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Confirm an email address (after registration or an email change) with the token from the mail.
+         * @param {VerifyEmailRequest} [verifyEmailRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1AuthVerifyEmailPost(verifyEmailRequest?: VerifyEmailRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AuthResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1AuthVerifyEmailPost(verifyEmailRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1AuthVerifyEmailPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Send the email confirmation link again.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1AuthVerifyEmailResendPost(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AuthResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1AuthVerifyEmailResendPost(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1AuthVerifyEmailResendPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -3019,12 +3452,13 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
         },
         /**
          * 
-         * @summary Delete the authenticated user\'s account and all associated data
+         * @summary Delete the authenticated user\'s account (requires the password). Personal data is  anonymized; time entries stay with the organization as required for working-time records.
+         * @param {DeleteAccountRequest} [deleteAccountRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1AuthAccountDelete(options?: RawAxiosRequestConfig): AxiosPromise<AuthResponse> {
-            return localVarFp.apiV1AuthAccountDelete(options).then((request) => request(axios, basePath));
+        apiV1AuthAccountDeletePost(deleteAccountRequest?: DeleteAccountRequest, options?: RawAxiosRequestConfig): AxiosPromise<AuthResponse> {
+            return localVarFp.apiV1AuthAccountDeletePost(deleteAccountRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -3035,6 +3469,16 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
          */
         apiV1AuthChangePasswordPost(changePasswordRequest?: ChangePasswordRequest, options?: RawAxiosRequestConfig): AxiosPromise<AuthResponse> {
             return localVarFp.apiV1AuthChangePasswordPost(changePasswordRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Mail a password reset link. Always answers the same, whether or not the account exists.
+         * @param {ForgotPasswordRequest} [forgotPasswordRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1AuthForgotPasswordPost(forgotPasswordRequest?: ForgotPasswordRequest, options?: RawAxiosRequestConfig): AxiosPromise<AuthResponse> {
+            return localVarFp.apiV1AuthForgotPasswordPost(forgotPasswordRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -3095,6 +3539,35 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
         apiV1AuthRegisterPost(registerRequest?: RegisterRequest, options?: RawAxiosRequestConfig): AxiosPromise<LoginResponse> {
             return localVarFp.apiV1AuthRegisterPost(registerRequest, options).then((request) => request(axios, basePath));
         },
+        /**
+         * 
+         * @summary Set a new password with the token from a reset link; ends all sessions.
+         * @param {ResetPasswordRequest} [resetPasswordRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1AuthResetPasswordPost(resetPasswordRequest?: ResetPasswordRequest, options?: RawAxiosRequestConfig): AxiosPromise<AuthResponse> {
+            return localVarFp.apiV1AuthResetPasswordPost(resetPasswordRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Confirm an email address (after registration or an email change) with the token from the mail.
+         * @param {VerifyEmailRequest} [verifyEmailRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1AuthVerifyEmailPost(verifyEmailRequest?: VerifyEmailRequest, options?: RawAxiosRequestConfig): AxiosPromise<AuthResponse> {
+            return localVarFp.apiV1AuthVerifyEmailPost(verifyEmailRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Send the email confirmation link again.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1AuthVerifyEmailResendPost(options?: RawAxiosRequestConfig): AxiosPromise<AuthResponse> {
+            return localVarFp.apiV1AuthVerifyEmailResendPost(options).then((request) => request(axios, basePath));
+        },
     };
 };
 
@@ -3147,12 +3620,13 @@ export class AuthApi extends BaseAPI {
 
     /**
      * 
-     * @summary Delete the authenticated user\'s account and all associated data
+     * @summary Delete the authenticated user\'s account (requires the password). Personal data is  anonymized; time entries stay with the organization as required for working-time records.
+     * @param {DeleteAccountRequest} [deleteAccountRequest] 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public apiV1AuthAccountDelete(options?: RawAxiosRequestConfig) {
-        return AuthApiFp(this.configuration).apiV1AuthAccountDelete(options).then((request) => request(this.axios, this.basePath));
+    public apiV1AuthAccountDeletePost(deleteAccountRequest?: DeleteAccountRequest, options?: RawAxiosRequestConfig) {
+        return AuthApiFp(this.configuration).apiV1AuthAccountDeletePost(deleteAccountRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -3164,6 +3638,17 @@ export class AuthApi extends BaseAPI {
      */
     public apiV1AuthChangePasswordPost(changePasswordRequest?: ChangePasswordRequest, options?: RawAxiosRequestConfig) {
         return AuthApiFp(this.configuration).apiV1AuthChangePasswordPost(changePasswordRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Mail a password reset link. Always answers the same, whether or not the account exists.
+     * @param {ForgotPasswordRequest} [forgotPasswordRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1AuthForgotPasswordPost(forgotPasswordRequest?: ForgotPasswordRequest, options?: RawAxiosRequestConfig) {
+        return AuthApiFp(this.configuration).apiV1AuthForgotPasswordPost(forgotPasswordRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -3229,6 +3714,38 @@ export class AuthApi extends BaseAPI {
      */
     public apiV1AuthRegisterPost(registerRequest?: RegisterRequest, options?: RawAxiosRequestConfig) {
         return AuthApiFp(this.configuration).apiV1AuthRegisterPost(registerRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Set a new password with the token from a reset link; ends all sessions.
+     * @param {ResetPasswordRequest} [resetPasswordRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1AuthResetPasswordPost(resetPasswordRequest?: ResetPasswordRequest, options?: RawAxiosRequestConfig) {
+        return AuthApiFp(this.configuration).apiV1AuthResetPasswordPost(resetPasswordRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Confirm an email address (after registration or an email change) with the token from the mail.
+     * @param {VerifyEmailRequest} [verifyEmailRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1AuthVerifyEmailPost(verifyEmailRequest?: VerifyEmailRequest, options?: RawAxiosRequestConfig) {
+        return AuthApiFp(this.configuration).apiV1AuthVerifyEmailPost(verifyEmailRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Send the email confirmation link again.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1AuthVerifyEmailResendPost(options?: RawAxiosRequestConfig) {
+        return AuthApiFp(this.configuration).apiV1AuthVerifyEmailResendPost(options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -6874,8 +7391,50 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
          * @summary Downloads a day-by-day PDF report for one calendar month.  Allowed for the member themselves, org Admins/Owners, or a Group Admin with export capability.
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Target member user ID.
-         * @param {number} [year] Report year.
-         * @param {number} [month] Report month (1-12).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdBalanceGet: async (slug: string, memberId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdBalanceGet', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdBalanceGet', 'memberId', memberId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/balance`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Downloads a day-by-day PDF report for one calendar month.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} [year] 
+         * @param {number} [month] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
@@ -6982,8 +7541,22 @@ export const ReportsApiFp = function(configuration?: Configuration) {
          * @summary Downloads a day-by-day PDF report for one calendar month.  Allowed for the member themselves, org Admins/Owners, or a Group Admin with export capability.
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Target member user ID.
-         * @param {number} [year] Report year.
-         * @param {number} [month] Report month (1-12).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdBalanceGet(slug: string, memberId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BalanceResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdBalanceGet(slug, memberId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ReportsApi.apiV1OrganizationsSlugMembersMemberIdBalanceGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Downloads a day-by-day PDF report for one calendar month.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} [year] 
+         * @param {number} [month] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
@@ -7022,8 +7595,19 @@ export const ReportsApiFactory = function (configuration?: Configuration, basePa
          * @summary Downloads a day-by-day PDF report for one calendar month.  Allowed for the member themselves, org Admins/Owners, or a Group Admin with export capability.
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Target member user ID.
-         * @param {number} [year] Report year.
-         * @param {number} [month] Report month (1-12).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdBalanceGet(slug: string, memberId: number, options?: RawAxiosRequestConfig): AxiosPromise<BalanceResponse> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdBalanceGet(slug, memberId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Downloads a day-by-day PDF report for one calendar month.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} [year] 
+         * @param {number} [month] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
@@ -7054,8 +7638,20 @@ export class ReportsApi extends BaseAPI {
      * @summary Downloads a day-by-day PDF report for one calendar month.  Allowed for the member themselves, org Admins/Owners, or a Group Admin with export capability.
      * @param {string} slug Organization URL slug.
      * @param {number} memberId Target member user ID.
-     * @param {number} [year] Report year.
-     * @param {number} [month] Report month (1-12).
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdBalanceGet(slug: string, memberId: number, options?: RawAxiosRequestConfig) {
+        return ReportsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdBalanceGet(slug, memberId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Downloads a day-by-day PDF report for one calendar month.
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {number} [year] 
+     * @param {number} [month] 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */

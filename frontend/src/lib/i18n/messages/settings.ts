@@ -19,7 +19,12 @@ export const de = {
 		emailInvalid: 'Bitte eine gültige E-Mail-Adresse eingeben.',
 		save: 'Profil speichern',
 		saved: 'Profil gespeichert.',
-		saveFailed: 'Das Profil konnte nicht gespeichert werden.'
+		saveFailed: 'Das Profil konnte nicht gespeichert werden.',
+		currentPassword: 'Aktuelles Passwort',
+		currentPasswordHint: 'Zum Ändern der E-Mail-Adresse erforderlich.',
+		currentPasswordRequired: 'Bitte dein aktuelles Passwort eingeben.',
+		emailChangeSent: 'Bestätigung an {email} gesendet. Die Adresse wird geändert, sobald du den Link darin öffnest.',
+		pendingEmail: 'Ausstehende Änderung auf {email} – noch nicht bestätigt.'
 	},
 	password: {
 		title: 'Passwort ändern',
@@ -66,7 +71,11 @@ export const de = {
 		signOut: 'Abmelden',
 		delete: 'Konto löschen',
 		deleteTitle: 'Konto löschen?',
-		deleteMessage: 'Dein Konto und alle deine Daten werden dauerhaft entfernt. Das lässt sich nicht rückgängig machen.',
+		deleteMessage: 'Deine persönlichen Daten (Name, E-Mail-Adresse, Anmeldedaten) werden entfernt und das Konto anonymisiert. Deine Zeiteinträge und Abwesenheiten bleiben bei den Organisationen erhalten. Das lässt sich nicht rückgängig machen.',
+		deletePassword: 'Passwort zur Bestätigung',
+		deletePasswordRequired: 'Bitte dein Passwort eingeben.',
+		deleteConfirm: 'Konto endgültig löschen',
+		deleted: 'Dein Konto wurde gelöscht.',
 		deleteFailed: 'Das Konto konnte nicht gelöscht werden.'
 	},
 	org: {
@@ -112,7 +121,12 @@ export const en: typeof de = {
 		emailInvalid: 'Enter a valid email address.',
 		save: 'Save profile',
 		saved: 'Profile saved.',
-		saveFailed: 'Could not save the profile.'
+		saveFailed: 'Could not save the profile.',
+		currentPassword: 'Current password',
+		currentPasswordHint: 'Required to change your email address.',
+		currentPasswordRequired: 'Enter your current password.',
+		emailChangeSent: 'Confirmation sent to {email}. The address changes once you open the link in it.',
+		pendingEmail: 'Pending change to {email} – not confirmed yet.'
 	},
 	password: {
 		title: 'Change password',
@@ -159,7 +173,11 @@ export const en: typeof de = {
 		signOut: 'Sign out',
 		delete: 'Delete account',
 		deleteTitle: 'Delete account?',
-		deleteMessage: 'Your account and all your data are removed permanently. This cannot be undone.',
+		deleteMessage: 'Your personal data (name, email address, sign-in data) is removed and the account is anonymized. Your time entries and absences stay with the organizations. This cannot be undone.',
+		deletePassword: 'Password to confirm',
+		deletePasswordRequired: 'Enter your password.',
+		deleteConfirm: 'Delete account permanently',
+		deleted: 'Your account has been deleted.',
 		deleteFailed: 'Could not delete the account.'
 	},
 	org: {

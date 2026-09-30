@@ -18,8 +18,10 @@ docs/ApiKeyResponse.md
 docs/ApiKeysApi.md
 docs/AuthApi.md
 docs/AuthResponse.md
+docs/BalanceResponse.md
 docs/ChangePasswordRequest.md
 docs/CreateAbsenceDayRequest.md
+docs/CreateAbsenceRangeRequest.md
 docs/CreateApiKeyRequest.md
 docs/CreateGroupRequest.md
 docs/CreateHolidayRequest.md
@@ -28,9 +30,11 @@ docs/CreateOrganizationRequest.md
 docs/CreatePauseRuleRequest.md
 docs/CreateWorkScheduleRequest.md
 docs/CreatedApiKeyResponse.md
+docs/DeleteAccountRequest.md
 docs/EffectivePermissionsResponse.md
 docs/ExportImportApi.md
 docs/ExportRequest.md
+docs/ForgotPasswordRequest.md
 docs/GroupApi.md
 docs/GroupDetailResponse.md
 docs/GroupMemberResponse.md
@@ -64,6 +68,7 @@ docs/OrganizationSettingsResponse.md
 docs/OrganizationsApi.md
 docs/PauseRuleResponse.md
 docs/PauseRulesApi.md
+docs/PeriodBalance.md
 docs/ProblemDetails.md
 docs/PunchRequest.md
 docs/PunchResponse.md
@@ -74,6 +79,7 @@ docs/ReportsApi.md
 docs/RequestStatus.md
 docs/RequestType.md
 docs/RequestsApi.md
+docs/ResetPasswordRequest.md
 docs/RespondToOrgRequestRequest.md
 docs/RuleMode.md
 docs/SetBadgeRequest.md
@@ -105,6 +111,7 @@ docs/UpsertAbsenceTypeDefinitionRequest.md
 docs/UserInfo.md
 docs/UserNotificationResponse.md
 docs/UserOrganizationResponse.md
+docs/VerifyEmailRequest.md
 docs/VisibilityMode.md
 docs/WorkScheduleApi.md
 docs/WorkScheduleResponse.md

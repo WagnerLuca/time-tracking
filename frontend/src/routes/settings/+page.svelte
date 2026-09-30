@@ -10,10 +10,10 @@
 	import { theme } from '$lib/stores/theme.svelte';
 	import { locale, type Locale } from '$lib/stores/locale.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { t } from '$lib/i18n';
 	import SchedulePeriodEditor from '$lib/components/SchedulePeriodEditor.svelte';
 	import InitialOvertimeEditor from '$lib/components/InitialOvertimeEditor.svelte';
+	import Modal from '$lib/components/Modal.svelte';
 
 	/** The backend's minimum (RegisterRequest / ChangePasswordRequest). */
 	const MIN_PASSWORD_LENGTH = 8;
@@ -33,6 +33,11 @@
 	let emailError = $derived(
 		!profileSubmitted ? '' : !profileEmail.trim() ? t('settings.profile.emailRequired') : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail.trim()) ? t('settings.profile.emailInvalid') : ''
 	);
+
+	/** Changing the email needs the current password; the new address only applies once confirmed. */
+	let emailChanged = $derived(profileEmail.trim().toLowerCase() !== (auth.user?.email ?? '').toLowerCase());
+	let profileCurrentPassword = $state('');
+	let profileCurrentPasswordError = $derived(profileSubmitted && emailChanged && !profileCurrentPassword ? t('settings.profile.currentPasswordRequired') : '');
 
 	// Password
 	let currentPassword = $state('');
@@ -63,6 +68,10 @@
 	let twoFactorSaving = $state(false);
 	let twoFactorDisablePassword = $state('');
 
+	// Account deletion (password-confirmed)
+	let deleteOpen = $state(false);
+	let deletePassword = $state('');
+	let deleteError = $state('');
 	let deleteAccountSaving = $state(false);
 
 	// Schedule of the selected org (for the rule modes; periods load inside the editor)
@@ -109,23 +118,25 @@
 	async function handleSaveProfile(e: Event) {
 		e.preventDefault();
 		profileSubmitted = true;
-		if (firstNameError || lastNameError || emailError) return;
+		if (firstNameError || lastNameError || emailError || profileCurrentPasswordError) return;
 		profileError = '';
 		profileSaving = true;
 		try {
-			// TODO(backend): changing the email should require the current password once the endpoint supports it.
+			const changingEmail = emailChanged;
 			const payload: UpdateProfileRequest = {
 				firstName: profileFirstName.trim(),
 				lastName: profileLastName.trim(),
-				email: profileEmail.trim()
+				...(changingEmail ? { email: profileEmail.trim(), currentPassword: profileCurrentPassword } : {})
 			};
 			const { data: updatedUser } = await authApi.apiV1AuthProfilePut(payload);
 			profileFirstName = updatedUser.firstName ?? '';
 			profileLastName = updatedUser.lastName ?? '';
-			profileEmail = updatedUser.email ?? '';
+			profileEmail = updatedUser.email ?? ''; // still the old address until the link is used
+			profileCurrentPassword = '';
 			await auth.fetchCurrentUser();
 			profileSubmitted = false;
-			toast.success(t('settings.profile.saved'));
+			if (changingEmail && updatedUser.pendingEmail) toast.success(t('settings.profile.emailChangeSent', { email: updatedUser.pendingEmail }));
+			else toast.success(t('settings.profile.saved'));
 		} catch (err) {
 			profileError = extractErrorMessage(err, t('settings.profile.saveFailed'));
 		} finally {
@@ -228,22 +239,30 @@
 		goto('/login');
 	}
 
-	async function handleDeleteAccount() {
-		// TODO(backend): account deletion should require the current password (and anonymize the account) — add a password field here once the endpoint accepts it.
-		const ok = await confirmDialog({
-			title: t('settings.account.deleteTitle'),
-			message: t('settings.account.deleteMessage'),
-			confirmLabel: t('settings.account.delete'),
-			danger: true
-		});
-		if (!ok) return;
+	function openDeleteAccount() {
+		deletePassword = '';
+		deleteError = '';
+		deleteOpen = true;
+	}
+
+	async function handleDeleteAccount(e: Event) {
+		e.preventDefault();
+		if (!deletePassword) {
+			deleteError = t('settings.account.deletePasswordRequired');
+			return;
+		}
+		deleteError = '';
 		deleteAccountSaving = true;
 		try {
-			await authApi.apiV1AuthAccountDelete();
+			await authApi.apiV1AuthAccountDeletePost({ password: deletePassword });
+			deleteOpen = false;
 			await auth.logout();
-			goto('/register');
+			toast.success(t('settings.account.deleted'));
+			goto('/login');
 		} catch (err) {
-			toast.error(err, t('settings.account.deleteFailed'));
+			// e.g. 400 "You own …": the backend lists the organizations to hand over first
+			deleteError = extractErrorMessage(err, t('settings.account.deleteFailed'));
+		} finally {
 			deleteAccountSaving = false;
 		}
 	}
@@ -295,7 +314,15 @@
 					<label for="profileEmail" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.profile.email')}</label>
 					<input id="profileEmail" type="email" autocomplete="email" bind:value={profileEmail} class="input input-bordered w-full max-w-md" class:input-error={emailError} aria-invalid={!!emailError} disabled={profileSaving} />
 					{#if emailError}<p class="text-error text-xs mt-1">{emailError}</p>{/if}
+					{#if auth.user?.pendingEmail}<p class="text-xs text-base-content/60 mt-1">{t('settings.profile.pendingEmail', { email: auth.user.pendingEmail })}</p>{/if}
 				</div>
+				{#if emailChanged}
+					<div>
+						<label for="profileCurrentPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.profile.currentPassword')}</label>
+						<input id="profileCurrentPw" type="password" autocomplete="current-password" bind:value={profileCurrentPassword} class="input input-bordered w-full max-w-xs" class:input-error={profileCurrentPasswordError} aria-invalid={!!profileCurrentPasswordError} aria-describedby="profileCurrentPwHint" disabled={profileSaving} />
+						<p id="profileCurrentPwHint" class="text-xs mt-1 {profileCurrentPasswordError ? 'text-error' : 'text-base-content/50'}">{profileCurrentPasswordError || t('settings.profile.currentPasswordHint')}</p>
+					</div>
+				{/if}
 				<div>
 					<button type="submit" class="btn btn-primary btn-sm" disabled={profileSaving}>
 						{profileSaving ? t('common.saving') : t('settings.profile.save')}
@@ -333,7 +360,7 @@
 			</form>
 		</section>
 
-		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
+		<section id="two-factor" class="card bg-base-100 border border-base-300 shadow-sm mb-5 scroll-mt-20">
 			<div class="card-body">
 				<h2 class="card-title text-base">{t('settings.twoFactor.title')}</h2>
 
@@ -437,12 +464,25 @@
 				<p class="text-sm text-base-content/60 m-0">{t('settings.account.intro')}</p>
 				<div class="flex flex-wrap gap-3">
 					<button type="button" class="btn btn-outline btn-sm" onclick={handleLogout}>{t('settings.account.signOut')}</button>
-					<button type="button" class="btn btn-error btn-sm" onclick={handleDeleteAccount} disabled={deleteAccountSaving}>
-						{deleteAccountSaving ? t('common.deleting') : t('settings.account.delete')}
-					</button>
+					<button type="button" class="btn btn-error btn-sm" onclick={openDeleteAccount}>{t('settings.account.delete')}</button>
 				</div>
 			</div>
 		</section>
+
+		<Modal open={deleteOpen} title={t('settings.account.deleteTitle')} onclose={() => (deleteOpen = false)}>
+			<form id="deleteAccountForm" onsubmit={handleDeleteAccount} novalidate>
+				<p class="text-sm text-base-content/70 mb-4">{t('settings.account.deleteMessage')}</p>
+				{#if deleteError}<div class="alert alert-error text-sm mb-3" role="alert">{deleteError}</div>{/if}
+				<label for="deleteAccountPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.account.deletePassword')}</label>
+				<input id="deleteAccountPw" type="password" autocomplete="current-password" bind:value={deletePassword} class="input input-bordered w-full" disabled={deleteAccountSaving} />
+			</form>
+			{#snippet actions()}
+				<button type="button" class="btn btn-ghost" onclick={() => (deleteOpen = false)} disabled={deleteAccountSaving}>{t('common.cancel')}</button>
+				<button type="submit" form="deleteAccountForm" class="btn btn-error" disabled={deleteAccountSaving || !deletePassword}>
+					{deleteAccountSaving ? t('common.deleting') : t('settings.account.deleteConfirm')}
+				</button>
+			{/snippet}
+		</Modal>
 	{:else if activeTab === 'organization'}
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
