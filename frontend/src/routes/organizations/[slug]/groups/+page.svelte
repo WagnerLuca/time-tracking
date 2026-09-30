@@ -6,6 +6,7 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import { t } from '$lib/i18n';
 	import { getInitials } from '$lib/utils/formatters';
 	import { DEFAULT_GROUP_COLOR, GROUP_COLOR_PRESETS, safeColor } from '$lib/utils/colors';
 	import ModeSelector from '$lib/components/ModeSelector.svelte';
@@ -79,7 +80,7 @@
 			const { data } = await groupApi.apiV1OrganizationsSlugGroupsGet(orgSlug);
 			groups = data;
 		} catch (err) {
-			error = extractErrorMessage(err, 'Failed to load groups.');
+			error = extractErrorMessage(err, t('groups.loadFailed'));
 		} finally {
 			loading = false;
 		}
@@ -106,7 +107,7 @@
 			selectedGroup = data;
 			if (isAdmin) loadPermissions(groupId);
 		} catch (err) {
-			toast.error(err, 'Failed to load group details.');
+			toast.error(err, t('groups.loadDetailFailed'));
 		} finally {
 			selectedGroupLoading = false;
 		}
@@ -130,7 +131,7 @@
 				description: createDescription.trim() || undefined,
 				color: createColor
 			});
-			toast.success('Group created.');
+			toast.success(t('groups.created'));
 			showCreateForm = false;
 			createName = '';
 			createDescription = '';
@@ -138,7 +139,7 @@
 			createSubmitted = false;
 			await loadGroups();
 		} catch (err) {
-			createError = extractErrorMessage(err, 'Failed to create group.');
+			createError = extractErrorMessage(err, t('groups.createFailed'));
 		} finally {
 			creating = false;
 		}
@@ -167,12 +168,12 @@
 				description: editDescription.trim() || undefined,
 				color: editColor
 			});
-			toast.success('Group saved.');
+			toast.success(t('groups.saved'));
 			editingGroup = false;
 			await loadGroups();
 			await refreshGroup(selectedGroup.id);
 		} catch (err) {
-			editError = extractErrorMessage(err, 'Failed to update group.');
+			editError = extractErrorMessage(err, t('groups.saveFailed'));
 		} finally {
 			editSaving = false;
 		}
@@ -181,19 +182,19 @@
 	async function deleteGroup() {
 		if (!selectedGroup?.id) return;
 		const ok = await confirmDialog({
-			title: `Delete group "${selectedGroup.name}"?`,
-			message: 'This cannot be undone.',
-			confirmLabel: 'Delete',
+			title: t('groups.deleteTitle', { name: selectedGroup.name ?? '' }),
+			message: t('groups.deleteMessage'),
+			confirmLabel: t('common.delete'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			await groupApi.apiV1OrganizationsSlugGroupsGroupIdDelete(orgSlug, selectedGroup.id);
-			toast.success('Group deleted.');
+			toast.success(t('groups.deleted'));
 			selectedGroup = null;
 			await loadGroups();
 		} catch (err) {
-			toast.error(err, 'Failed to delete group.');
+			toast.error(err, t('groups.deleteFailed'));
 		}
 	}
 
@@ -209,7 +210,7 @@
 			}));
 		} catch (err) {
 			orgMembers = [];
-			addMemberError = extractErrorMessage(err, 'Failed to load organization members.');
+			addMemberError = extractErrorMessage(err, t('groups.members.loadOrgMembersFailed'));
 		}
 	}
 
@@ -234,13 +235,13 @@
 			await groupApi.apiV1OrganizationsSlugGroupsGroupIdMembersPost(orgSlug, selectedGroup.id, {
 				userId: addMemberUserId
 			});
-			toast.success('Member added.');
+			toast.success(t('groups.members.added'));
 			showAddMember = false;
 			addMemberUserId = null;
 			await refreshGroup(selectedGroup.id);
 			await loadGroups();
 		} catch (err) {
-			addMemberError = extractErrorMessage(err, 'Failed to add member.');
+			addMemberError = extractErrorMessage(err, t('groups.members.addFailed'));
 		} finally {
 			addingMember = false;
 		}
@@ -250,18 +251,18 @@
 		if (!selectedGroup?.id) return;
 		const member = selectedGroup.members?.find((m) => m.userId === userId);
 		const ok = await confirmDialog({
-			title: `Remove ${member?.firstName} ${member?.lastName} from this group?`,
-			confirmLabel: 'Remove',
+			title: t('groups.members.removeTitle', { name: `${member?.firstName ?? ''} ${member?.lastName ?? ''}`.trim() }),
+			confirmLabel: t('common.remove'),
 			danger: true
 		});
 		if (!ok) return;
 		try {
 			await groupApi.apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete(orgSlug, selectedGroup.id, userId);
-			toast.success('Member removed.');
+			toast.success(t('groups.members.removed'));
 			await refreshGroup(selectedGroup.id);
 			await loadGroups();
 		} catch (err) {
-			toast.error(err, 'Failed to remove member.');
+			toast.error(err, t('groups.members.removeFailed'));
 		}
 	}
 
@@ -272,37 +273,26 @@
 			await groupApi.apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdPatch(orgSlug, selectedGroup.id, member.userId, {
 				role: newRole
 			});
-			toast.success(newRole === 'Admin' ? 'Promoted to group admin.' : 'Demoted to member.');
+			toast.success(newRole === 'Admin' ? t('groups.members.promoted') : t('groups.members.demoted'));
 			await refreshGroup(selectedGroup.id);
 		} catch (err) {
-			toast.error(err, 'Failed to update role.');
+			toast.error(err, t('groups.members.roleFailed'));
 		}
 	}
 
-	// Permission settings definitions
-	const permRuleSettings = [
-		{ key: 'editPastEntriesMode', label: 'Edit Past Entries', description: 'Can group members edit their own past time entries?' },
-		{ key: 'editPauseMode', label: 'Edit Pause', description: 'Can group members edit pause durations?' },
-		{ key: 'csvImportMode', label: 'CSV Import', description: 'Can group members import time entries via CSV?' },
-		{ key: 'workScheduleChangeMode', label: 'Work Schedule Changes', description: 'Can members change their own work schedule?' },
-		{ key: 'initialOvertimeMode', label: 'Initial Overtime', description: 'Can members set their initial overtime balance?' },
-		{ key: 'absenceSelfServiceMode', label: 'Absences & Vacation', description: 'Can group members add their own absences directly, or must they request approval?' },
-	];
+	// Permission settings definitions (labels follow the UI language)
+	const PERM_RULE_KEYS = ['editPastEntriesMode', 'editPauseMode', 'csvImportMode', 'workScheduleChangeMode', 'initialOvertimeMode', 'absenceSelfServiceMode'] as const;
+	const PERM_VISIBILITY_KEYS = ['vacationVisibility', 'sickDayVisibility', 'timeEntryVisibility'] as const;
+	const PERM_ADMIN_FLAG_KEYS = ['groupAdminCanApproveAbsences', 'groupAdminCanApproveTimeEdits', 'groupAdminCanApproveScheduleChanges', 'groupAdminCanManageMembers', 'groupAdminCanViewAllTimeEntries', 'groupAdminCanExportData'] as const;
+	type PermKey = (typeof PERM_RULE_KEYS)[number] | (typeof PERM_VISIBILITY_KEYS)[number] | (typeof PERM_ADMIN_FLAG_KEYS)[number];
 
-	const permVisibilitySettings = [
-		{ key: 'vacationVisibility', label: 'Vacation Visibility', description: 'Who can see vacation absences?' },
-		{ key: 'sickDayVisibility', label: 'Sick Day Visibility', description: 'Who can see sick day absences?' },
-		{ key: 'timeEntryVisibility', label: 'Time Entry Visibility', description: 'Who can see time entries of group members?' },
-	];
+	function permSetting(key: PermKey) {
+		return { key, label: t(`groups.perm.${key}.label`), description: t(`groups.perm.${key}.description`) };
+	}
 
-	const permAdminFlags = [
-		{ key: 'groupAdminCanApproveAbsences', label: 'Approve Absences', description: 'Group Admins can approve/reject absence requests' },
-		{ key: 'groupAdminCanApproveTimeEdits', label: 'Approve Time Edits', description: 'Group Admins can approve time entry edit requests' },
-		{ key: 'groupAdminCanApproveScheduleChanges', label: 'Approve Schedule Changes', description: 'Group Admins can approve schedule change requests' },
-		{ key: 'groupAdminCanManageMembers', label: 'Manage Members', description: 'Group Admins can add/remove members from their group' },
-		{ key: 'groupAdminCanViewAllTimeEntries', label: 'View All Time Entries', description: 'Group Admins can see all time entries of group members' },
-		{ key: 'groupAdminCanExportData', label: 'Export Data', description: 'Group Admins can export data for their group' },
-	];
+	let permRuleSettings = $derived(PERM_RULE_KEYS.map(permSetting));
+	let permVisibilitySettings = $derived(PERM_VISIBILITY_KEYS.map(permSetting));
+	let permAdminFlags = $derived(PERM_ADMIN_FLAG_KEYS.map(permSetting));
 
 	async function loadPermissions(groupId: number) {
 		permissionsLoadError = '';
@@ -311,7 +301,7 @@
 			permissions = data;
 		} catch (err) {
 			permissions = null;
-			permissionsLoadError = extractErrorMessage(err, 'Failed to load permissions.');
+			permissionsLoadError = extractErrorMessage(err, t('groups.perm.loadFailed'));
 		}
 	}
 
@@ -323,10 +313,10 @@
 			// "Inherit" (null) is transmitted as -1; the backend clears the override
 			const payload = value === null ? -1 : value;
 			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, selectedGroup.id, { [key]: payload } as any);
-			toast.success('Permission saved.');
+			toast.success(t('groups.perm.saved'));
 			await loadPermissions(selectedGroup.id);
 		} catch (err) {
-			permissionsError = extractErrorMessage(err, 'Failed to update permission.');
+			permissionsError = extractErrorMessage(err, t('groups.perm.saveFailed'));
 		} finally {
 			permissionsSaving = false;
 		}
@@ -335,7 +325,7 @@
 </script>
 
 <svelte:head>
-	<title>Groups - {orgContext.selectedOrg?.name ?? 'Organization'} - Time Tracking</title>
+	<title>{t('common.pageTitle', { page: orgContext.selectedOrg?.name ? `${t('groups.title')} – ${orgContext.selectedOrg.name}` : t('groups.title') })}</title>
 </svelte:head>
 
 {#snippet colorPicker(value: string, onpick: (c: string) => void, id: string, disabled: boolean)}
@@ -345,20 +335,20 @@
 				type="button"
 				class="w-6 h-6 rounded-full border-2 transition-transform {value.toLowerCase() === c.toLowerCase() ? 'border-base-content scale-110' : 'border-transparent'}"
 				style="background-color: {c}"
-				aria-label={`Colour ${c}`}
+				aria-label={t('groups.colorSwatch', { color: c })}
 				aria-pressed={value.toLowerCase() === c.toLowerCase()}
 				{disabled}
 				onclick={() => onpick(c)}
 			></button>
 		{/each}
-		<input {id} type="color" class="w-6 h-6 rounded cursor-pointer border-0 p-0" aria-label="Custom colour" {value} {disabled} oninput={(e) => onpick(e.currentTarget.value)} />
+		<input {id} type="color" class="w-6 h-6 rounded cursor-pointer border-0 p-0" aria-label={t('groups.customColor')} {value} {disabled} oninput={(e) => onpick(e.currentTarget.value)} />
 	</div>
 {/snippet}
 
 <div class="max-w-5xl mx-auto sm:px-6 pb-6">
 	{#if loading}
 		<div class="flex items-center gap-3 justify-center py-12 text-base-content/40">
-			<span class="loading loading-spinner loading-sm"></span><span>Loading…</span>
+			<span class="loading loading-spinner loading-sm"></span><span>{t('common.loading')}</span>
 		</div>
 	{:else if error && groups.length === 0}
 		<div class="alert alert-error">{error}</div>
@@ -366,10 +356,10 @@
 		<div class="pt-4">
 			<!-- Header -->
 			<div class="flex items-center justify-between gap-2 mb-4 flex-wrap">
-				<h2 class="text-xl font-bold text-base-content m-0">Groups</h2>
+				<h2 class="text-xl font-bold text-base-content m-0">{t('groups.title')}</h2>
 				{#if isAdmin}
 					<button class="btn btn-primary btn-sm" onclick={toggleCreateForm} aria-expanded={showCreateForm}>
-						{showCreateForm ? 'Cancel' : '+ Create Group'}
+						{showCreateForm ? t('common.cancel') : t('groups.create')}
 					</button>
 				{/if}
 			</div>
@@ -386,27 +376,27 @@
 					{/if}
 					<form onsubmit={createGroup} class="flex gap-3 items-end flex-wrap" novalidate>
 						<div class="form-control w-full sm:w-auto">
-							<label for="groupName" class="label text-xs">Name</label>
-							<input id="groupName" type="text" class="input input-bordered input-sm w-full" class:input-error={createSubmitted && !createName.trim()} bind:value={createName} required disabled={creating} placeholder="e.g. Backend Team" />
-							{#if createSubmitted && !createName.trim()}<span class="text-xs text-error mt-1">Required</span>{/if}
+							<label for="groupName" class="label text-xs">{t('groups.name')}</label>
+							<input id="groupName" type="text" class="input input-bordered input-sm w-full" class:input-error={createSubmitted && !createName.trim()} bind:value={createName} required disabled={creating} placeholder={t('groups.namePlaceholder')} />
+							{#if createSubmitted && !createName.trim()}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 						</div>
 						<div class="form-control w-full sm:w-auto">
-							<label for="groupDesc" class="label text-xs">Description</label>
-							<input id="groupDesc" type="text" class="input input-bordered input-sm w-full sm:w-56" bind:value={createDescription} disabled={creating} placeholder="Optional description" />
+							<label for="groupDesc" class="label text-xs">{t('groups.description')}</label>
+							<input id="groupDesc" type="text" class="input input-bordered input-sm w-full sm:w-56" bind:value={createDescription} disabled={creating} placeholder={t('groups.descriptionPlaceholder')} />
 						</div>
 						<div class="form-control">
-							<span class="label text-xs">Color</span>
+							<span class="label text-xs">{t('groups.color')}</span>
 							{@render colorPicker(createColor, (c) => (createColor = c), 'groupColor', creating)}
 						</div>
 						<button type="submit" class="btn btn-primary btn-sm" disabled={creating}>
-							{creating ? 'Creating…' : 'Create'}
+							{creating ? t('common.creating') : t('common.create')}
 						</button>
 					</form>
 				</div>
 			{/if}
 
 			{#if groups.length === 0}
-				<p class="text-base-content/40 text-sm">No groups yet.{#if isAdmin} Create a group to organize your team.{/if}</p>
+				<p class="text-base-content/40 text-sm">{t('groups.empty')}{#if isAdmin} {t('groups.emptyAdminHint')}{/if}</p>
 			{:else}
 				<div class="grid gap-3">
 					{#each groups as group (group.id)}
@@ -430,7 +420,7 @@
 									<span>{group.memberCount ?? 0}</span>
 								</div>
 								{#if group.isGroupAdmin}
-									<span class="badge badge-sm badge-primary badge-outline">Admin</span>
+									<span class="badge badge-sm badge-primary badge-outline" title={t('groups.groupAdmin')}>{t('groups.adminBadge')}</span>
 								{/if}
 								<svg class="w-4 h-4 text-base-content/30 transition-transform" class:rotate-180={isSelected} viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
 							</button>
@@ -440,7 +430,7 @@
 								<div class="border-t border-base-300 p-4">
 									{#if selectedGroupLoading}
 										<div class="flex items-center gap-2 justify-center py-4 text-base-content/40">
-											<span class="loading loading-spinner loading-xs"></span><span class="text-sm">Loading…</span>
+											<span class="loading loading-spinner loading-xs"></span><span class="text-sm">{t('common.loading')}</span>
 										</div>
 									{:else if selectedGroup}
 										<!-- Edit form or group info + actions -->
@@ -451,48 +441,48 @@
 												{/if}
 												<div class="flex gap-3 items-end flex-wrap">
 													<div class="form-control w-full sm:w-auto">
-														<label for="editName" class="label text-xs">Name</label>
+														<label for="editName" class="label text-xs">{t('groups.name')}</label>
 														<input id="editName" type="text" class="input input-bordered input-sm w-full" class:input-error={editSubmitted && !editName.trim()} bind:value={editName} required disabled={editSaving} />
-														{#if editSubmitted && !editName.trim()}<span class="text-xs text-error mt-1">Required</span>{/if}
+														{#if editSubmitted && !editName.trim()}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 													</div>
 													<div class="form-control w-full sm:w-auto">
-														<label for="editDesc" class="label text-xs">Description</label>
+														<label for="editDesc" class="label text-xs">{t('groups.description')}</label>
 														<input id="editDesc" type="text" class="input input-bordered input-sm w-full sm:w-56" bind:value={editDescription} disabled={editSaving} />
 													</div>
 													<div class="form-control">
-														<span class="label text-xs">Color</span>
+														<span class="label text-xs">{t('groups.color')}</span>
 														{@render colorPicker(editColor, (c) => (editColor = c), 'editColor', editSaving)}
 													</div>
 													<div class="flex gap-1.5">
 														<button type="submit" class="btn btn-primary btn-sm" disabled={editSaving}>
-															{editSaving ? 'Saving…' : 'Save'}
+															{editSaving ? t('common.saving') : t('common.save')}
 														</button>
-														<button type="button" class="btn btn-ghost btn-sm" onclick={() => (editingGroup = false)}>Cancel</button>
+														<button type="button" class="btn btn-ghost btn-sm" onclick={() => (editingGroup = false)}>{t('common.cancel')}</button>
 													</div>
 												</div>
 											</form>
 										{:else if isAdmin}
 											<div class="flex items-center gap-2 mb-4">
-												<button class="btn btn-ghost btn-sm" onclick={startEdit}>Edit</button>
-												<button class="btn btn-ghost btn-sm text-error" onclick={deleteGroup}>Delete</button>
+												<button class="btn btn-ghost btn-sm" onclick={startEdit}>{t('common.edit')}</button>
+												<button class="btn btn-ghost btn-sm text-error" onclick={deleteGroup}>{t('common.delete')}</button>
 											</div>
 										{/if}
 
 										<!-- Tab switcher (Members / Permissions) -->
 										{#if isAdmin}
 											<div class="tabs tabs-bordered mb-4" role="tablist">
-												<button class="tab {detailTab === 'members' ? 'tab-active' : ''}" role="tab" aria-selected={detailTab === 'members'} onclick={() => (detailTab = 'members')}>Members</button>
-												<button class="tab {detailTab === 'permissions' ? 'tab-active' : ''}" role="tab" aria-selected={detailTab === 'permissions'} onclick={() => (detailTab = 'permissions')}>Permissions</button>
+												<button class="tab {detailTab === 'members' ? 'tab-active' : ''}" role="tab" aria-selected={detailTab === 'members'} onclick={() => (detailTab = 'members')}>{t('groups.tabs.members')}</button>
+												<button class="tab {detailTab === 'permissions' ? 'tab-active' : ''}" role="tab" aria-selected={detailTab === 'permissions'} onclick={() => (detailTab = 'permissions')}>{t('groups.tabs.permissions')}</button>
 											</div>
 										{/if}
 
 										{#if detailTab === 'members'}
 											<!-- Members section -->
 											<div class="flex items-center justify-between mb-3">
-												<h3 class="text-sm font-semibold text-base-content/70">Members ({selectedGroup.members?.length ?? 0})</h3>
+												<h3 class="text-sm font-semibold text-base-content/70">{t('groups.members.heading', { count: selectedGroup.members?.length ?? 0 })}</h3>
 												{#if isAdmin || (group.isGroupAdmin && group.groupAdminCanManageMembers)}
 													<button class="btn btn-ghost btn-xs" onclick={openAddMember}>
-														+ Add Member
+														{t('groups.members.add')}
 													</button>
 												{/if}
 											</div>
@@ -505,25 +495,25 @@
 													{/if}
 													<form onsubmit={addMember} class="flex gap-2 items-end flex-wrap">
 														<div class="form-control flex-1 min-w-[12rem]">
-															<label for="addMemberId" class="label text-xs">Select Member</label>
+															<label for="addMemberId" class="label text-xs">{t('groups.members.select')}</label>
 															<select id="addMemberId" class="select select-bordered select-sm w-full" bind:value={addMemberUserId} disabled={addingMember}>
-																<option value={null}>Select a member…</option>
+																<option value={null}>{t('groups.members.selectPlaceholder')}</option>
 																{#each availableMembers() as m}
 																	<option value={m.id}>{m.firstName} {m.lastName} ({m.email})</option>
 																{/each}
 															</select>
 														</div>
 														<button type="submit" class="btn btn-primary btn-sm" disabled={addingMember || !addMemberUserId}>
-															{addingMember ? 'Adding…' : 'Add'}
+															{addingMember ? t('common.adding') : t('common.add')}
 														</button>
-														<button type="button" class="btn btn-ghost btn-sm" onclick={() => (showAddMember = false)}>Cancel</button>
+														<button type="button" class="btn btn-ghost btn-sm" onclick={() => (showAddMember = false)}>{t('common.cancel')}</button>
 													</form>
 												</div>
 											{/if}
 
 											<!-- Member list -->
 											{#if (selectedGroup.members?.length ?? 0) === 0}
-												<p class="text-base-content/40 text-sm">No members in this group.</p>
+												<p class="text-base-content/40 text-sm">{t('groups.members.empty')}</p>
 											{:else}
 												<div class="space-y-1">
 													{#each selectedGroup.members ?? [] as member}
@@ -544,21 +534,21 @@
 																<div class="text-xs text-base-content/60 truncate">{member.email}</div>
 															</div>
 															{#if member.role === 'Admin'}
-																<span class="badge badge-xs badge-primary">Admin</span>
+																<span class="badge badge-xs badge-primary" title={t('groups.groupAdmin')}>{t('groups.adminBadge')}</span>
 															{/if}
 															{#if isAdmin}
 																<div class="flex items-center gap-1">
 																	<button
 																		class="btn btn-ghost btn-xs"
-																		title={member.role === 'Admin' ? 'Demote to Member' : 'Promote to Admin'}
+																		title={member.role === 'Admin' ? t('groups.members.demoteTitle') : t('groups.members.promoteTitle')}
 																		onclick={() => toggleMemberRole(member)}
 																	>
-																		{member.role === 'Admin' ? 'Demote' : 'Promote'}
+																		{member.role === 'Admin' ? t('groups.members.demote') : t('groups.members.promote')}
 																	</button>
 																	<button
 																		class="btn btn-ghost btn-xs text-error"
-																		title="Remove from group"
-																		aria-label="Remove {member.firstName} {member.lastName} from group"
+																		title={t('groups.members.removeFromGroup')}
+																		aria-label={t('groups.members.removeLabel', { name: `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() })}
 																		onclick={() => removeMember(member.userId!)}
 																	>
 																		&times;
@@ -574,12 +564,12 @@
 											{#if permissionsError}
 												<div class="alert alert-error mb-3 text-sm">{permissionsError}</div>
 											{/if}
-											<p class="text-xs text-base-content/50 mb-4">Override organization defaults for this group. "Inherit" uses the org-level setting.</p>
+											<p class="text-xs text-base-content/50 mb-4">{t('groups.perm.intro')}</p>
 
 											<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
 												<!-- Rule mode overrides -->
 												<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">
-													<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Rules</span>
+													<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">{t('groups.perm.rules')}</span>
 												</div>
 												{#each permRuleSettings as rs}
 													{@const value = (permissions as Record<string, any>)[rs.key]}
@@ -600,7 +590,7 @@
 
 												<!-- Visibility overrides -->
 												<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">
-													<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Visibility</span>
+													<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">{t('groups.perm.visibility')}</span>
 												</div>
 												{#each permVisibilitySettings as vs}
 													{@const value = (permissions as Record<string, any>)[vs.key]}
@@ -621,7 +611,7 @@
 
 												<!-- Group Admin capability flags -->
 												<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">
-													<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Group Admin Capabilities</span>
+													<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">{t('groups.perm.capabilities')}</span>
 												</div>
 												{#each permAdminFlags as flag}
 													{@const value = (permissions as Record<string, any>)[flag.key]}
@@ -632,8 +622,8 @@
 														</div>
 														<ModeSelector
 															options={[
-																{ value: 0, label: 'Disabled', activeClass: 'btn-neutral' },
-																{ value: 1, label: 'Enabled', activeClass: 'btn-success' }
+																{ value: 0, label: t('groups.perm.disabled'), activeClass: 'btn-neutral' },
+																{ value: 1, label: t('groups.perm.enabled'), activeClass: 'btn-success' }
 															]}
 															value={value === true ? 1 : 0}
 															onselect={(v) => setPermValue(flag.key, v === 1)}
@@ -646,11 +636,11 @@
 										{:else if detailTab === 'permissions' && isAdmin && permissionsLoadError}
 											<div class="alert alert-error text-sm" role="alert">
 												<span>{permissionsLoadError}</span>
-												<button class="btn btn-sm" onclick={() => loadPermissions(selectedGroup!.id!)}>Try again</button>
+												<button class="btn btn-sm" onclick={() => loadPermissions(selectedGroup!.id!)}>{t('common.retry')}</button>
 											</div>
 										{:else if detailTab === 'permissions' && isAdmin && !permissions}
 											<div class="flex items-center gap-2 justify-center py-4 text-base-content/40">
-												<span class="loading loading-spinner loading-xs"></span><span class="text-sm">Loading permissions…</span>
+												<span class="loading loading-spinner loading-xs"></span><span class="text-sm">{t('groups.perm.loading')}</span>
 											</div>
 										{/if}
 									{/if}

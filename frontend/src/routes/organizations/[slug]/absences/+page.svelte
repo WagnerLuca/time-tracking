@@ -5,7 +5,8 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { organizationsApi, holidayApi, absenceDayApi, groupApi } from '$lib/apiClient';
-	import { absenceTypeLabel, dayNamesShort, formatDate, formatDateShort, getInitials } from '$lib/utils/formatters';
+	import { t, tp } from '$lib/i18n';
+	import { absenceTypeLabel, dayNamesShort, formatDate, formatDateShort, formatNumber, getInitials } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import { DAY_TYPE_CLASSES, dayTypeClasses, personChipStyle, personDotStyle, tintStyle } from '$lib/utils/colors';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
@@ -77,7 +78,7 @@
 			loadEffectivePermissions();
 			loadAbsenceTypes();
 		} catch (err) {
-			error = getErrorStatus(err) === 404 ? 'Organization not found.' : extractErrorMessage(err, 'Failed to load organization.');
+			error = getErrorStatus(err) === 404 ? t('absences.notFound') : extractErrorMessage(err, t('absences.loadOrgFailed'));
 		} finally {
 			loading = false;
 		}
@@ -90,7 +91,7 @@
 		} catch (err) {
 			// The org defaults still apply; group overrides are just not known
 			effectivePerms = null;
-			toast.error(err, 'Failed to load your permissions.');
+			toast.error(err, t('absences.loadPermsFailed'));
 		}
 	}
 
@@ -100,7 +101,7 @@
 			absenceTypes = data;
 		} catch (err) {
 			absenceTypes = [];
-			toast.error(err, 'Failed to load absence types.');
+			toast.error(err, t('absences.loadTypesFailed'));
 		}
 	}
 
@@ -109,7 +110,7 @@
 			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			org = data;
 		} catch (err) {
-			toast.error(err, 'Failed to refresh vacation balances.');
+			toast.error(err, t('absences.refreshFailed'));
 		}
 	}
 
@@ -119,7 +120,7 @@
 			holidays = [...data].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
 		} catch (err) {
 			holidays = [];
-			toast.error(err, 'Failed to load holidays.');
+			toast.error(err, t('absences.loadHolidaysFailed'));
 		}
 	}
 
@@ -131,7 +132,7 @@
 			absences = [...(data.items ?? [])].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
 		} catch (err) {
 			absences = [];
-			absencesError = extractErrorMessage(err, 'Failed to load absences.');
+			absencesError = extractErrorMessage(err, t('absences.loadFailed'));
 		} finally {
 			absencesLoading = false;
 		}
@@ -143,18 +144,18 @@
 
 	async function deleteSpan(span: AbsenceSpan) {
 		const ok = await confirmDialog({
-			title: 'Delete absence?',
+			title: t('absences.deleteTitle'),
 			message: `${span.userFirstName} ${span.userLastName}: ${spanDateLabel(span)} (${span.customTypeName ?? absenceTypeLabel(span.type)})`,
-			confirmLabel: 'Delete',
+			confirmLabel: t('common.delete'),
 			danger: true
 		});
 		if (!ok) return;
 		deletingSpan = spanKey(span);
 		try {
 			for (const id of span.ids) await absenceDayApi.apiV1OrganizationsSlugAbsencesIdDelete(orgSlug, id);
-			toast.success('Absence deleted.');
+			toast.success(t('absences.deleted'));
 		} catch (err) {
-			toast.error(err, 'Failed to delete absence.');
+			toast.error(err, t('absences.deleteFailed'));
 		} finally {
 			deletingSpan = null;
 			await loadAbsences();
@@ -219,7 +220,7 @@
 			toast.success(requestMessage);
 			return;
 		}
-		toast.success('Absence saved.');
+		toast.success(t('absences.saved'));
 		await loadAbsences();
 		await reloadOrg();
 	}
@@ -331,7 +332,7 @@
 	}
 
 	function spanTitle(span: AbsenceSpan): string {
-		return `${span.userFirstName} ${span.userLastName} — ${span.customTypeName ?? absenceTypeLabel(span.type)}${span.days > 1 ? ` (${span.days} days)` : ''}${span.isHalfDay ? ' (½)' : ''}${span.note ? ': ' + span.note : ''}`;
+		return `${span.userFirstName} ${span.userLastName} — ${span.customTypeName ?? absenceTypeLabel(span.type)}${span.days > 1 ? ` (${tp('absences.days', span.days)})` : ''}${span.isHalfDay ? ' (½)' : ''}${span.note ? ': ' + span.note : ''}`;
 	}
 
 	interface WeekLane {
@@ -408,7 +409,7 @@
 </script>
 
 <svelte:head>
-	<title>{org ? `Absences - ${org.name}` : 'Absences'} - Time Tracking</title>
+	<title>{t('common.pageTitle', { page: org ? `${t('absences.title')} – ${org.name}` : t('absences.title') })}</title>
 </svelte:head>
 
 {#snippet personName(span: AbsenceSpan)}
@@ -418,31 +419,31 @@
 
 <div class="max-w-5xl mx-auto sm:px-6 pb-6">
 	<div class="flex items-center gap-2 mb-6">
-		<a href="/organizations/{orgSlug}" class="text-base-content/60 no-underline text-sm hover:text-primary">&larr; {org?.name ?? 'Organization'}</a>
+		<a href="/organizations/{orgSlug}" class="text-base-content/60 no-underline text-sm hover:text-primary">&larr; {org?.name ?? t('nav.organization')}</a>
 	</div>
 
 	{#if loading}
-		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>Loading…</span></div>
+		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>{t('common.loading')}</span></div>
 	{:else if error}
 		<div class="alert alert-error">{error}</div>
 	{:else if org}
-		<h1 class="text-2xl font-bold text-base-content mb-1">Absences</h1>
+		<h1 class="text-2xl font-bold text-base-content mb-1">{t('absences.title')}</h1>
 		<p class="text-base-content/60 text-sm mb-6 leading-relaxed">
 			{#if canEdit}
-				Calendar overview of absences and vacation days across all members. Click a day to add an absence.
+				{t('absences.intro.admin')}
 			{:else if mustRequest}
-				Calendar overview of absences visible to you. Click a day to request an absence — a group or org admin approves it.
+				{t('absences.intro.request')}
 			{:else if canAddSelf}
-				Calendar overview of absences visible to you. Click a day to add your own absence.
+				{t('absences.intro.self')}
 			{:else}
-				Calendar overview of absences visible to you.
+				{t('absences.intro.readOnly')}
 			{/if}
 		</p>
 
 		{#if absencesError}
 			<div class="alert alert-error text-sm mb-4" role="alert">
 				<span>{absencesError}</span>
-				<button class="btn btn-sm" onclick={loadAbsences}>Try again</button>
+				<button class="btn btn-sm" onclick={loadAbsences}>{t('common.retry')}</button>
 			</div>
 		{/if}
 
@@ -452,14 +453,14 @@
 		<section aria-labelledby="calendar-heading">
 			<!-- Calendar navigation -->
 			<div class="flex items-center justify-between gap-2 mb-4">
-				<button class="btn btn-ghost btn-sm" aria-label="Previous month" title="Previous month" onclick={() => navigateMonth(-1)}>
+				<button class="btn btn-ghost btn-sm" aria-label={t('absences.prevMonth')} title={t('absences.prevMonth')} onclick={() => navigateMonth(-1)}>
 					<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd"/></svg>
 				</button>
 				<div class="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
 					<h2 id="calendar-heading" class="text-lg sm:text-xl font-bold text-base-content m-0" aria-live="polite">{monthLabel}</h2>
-					<button class="btn btn-ghost btn-xs" onclick={goToToday}>Today</button>
+					<button class="btn btn-ghost btn-xs" onclick={goToToday}>{t('absences.today')}</button>
 				</div>
-				<button class="btn btn-ghost btn-sm" aria-label="Next month" title="Next month" onclick={() => navigateMonth(1)}>
+				<button class="btn btn-ghost btn-sm" aria-label={t('absences.nextMonth')} title={t('absences.nextMonth')} onclick={() => navigateMonth(1)}>
 					<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
 				</button>
 			</div>
@@ -467,20 +468,20 @@
 			<!-- Calendar member filter + mobile add -->
 			<div class="flex items-center justify-end gap-2 mb-3 flex-wrap">
 				{#if calendarUserOptions.length > 1}
-					<label class="text-xs text-base-content/60" for="calendar-user-filter">Show</label>
+					<label class="text-xs text-base-content/60" for="calendar-user-filter">{t('absences.show')}</label>
 					<select id="calendar-user-filter" bind:value={calendarUserFilter} class="select select-bordered select-sm max-w-[14rem]">
-						<option value={null}>All members</option>
+						<option value={null}>{t('absences.allMembers')}</option>
 						{#each calendarUserOptions as u (u.id)}
-							<option value={u.id}>{u.name}{u.id === auth.user?.id ? ' (you)' : ''}</option>
+							<option value={u.id}>{u.name}{u.id === auth.user?.id ? t('absences.youSuffix') : ''}</option>
 						{/each}
 					</select>
 					{#if calendarUserFilter !== null}
-						<button class="btn btn-ghost btn-xs" onclick={() => (calendarUserFilter = null)}>Clear</button>
+						<button class="btn btn-ghost btn-xs" onclick={() => (calendarUserFilter = null)}>{t('absences.clearFilter')}</button>
 					{/if}
 				{/if}
 				{#if canOpenDayDialog}
 					<button class="btn btn-primary btn-sm sm:hidden" onclick={openDialogForVisibleMonth}>
-						{mustRequest ? 'Request absence' : 'Add absence'}
+						{mustRequest ? t('absences.requestAbsence') : t('absences.addAbsence')}
 					</button>
 				{/if}
 			</div>
@@ -488,9 +489,9 @@
 			<!-- Mobile: agenda list for the visible month -->
 			<div class="sm:hidden">
 				{#if absencesLoading}
-					<p class="text-base-content/50 text-sm">Loading…</p>
+					<p class="text-base-content/50 text-sm">{t('common.loading')}</p>
 				{:else if agenda.length === 0}
-					<p class="text-base-content/50 text-sm text-center py-6 bg-base-200/30 rounded-lg border border-base-300">No absences or holidays this month.</p>
+					<p class="text-base-content/50 text-sm text-center py-6 bg-base-200/30 rounded-lg border border-base-300">{t('absences.emptyMonth')}</p>
 				{:else}
 					<ul class="flex flex-col gap-1.5">
 						{#each agenda as item (item.kind === 'holiday' ? `h${item.holiday.id}-${item.date}` : `a${spanKey(item.span)}`)}
@@ -499,7 +500,7 @@
 									<span class="w-2.5 h-2.5 rounded-full shrink-0 {DAY_TYPE_CLASSES.holiday.dot}" aria-hidden="true"></span>
 									<span class="text-base-content/60 shrink-0">{formatDate(item.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
 									<span class="font-medium truncate">{item.holiday.name}</span>
-									{#if item.holiday.isHalfDay}<span class="badge badge-xs badge-outline" title="Half day">½</span>{/if}
+									{#if item.holiday.isHalfDay}<span class="badge badge-xs badge-outline" title={t('absences.halfDay')}>½</span>{/if}
 								</li>
 							{:else}
 								{@const span = item.span}
@@ -511,8 +512,8 @@
 												: `${formatDateShort(span.startDate)} – ${formatDateShort(span.endDate)}`}
 										</span>
 										<span class="flex items-center gap-1">
-											{#if span.days > 1}<span class="badge badge-xs badge-outline">{span.days} days</span>{/if}
-											{#if span.isHalfDay}<span class="badge badge-xs badge-outline" title="Half day">½</span>{/if}
+											{#if span.days > 1}<span class="badge badge-xs badge-outline">{tp('absences.days', span.days)}</span>{/if}
+											{#if span.isHalfDay}<span class="badge badge-xs badge-outline" title={t('absences.halfDay')}>½</span>{/if}
 											<AbsenceTypeBadge type={span.type} customTypeName={span.customTypeName} customTypeColor={span.customTypeColor} size="xs" />
 										</span>
 									</div>
@@ -555,7 +556,7 @@
 									class="min-h-[60px] p-1 pt-1.5 pb-3 flex flex-col transition-colors {clickable ? 'cursor-pointer hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary' : ''} {inMonth && !isWeekend ? 'bg-base-100' : ''} {inMonth && isWeekend ? 'bg-base-200/40' : ''} {!inMonth ? 'bg-base-200/70' : ''}"
 									role={clickable ? 'button' : undefined}
 									tabindex={clickable ? 0 : undefined}
-									aria-label={clickable ? `${mustRequest ? 'Request absence' : 'Add absence'}: ${formatDate(date)}` : undefined}
+									aria-label={clickable ? t('absences.cellLabel', { action: mustRequest ? t('absences.requestAbsence') : t('absences.addAbsence'), date: formatDate(date) }) : undefined}
 									onclick={() => { if (clickable) openDayDialog(key); }}
 									onkeydown={(e) => { if (clickable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDayDialog(key); } }}
 								>
@@ -619,10 +620,10 @@
 
 			<!-- Legend -->
 			<div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-base-content/60">
-				<span class="flex items-center gap-1"><span class="w-3 h-3 rounded {DAY_TYPE_CLASSES.sick.dot}"></span> Sick day</span>
-				<span class="flex items-center gap-1"><span class="w-3 h-3 rounded {DAY_TYPE_CLASSES['other-absence'].dot}"></span> Other</span>
-				<span class="flex items-center gap-1"><span class="w-3 h-3 rounded {DAY_TYPE_CLASSES.holiday.dot}"></span> Holiday</span>
-				<span class="text-base-content/50">Vacation colours vary by person</span>
+				<span class="flex items-center gap-1"><span class="w-3 h-3 rounded {DAY_TYPE_CLASSES.sick.dot}"></span> {t('format.dayType.sick')}</span>
+				<span class="flex items-center gap-1"><span class="w-3 h-3 rounded {DAY_TYPE_CLASSES['other-absence'].dot}"></span> {t('format.absenceType.Other')}</span>
+				<span class="flex items-center gap-1"><span class="w-3 h-3 rounded {DAY_TYPE_CLASSES.holiday.dot}"></span> {t('format.dayType.holiday')}</span>
+				<span class="text-base-content/50">{t('absences.legend.vacationHint')}</span>
 			</div>
 		</section>
 
@@ -645,20 +646,20 @@
 		{#if canEdit || vacationVisibleMembers.length > 0}
 		<section class="mt-8 bg-base-200/30 rounded-lg p-4 sm:p-5 border border-base-300">
 			<div class="flex items-center justify-between flex-wrap gap-2 mb-4">
-				<h2 class="text-xl font-bold text-base-content m-0">Vacation days balance</h2>
+				<h2 class="text-xl font-bold text-base-content m-0">{t('absences.balance.title')}</h2>
 				<div class="flex items-center gap-4 text-xs text-base-content/60">
-					<span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-primary"></span> Taken</span>
-					<span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-primary/40"></span> Planned</span>
+					<span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-primary"></span> {t('absences.balance.taken')}</span>
+					<span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-primary/40"></span> {t('absences.balance.planned')}</span>
 				</div>
 			</div>
 			{#if vacationVisibleMembers.length === 0}
-				<p class="text-base-content/50 text-sm">No members have vacation days configured.</p>
+				<p class="text-base-content/50 text-sm">{t('absences.balance.none')}</p>
 			{:else}
 				{@const membersWithVacation = vacationVisibleMembers
 					.filter((m) => calendarUserFilter === null || m.id === calendarUserFilter)
 					.sort((a, b) => ((a.vacationDaysRemaining ?? 0) - (b.vacationDaysRemaining ?? 0)))}
 				{#if membersWithVacation.length === 0}
-					<p class="text-base-content/50 text-sm">The selected member has no vacation days configured.</p>
+					<p class="text-base-content/50 text-sm">{t('absences.balance.noneSelected')}</p>
 				{:else}
 				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 					{#each membersWithVacation as member (member.id)}
@@ -676,15 +677,15 @@
 							<div class="flex-1 min-w-0">
 								<div class="font-semibold text-sm truncate">{member.firstName} {member.lastName}</div>
 								<div class="flex items-center gap-2 mt-1">
-									<div class="flex-1 h-2 bg-base-200 rounded-full overflow-hidden flex" title="{taken}d taken, {planned}d planned">
+									<div class="flex-1 h-2 bg-base-200 rounded-full overflow-hidden flex" title={t('absences.balance.barTitle', { taken: formatNumber(taken), planned: formatNumber(planned) })}>
 										<div class="h-full {pct >= 90 ? 'bg-error' : pct >= 70 ? 'bg-warning' : 'bg-primary'}" style="width: {takenPct}%"></div>
 										<div class="h-full {pct >= 90 ? 'bg-error/40' : pct >= 70 ? 'bg-warning/40' : 'bg-primary/40'}" style="width: {plannedPct}%"></div>
 									</div>
-									<span class="text-xs text-base-content/60 shrink-0">{pct}%</span>
+									<span class="text-xs text-base-content/60 shrink-0">{formatNumber(pct / 100, { style: 'percent' })}</span>
 								</div>
 								<div class="flex justify-between gap-2 mt-1 text-xs text-base-content/60">
-									<span>{taken}d taken{planned > 0 ? ` · ${planned}d planned` : ''} / {total}d</span>
-									<span class="font-semibold shrink-0 {remaining <= 2 ? 'text-error' : remaining <= 5 ? 'text-warning' : 'text-success'}">{remaining}d left</span>
+									<span>{t('absences.balance.used', { taken: formatNumber(taken), total: formatNumber(total) })}{planned > 0 ? t('absences.balance.plannedSuffix', { planned: formatNumber(planned) }) : ''}</span>
+									<span class="font-semibold shrink-0 {remaining <= 2 ? 'text-error' : remaining <= 5 ? 'text-warning' : 'text-success'}">{t('absences.balance.left', { remaining: formatNumber(remaining) })}</span>
 								</div>
 							</div>
 						</a>
@@ -697,30 +698,30 @@
 
 		<!-- Absence List -->
 		<section class="mt-8 bg-base-200/30 rounded-lg p-4 sm:p-5 border border-base-300">
-			<h2 class="text-xl font-bold text-base-content mb-4">Absence list</h2>
+			<h2 class="text-xl font-bold text-base-content mb-4">{t('absences.list.title')}</h2>
 			<div class="flex flex-wrap gap-2 mb-4">
-				<select bind:value={selectedListYear} class="select select-bordered select-sm w-auto" aria-label="Year">
+				<select bind:value={selectedListYear} class="select select-bordered select-sm w-auto" aria-label={t('absences.list.year')}>
 					{#each getAvailableAbsenceYears() as y (y)}
 						<option value={y}>{y}</option>
 					{/each}
 				</select>
 				{#if canEdit}
-				<select bind:value={adminAbsenceFilter} class="select select-bordered select-sm w-auto max-w-full" aria-label="Member">
-					<option value={null}>All members</option>
+				<select bind:value={adminAbsenceFilter} class="select select-bordered select-sm w-auto max-w-full" aria-label={t('absences.list.member')}>
+					<option value={null}>{t('absences.allMembers')}</option>
 					{#each (org?.members ?? []) as m (m.id)}
 						<option value={m.id}>{m.firstName} {m.lastName}</option>
 					{/each}
 				</select>
 				{/if}
-				<select bind:value={panelTypeFilter} class="select select-bordered select-sm w-auto" aria-label="Type">
-					<option value="all">All types</option>
-					<option value="Vacation">Vacation</option>
-					<option value="SickDay">Sick day</option>
-					<option value="Other">Other</option>
+				<select bind:value={panelTypeFilter} class="select select-bordered select-sm w-auto" aria-label={t('absences.list.type')}>
+					<option value="all">{t('absences.list.allTypes')}</option>
+					<option value="Vacation">{absenceTypeLabel('Vacation')}</option>
+					<option value="SickDay">{absenceTypeLabel('SickDay')}</option>
+					<option value="Other">{absenceTypeLabel('Other')}</option>
 				</select>
 			</div>
 			{#if absencesLoading}
-				<p class="text-base-content/50 text-sm">Loading…</p>
+				<p class="text-base-content/50 text-sm">{t('common.loading')}</p>
 			{:else}
 				{@const yearStr = String(selectedListYear)}
 				{@const filtered = absences
@@ -729,7 +730,7 @@
 					.filter((a) => panelTypeFilter === 'all' || a.type === panelTypeFilter)}
 				{@const spans = buildAbsenceSpans(filtered)}
 				{#if spans.length === 0}
-					<p class="text-base-content/50 text-sm text-center py-4">No absences found for {selectedListYear}.</p>
+					<p class="text-base-content/50 text-sm text-center py-4">{t('absences.list.empty', { year: selectedListYear })}</p>
 				{:else}
 					<ul class="flex flex-col gap-1.5">
 						{#each spans as span (spanKey(span))}
@@ -746,10 +747,10 @@
 								{/if}
 								<AbsenceTypeBadge type={span.type} customTypeName={span.customTypeName} customTypeColor={span.customTypeColor} />
 								{#if span.days > 1}
-									<span class="badge badge-sm badge-outline">{span.days} days</span>
+									<span class="badge badge-sm badge-outline">{tp('absences.days', span.days)}</span>
 								{/if}
 								{#if span.isHalfDay && span.days === 1}
-									<span class="badge badge-sm badge-outline">½ day</span>
+									<span class="badge badge-sm badge-outline">{t('absences.list.halfDay')}</span>
 								{/if}
 								{#if span.note}
 									<span class="text-base-content/50 truncate min-w-0 flex-1">{span.note}</span>
@@ -757,8 +758,8 @@
 								{#if canDeleteSpan(span)}
 									<button
 										class="btn btn-ghost btn-xs text-error ml-auto"
-										aria-label="Delete absence"
-										title="Delete absence"
+										aria-label={t('absences.deleteLabel')}
+										title={t('absences.deleteLabel')}
 										disabled={deletingSpan === spanKey(span)}
 										onclick={() => deleteSpan(span)}
 									>{#if deletingSpan === spanKey(span)}<span class="loading loading-spinner loading-xs"></span>{:else}&times;{/if}</button>
@@ -766,7 +767,7 @@
 							</li>
 						{/each}
 					</ul>
-					<p class="text-xs text-base-content/50 mt-2">{spans.length} entries ({filtered.length} days total)</p>
+					<p class="text-xs text-base-content/50 mt-2">{tp('absences.list.entries', spans.length)} {tp('absences.list.totalDays', filtered.length)}</p>
 				{/if}
 			{/if}
 		</section>

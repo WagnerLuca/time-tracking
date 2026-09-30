@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth.svelte';
 	import { absenceDayApi, requestsApi } from '$lib/apiClient';
-	import { formatDate, getInitials } from '$lib/utils/formatters';
+	import { t, tp } from '$lib/i18n';
+	import { absenceTypeLabel, formatDate, getInitials } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import Modal from '$lib/components/Modal.svelte';
@@ -123,7 +124,7 @@
 					message: note || undefined,
 					requestData: JSON.stringify({ dates: workdays, type, customTypeId, isHalfDay: halfDay, note: note || undefined })
 				});
-				onsaved(`Absence request for ${workdays.length} day${workdays.length > 1 ? 's' : ''} sent for approval.`);
+				onsaved(tp('absences.dialog.requestSent', workdays.length));
 			} else {
 				for (const dateStr of workdays) {
 					if (isAdmin) {
@@ -140,7 +141,7 @@
 			}
 			onclose();
 		} catch (err) {
-			errorMsg = extractErrorMessage(err, willRequest ? 'Failed to send request.' : 'Failed to add absence.');
+			errorMsg = extractErrorMessage(err, willRequest ? t('absences.dialog.requestFailed') : t('absences.dialog.addFailed'));
 		} finally {
 			saving = false;
 		}
@@ -151,7 +152,7 @@
 	<!-- Existing absences on this day -->
 	{#if dayAbsences.length > 0}
 		<div class="mb-4">
-			<h4 class="text-sm font-semibold text-base-content/60 mb-2">Absences on this day</h4>
+			<h4 class="text-sm font-semibold text-base-content/60 mb-2">{t('absences.dialog.existing')}</h4>
 			<ul class="flex flex-col gap-1">
 				{#each dayAbsences as ab (ab.id)}
 					<li class="flex items-center gap-2 p-2 bg-base-200/50 rounded-lg text-sm flex-wrap">
@@ -160,18 +161,18 @@
 						</span>
 						<span class="font-medium">{ab.userFirstName} {ab.userLastName}</span>
 						<AbsenceTypeBadge type={ab.type} customTypeName={ab.customTypeName} customTypeColor={ab.customTypeColor} size="xs" />
-						{#if ab.isHalfDay}<span class="badge badge-xs badge-outline" title="Half day">½</span>{/if}
+						{#if ab.isHalfDay}<span class="badge badge-xs badge-outline" title={t('absences.dialog.halfDay')}>½</span>{/if}
 						{#if ab.note}<span class="text-base-content/50 text-xs truncate">{ab.note}</span>{/if}
 					</li>
 				{/each}
 			</ul>
 		</div>
-		<div class="divider my-2 text-xs text-base-content/50">{willRequest ? 'Request absence' : 'Add new absence'}</div>
+		<div class="divider my-2 text-xs text-base-content/50">{willRequest ? t('absences.dialog.requestDivider') : t('absences.dialog.addDivider')}</div>
 	{/if}
 
 	{#if willRequest}
 		<div class="alert alert-info text-sm py-1.5 px-2.5 mb-3">
-			This will be sent as a request and needs approval by your group admin or an organization admin.
+			{t('absences.dialog.requestHint')}
 		</div>
 	{/if}
 	{#if errorMsg}
@@ -181,62 +182,62 @@
 	<form onsubmit={submit} class="flex flex-col gap-3" novalidate>
 		{#if members}
 			<div class="flex flex-col gap-1">
-				<label for="{fieldId}-member" class="text-sm font-medium text-base-content/70">Member</label>
+				<label for="{fieldId}-member" class="text-sm font-medium text-base-content/70">{t('absences.dialog.member')}</label>
 				<select id="{fieldId}-member" bind:value={selectedUserId} class="select select-bordered select-sm w-full" class:select-error={submitted && memberMissing} aria-invalid={submitted && memberMissing} disabled={saving}>
-					<option value={null}>Select member…</option>
+					<option value={null}>{t('absences.dialog.selectMember')}</option>
 					{#each members as m (m.id)}
-						<option value={m.id}>{m.firstName} {m.lastName}{m.id === auth.user?.id ? ' (you)' : ''}</option>
+						<option value={m.id}>{m.firstName} {m.lastName}{m.id === auth.user?.id ? t('absences.youSuffix') : ''}</option>
 					{/each}
 				</select>
-				{#if submitted && memberMissing}<span class="text-xs text-error">Select a member.</span>{/if}
+				{#if submitted && memberMissing}<span class="text-xs text-error">{t('absences.dialog.memberRequired')}</span>{/if}
 			</div>
 		{/if}
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 			<div class="flex flex-col gap-1">
-				<label for="{fieldId}-from" class="text-sm font-medium text-base-content/70">From</label>
+				<label for="{fieldId}-from" class="text-sm font-medium text-base-content/70">{t('absences.dialog.from')}</label>
 				<input id="{fieldId}-from" type="date" class="input input-bordered input-sm w-full" class:input-error={submitted && !fromDate} bind:value={fromDate} required disabled={saving} />
-				{#if submitted && !fromDate}<span class="text-xs text-error">Required</span>{/if}
+				{#if submitted && !fromDate}<span class="text-xs text-error">{t('common.required')}</span>{/if}
 			</div>
 			<div class="flex flex-col gap-1">
-				<label for="{fieldId}-to" class="text-sm font-medium text-base-content/70">To (optional)</label>
+				<label for="{fieldId}-to" class="text-sm font-medium text-base-content/70">{t('absences.dialog.to')}</label>
 				<input id="{fieldId}-to" type="date" class="input input-bordered input-sm w-full" class:input-error={toBeforeFrom} aria-invalid={toBeforeFrom} bind:value={toDate} min={fromDate} disabled={saving} />
-				{#if toBeforeFrom}<span class="text-xs text-error">The end date must not be before the start date.</span>{/if}
+				{#if toBeforeFrom}<span class="text-xs text-error">{t('absences.dialog.toBeforeFrom')}</span>{/if}
 			</div>
 		</div>
 		{#if noWorkdays}
-			<p class="text-xs text-warning m-0" role="status">No workdays (Mon–Fri) in the selected range.</p>
+			<p class="text-xs text-warning m-0" role="status">{t('absences.dialog.noWorkdays')}</p>
 		{/if}
 		<div class="flex flex-col gap-1">
-			<label for="{fieldId}-type" class="text-sm font-medium text-base-content/70">Type</label>
+			<label for="{fieldId}-type" class="text-sm font-medium text-base-content/70">{t('absences.dialog.type')}</label>
 			<select id="{fieldId}-type" bind:value={typeValue} class="select select-bordered select-sm w-full" disabled={saving}>
-				<option value="0">Sick day</option>
-				<option value="1">Vacation</option>
-				<option value="2">Other</option>
+				<option value="0">{absenceTypeLabel('SickDay')}</option>
+				<option value="1">{absenceTypeLabel('Vacation')}</option>
+				<option value="2">{absenceTypeLabel('Other')}</option>
 				{#each absenceTypes as at (at.id)}
 					<option value={'c' + at.id}>{at.name}</option>
 				{/each}
 			</select>
 			{#if selectedCustomType}
 				<span class="text-xs text-base-content/50">
-					{selectedCustomType.creditMode === 'FillToTarget' ? 'Hours are filled up to the expected daily target.'
-					: selectedCustomType.creditMode === 'FullCredit' ? 'The full daily target is credited.'
-					: 'Hours are kept as tracked — no credit.'}
+					{selectedCustomType.creditMode === 'FillToTarget' ? t('absences.dialog.credit.FillToTarget')
+					: selectedCustomType.creditMode === 'FullCredit' ? t('absences.dialog.credit.FullCredit')
+					: t('absences.dialog.credit.None')}
 				</span>
 			{/if}
 		</div>
 		<div class="flex flex-col gap-1">
-			<label for="{fieldId}-note" class="text-sm font-medium text-base-content/70">Note (optional)</label>
-			<input id="{fieldId}-note" type="text" class="input input-bordered input-sm w-full" bind:value={note} placeholder="e.g. Doctor's appointment" disabled={saving} />
+			<label for="{fieldId}-note" class="text-sm font-medium text-base-content/70">{t('absences.dialog.note')}</label>
+			<input id="{fieldId}-note" type="text" class="input input-bordered input-sm w-full" bind:value={note} placeholder={t('absences.dialog.notePlaceholder')} disabled={saving} />
 		</div>
 		<label class="label cursor-pointer flex items-center gap-2 text-sm">
 			<input type="checkbox" class="checkbox checkbox-sm" bind:checked={halfDay} disabled={saving} />
-			Half day
+			{t('absences.dialog.halfDay')}
 		</label>
-		<p class="text-xs text-base-content/50 m-0">Only workdays (Mon–Fri) in the range are counted.</p>
+		<p class="text-xs text-base-content/50 m-0">{t('absences.dialog.workdaysHint')}</p>
 		<div class="flex justify-end gap-2 mt-2">
-			<button type="button" class="btn btn-ghost btn-sm" onclick={onclose}>Cancel</button>
+			<button type="button" class="btn btn-ghost btn-sm" onclick={onclose}>{t('common.cancel')}</button>
 			<button type="submit" class="btn btn-primary btn-sm" disabled={saving}>
-				{saving ? (willRequest ? 'Sending…' : 'Adding…') : willRequest ? 'Send request' : 'Add absence'}
+				{saving ? (willRequest ? t('common.sending') : t('common.adding')) : willRequest ? t('absences.dialog.sendRequest') : t('absences.dialog.add')}
 			</button>
 		</div>
 	</form>

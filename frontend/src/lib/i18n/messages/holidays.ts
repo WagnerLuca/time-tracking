@@ -1,4 +1,52 @@
 /** Strings for the holidays area. Add keys to both objects; `en` is typed against `de`. */
-export const de = {};
+export const de = {
+	title: 'Feiertage',
+	notFound: 'Organisation nicht gefunden.',
+	loadOrgFailed: 'Organisation konnte nicht geladen werden.',
+	loadFailed: 'Feiertage konnten nicht geladen werden.',
+	year: 'Jahr',
+	add: '+ Feiertag hinzufügen',
+	name: 'Name',
+	namePlaceholder: 'z. B. Weihnachten',
+	date: 'Datum',
+	recurringEveryYear: 'Jährlich wiederkehrend',
+	recurring: 'Jährlich',
+	halfDay: 'Halber Tag',
+	halfDayBadge: '½ Tag',
+	added: 'Feiertag hinzugefügt.',
+	addFailed: 'Feiertag konnte nicht hinzugefügt werden.',
+	saved: 'Feiertag gespeichert.',
+	saveFailed: 'Feiertag konnte nicht gespeichert werden.',
+	deleteTitle: 'Feiertag löschen?',
+	deleteLabel: 'Feiertag {name} löschen',
+	deleted: 'Feiertag gelöscht.',
+	deleteFailed: 'Feiertag konnte nicht gelöscht werden.',
+	empty: 'Keine Feiertage in {year}.',
+	managedByAdmins: 'Feiertage werden von den Admins der Organisation verwaltet.'
+};
 
-export const en: typeof de = {};
+export const en: typeof de = {
+	title: 'Holidays',
+	notFound: 'Organization not found.',
+	loadOrgFailed: 'Could not load the organization.',
+	loadFailed: 'Could not load holidays.',
+	year: 'Year',
+	add: '+ Add holiday',
+	name: 'Name',
+	namePlaceholder: 'e.g. Christmas',
+	date: 'Date',
+	recurringEveryYear: 'Recurring every year',
+	recurring: 'Recurring',
+	halfDay: 'Half day',
+	halfDayBadge: '½ day',
+	added: 'Holiday added.',
+	addFailed: 'Could not add the holiday.',
+	saved: 'Holiday saved.',
+	saveFailed: 'Could not save the holiday.',
+	deleteTitle: 'Delete holiday?',
+	deleteLabel: 'Delete holiday {name}',
+	deleted: 'Holiday deleted.',
+	deleteFailed: 'Could not delete the holiday.',
+	empty: 'No holidays for {year}.',
+	managedByAdmins: 'Holidays are managed by organization admins.'
+};

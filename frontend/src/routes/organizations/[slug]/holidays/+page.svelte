@@ -5,6 +5,7 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { organizationsApi, holidayApi } from '$lib/apiClient';
+	import { t } from '$lib/i18n';
 	import { formatDate } from '$lib/utils/formatters';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
@@ -75,7 +76,7 @@
 			org = data;
 			loadHolidays();
 		} catch (err) {
-			error = getErrorStatus(err) === 404 ? 'Organization not found.' : extractErrorMessage(err, 'Failed to load organization.');
+			error = getErrorStatus(err) === 404 ? t('holidays.notFound') : extractErrorMessage(err, t('holidays.loadOrgFailed'));
 		} finally {
 			loading = false;
 		}
@@ -87,7 +88,7 @@
 			const { data } = await holidayApi.apiV1OrganizationsSlugHolidaysGet(orgSlug);
 			holidays = [...data].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
 		} catch (err) {
-			holidaysError = extractErrorMessage(err, 'Failed to load holidays.');
+			holidaysError = extractErrorMessage(err, t('holidays.loadFailed'));
 		}
 	}
 
@@ -110,7 +111,7 @@
 				isRecurring: newHolidayRecurring,
 				isHalfDay: newHolidayHalfDay
 			});
-			toast.success('Holiday added.');
+			toast.success(t('holidays.added'));
 			showAddHoliday = false;
 			newHolidayName = '';
 			newHolidayDate = '';
@@ -119,7 +120,7 @@
 			addSubmitted = false;
 			await loadHolidays();
 		} catch (err) {
-			addError = extractErrorMessage(err, 'Failed to add holiday.');
+			addError = extractErrorMessage(err, t('holidays.addFailed'));
 		} finally {
 			addingHoliday = false;
 		}
@@ -148,11 +149,11 @@
 				isRecurring: editHolidayRecurring,
 				isHalfDay: editHolidayHalfDay
 			});
-			toast.success('Holiday saved.');
+			toast.success(t('holidays.saved'));
 			editingHolidayId = null;
 			await loadHolidays();
 		} catch (err) {
-			editError = extractErrorMessage(err, 'Failed to update holiday.');
+			editError = extractErrorMessage(err, t('holidays.saveFailed'));
 		} finally {
 			editHolidaySaving = false;
 		}
@@ -161,19 +162,19 @@
 	async function deleteHoliday(h: HolidayResponse) {
 		if (!h.id) return;
 		const ok = await confirmDialog({
-			title: 'Delete holiday?',
+			title: t('holidays.deleteTitle'),
 			message: `${h.name} (${formatHolidayDate(h)})`,
-			confirmLabel: 'Delete',
+			confirmLabel: t('common.delete'),
 			danger: true
 		});
 		if (!ok) return;
 		deletingId = h.id;
 		try {
 			await holidayApi.apiV1OrganizationsSlugHolidaysIdDelete(orgSlug, h.id);
-			toast.success('Holiday deleted.');
+			toast.success(t('holidays.deleted'));
 			await loadHolidays();
 		} catch (err) {
-			toast.error(err, 'Failed to delete holiday.');
+			toast.error(err, t('holidays.deleteFailed'));
 		} finally {
 			deletingId = null;
 		}
@@ -187,12 +188,12 @@
 </script>
 
 <svelte:head>
-	<title>Holidays - {org?.name ?? 'Organization'} - Time Tracking</title>
+	<title>{t('common.pageTitle', { page: org ? `${t('holidays.title')} – ${org.name}` : t('holidays.title') })}</title>
 </svelte:head>
 
 <div class="max-w-5xl mx-auto sm:px-6 pb-6">
 	{#if loading}
-		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>Loading…</span></div>
+		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>{t('common.loading')}</span></div>
 	{:else if error}
 		<div class="alert alert-error">{error}</div>
 	{:else if org}
@@ -200,8 +201,8 @@
 			<section>
 				<div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
 					<div class="flex items-center gap-3">
-						<h2 class="text-xl font-bold text-base-content m-0">Holidays</h2>
-						<select class="select select-bordered select-sm w-auto" bind:value={selectedYear} aria-label="Year">
+						<h2 class="text-xl font-bold text-base-content m-0">{t('holidays.title')}</h2>
+						<select class="select select-bordered select-sm w-auto" bind:value={selectedYear} aria-label={t('holidays.year')}>
 							{#each availableYears as year (year)}
 								<option value={year}>{year}</option>
 							{/each}
@@ -209,7 +210,7 @@
 					</div>
 					{#if canEdit}
 						<button class="btn btn-primary btn-sm" onclick={toggleAddForm} aria-expanded={showAddHoliday}>
-							{showAddHoliday ? 'Cancel' : '+ Add holiday'}
+							{showAddHoliday ? t('common.cancel') : t('holidays.add')}
 						</button>
 					{/if}
 				</div>
@@ -217,7 +218,7 @@
 				{#if holidaysError}
 					<div class="alert alert-error mb-4 text-sm" role="alert">
 						<span>{holidaysError}</span>
-						<button class="btn btn-sm" onclick={loadHolidays}>Try again</button>
+						<button class="btn btn-sm" onclick={loadHolidays}>{t('common.retry')}</button>
 					</div>
 				{/if}
 
@@ -228,32 +229,32 @@
 						{/if}
 						<form onsubmit={addHoliday} class="flex gap-3 items-end flex-wrap" novalidate>
 							<div class="form-control w-full sm:w-auto">
-								<label for="holidayName" class="label text-xs">Name</label>
-								<input id="holidayName" type="text" class="input input-bordered input-sm w-full" class:input-error={addSubmitted && !newHolidayName.trim()} bind:value={newHolidayName} required disabled={addingHoliday} placeholder="e.g. Christmas" />
-								{#if addSubmitted && !newHolidayName.trim()}<span class="text-xs text-error mt-1">Required</span>{/if}
+								<label for="holidayName" class="label text-xs">{t('holidays.name')}</label>
+								<input id="holidayName" type="text" class="input input-bordered input-sm w-full" class:input-error={addSubmitted && !newHolidayName.trim()} bind:value={newHolidayName} required disabled={addingHoliday} placeholder={t('holidays.namePlaceholder')} />
+								{#if addSubmitted && !newHolidayName.trim()}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 							</div>
 							<div class="form-control w-full sm:w-auto">
-								<label for="holidayDate" class="label text-xs">Date</label>
+								<label for="holidayDate" class="label text-xs">{t('holidays.date')}</label>
 								<input id="holidayDate" type="date" class="input input-bordered input-sm w-full" class:input-error={addSubmitted && !newHolidayDate} bind:value={newHolidayDate} required disabled={addingHoliday} />
-								{#if addSubmitted && !newHolidayDate}<span class="text-xs text-error mt-1">Required</span>{/if}
+								{#if addSubmitted && !newHolidayDate}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 							</div>
 							<label class="label cursor-pointer flex items-center gap-2 text-sm">
 								<input type="checkbox" class="checkbox checkbox-sm" bind:checked={newHolidayRecurring} disabled={addingHoliday} />
-								Recurring every year
+								{t('holidays.recurringEveryYear')}
 							</label>
 							<label class="label cursor-pointer flex items-center gap-2 text-sm">
 								<input type="checkbox" class="checkbox checkbox-sm" bind:checked={newHolidayHalfDay} disabled={addingHoliday} />
-								Half day
+								{t('holidays.halfDay')}
 							</label>
 							<button type="submit" class="btn btn-primary btn-sm" disabled={addingHoliday}>
-								{addingHoliday ? 'Adding…' : 'Add'}
+								{addingHoliday ? t('common.adding') : t('common.add')}
 							</button>
 						</form>
 					</div>
 				{/if}
 
 				{#if filteredHolidays.length === 0}
-					<p class="text-base-content/50 text-sm">No holidays for {selectedYear}.{#if !canEdit} Holidays are managed by organization admins.{/if}</p>
+					<p class="text-base-content/50 text-sm">{t('holidays.empty', { year: selectedYear })}{#if !canEdit} {t('holidays.managedByAdmins')}{/if}</p>
 				{:else}
 					<ul class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
 						{#each filteredHolidays as h (h.id)}
@@ -264,26 +265,26 @@
 											<div class="alert alert-error text-sm w-full" role="alert">{editError}</div>
 										{/if}
 										<div class="form-control w-full sm:w-auto">
-											<label for="editHolidayName" class="label text-xs">Name</label>
+											<label for="editHolidayName" class="label text-xs">{t('holidays.name')}</label>
 											<input id="editHolidayName" type="text" class="input input-bordered input-sm w-full" class:input-error={editSubmitted && !editHolidayName.trim()} bind:value={editHolidayName} required disabled={editHolidaySaving} />
-											{#if editSubmitted && !editHolidayName.trim()}<span class="text-xs text-error mt-1">Required</span>{/if}
+											{#if editSubmitted && !editHolidayName.trim()}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 										</div>
 										<div class="form-control w-full sm:w-auto">
-											<label for="editHolidayDate" class="label text-xs">Date</label>
+											<label for="editHolidayDate" class="label text-xs">{t('holidays.date')}</label>
 											<input id="editHolidayDate" type="date" class="input input-bordered input-sm w-full" class:input-error={editSubmitted && !editHolidayDate} bind:value={editHolidayDate} required disabled={editHolidaySaving} />
-											{#if editSubmitted && !editHolidayDate}<span class="text-xs text-error mt-1">Required</span>{/if}
+											{#if editSubmitted && !editHolidayDate}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 										</div>
 										<label class="label cursor-pointer flex items-center gap-2 text-sm">
 											<input type="checkbox" class="checkbox checkbox-sm" bind:checked={editHolidayRecurring} disabled={editHolidaySaving} />
-											Recurring every year
+											{t('holidays.recurringEveryYear')}
 										</label>
 										<label class="label cursor-pointer flex items-center gap-2 text-sm">
 											<input type="checkbox" class="checkbox checkbox-sm" bind:checked={editHolidayHalfDay} disabled={editHolidaySaving} />
-											Half day
+											{t('holidays.halfDay')}
 										</label>
 										<div class="flex gap-1.5">
-											<button type="submit" class="btn btn-primary btn-sm" disabled={editHolidaySaving}>{editHolidaySaving ? 'Saving…' : 'Save'}</button>
-											<button type="button" class="btn btn-ghost btn-sm" onclick={() => (editingHolidayId = null)}>Cancel</button>
+											<button type="submit" class="btn btn-primary btn-sm" disabled={editHolidaySaving}>{editHolidaySaving ? t('common.saving') : t('common.save')}</button>
+											<button type="button" class="btn btn-ghost btn-sm" onclick={() => (editingHolidayId = null)}>{t('common.cancel')}</button>
 										</div>
 									</form>
 								{:else}
@@ -291,16 +292,16 @@
 										<span class="font-medium text-base-content">{h.name}</span>
 										<span class="text-base-content/60 text-sm tabular-nums">{formatHolidayDate(h)}</span>
 										{#if h.isRecurring}
-											<span class="badge badge-sm badge-outline">Recurring</span>
+											<span class="badge badge-sm badge-outline">{t('holidays.recurring')}</span>
 										{/if}
 										{#if h.isHalfDay}
-											<span class="badge badge-sm badge-outline">½ day</span>
+											<span class="badge badge-sm badge-outline">{t('holidays.halfDayBadge')}</span>
 										{/if}
 									</div>
 									{#if canEdit}
 										<div class="flex items-center gap-1.5 ml-auto">
-											<button class="btn btn-ghost btn-sm" onclick={() => startEditHoliday(h)}>Edit</button>
-											<button class="btn btn-ghost btn-xs text-error" aria-label="Delete holiday {h.name}" title="Delete holiday" disabled={deletingId === h.id} onclick={() => deleteHoliday(h)}>&times;</button>
+											<button class="btn btn-ghost btn-sm" onclick={() => startEditHoliday(h)}>{t('common.edit')}</button>
+											<button class="btn btn-ghost btn-xs text-error" aria-label={t('holidays.deleteLabel', { name: h.name ?? '' })} title={t('holidays.deleteLabel', { name: h.name ?? '' })} disabled={deletingId === h.id} onclick={() => deleteHoliday(h)}>&times;</button>
 										</div>
 									{/if}
 								{/if}
