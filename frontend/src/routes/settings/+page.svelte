@@ -4,79 +4,67 @@
 	import { goto } from '$app/navigation';
 	import { authApi, workScheduleApi } from '$lib/apiClient';
 	import type { WorkScheduleResponse, UpdateProfileRequest, TwoFactorSetupResponse } from '$lib/api';
-	import { extractErrorMessage } from '$lib/utils/errorHandler';
-	import { dateKey } from '$lib/utils/dateHelpers';
+	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
+	import { roleLabel } from '$lib/utils/formatters';
 	import { theme } from '$lib/stores/theme.svelte';
+	import { locale, type Locale } from '$lib/stores/locale.svelte';
+	import { toast } from '$lib/stores/toast.svelte';
+	import { confirmDialog } from '$lib/stores/confirm.svelte';
+	import SchedulePeriodEditor from '$lib/components/SchedulePeriodEditor.svelte';
+	import InitialOvertimeEditor from '$lib/components/InitialOvertimeEditor.svelte';
 
-	let changePasswordError = $state('');
-	let changePasswordSuccess = $state('');
-	let currentPassword = $state('');
-	let newPassword = $state('');
-	let saving = $state(false);
+	/** The backend's minimum (RegisterRequest / ChangePasswordRequest). */
+	const MIN_PASSWORD_LENGTH = 8;
+
 	let activeTab = $state<'profile' | 'organization' | 'appearance'>('profile');
 
-	// Profile/account state
+	// Profile
 	let profileFirstName = $state('');
 	let profileLastName = $state('');
 	let profileEmail = $state('');
 	let profileUserId = $state<number | null>(null);
+	let profileSubmitted = $state(false);
 	let profileSaving = $state(false);
 	let profileError = $state('');
-	let profileSuccess = $state('');
-	let deleteAccountSaving = $state(false);
-	let deleteAccountError = $state('');
+	let firstNameError = $derived(profileSubmitted && !profileFirstName.trim() ? 'First name is required.' : '');
+	let lastNameError = $derived(profileSubmitted && !profileLastName.trim() ? 'Last name is required.' : '');
+	let emailError = $derived(
+		!profileSubmitted ? '' : !profileEmail.trim() ? 'Email is required.' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail.trim()) ? 'Enter a valid email address.' : ''
+	);
 
-	// Two-Factor Authentication state
-	let twoFactorStep = $state<'idle' | 'setup' | 'confirm' | 'backup'>('idle');
+	// Password
+	let currentPassword = $state('');
+	let newPassword = $state('');
+	let confirmPassword = $state('');
+	let passwordSubmitted = $state(false);
+	let passwordSaving = $state(false);
+	let passwordError = $state('');
+	let currentPasswordError = $derived(passwordSubmitted && !currentPassword ? 'Enter your current password.' : '');
+	let newPasswordError = $derived(
+		!passwordSubmitted ? '' : newPassword.length < MIN_PASSWORD_LENGTH ? `At least ${MIN_PASSWORD_LENGTH} characters.` : newPassword === currentPassword ? 'The new password must differ from the current one.' : ''
+	);
+	let confirmPasswordError = $derived(passwordSubmitted && confirmPassword !== newPassword ? 'The passwords do not match.' : '');
+
+	// Two-factor authentication
+	let twoFactorStep = $state<'idle' | 'setup' | 'backup'>('idle');
 	let twoFactorSetup = $state<TwoFactorSetupResponse | null>(null);
 	let twoFactorConfirmCode = $state('');
 	let twoFactorBackupCodes = $state<string[]>([]);
 	let twoFactorError = $state('');
-	let twoFactorSuccess = $state('');
 	let twoFactorSaving = $state(false);
 	let twoFactorDisablePassword = $state('');
 
-	// Schedule periods state
+	let deleteAccountSaving = $state(false);
+
+	// Schedule of the selected org (for the rule modes; periods load inside the editor)
 	let currentSchedule = $state<WorkScheduleResponse | null>(null);
-	let schedulePeriods = $state<WorkScheduleResponse[]>([]);
-	let showAddSchedulePeriod = $state(false);
-	let periodFrom = $state('');
-	let periodTo = $state('');
-	let periodWeeklyHours = $state<number | null>(null);
-	let periodDistributeEvenly = $state(true);
-	let periodMon = $state(0);
-	let periodTue = $state(0);
-	let periodWed = $state(0);
-	let periodThu = $state(0);
-	let periodFri = $state(0);
-	let initialOvertimeHours = $state(0);
-	let initialOvertimeMode = $state('Disabled');
 	let scheduleLoading = $state(false);
-	let periodSaving = $state(false);
-	let periodError = $state('');
-	let periodSuccess = $state('');
+	let scheduleError = $state('');
 
-	// Overtime state (separate from schedule)
-	let overtimeSaving = $state(false);
-	let overtimeError = $state('');
-	let overtimeSuccess = $state('');
-
-	// Load work schedule when org changes
 	$effect(() => {
-		if (orgContext.selectedOrgSlug) {
-			loadSchedulePeriodsForOrg(orgContext.selectedOrgSlug);
-		} else {
-			currentSchedule = null;
-			schedulePeriods = [];
-			showAddSchedulePeriod = false;
-			periodFrom = '';
-			periodTo = '';
-			periodWeeklyHours = null;
-			periodDistributeEvenly = true;
-			periodMon = periodTue = periodWed = periodThu = periodFri = 0;
-			initialOvertimeHours = 0;
-			initialOvertimeMode = 'Disabled';
-		}
+		const slug = orgContext.selectedOrgSlug;
+		if (slug) loadSchedule(slug);
+		else currentSchedule = null;
 	});
 
 	$effect(() => {
@@ -87,7 +75,6 @@
 			profileEmail = '';
 			return;
 		}
-
 		if (profileUserId !== auth.user.id) {
 			profileUserId = auth.user.id;
 			profileFirstName = auth.user.firstName ?? '';
@@ -96,196 +83,64 @@
 		}
 	});
 
-	function clearSchedulePeriodForm() {
-		periodFrom = '';
-		periodTo = '';
-		periodWeeklyHours = null;
-		periodDistributeEvenly = true;
-		periodMon = periodTue = periodWed = periodThu = periodFri = 0;
-	}
-
-	function normalizeDateOnly(value: string): string {
-		return value?.split('T')[0] ?? '';
-	}
-
-	async function loadSchedulePeriodsForOrg(orgSlug: string) {
+	async function loadSchedule(slug: string) {
 		scheduleLoading = true;
-		periodError = '';
+		scheduleError = '';
 		try {
-			const { data: schedule } = await workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(orgSlug);
-			currentSchedule = schedule;
-			initialOvertimeHours = schedule.initialOvertimeHours ?? 0;
-			initialOvertimeMode = schedule.initialOvertimeMode ?? 'Disabled';
-		} catch {
+			const { data } = await workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(slug);
+			if (slug === orgContext.selectedOrgSlug) currentSchedule = data;
+		} catch (err) {
 			currentSchedule = null;
-			initialOvertimeHours = 0;
-			initialOvertimeMode = 'Disabled';
-		}
-
-		try {
-			const { data } = await workScheduleApi.apiV1OrganizationsSlugWorkSchedulesGet(orgSlug);
-			schedulePeriods = (data as WorkScheduleResponse[]).sort((a, b) =>
-				(b.validFrom ?? '').localeCompare(a.validFrom ?? '')
-			);
-		} catch {
-			schedulePeriods = [];
+			if (getErrorStatus(err) !== 404) scheduleError = extractErrorMessage(err, 'Could not load your schedule.');
 		} finally {
 			scheduleLoading = false;
 		}
 	}
 
-	async function saveSchedulePeriod() {
-		if (!orgContext.selectedOrgSlug) return;
-		if (!periodFrom) {
-			periodError = 'A valid start date is required.';
-			return;
-		}
-
-		const validFrom = normalizeDateOnly(periodFrom);
-		const validTo = normalizeDateOnly(periodTo);
-		if (validTo && validTo < validFrom) {
-			periodError = 'Valid to must be on or after valid from.';
-			return;
-		}
-
-		periodSaving = true;
-		periodError = '';
-		periodSuccess = '';
-		try {
-			const payload = {
-				validFrom,
-				validTo: validTo || undefined,
-				weeklyWorkHours: periodWeeklyHours ?? undefined,
-				distributeEvenly: periodDistributeEvenly,
-				targetMon: periodDistributeEvenly ? undefined : periodMon,
-				targetTue: periodDistributeEvenly ? undefined : periodTue,
-				targetWed: periodDistributeEvenly ? undefined : periodWed,
-				targetThu: periodDistributeEvenly ? undefined : periodThu,
-				targetFri: periodDistributeEvenly ? undefined : periodFri
-			};
-
-			const existingPeriod = schedulePeriods.find((p) => p.validFrom === validFrom);
-			if (existingPeriod?.id) {
-				await workScheduleApi.apiV1OrganizationsSlugWorkSchedulesIdPut(
-					orgContext.selectedOrgSlug,
-					existingPeriod.id,
-					payload
-				);
-			} else {
-				await workScheduleApi.apiV1OrganizationsSlugWorkSchedulesPost(orgContext.selectedOrgSlug, payload);
-			}
-
-			await loadSchedulePeriodsForOrg(orgContext.selectedOrgSlug);
-			showAddSchedulePeriod = false;
-			clearSchedulePeriodForm();
-			periodSuccess = existingPeriod ? 'Schedule period updated.' : 'Schedule period added.';
-			setTimeout(() => (periodSuccess = ''), 3000);
-		} catch (err) {
-			periodError = extractErrorMessage(err, 'Failed to save schedule period.');
-		} finally {
-			periodSaving = false;
-		}
-	}
-
-	async function deleteSchedulePeriod(periodId: number) {
-		if (!orgContext.selectedOrgSlug) return;
-		try {
-			await workScheduleApi.apiV1OrganizationsSlugWorkSchedulesIdDelete(orgContext.selectedOrgSlug, periodId);
-			periodSuccess = 'Schedule period deleted.';
-			setTimeout(() => (periodSuccess = ''), 3000);
-			await loadSchedulePeriodsForOrg(orgContext.selectedOrgSlug);
-		} catch (err) {
-			periodError = extractErrorMessage(err, 'Failed to delete schedule period.');
-		}
-	}
-
-	async function saveInitialOvertime() {
-		if (!orgContext.selectedOrgSlug) return;
-		overtimeSaving = true;
-		overtimeError = '';
-		overtimeSuccess = '';
-		try {
-			await workScheduleApi.apiV1OrganizationsSlugInitialOvertimePut(orgContext.selectedOrgSlug, {
-				initialOvertimeHours: initialOvertimeHours
-			});
-			overtimeSuccess = 'Initial overtime saved.';
-			setTimeout(() => (overtimeSuccess = ''), 3000);
-		} catch (err) {
-			overtimeError = extractErrorMessage(err, 'Failed to save initial overtime.');
-		} finally {
-			overtimeSaving = false;
-		}
-	}
-
-	function handleOrgSelect(orgId: number | null) {
-		orgContext.select(orgId);
-	}
-
-	async function handleSaveProfile() {
+	async function handleSaveProfile(e: Event) {
+		e.preventDefault();
+		profileSubmitted = true;
+		if (firstNameError || lastNameError || emailError) return;
 		profileError = '';
-		profileSuccess = '';
-
-		const trimmedFirstName = profileFirstName.trim();
-		const trimmedLastName = profileLastName.trim();
-		const trimmedEmail = profileEmail.trim();
-
-		if (!trimmedFirstName || !trimmedLastName) {
-			profileError = 'First and last name are required.';
-			return;
-		}
-
-		if (!trimmedEmail) {
-			profileError = 'Email is required.';
-			return;
-		}
-
 		profileSaving = true;
 		try {
+			// TODO(backend): changing the email should require the current password once the endpoint supports it.
 			const payload: UpdateProfileRequest = {
-				firstName: trimmedFirstName,
-				lastName: trimmedLastName,
-				email: trimmedEmail
+				firstName: profileFirstName.trim(),
+				lastName: profileLastName.trim(),
+				email: profileEmail.trim()
 			};
 			const { data: updatedUser } = await authApi.apiV1AuthProfilePut(payload);
-
 			profileFirstName = updatedUser.firstName ?? '';
 			profileLastName = updatedUser.lastName ?? '';
 			profileEmail = updatedUser.email ?? '';
 			await auth.fetchCurrentUser();
-
-			profileSuccess = 'Profile updated.';
-			setTimeout(() => (profileSuccess = ''), 3000);
+			profileSubmitted = false;
+			toast.success('Profile saved.');
 		} catch (err) {
-			profileError = extractErrorMessage(err, 'Failed to update profile.');
+			profileError = extractErrorMessage(err, 'Could not save the profile.');
 		} finally {
 			profileSaving = false;
 		}
 	}
 
-	async function handleChangePassword() {
-		changePasswordError = '';
-		changePasswordSuccess = '';
-		if (!currentPassword || !newPassword) {
-			changePasswordError = 'Both fields are required.';
-			return;
-		}
-		if (newPassword.length < 6) {
-			changePasswordError = 'New password must be at least 6 characters.';
-			return;
-		}
-		saving = true;
+	async function handleChangePassword(e: Event) {
+		e.preventDefault();
+		passwordSubmitted = true;
+		if (currentPasswordError || newPasswordError || confirmPasswordError) return;
+		passwordError = '';
+		passwordSaving = true;
 		try {
-			await authApi.apiV1AuthChangePasswordPost({
-				currentPassword,
-				newPassword
-			});
-			changePasswordSuccess = 'Password changed successfully.';
+			await authApi.apiV1AuthChangePasswordPost({ currentPassword, newPassword });
 			currentPassword = '';
 			newPassword = '';
+			confirmPassword = '';
+			passwordSubmitted = false;
+			toast.success('Password changed.');
 		} catch (err) {
-			changePasswordError = extractErrorMessage(err, 'Failed to change password.');
+			passwordError = extractErrorMessage(err, 'Could not change the password.');
 		} finally {
-			saving = false;
+			passwordSaving = false;
 		}
 	}
 
@@ -297,15 +152,16 @@
 			twoFactorSetup = data;
 			twoFactorStep = 'setup';
 		} catch (err) {
-			twoFactorError = extractErrorMessage(err, 'Failed to start 2FA setup.');
+			twoFactorError = extractErrorMessage(err, 'Could not start the 2FA setup.');
 		} finally {
 			twoFactorSaving = false;
 		}
 	}
 
-	async function handleConfirm2FA() {
-		if (!twoFactorConfirmCode || twoFactorConfirmCode.length !== 6) {
-			twoFactorError = 'Please enter a 6-digit code.';
+	async function handleConfirm2FA(e: Event) {
+		e.preventDefault();
+		if (!/^\d{6}$/.test(twoFactorConfirmCode)) {
+			twoFactorError = 'Enter the 6-digit code.';
 			return;
 		}
 		twoFactorError = '';
@@ -317,7 +173,7 @@
 			twoFactorConfirmCode = '';
 			await auth.fetchCurrentUser();
 		} catch (err) {
-			twoFactorError = extractErrorMessage(err, 'Invalid code. Please try again.');
+			twoFactorError = extractErrorMessage(err, 'Invalid code. Try again.');
 		} finally {
 			twoFactorSaving = false;
 		}
@@ -327,13 +183,13 @@
 		twoFactorStep = 'idle';
 		twoFactorSetup = null;
 		twoFactorBackupCodes = [];
-		twoFactorSuccess = 'Two-factor authentication is now enabled.';
-		setTimeout(() => (twoFactorSuccess = ''), 5000);
+		toast.success('Two-factor authentication is on.');
 	}
 
-	async function handleDisable2FA() {
+	async function handleDisable2FA(e: Event) {
+		e.preventDefault();
 		if (!twoFactorDisablePassword) {
-			twoFactorError = 'Password is required to disable 2FA.';
+			twoFactorError = 'Enter your password to turn off 2FA.';
 			return;
 		}
 		twoFactorError = '';
@@ -341,11 +197,10 @@
 		try {
 			await authApi.apiV1Auth2faDisablePost({ currentPassword: twoFactorDisablePassword, newPassword: twoFactorDisablePassword });
 			twoFactorDisablePassword = '';
-			twoFactorSuccess = 'Two-factor authentication has been disabled.';
-			setTimeout(() => (twoFactorSuccess = ''), 5000);
 			await auth.fetchCurrentUser();
+			toast.success('Two-factor authentication is off.');
 		} catch (err) {
-			twoFactorError = extractErrorMessage(err, 'Failed to disable 2FA.');
+			twoFactorError = extractErrorMessage(err, 'Could not turn off 2FA.');
 		} finally {
 			twoFactorSaving = false;
 		}
@@ -365,184 +220,174 @@
 	}
 
 	async function handleDeleteAccount() {
-		deleteAccountError = '';
-		const confirmation = window.prompt('Type DELETE to permanently remove your account.');
-		if (confirmation !== 'DELETE') {
-			return;
-		}
-
+		// TODO(backend): account deletion should require the current password (and anonymize the account) — add a password field here once the endpoint accepts it.
+		const ok = await confirmDialog({
+			title: 'Delete account?',
+			message: 'Your account and all your data are removed permanently. This cannot be undone.',
+			confirmLabel: 'Delete account',
+			danger: true
+		});
+		if (!ok) return;
 		deleteAccountSaving = true;
 		try {
 			await authApi.apiV1AuthAccountDelete();
 			await auth.logout();
 			goto('/register');
 		} catch (err) {
-			deleteAccountError = extractErrorMessage(err, 'Failed to delete account.');
-		} finally {
+			toast.error(err, 'Could not delete the account.');
 			deleteAccountSaving = false;
 		}
 	}
+
+	const LOCALES: { value: Locale; label: string }[] = [
+		{ value: 'de', label: 'Deutsch' },
+		{ value: 'en', label: 'English' }
+	];
 </script>
 
 <svelte:head>
-	<title>Settings - Time Tracking</title>
+	<title>Settings – Time Tracking</title>
 </svelte:head>
 
 <div class="max-w-3xl mx-auto">
 	<h1 class="text-2xl font-bold mb-4">Settings</h1>
 
-	<div class="tabs tabs-boxed p-1 bg-base-200/70 mb-6 w-full md:w-fit" role="tablist" aria-label="Settings sections">
-		<button
-			type="button"
-			role="tab"
-			class={"tab " + (activeTab === 'profile' ? 'tab-active' : '')}
-			onclick={() => (activeTab = 'profile')}
-			aria-selected={activeTab === 'profile'}
-		>
-			Profile
-		</button>
-		<button
-			type="button"
-			role="tab"
-			class={"tab " + (activeTab === 'organization' ? 'tab-active' : '')}
-			onclick={() => (activeTab = 'organization')}
-			aria-selected={activeTab === 'organization'}
-		>
-			Org Settings
-		</button>
-		<button
-			type="button"
-			role="tab"
-			class={"tab " + (activeTab === 'appearance' ? 'tab-active' : '')}
-			onclick={() => (activeTab = 'appearance')}
-			aria-selected={activeTab === 'appearance'}
-		>
-			Appearance
-		</button>
+	<div class="tabs tabs-boxed p-1 bg-base-200/70 mb-6 w-full md:w-fit flex-wrap" role="tablist" aria-label="Settings sections">
+		{#each [{ id: 'profile', label: 'Profile' }, { id: 'organization', label: 'Organization' }, { id: 'appearance', label: 'Appearance' }] as const as tab}
+			<button
+				type="button"
+				role="tab"
+				class="tab {activeTab === tab.id ? 'tab-active' : ''}"
+				onclick={() => (activeTab = tab.id)}
+				aria-selected={activeTab === tab.id}
+			>
+				{tab.label}
+			</button>
+		{/each}
 	</div>
 
 	{#if activeTab === 'profile'}
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
-			<div class="card-body">
+			<form class="card-body" onsubmit={handleSaveProfile} novalidate>
 				<h2 class="card-title text-base">Profile</h2>
-
 				{#if profileError}
-					<div class="alert alert-error text-sm mb-4">{profileError}</div>
+					<div class="alert alert-error text-sm">{profileError}</div>
 				{/if}
-				{#if profileSuccess}
-					<div class="alert alert-success text-sm mb-4">{profileSuccess}</div>
-				{/if}
-
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 					<div>
-						<label for="profileFirstName" class="block text-sm font-medium text-base-content/80 mb-1.5">First Name</label>
-						<input id="profileFirstName" type="text" bind:value={profileFirstName} class="input input-bordered w-full" />
+						<label for="profileFirstName" class="block text-sm font-medium text-base-content/80 mb-1.5">First name</label>
+						<input id="profileFirstName" type="text" autocomplete="given-name" bind:value={profileFirstName} class="input input-bordered w-full" class:input-error={firstNameError} aria-invalid={!!firstNameError} disabled={profileSaving} />
+						{#if firstNameError}<p class="text-error text-xs mt-1">{firstNameError}</p>{/if}
 					</div>
 					<div>
-						<label for="profileLastName" class="block text-sm font-medium text-base-content/80 mb-1.5">Last Name</label>
-						<input id="profileLastName" type="text" bind:value={profileLastName} class="input input-bordered w-full" />
+						<label for="profileLastName" class="block text-sm font-medium text-base-content/80 mb-1.5">Last name</label>
+						<input id="profileLastName" type="text" autocomplete="family-name" bind:value={profileLastName} class="input input-bordered w-full" class:input-error={lastNameError} aria-invalid={!!lastNameError} disabled={profileSaving} />
+						{#if lastNameError}<p class="text-error text-xs mt-1">{lastNameError}</p>{/if}
 					</div>
 				</div>
-
-				<div class="mb-4">
+				<div>
 					<label for="profileEmail" class="block text-sm font-medium text-base-content/80 mb-1.5">Email</label>
-					<input id="profileEmail" type="email" bind:value={profileEmail} class="input input-bordered w-full max-w-md" />
+					<input id="profileEmail" type="email" autocomplete="email" bind:value={profileEmail} class="input input-bordered w-full max-w-md" class:input-error={emailError} aria-invalid={!!emailError} disabled={profileSaving} />
+					{#if emailError}<p class="text-error text-xs mt-1">{emailError}</p>{/if}
 				</div>
+				<div>
+					<button type="submit" class="btn btn-primary btn-sm" disabled={profileSaving}>
+						{profileSaving ? 'Saving…' : 'Save profile'}
+					</button>
+				</div>
+			</form>
+		</section>
 
-				<button class="btn btn-primary btn-sm" onclick={handleSaveProfile} disabled={profileSaving}>
-					{profileSaving ? 'Saving...' : 'Save Profile'}
-				</button>
-			</div>
+		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
+			<form class="card-body" onsubmit={handleChangePassword} novalidate>
+				<h2 class="card-title text-base">Change password</h2>
+				{#if passwordError}
+					<div class="alert alert-error text-sm">{passwordError}</div>
+				{/if}
+				<div>
+					<label for="currentPw" class="block text-sm font-medium text-base-content/80 mb-1.5">Current password</label>
+					<input id="currentPw" type="password" autocomplete="current-password" bind:value={currentPassword} class="input input-bordered w-full max-w-xs" class:input-error={currentPasswordError} aria-invalid={!!currentPasswordError} disabled={passwordSaving} />
+					{#if currentPasswordError}<p class="text-error text-xs mt-1">{currentPasswordError}</p>{/if}
+				</div>
+				<div>
+					<label for="newPw" class="block text-sm font-medium text-base-content/80 mb-1.5">New password</label>
+					<input id="newPw" type="password" autocomplete="new-password" minlength={MIN_PASSWORD_LENGTH} bind:value={newPassword} class="input input-bordered w-full max-w-xs" class:input-error={newPasswordError} aria-invalid={!!newPasswordError} aria-describedby="newPwHint" disabled={passwordSaving} />
+					<p id="newPwHint" class="text-xs mt-1 {newPasswordError ? 'text-error' : 'text-base-content/50'}">{newPasswordError || `At least ${MIN_PASSWORD_LENGTH} characters.`}</p>
+				</div>
+				<div>
+					<label for="confirmPw" class="block text-sm font-medium text-base-content/80 mb-1.5">Repeat new password</label>
+					<input id="confirmPw" type="password" autocomplete="new-password" bind:value={confirmPassword} class="input input-bordered w-full max-w-xs" class:input-error={confirmPasswordError} aria-invalid={!!confirmPasswordError} disabled={passwordSaving} />
+					{#if confirmPasswordError}<p class="text-error text-xs mt-1">{confirmPasswordError}</p>{/if}
+				</div>
+				<div>
+					<button type="submit" class="btn btn-primary btn-sm" disabled={passwordSaving}>
+						{passwordSaving ? 'Saving…' : 'Change password'}
+					</button>
+				</div>
+			</form>
 		</section>
 
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
-				<h2 class="card-title text-base">Change Password</h2>
-
-				{#if changePasswordError}
-					<div class="alert alert-error text-sm mb-4">{changePasswordError}</div>
-				{/if}
-				{#if changePasswordSuccess}
-					<div class="alert alert-success text-sm mb-4">{changePasswordSuccess}</div>
-				{/if}
-
-				<div class="mb-4">
-					<label for="currentPw" class="block text-sm font-medium text-base-content/80 mb-1.5">Current Password</label>
-					<input id="currentPw" type="password" bind:value={currentPassword} class="input input-bordered w-full max-w-xs" />
-				</div>
-				<div class="mb-4">
-					<label for="newPw" class="block text-sm font-medium text-base-content/80 mb-1.5">New Password</label>
-					<input id="newPw" type="password" bind:value={newPassword} class="input input-bordered w-full max-w-xs" />
-				</div>
-				<button class="btn btn-primary btn-sm" onclick={handleChangePassword} disabled={saving}>
-					{saving ? 'Saving...' : 'Change Password'}
-				</button>
-			</div>
-		</section>
-
-		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
-			<div class="card-body">
-				<h2 class="card-title text-base">Two-Factor Authentication</h2>
+				<h2 class="card-title text-base">Two-factor authentication</h2>
 
 				{#if twoFactorError}
-					<div class="alert alert-error text-sm mb-4">{twoFactorError}</div>
-				{/if}
-				{#if twoFactorSuccess}
-					<div class="alert alert-success text-sm mb-4">{twoFactorSuccess}</div>
+					<div class="alert alert-error text-sm">{twoFactorError}</div>
 				{/if}
 
 				{#if twoFactorStep === 'idle'}
 					{#if auth.user?.twoFactorEnabled}
-						<div class="flex items-center gap-2 mb-4">
-							<span class="badge badge-success badge-sm">Enabled</span>
-							<span class="text-sm text-base-content/60">Two-factor authentication is active on your account.</span>
+						<div class="flex items-center gap-2 flex-wrap">
+							<span class="badge badge-success badge-sm">On</span>
+							<span class="text-sm text-base-content/60">Two-factor authentication protects your account.</span>
 						</div>
-						<p class="text-sm text-base-content/60 mb-3">To disable 2FA, enter your password below.</p>
-						<div class="flex gap-2 items-end">
+						<form class="flex gap-2 items-end flex-wrap" onsubmit={handleDisable2FA}>
 							<div>
-								<label for="disable2faPassword" class="block text-sm font-medium text-base-content/80 mb-1.5">Password</label>
+								<label for="disable2faPassword" class="block text-sm font-medium text-base-content/80 mb-1.5">Password (to turn off 2FA)</label>
 								<input
 									id="disable2faPassword"
 									type="password"
+									autocomplete="current-password"
 									bind:value={twoFactorDisablePassword}
 									class="input input-bordered input-sm w-full max-w-xs"
-									placeholder="Your current password"
+									disabled={twoFactorSaving}
 								/>
 							</div>
-							<button class="btn btn-error btn-sm" onclick={handleDisable2FA} disabled={twoFactorSaving || !twoFactorDisablePassword}>
-								{twoFactorSaving ? 'Disabling...' : 'Disable 2FA'}
+							<button type="submit" class="btn btn-error btn-sm" disabled={twoFactorSaving || !twoFactorDisablePassword}>
+								{twoFactorSaving ? 'Turning off…' : 'Turn off 2FA'}
+							</button>
+						</form>
+					{:else}
+						<p class="text-sm text-base-content/60">Add an extra layer of security with an authenticator app (e.g. Google Authenticator, Authy).</p>
+						<div>
+							<button type="button" class="btn btn-primary btn-sm" onclick={handleSetup2FA} disabled={twoFactorSaving}>
+								{twoFactorSaving ? 'Setting up…' : 'Set up 2FA'}
 							</button>
 						</div>
-					{:else}
-						<p class="text-sm text-base-content/60 mb-3">Add an extra layer of security to your account using an authenticator app (e.g. Google Authenticator, Authy).</p>
-						<button class="btn btn-primary btn-sm" onclick={handleSetup2FA} disabled={twoFactorSaving}>
-							{twoFactorSaving ? 'Setting up...' : 'Set Up 2FA'}
-						</button>
 					{/if}
 				{:else if twoFactorStep === 'setup'}
-					<p class="text-sm text-base-content/60 mb-4">Scan this QR code with your authenticator app or enter the key manually.</p>
+					<p class="text-sm text-base-content/60">Scan this QR code with your authenticator app or enter the key manually.</p>
 
 					{#if twoFactorSetup}
-						<div class="flex flex-col items-center gap-4 mb-4 p-4 bg-base-200/50 rounded-lg border border-base-300">
+						<div class="flex flex-col items-center gap-4 p-4 bg-base-200/50 rounded-lg border border-base-300">
 							<div class="bg-white p-3 rounded-lg">
 								<img
-										src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={encodeURIComponent(twoFactorSetup.authenticatorUri ?? '')}"
-									alt="2FA QR Code"
+									src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={encodeURIComponent(twoFactorSetup.authenticatorUri ?? '')}"
+									alt="QR code for the authenticator app"
 									width="200"
 									height="200"
 									class="block"
 								/>
 							</div>
-							<div class="text-center">
+							<div class="text-center max-w-full">
 								<p class="text-xs text-base-content/50 mb-1">Or enter this key manually:</p>
-								<code class="text-sm font-mono bg-base-300 px-3 py-1.5 rounded select-all">{twoFactorSetup.sharedKey}</code>
+								<code class="text-sm font-mono bg-base-300 px-3 py-1.5 rounded select-all break-all">{twoFactorSetup.sharedKey}</code>
 							</div>
 						</div>
 
-						<p class="text-sm text-base-content/60 mb-3">Enter the 6-digit code from your authenticator app to confirm:</p>
-						<div class="flex gap-2 items-end">
+						<form class="flex gap-2 items-end flex-wrap" onsubmit={handleConfirm2FA}>
 							<div>
-								<label for="confirm2faCode" class="block text-sm font-medium text-base-content/80 mb-1.5">Verification Code</label>
+								<label for="confirm2faCode" class="block text-sm font-medium text-base-content/80 mb-1.5">6-digit code from the app</label>
 								<input
 									id="confirm2faCode"
 									type="text"
@@ -552,46 +397,42 @@
 									class="input input-bordered input-sm w-[160px] text-center tracking-[0.2em] font-mono"
 									placeholder="000000"
 									maxlength="6"
+									disabled={twoFactorSaving}
 								/>
 							</div>
-							<button class="btn btn-primary btn-sm" onclick={handleConfirm2FA} disabled={twoFactorSaving || twoFactorConfirmCode.length !== 6}>
-								{twoFactorSaving ? 'Verifying...' : 'Verify & Enable'}
+							<button type="submit" class="btn btn-primary btn-sm" disabled={twoFactorSaving || twoFactorConfirmCode.length !== 6}>
+								{twoFactorSaving ? 'Verifying…' : 'Verify and turn on'}
 							</button>
-						</div>
+						</form>
 					{/if}
 
-					<button type="button" class="btn btn-ghost btn-sm mt-3" onclick={cancelSetup2FA}>Cancel</button>
-				{:else if twoFactorStep === 'backup'}
-					<div class="alert alert-warning text-sm mb-4">
-						<span>Save these backup codes in a safe place. Each code can only be used once. You will not see them again.</span>
+					<div>
+						<button type="button" class="btn btn-ghost btn-sm" onclick={cancelSetup2FA} disabled={twoFactorSaving}>Cancel</button>
 					</div>
-
-					<div class="grid grid-cols-2 gap-2 mb-4 p-4 bg-base-200/50 rounded-lg border border-base-300 max-w-xs">
+				{:else if twoFactorStep === 'backup'}
+					<div class="alert alert-warning text-sm">
+						<span>Keep these backup codes somewhere safe. Each code works once, and they are not shown again.</span>
+					</div>
+					<div class="grid grid-cols-2 gap-2 p-4 bg-base-200/50 rounded-lg border border-base-300 max-w-xs">
 						{#each twoFactorBackupCodes as code}
 							<code class="text-sm font-mono text-center py-1">{code}</code>
 						{/each}
 					</div>
-
-					<button class="btn btn-primary btn-sm" onclick={handleFinish2FASetup}>
-						I've saved my backup codes
-					</button>
+					<div>
+						<button type="button" class="btn btn-primary btn-sm" onclick={handleFinish2FASetup}>I have saved the backup codes</button>
+					</div>
 				{/if}
 			</div>
 		</section>
 
 		<section class="card bg-base-100 border border-error/30 shadow-sm mb-5">
 			<div class="card-body gap-4">
-				<h2 class="card-title text-base">Account Actions</h2>
-				<p class="text-sm text-base-content/60 m-0">Sign out of this device or permanently delete your account.</p>
-
-				{#if deleteAccountError}
-					<div class="alert alert-error text-sm">{deleteAccountError}</div>
-				{/if}
-
+				<h2 class="card-title text-base">Account</h2>
+				<p class="text-sm text-base-content/60 m-0">Sign out of this device or delete your account permanently.</p>
 				<div class="flex flex-wrap gap-3">
-					<button class="btn btn-outline btn-sm" onclick={handleLogout}>Sign Out</button>
-					<button class="btn btn-error btn-sm" onclick={handleDeleteAccount} disabled={deleteAccountSaving}>
-						{deleteAccountSaving ? 'Deleting...' : 'Delete Account'}
+					<button type="button" class="btn btn-outline btn-sm" onclick={handleLogout}>Sign out</button>
+					<button type="button" class="btn btn-error btn-sm" onclick={handleDeleteAccount} disabled={deleteAccountSaving}>
+						{deleteAccountSaving ? 'Deleting…' : 'Delete account'}
 					</button>
 				</div>
 			</div>
@@ -599,30 +440,34 @@
 	{:else if activeTab === 'organization'}
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
-				<h2 class="card-title text-base">Active Organization</h2>
-				<p class="text-sm text-base-content/60 mb-4">Select which organization to track time for. This applies globally to new time entries.</p>
+				<h2 class="card-title text-base">Active organization</h2>
+				<p class="text-sm text-base-content/60 mb-2">Choose the organization new time entries are tracked for.</p>
 
-				<div class="flex flex-col gap-2">
+				<div class="flex flex-col gap-2" role="radiogroup" aria-label="Active organization">
 					<button
 						type="button"
-						class={"flex items-center gap-3 border rounded-xl px-4 py-3 cursor-pointer text-left w-full transition-colors hover:border-base-content/20 hover:bg-base-200 " + (orgContext.selectedOrgId === null ? "border-primary bg-primary/5" : "bg-base-200/50 border-base-300")}
-						onclick={() => handleOrgSelect(null)}
+						role="radio"
+						aria-checked={orgContext.selectedOrgId === null}
+						class="flex items-center gap-3 border rounded-xl px-4 py-3 text-left w-full transition-colors hover:border-base-content/20 hover:bg-base-200 {orgContext.selectedOrgId === null ? 'border-primary bg-primary/5' : 'bg-base-200/50 border-base-300'}"
+						onclick={() => orgContext.select(null)}
 					>
-						<input type="radio" class="radio radio-primary radio-sm" checked={orgContext.selectedOrgId === null} tabindex="-1" />
+						<input type="radio" class="radio radio-primary radio-sm pointer-events-none" checked={orgContext.selectedOrgId === null} tabindex="-1" aria-hidden="true" />
 						<span class="text-sm font-medium">Personal (no organization)</span>
 					</button>
 
-					{#each orgContext.organizations as org}
+					{#each orgContext.organizations as org (org.organizationId)}
 						<button
 							type="button"
-							class={"flex items-center gap-3 border rounded-xl px-4 py-3 cursor-pointer text-left w-full transition-colors hover:border-base-content/20 hover:bg-base-200 " + (orgContext.selectedOrgId === org.organizationId ? "border-primary bg-primary/5" : "bg-base-200/50 border-base-300")}
-							onclick={() => handleOrgSelect(org.organizationId ?? null)}
+							role="radio"
+							aria-checked={orgContext.selectedOrgId === org.organizationId}
+							class="flex items-center gap-3 border rounded-xl px-4 py-3 text-left w-full transition-colors hover:border-base-content/20 hover:bg-base-200 {orgContext.selectedOrgId === org.organizationId ? 'border-primary bg-primary/5' : 'bg-base-200/50 border-base-300'}"
+							onclick={() => orgContext.select(org.organizationId ?? null)}
 						>
-							<input type="radio" class="radio radio-primary radio-sm" checked={orgContext.selectedOrgId === org.organizationId} tabindex="-1" />
-							<div class="flex gap-2 items-center">
-								<span class="text-sm font-medium">{org.name}</span>
-								<span class="text-[0.6875rem] text-base-content/60 uppercase font-semibold tracking-wide">{org.role}</span>
-							</div>
+							<input type="radio" class="radio radio-primary radio-sm pointer-events-none" checked={orgContext.selectedOrgId === org.organizationId} tabindex="-1" aria-hidden="true" />
+							<span class="flex gap-2 items-center flex-wrap min-w-0">
+								<span class="text-sm font-medium break-words">{org.name}</span>
+								<span class="text-[0.6875rem] text-base-content/60 uppercase font-semibold tracking-wide">{roleLabel(org.role)}</span>
+							</span>
 						</button>
 					{/each}
 
@@ -631,183 +476,44 @@
 					{/if}
 				</div>
 
-				<div class="flex gap-4 mt-4 pt-4 border-t border-base-200">
-					<a href="/organizations" class="text-sm link link-primary font-medium no-underline hover:underline">Browse Organizations</a>
-					<a href="/organizations/new" class="text-sm link link-primary font-medium no-underline hover:underline">+ Create New</a>
+				<div class="flex gap-4 mt-4 pt-4 border-t border-base-200 flex-wrap">
+					<a href="/organizations" class="text-sm link link-primary font-medium no-underline hover:underline">Browse organizations</a>
+					<a href="/organizations/new" class="text-sm link link-primary font-medium no-underline hover:underline">+ Create organization</a>
 				</div>
 			</div>
 		</section>
 
-		{#if orgContext.selectedOrgId}
-			<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
-				<div class="card-body">
-					<h2 class="card-title text-base">Schedule Periods</h2>
-					<p class="text-sm text-base-content/60 mb-4">Manage your work schedule in <strong>{orgContext.selectedOrg?.name}</strong> through schedule periods only.</p>
-
-					{#if periodError}
-						<div class="alert alert-error text-sm mb-4">{periodError}</div>
-					{/if}
-					{#if periodSuccess}
-						<div class="alert alert-success text-sm mb-4">{periodSuccess}</div>
-					{/if}
-
-					{#if scheduleLoading}
-						<p class="text-sm text-base-content/50">Loading schedule periods...</p>
-					{:else}
-						{#if currentSchedule && (currentSchedule.id ?? 0) > 0}
-							<div class="mb-4 p-3 rounded-lg border border-base-300 bg-base-200/40">
-								<p class="text-sm text-base-content/70 mb-1">Current active period</p>
-								<p class="text-sm font-medium text-base-content">
-									{currentSchedule.validFrom} &rarr; {currentSchedule.validTo ?? 'ongoing'}
-									<span class="ml-2 text-primary">{currentSchedule.weeklyWorkHours ?? '—'}h/week</span>
-								</p>
-							</div>
-						{/if}
-
-						{#if currentSchedule?.workScheduleChangeMode === 'RequiresApproval'}
-							<div class="alert alert-warning text-sm mb-4">Schedule period changes require admin approval.</div>
-						{:else if currentSchedule?.workScheduleChangeMode === 'Disabled'}
-							<div class="alert alert-info text-sm mb-4">Schedule period changes are disabled in this organization.</div>
-						{/if}
-
-						{#if currentSchedule?.workScheduleChangeMode === 'Allowed'}
-							<button
-								class="btn btn-primary btn-sm mb-4"
-								onclick={() => {
-									showAddSchedulePeriod = !showAddSchedulePeriod;
-									if (!showAddSchedulePeriod) clearSchedulePeriodForm();
-								}}
-							>
-								{showAddSchedulePeriod ? 'Cancel' : '+ Add Period'}
-							</button>
-						{/if}
-
-						{#if showAddSchedulePeriod && currentSchedule?.workScheduleChangeMode === 'Allowed'}
-							<div class="flex flex-col gap-3 p-3 rounded-lg mb-4 border border-base-300 bg-base-200/40">
-								<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-									<div>
-										<label for="periodFrom" class="block text-sm font-medium text-base-content/80 mb-1.5">Valid From</label>
-										<input id="periodFrom" type="date" bind:value={periodFrom} class="input input-bordered input-sm w-full" />
-									</div>
-									<div>
-										<label for="periodTo" class="block text-sm font-medium text-base-content/80 mb-1.5">Valid To (optional)</label>
-										<input id="periodTo" type="date" min={periodFrom || undefined} bind:value={periodTo} class="input input-bordered input-sm w-full" />
-									</div>
-								</div>
-
-								<div>
-									<label for="periodWeekly" class="block text-sm font-medium text-base-content/80 mb-1.5">Weekly Work Hours</label>
-									<input id="periodWeekly" type="number" step="0.5" min="0" max="80" bind:value={periodWeeklyHours} class="input input-bordered input-sm max-w-[120px]" />
-								</div>
-
-								<label class="flex items-center gap-2 text-sm text-base-content/80 cursor-pointer">
-									<input type="checkbox" class="checkbox checkbox-primary checkbox-sm" bind:checked={periodDistributeEvenly} />
-									Distribute evenly (Mon-Fri)
-								</label>
-
-								{#if !periodDistributeEvenly}
-									<div class="grid grid-cols-5 gap-2">
-										<div class="flex flex-col items-center gap-1"><label for="periodMon" class="text-xs font-semibold text-base-content/60 uppercase">Mon</label><input id="periodMon" type="number" step="0.5" min="0" max="24" bind:value={periodMon} class="input input-bordered input-xs w-full text-center" /></div>
-										<div class="flex flex-col items-center gap-1"><label for="periodTue" class="text-xs font-semibold text-base-content/60 uppercase">Tue</label><input id="periodTue" type="number" step="0.5" min="0" max="24" bind:value={periodTue} class="input input-bordered input-xs w-full text-center" /></div>
-										<div class="flex flex-col items-center gap-1"><label for="periodWed" class="text-xs font-semibold text-base-content/60 uppercase">Wed</label><input id="periodWed" type="number" step="0.5" min="0" max="24" bind:value={periodWed} class="input input-bordered input-xs w-full text-center" /></div>
-										<div class="flex flex-col items-center gap-1"><label for="periodThu" class="text-xs font-semibold text-base-content/60 uppercase">Thu</label><input id="periodThu" type="number" step="0.5" min="0" max="24" bind:value={periodThu} class="input input-bordered input-xs w-full text-center" /></div>
-										<div class="flex flex-col items-center gap-1"><label for="periodFri" class="text-xs font-semibold text-base-content/60 uppercase">Fri</label><input id="periodFri" type="number" step="0.5" min="0" max="24" bind:value={periodFri} class="input input-bordered input-xs w-full text-center" /></div>
-									</div>
-								{/if}
-
-								<div class="flex gap-2">
-									<button class="btn btn-primary btn-sm" onclick={saveSchedulePeriod} disabled={periodSaving || !periodFrom}>
-										{periodSaving ? 'Saving...' : 'Save Period'}
-									</button>
-								</div>
-							</div>
-						{/if}
-
-						{#if schedulePeriods.length === 0}
-							<p class="text-sm text-base-content/50">No schedule periods configured yet.</p>
-						{:else}
-							<div class="flex flex-col gap-2">
-								{#each schedulePeriods as period}
-									{@const today = dateKey(new Date())}
-									{@const isActive = period.validFrom && period.validFrom <= today && (!period.validTo || period.validTo >= today)}
-									<div class="flex items-center gap-3 py-2 px-3 rounded-lg border text-sm {isActive ? 'border-success/40 bg-success/5' : 'border-base-300 bg-base-200/30'}">
-										<div class="flex items-center gap-1.5 flex-1 min-w-0">
-											<span class="font-medium text-base-content/70">{period.validFrom}</span>
-											<span class="text-base-content/40 text-xs">&rarr;</span>
-											<span class="font-medium text-base-content/70">{period.validTo ?? 'ongoing'}</span>
-											{#if isActive}
-												<span class="badge badge-success badge-xs">Active</span>
-											{/if}
-										</div>
-										<span class="font-semibold text-base-content whitespace-nowrap">{period.weeklyWorkHours ?? '—'}h/week</span>
-										{#if currentSchedule?.workScheduleChangeMode === 'Allowed'}
-											<button class="btn btn-ghost btn-xs text-error" onclick={() => deleteSchedulePeriod(period.id!)} title="Delete period">&times;</button>
-										{/if}
-									</div>
-								{/each}
-							</div>
-						{/if}
-					{/if}
-				</div>
-			</section>
-
-			{#if initialOvertimeMode !== 'Disabled'}
-				<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
-					<div class="card-body">
-						<h2 class="card-title text-base">Initial Overtime Balance</h2>
-						<p class="text-sm text-base-content/60 mb-4">
-							Set your starting overtime balance for <strong>{orgContext.selectedOrg?.name}</strong>.
-							{#if initialOvertimeMode === 'RequiresApproval'}
-								<em>This requires admin approval.</em>
-							{/if}
-						</p>
-
-						{#if overtimeError}
-							<div class="alert alert-error text-sm mb-4">{overtimeError}</div>
-						{/if}
-						{#if overtimeSuccess}
-							<div class="alert alert-success text-sm mb-4">{overtimeSuccess}</div>
-						{/if}
-
-						<div class="mb-4">
-							<label for="initialOvertime" class="block text-sm font-medium text-base-content/80 mb-1.5">Overtime (hours)</label>
-							<input
-								id="initialOvertime"
-								type="number"
-								step="0.5"
-								bind:value={initialOvertimeHours}
-								placeholder="e.g. 2.5 or -1"
-								class="input input-bordered input-sm max-w-[120px]"
-								disabled={initialOvertimeMode === 'RequiresApproval'}
-							/>
-							<span class="block text-xs text-base-content/50 mt-1">
-								{#if initialOvertimeHours > 0}
-									+{initialOvertimeHours.toFixed(1)}h carried over
-								{:else if initialOvertimeHours < 0}
-									{initialOvertimeHours.toFixed(1)}h deficit
-								{:else}
-									Starting from zero
-								{/if}
-							</span>
-						</div>
-
-						{#if initialOvertimeMode === 'Allowed'}
-							<button class="btn btn-primary btn-sm" onclick={saveInitialOvertime} disabled={overtimeSaving}>
-								{overtimeSaving ? 'Saving...' : 'Save Overtime'}
-							</button>
-						{:else}
-							<p class="text-sm text-base-content/50" style="font-size: 0.8125rem;">Submit a request through the Timer page to change this value.</p>
-						{/if}
-					</div>
-				</section>
+		{#if orgContext.selectedOrgSlug}
+			<p class="text-sm text-base-content/60 mb-3">Your work schedule in <strong>{orgContext.selectedOrg?.name}</strong>:</p>
+			{#if scheduleLoading && !currentSchedule}
+				<p class="text-sm text-base-content/50 flex items-center gap-2 mb-5"><span class="loading loading-spinner loading-xs"></span> Loading…</p>
+			{:else if scheduleError}
+				<div class="alert alert-error text-sm mb-5">{scheduleError}</div>
+			{:else if currentSchedule}
+				{#key orgContext.selectedOrgSlug}
+					<SchedulePeriodEditor
+						class="mb-5"
+						orgSlug={orgContext.selectedOrgSlug}
+						editable={currentSchedule.workScheduleChangeMode === 'Allowed'}
+						mode={currentSchedule.workScheduleChangeMode}
+						onchanged={() => orgContext.selectedOrgSlug && loadSchedule(orgContext.selectedOrgSlug)}
+					/>
+					<InitialOvertimeEditor
+						class="mb-5"
+						orgSlug={orgContext.selectedOrgSlug}
+						hours={currentSchedule.initialOvertimeHours ?? 0}
+						editable={currentSchedule.initialOvertimeMode === 'Allowed'}
+						mode={currentSchedule.initialOvertimeMode}
+						onsaved={() => orgContext.selectedOrgSlug && loadSchedule(orgContext.selectedOrgSlug)}
+					/>
+				{/key}
 			{/if}
 		{/if}
 	{:else}
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
 				<h2 class="card-title text-base">Theme</h2>
-				<p class="text-sm text-base-content/60 mb-4">Light or dark. The choice is shared with the other Wagner Luca apps.</p>
-
+				<p class="text-sm text-base-content/60 mb-2">Light or dark. The choice is shared with the other Wagner Luca apps.</p>
 				<div class="join">
 					{#each [{ dark: false, label: 'Light' }, { dark: true, label: 'Dark' }] as opt}
 						<button
@@ -815,6 +521,24 @@
 							class="btn btn-sm join-item {theme.isDark === opt.dark ? 'btn-neutral' : 'btn-ghost border-base-300'}"
 							onclick={() => theme.set(opt.dark)}
 							aria-pressed={theme.isDark === opt.dark}
+						>{opt.label}</button>
+					{/each}
+				</div>
+			</div>
+		</section>
+
+		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
+			<div class="card-body">
+				<h2 class="card-title text-base">Language</h2>
+				<p class="text-sm text-base-content/60 mb-2">German or English. The choice is shared with the other Wagner Luca apps.</p>
+				<div class="join">
+					{#each LOCALES as opt}
+						<button
+							type="button"
+							lang={opt.value}
+							class="btn btn-sm join-item {locale.current === opt.value ? 'btn-neutral' : 'btn-ghost border-base-300'}"
+							onclick={() => locale.set(opt.value)}
+							aria-pressed={locale.current === opt.value}
 						>{opt.label}</button>
 					{/each}
 				</div>

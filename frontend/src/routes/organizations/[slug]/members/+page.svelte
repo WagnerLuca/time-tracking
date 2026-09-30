@@ -2,284 +2,157 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 	import GroupTags from '$lib/components/GroupTags.svelte';
 	import { organizationsApi } from '$lib/apiClient';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
-	import type {
-		OrganizationDetailResponse,
-		AddMemberRequest,
-		MemberTimeOverviewResponse,
-		OrganizationRole
-	} from '$lib/api';
+	import { getWeekRange } from '$lib/utils/dateHelpers';
+	import { formatHours, formatNumber, getInitials, roleLabel } from '$lib/utils/formatters';
+	import { isOrgAdmin } from '$lib/utils/orgRules';
+	import type { OrganizationDetailResponse, MemberTimeOverviewResponse } from '$lib/api';
+
+	const orgSlug = $derived(page.params.slug ?? '');
 
 	let org = $state<OrganizationDetailResponse | null>(null);
 	let loading = $state(true);
 	let error = $state('');
 
-	let myRole = $derived(
-		org?.members?.find((m) => m.id === auth.user?.id)?.role ?? null
-	);
-	let canEdit = $derived(myRole === 'Owner' || myRole === 'Admin');
-	let isOwner = $derived(myRole === 'Owner');
+	let isAdmin = $derived(isOrgAdmin(org?.members?.find((m) => m.id === auth.user?.id)?.role));
 
-	// Add member
-	let showAddMember = $state(false);
-	let newMemberRole = $state<OrganizationRole>(0 as OrganizationRole);
-	let addMemberError = $state('');
-	let addingMember = $state(false);
+	// This week's tracked time per member (only returned where the caller may see it)
+	let overviewByUser = $state(new Map<number, MemberTimeOverviewResponse>());
 
-	// User search for add member dropdown
-	let allUsers = $state<Array<{id: number, email: string, firstName: string, lastName: string}>>([]);
-	let selectedUserId = $state<number | null>(null);
-	let usersLoaded = $state(false);
-
-	// Team overview data (admin)
-	let teamOverview = $state<MemberTimeOverviewResponse[]>([]);
-	let teamOverviewLoading = $state(false);
-	let teamOverviewLoaded = $state(false);
-
-	const orgSlug = $derived(page.params.slug ?? '');
+	let groupFilter = $state<number | 'none' | null>(null);
 
 	// (Re)load whenever the slug in the URL changes, so switching orgs never shows stale data
 	$effect(() => {
 		if (!orgSlug) return;
-		untrack(() => {
-			loadOrg();
-		});
+		untrack(() => loadOrg());
 	});
 
 	async function loadOrg() {
 		loading = true;
 		error = '';
+		groupFilter = null;
+		overviewByUser = new Map();
 		try {
 			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			org = data;
-			loadUsersForDropdown();
-			loadTeamOverview();
 		} catch (err) {
-			if (getErrorStatus(err) === 404) { error = 'Organization not found.'; }
-			else { error = 'Failed to load organization.'; }
+			error = getErrorStatus(err) === 404 ? 'Organization not found.' : extractErrorMessage(err, 'Could not load the organization.');
 		} finally {
 			loading = false;
 		}
-	}
-
-	async function reloadOrg() {
-		try {
-			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
-			org = data;
-		} catch {}
+		if (org) loadTeamOverview();
 	}
 
 	async function loadTeamOverview() {
-		if (teamOverviewLoaded) return;
-		teamOverviewLoading = true;
+		const week = getWeekRange(0);
 		try {
-			const now = new Date();
-			const dayOfWeek = now.getDay() || 7;
-			const weekStart = new Date(now);
-			weekStart.setDate(now.getDate() - dayOfWeek + 1);
-			weekStart.setHours(0, 0, 0, 0);
-			const weekEnd = new Date(weekStart);
-			weekEnd.setDate(weekStart.getDate() + 6);
-			weekEnd.setHours(23, 59, 59, 999);
-			const { data } = await organizationsApi.apiV1OrganizationsSlugTimeOverviewGet(orgSlug, weekStart.toISOString(), weekEnd.toISOString());
-			teamOverview = data;
-			teamOverviewLoaded = true;
-		} catch {
-			teamOverview = [];
-		} finally {
-			teamOverviewLoading = false;
-		}
-	}
-
-	function getMemberOverview(memberId: number): MemberTimeOverviewResponse | null {
-		return teamOverview.find(m => m.userId === memberId) ?? null;
-	}
-
-	function formatMinutesToHours(minutes?: number | null): string {
-		if (!minutes) return '0h';
-		const h = Math.floor(Math.abs(minutes) / 60);
-		const m = Math.abs(minutes) % 60;
-		const sign = minutes < 0 ? '-' : '';
-		return m > 0 ? `${sign}${h}h ${m}m` : `${sign}${h}h`;
-	}
-
-	async function loadUsersForDropdown() {
-		if (usersLoaded) return;
-		try {
-			const { data: orgData } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
-			const users = orgData?.members ?? [];
-			allUsers = users.map((u: any) => ({
-				id: u.id,
-				email: u.email,
-				firstName: u.firstName,
-				lastName: u.lastName
-			}));
-			usersLoaded = true;
-		} catch {
-			allUsers = [];
-		}
-	}
-
-	function getAvailableUsers() {
-		const memberIds = new Set((org?.members ?? []).map(m => m.id));
-		return allUsers.filter(u => !memberIds.has(u.id));
-	}
-
-	async function addMember(e: Event) {
-		e.preventDefault();
-		if (!selectedUserId) { addMemberError = 'Select a user.'; return; }
-		addMemberError = '';
-		addingMember = true;
-		try {
-			const payload: AddMemberRequest = { userId: selectedUserId, role: newMemberRole };
-			await organizationsApi.apiV1OrganizationsSlugMembersPost(orgSlug, payload);
-			await reloadOrg();
-			usersLoaded = false;
-			await loadUsersForDropdown();
-			showAddMember = false;
-			selectedUserId = null;
-			newMemberRole = 0;
+			const { data } = await organizationsApi.apiV1OrganizationsSlugTimeOverviewGet(orgSlug, week.start.toISOString(), week.end.toISOString());
+			overviewByUser = new Map(data.filter((m) => m.userId != null).map((m) => [m.userId!, m]));
 		} catch (err) {
-			addMemberError = extractErrorMessage(err, 'Failed to add member.');
-		} finally {
-			addingMember = false;
+			// 403 = time entries are not visible to the caller; the list works without them
+			if (getErrorStatus(err) !== 403) toast.error(err, "Could not load this week's hours.");
 		}
 	}
 
-	// ── Group filter ──
-	let groupFilter = $state<number | 'none' | null>(null);
-
-	function getGroupOptions(): { id: number; name: string; color?: string | null }[] {
-		const seen = new Map<number, { id: number; name: string; color?: string | null }>();
+	let groupOptions = $derived.by(() => {
+		const seen = new Map<number, string>();
 		for (const m of org?.members ?? []) {
 			for (const g of m.groups ?? []) {
-				if (g.groupId != null && !seen.has(g.groupId)) seen.set(g.groupId, { id: g.groupId, name: g.name ?? '', color: g.color });
+				if (g.groupId != null && !seen.has(g.groupId)) seen.set(g.groupId, g.name ?? '');
 			}
 		}
-		return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
-	}
+		return [...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+	});
 
-	function filteredMembers() {
-		const members = org?.members ?? [];
-		if (groupFilter === null) return members;
-		if (groupFilter === 'none') return members.filter(m => (m.groups ?? []).length === 0);
-		return members.filter(m => (m.groups ?? []).some(g => g.groupId === groupFilter));
+	let members = $derived.by(() => {
+		const all = org?.members ?? [];
+		if (groupFilter === null) return all;
+		if (groupFilter === 'none') return all.filter((m) => (m.groups ?? []).length === 0);
+		return all.filter((m) => (m.groups ?? []).some((g) => g.groupId === groupFilter));
+	});
+
+	function roleBadge(role: string | null | undefined): string {
+		return role === 'Owner' ? 'badge-warning' : role === 'Admin' ? 'badge-info' : 'badge-ghost';
 	}
 </script>
 
 <svelte:head>
-	<title>Members - {org?.name ?? 'Organization'} - Time Tracking</title>
+	<title>Members – {org?.name ?? 'Organization'} – Time Tracking</title>
 </svelte:head>
 
-<div class="max-w-5xl mx-auto px-6 pb-6">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 pb-6">
 	{#if loading}
-		<div class="flex items-center gap-3 justify-center py-12 text-base-content/40"><span class="loading loading-spinner loading-sm"></span><span>Loading...</span></div>
+		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>Loading…</span></div>
 	{:else if error}
 		<div class="alert alert-error">{error}</div>
 	{:else if org}
-		<div class="pt-2">
-			<p class="text-base-content/50 text-sm mt-2 mb-5 leading-relaxed">Your team at a glance. {#if canEdit}Click a member for details, schedule editing, and absence history.{:else}Click a member to see their profile.{/if}</p>
+		<p class="text-base-content/60 text-sm mt-2 mb-5">
+			{isAdmin ? 'Open a member for details, schedule editing and absence history.' : 'Open a member to see their profile.'}
+		</p>
 
-			<!-- Members -->
-			<section class="mt-4">
-				<div class="flex items-center justify-between mb-4 flex-wrap gap-2">
-					<h2 class="text-xl text-base-content/70">Members ({filteredMembers().length}{groupFilter !== null ? ` of ${(org.members ?? []).length}` : ''})</h2>
-					<div class="flex items-center gap-2">
-						{#if getGroupOptions().length > 0}
-							<select bind:value={groupFilter} class="select select-bordered select-sm" title="Filter members by group">
-								<option value={null}>All groups</option>
-								{#each getGroupOptions() as g}
-									<option value={g.id}>{g.name}</option>
-								{/each}
-								<option value="none">No group</option>
-							</select>
-						{/if}
-						{#if canEdit}
-							<button class="btn btn-primary btn-sm" onclick={() => { showAddMember = !showAddMember; if (showAddMember) loadUsersForDropdown(); }}>
-								{showAddMember ? 'Cancel' : '+ Add Member'}
-							</button>
-						{/if}
-					</div>
-				</div>
-
-				{#if showAddMember && canEdit}
-					<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
-						{#if addMemberError}
-							<div class="alert alert-error mb-4 text-sm">{addMemberError}</div>
-						{/if}
-						<form onsubmit={addMember} class="flex gap-2 items-center flex-wrap">
-							<select bind:value={selectedUserId} disabled={addingMember} class="select select-bordered select-sm flex-1 min-w-[200px]">
-								<option value={null}>Select a user...</option>
-								{#each getAvailableUsers() as user}
-									<option value={user.id}>{user.firstName} {user.lastName} ({user.email})</option>
-								{/each}
-							</select>
-							<select bind:value={newMemberRole} disabled={addingMember} class="select select-bordered select-sm">
-								<option value={0}>Member</option>
-								<option value={1}>Admin</option>
-								{#if isOwner}<option value={2}>Owner</option>{/if}
-							</select>
-							<button type="submit" class="btn btn-primary btn-sm" disabled={addingMember}>
-								{addingMember ? 'Adding...' : 'Add'}
-							</button>
-						</form>
-					</div>
+		<section>
+			<div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+				<h2 class="text-xl text-base-content/70 m-0">
+					Members ({members.length}{groupFilter !== null ? ` of ${(org.members ?? []).length}` : ''})
+				</h2>
+				{#if groupOptions.length > 0}
+					<label class="flex items-center gap-2 text-sm">
+						<span class="sr-only">Filter by group</span>
+						<select bind:value={groupFilter} class="select select-bordered select-sm">
+							<option value={null}>All groups</option>
+							{#each groupOptions as g (g.id)}
+								<option value={g.id}>{g.name}</option>
+							{/each}
+							<option value="none">No group</option>
+						</select>
+					</label>
 				{/if}
+			</div>
 
-				<div class="flex flex-col gap-2">
-					{#each filteredMembers() as member}
-						{@const overview = getMemberOverview(member.id!)}
+			<ul class="flex flex-col gap-2 list-none p-0 m-0">
+				{#each members as member (member.id)}
+					{@const overview = overviewByUser.get(member.id!)}
+					<li>
 						<a
-							class="group flex items-center gap-4 p-3.5 bg-base-100 border border-base-300 rounded-xl cursor-pointer transition-all hover:border-primary/30 hover:shadow-md hover:-translate-y-px no-underline text-base-content"
+							class="group flex items-center gap-3 sm:gap-4 p-3.5 bg-base-100 border border-base-300 rounded-xl transition-all hover:border-primary/30 hover:shadow-md no-underline text-base-content"
 							href="/organizations/{orgSlug}/members/{member.id}"
-							title="View {member.firstName}'s details"
 						>
-							<div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-sm font-semibold shrink-0">
-								{(member.firstName?.[0] ?? '').toUpperCase()}{(member.lastName?.[0] ?? '').toUpperCase()}
+							<div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-sm font-semibold shrink-0" aria-hidden="true">
+								{getInitials(member.firstName, member.lastName)}
 							</div>
 							<div class="flex-1 min-w-0">
-								<div class="font-semibold text-base-content text-[0.9375rem] flex items-center gap-1.5 flex-wrap">
-									{member.firstName} {member.lastName}
+								<div class="font-semibold text-[0.9375rem] flex items-center gap-1.5 flex-wrap">
+									<span class="break-words">{member.firstName} {member.lastName}</span>
 									{#if member.id === auth.user?.id}
 										<span class="badge badge-info badge-xs font-semibold">You</span>
 									{/if}
 									<GroupTags groups={member.groups} />
 								</div>
-								<div class="text-sm text-base-content/40 mt-0.5">{member.email}</div>
-								{#if teamOverviewLoaded && overview}
-									<div class="flex gap-3 mt-1.5 flex-wrap">
-										<span class="flex items-center gap-1 text-xs text-base-content/50" title="Tracked this week">
-											<svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5 opacity-60"><path d="M8 3.5a.5.5 0 00-1 0V8a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 7.71V3.5z"/><path d="M8 16A8 8 0 108 0a8 8 0 000 16zm7-8A7 7 0 111 8a7 7 0 0114 0z"/></svg>
-											{formatMinutesToHours(overview.netTrackedMinutes)}
+								<div class="text-sm text-base-content/50 mt-0.5 truncate">{member.email}</div>
+								<div class="flex gap-x-3 gap-y-1 mt-1.5 flex-wrap items-center text-xs text-base-content/60">
+									<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>
+									{#if member.vacationVisible !== false && (member.vacationDaysPerYear ?? 0) > 0}
+										<span title="Vacation: {formatNumber(member.vacationDaysUsed ?? 0)}/{formatNumber(member.vacationDaysPerYear ?? 0)} used">
+											{formatNumber(member.vacationDaysRemaining ?? member.vacationDaysPerYear ?? 0)} vacation days left
 										</span>
-										<span class="flex items-center gap-1 text-xs text-base-content/50" title="Entries this week">
-											<svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5 opacity-60"><path d="M5 3.5h6A1.5 1.5 0 0112.5 5v6a1.5 1.5 0 01-1.5 1.5H5A1.5 1.5 0 013.5 11V5A1.5 1.5 0 015 3.5z"/></svg>
-											{overview.entryCount ?? 0} entries
-										</span>
+									{/if}
+									{#if overview}
+										<span title="Tracked this week">{formatHours(overview.netTrackedMinutes)} this week</span>
+										<span>{formatNumber(overview.entryCount ?? 0)} entries</span>
 										{#if overview.weeklyWorkHours}
-											<span class="flex items-center gap-1 text-xs text-base-content/50" title="Weekly target">
-												<svg viewBox="0 0 16 16" fill="currentColor" class="w-3.5 h-3.5 opacity-60"><path d="M8 15A7 7 0 118 1a7 7 0 010 14zm0 1A8 8 0 108 0a8 8 0 000 16z"/><path d="M10.97 4.97a.235.235 0 00-.02.022L7.477 9.417 5.384 7.323a.75.75 0 00-1.06 1.06L6.97 11.03a.75.75 0 001.079-.02l3.992-4.99a.75.75 0 00-1.071-1.05z"/></svg>
-												{overview.weeklyWorkHours}h/w
-											</span>
+											<span title="Weekly target">{formatNumber(overview.weeklyWorkHours)} h/week</span>
 										{/if}
-									</div>
-								{/if}
+									{/if}
+								</div>
 							</div>
-							<div class="flex items-center gap-2 shrink-0">
-								{#if (member.vacationDaysPerYear ?? 0) > 0}
-									<span class="badge badge-sm badge-outline" title="Vacation: {member.vacationDaysUsed ?? 0}/{member.vacationDaysPerYear} used">
-										🏖 {member.vacationDaysRemaining ?? member.vacationDaysPerYear}d left
-									</span>
-								{/if}
-								<span class="badge badge-sm uppercase tracking-wide {(member.role?.toLowerCase() ?? 'member') === 'owner' ? 'badge-warning' : (member.role?.toLowerCase() ?? 'member') === 'admin' ? 'badge-info' : 'badge-ghost'}">{member.role}</span>
-								<svg class="w-5 h-5 text-base-content/20 group-hover:text-primary transition-colors" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
-							</div>
+							<svg class="w-5 h-5 text-base-content/20 group-hover:text-primary transition-colors shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
 						</a>
-					{/each}
-				</div>
-			</section>
-		</div>
+					</li>
+				{/each}
+			</ul>
+		</section>
 	{/if}
 </div>

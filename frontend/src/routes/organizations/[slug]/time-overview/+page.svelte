@@ -3,7 +3,8 @@
 	import { page } from '$app/state';
 	import { organizationsApi } from '$lib/apiClient';
 	import type { MemberTimeOverviewResponse, OrganizationDetailResponse, TimeEntryResponse } from '$lib/api';
-	import { formatHoursDecimal, formatTime, formatDateShort, formatWeekLabel, formatDuration } from '$lib/utils/formatters';
+	import { formatHoursDecimal, formatTime, formatDateShort, formatWeekLabel, formatDuration, formatNumber, roleLabel } from '$lib/utils/formatters';
+	import { toast } from '$lib/stores/toast.svelte';
 	import { getWeekRange } from '$lib/utils/dateHelpers';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 
@@ -21,6 +22,7 @@
 	let expandedUserId = $state<number | null>(null);
 	let memberEntries = $state<TimeEntryResponse[]>([]);
 	let entriesLoading = $state(false);
+	let entriesError = $state('');
 
 	// (Re)load whenever the slug in the URL changes, so switching orgs never shows stale data
 	$effect(() => {
@@ -35,7 +37,10 @@
 		try {
 			const { data: org } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			orgName = org.name ?? '';
-		} catch {}
+		} catch (err) {
+			// Only the heading uses the name; the overview below reports its own errors
+			if (getErrorStatus(err) !== 403) toast.error(err, 'Could not load the organization.');
+		}
 	}
 
 	async function loadOverview() {
@@ -72,13 +77,15 @@
 		}
 		expandedUserId = userId;
 		entriesLoading = true;
+		entriesError = '';
 		try {
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
 			const { data } = await organizationsApi.apiV1OrganizationsSlugMemberEntriesMemberIdGet(orgSlug, userId, from, to);
 			memberEntries = data.items ?? [];
-		} catch {
+		} catch (err) {
 			memberEntries = [];
+			entriesError = extractErrorMessage(err, 'Could not load the time entries.');
 		} finally {
 			entriesLoading = false;
 		}
@@ -87,13 +94,13 @@
 </script>
 
 <svelte:head>
-	<title>Time Overview - {orgName || 'Organization'}</title>
+	<title>Team time overview – {orgName || 'Organization'}</title>
 </svelte:head>
 
-<div class="page">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 pb-6">
 	<a href="/organizations/{orgSlug}" class="text-base-content/60 text-sm inline-block mb-3 no-underline hover:text-primary">&larr; Back to {orgName || 'Organization'}</a>
 
-	<h1 class="text-xl font-bold mb-1">Team Time Overview</h1>
+	<h1 class="text-xl font-bold mb-1">Team time overview</h1>
 	{#if orgName}<p class="text-base-content/60 text-sm mb-6">{orgName}</p>{/if}
 
 	{#if error}
@@ -101,19 +108,18 @@
 	{:else}
 		<!-- Week nav -->
 		<div class="flex items-center justify-center gap-4 mb-6">
-			<button class="btn btn-ghost btn-sm btn-square border border-base-300" onclick={() => changeWeek(-1)}>&lsaquo;</button>
-			<div class="week-title">
-				<span class="font-semibold text-base">{formatWeekLabel(weekRange)}</span>
-			</div>
-			<button class="btn btn-ghost btn-sm btn-square border border-base-300" onclick={() => changeWeek(1)} disabled={weekOffset >= 0}>&rsaquo;</button>
+			<button type="button" class="btn btn-ghost btn-sm btn-square border border-base-300" onclick={() => changeWeek(-1)} aria-label="Previous week" title="Previous week">&lsaquo;</button>
+			<span class="font-semibold text-base text-center" aria-live="polite">{formatWeekLabel(weekRange)}</span>
+			<button type="button" class="btn btn-ghost btn-sm btn-square border border-base-300" onclick={() => changeWeek(1)} disabled={weekOffset >= 0} aria-label="Next week" title="Next week">&rsaquo;</button>
 		</div>
 
 		{#if loading}
-			<p class="text-base-content/50">Loading...</p>
+			<p class="text-base-content/50 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Loading…</p>
 		{:else if members.length === 0}
 			<p class="text-base-content/50">No members found.</p>
 		{:else}
-			<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+			<div class="bg-base-100 border border-base-300 rounded-xl overflow-x-auto">
+				<div class="min-w-[40rem]">
 				<div class="grid grid-cols-[2fr_0.7fr_0.7fr_0.8fr_0.8fr_0.6fr_0.8fr] gap-2 px-4 py-3 bg-base-200/50 text-[0.6875rem] font-bold text-base-content/60 uppercase tracking-wider border-b border-base-300">
 					<span class="overflow-hidden">Member</span>
 					<span class="text-center">Role</span>
@@ -127,16 +133,16 @@
 				{#each members as member}
 					{@const targetMinutes = member.weeklyWorkHours ? member.weeklyWorkHours * 60 : 0}
 					{@const pct = targetMinutes > 0 ? Math.round(((member.netTrackedMinutes ?? 0) / targetMinutes) * 100) : 0}
-					<button class="grid grid-cols-[2fr_0.7fr_0.7fr_0.8fr_0.8fr_0.6fr_0.8fr] gap-2 px-4 py-3 border-b border-base-200 bg-base-100 w-full text-left cursor-pointer transition-colors text-sm items-center hover:bg-base-200/50" onclick={() => toggleMemberDetail(member.userId!)}>
+					<button type="button" class="grid grid-cols-[2fr_0.7fr_0.7fr_0.8fr_0.8fr_0.6fr_0.8fr] gap-2 px-4 py-3 border-b border-base-200 bg-base-100 w-full text-left cursor-pointer transition-colors text-sm items-center hover:bg-base-200/50" aria-expanded={expandedUserId === member.userId} onclick={() => toggleMemberDetail(member.userId!)}>
 						<span class="overflow-hidden">
 							<span class="block font-semibold text-sm">{member.firstName} {member.lastName}</span>
 							<span class="block text-[0.6875rem] text-base-content/50 overflow-hidden text-ellipsis whitespace-nowrap">{member.email}</span>
 						</span>
 						<span class="text-center">
-							<span class={"badge badge-sm " + ((member.role?.toLowerCase() ?? 'member') === 'owner' ? 'badge-warning' : (member.role?.toLowerCase() ?? 'member') === 'admin' ? 'badge-info' : 'badge-ghost')}>{member.role}</span>
+							<span class="badge badge-sm {member.role === 'Owner' ? 'badge-warning' : member.role === 'Admin' ? 'badge-info' : 'badge-ghost'}">{roleLabel(member.role)}</span>
 						</span>
 						<span class="text-center">
-							{member.weeklyWorkHours ? `${member.weeklyWorkHours}h` : '-'}
+							{member.weeklyWorkHours ? `${formatNumber(member.weeklyWorkHours)}h` : '-'}
 						</span>
 						<span class="text-center">{formatHoursDecimal(member.totalTrackedMinutes ?? 0)}</span>
 						<span class="text-center">{formatHoursDecimal(member.netTrackedMinutes ?? 0)}</span>
@@ -166,15 +172,17 @@
 					{#if expandedUserId === member.userId}
 						<div class="px-5 py-3 bg-base-200/50 border-b border-base-300">
 							{#if entriesLoading}
-								<p class="text-base-content/50">Loading entries...</p>
+								<p class="text-base-content/50 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Loading…</p>
+							{:else if entriesError}
+								<div class="alert alert-error text-sm py-2">{entriesError}</div>
 							{:else if memberEntries.length === 0}
 								<p class="text-base-content/50">No entries this week.</p>
 							{:else}
 								<div class="flex flex-col gap-1.5">
 									{#each memberEntries as entry}
 										<div class="flex items-center gap-3 text-sm px-2 py-1.5 bg-base-100 rounded-md border border-base-300">
-											<span class="text-base-content/60 min-w-[56px] text-xs">{formatDateShort(entry.startTime!)}</span>
-											<span class="text-base-content min-w-[100px]">
+											<span class="text-base-content/60 min-w-[56px] text-xs whitespace-nowrap">{formatDateShort(entry.startTime!)}</span>
+											<span class="text-base-content min-w-[100px] whitespace-nowrap">
 												{formatTime(entry.startTime!)}{entry.endTime ? ` – ${formatTime(entry.endTime!)}` : ''}
 											</span>
 											<span class="text-base-content/50 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{entry.description || ''}</span>
@@ -191,6 +199,7 @@
 						</div>
 					{/if}
 				{/each}
+				</div>
 			</div>
 		{/if}
 	{/if}
