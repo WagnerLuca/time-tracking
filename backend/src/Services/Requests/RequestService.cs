@@ -460,7 +460,7 @@ public class RequestService : IRequestService
                             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                         if (importData?.Entries != null)
                         {
-                            await ApplyCsvImportAsync(orgRequest.UserId, org.Id, importData.Entries);
+                            await ApplyCsvImportAsync(orgRequest.UserId, org, importData.Entries);
                         }
                     }
                     catch { /* invalid JSON — request is accepted but entries not imported */ }
@@ -577,7 +577,7 @@ public class RequestService : IRequestService
         _context.WorkSchedules.Add(schedule);
     }
 
-    private async Task ApplyCsvImportAsync(int userId, int orgId, List<CsvImportEntry> entries)
+    private async Task ApplyCsvImportAsync(int userId, Organization org, List<CsvImportEntry> entries)
     {
         var imported = 0;
         foreach (var entry in entries)
@@ -598,9 +598,10 @@ public class RequestService : IRequestService
             _context.TimeEntries.Add(new TimeEntry
             {
                 UserId = userId,
-                OrganizationId = orgId,
-                StartTime = DateTime.SpecifyKind(startTime, DateTimeKind.Utc),
-                EndTime = DateTime.SpecifyKind(endTime, DateTimeKind.Utc),
+                OrganizationId = org.Id,
+                // CSV times are the organization's local wall-clock times
+                StartTime = OrgClock.For(org).ToUtc(startTime),
+                EndTime = OrgClock.For(org).ToUtc(endTime),
                 IsRunning = false,
                 PauseDurationMinutes = Math.Max(0, entry.PauseMinutes),
                 Description = entry.Description,
@@ -614,7 +615,7 @@ public class RequestService : IRequestService
             await _context.SaveChangesAsync();
 
         _logger.LogInformation("CSV import approved: {Count} entries created for user {UserId} in org {OrgId}",
-            imported, userId, orgId);
+            imported, userId, org.Id);
     }
 
     private static OrgRequestResponse MapToResponse(

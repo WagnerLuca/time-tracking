@@ -12,9 +12,6 @@ namespace TimeTracking.Api.Services;
 /// </summary>
 public class FailureEntryService : BackgroundService
 {
-    /// <summary>Used for personal entries (no organization) and unknown time zone ids.</summary>
-    public const string DefaultTimeZone = "Europe/Berlin";
-
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<FailureEntryService> _logger;
     private readonly TimeSpan _interval = TimeSpan.FromMinutes(1);
@@ -104,9 +101,5 @@ public class FailureEntryService : BackgroundService
         return TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(endLocal, DateTimeKind.Unspecified), tz);
     }
 
-    public static TimeZoneInfo ResolveTimeZone(string? id)
-    {
-        if (!string.IsNullOrWhiteSpace(id) && TimeZoneInfo.TryFindSystemTimeZoneById(id, out var tz)) return tz;
-        return TimeZoneInfo.TryFindSystemTimeZoneById(DefaultTimeZone, out var fallback) ? fallback : TimeZoneInfo.Utc;
-    }
+    public static TimeZoneInfo ResolveTimeZone(string? id) => OrgClock.ResolveTimeZone(id);
 }

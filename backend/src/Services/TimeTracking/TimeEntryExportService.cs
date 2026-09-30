@@ -49,19 +49,28 @@ public class TimeEntryExportService : ITimeEntryExportService
             .Where(e => e.UserId == userId && !e.IsRunning)
             .AsQueryable();
 
+        Organization? filterOrg = null;
         if (!string.IsNullOrEmpty(request.OrganizationSlug))
         {
-            var org = await _context.Organizations.AsNoTracking()
+            filterOrg = await _context.Organizations.AsNoTracking()
                 .FirstOrDefaultAsync(o => o.Slug == request.OrganizationSlug);
-            if (org == null)
+            if (filterOrg == null)
                 return ServiceResult.NotFound<byte[]>("Organization not found.");
-            query = query.Where(e => e.OrganizationId == org.Id);
+            query = query.Where(e => e.OrganizationId == filterOrg.Id);
         }
 
+        // From/To are local calendar days of the organization (inclusive)
+        var rangeClock = OrgClock.For(filterOrg);
         if (request.From.HasValue)
-            query = query.Where(e => e.StartTime >= request.From.Value);
+        {
+            var fromUtc = rangeClock.StartOfDayUtc(DateOnly.FromDateTime(request.From.Value));
+            query = query.Where(e => e.StartTime >= fromUtc);
+        }
         if (request.To.HasValue)
-            query = query.Where(e => e.StartTime <= request.To.Value.Date.AddDays(1));
+        {
+            var toUtc = rangeClock.StartOfDayUtc(DateOnly.FromDateTime(request.To.Value).AddDays(1));
+            query = query.Where(e => e.StartTime < toUtc);
+        }
 
         var entries = await query.OrderBy(e => e.StartTime).ToListAsync();
 
@@ -73,6 +82,9 @@ public class TimeEntryExportService : ITimeEntryExportService
 
         foreach (var entry in entries)
         {
+            var clock = entry.Organization != null ? OrgClock.For(entry.Organization) : rangeClock;
+            var localStart = clock.ToLocal(entry.StartTime);
+            var localEnd = entry.EndTime.HasValue ? clock.ToLocal(entry.EndTime.Value) : (DateTime?)null;
             // Failure entries have no trustworthy duration until corrected
             var durationMinutes = entry.EndTime.HasValue && !entry.IsFailure
                 ? (entry.EndTime.Value - entry.StartTime).TotalMinutes
@@ -84,10 +96,10 @@ public class TimeEntryExportService : ITimeEntryExportService
             {
                 values.Add(col switch
                 {
-                    "Date" => entry.StartTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    "DayOfWeek" => entry.StartTime.DayOfWeek.ToString()[..3],
-                    "StartTime" => entry.StartTime.ToString("HH:mm", CultureInfo.InvariantCulture),
-                    "EndTime" => entry.EndTime?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "",
+                    "Date" => localStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    "DayOfWeek" => localStart.DayOfWeek.ToString()[..3],
+                    "StartTime" => localStart.ToString("HH:mm", CultureInfo.InvariantCulture),
+                    "EndTime" => localEnd?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "",
                     "Duration" => (durationMinutes / 60.0).ToString("F2", CultureInfo.InvariantCulture),
                     "Pause" => entry.PauseDurationMinutes.ToString(CultureInfo.InvariantCulture),
                     "NetDuration" => (netMinutes / 60.0).ToString("F2", CultureInfo.InvariantCulture),
@@ -125,11 +137,9 @@ public class TimeEntryExportService : ITimeEntryExportService
         if (membership == null)
             return ServiceResult.Forbidden<byte[]>("You are not a member of this organization.");
 
-        var rangeFrom = request.From ?? new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var rangeTo = request.To ?? rangeFrom.AddMonths(1).AddDays(-1);
-
-        var dateFrom = DateOnly.FromDateTime(rangeFrom);
-        var dateTo = DateOnly.FromDateTime(rangeTo);
+        var localToday = OrgClock.For(org).Today();
+        var dateFrom = request.From.HasValue ? DateOnly.FromDateTime(request.From.Value) : new DateOnly(localToday.Year, localToday.Month, 1);
+        var dateTo = request.To.HasValue ? DateOnly.FromDateTime(request.To.Value) : dateFrom.AddMonths(1).AddDays(-1);
 
         var rows = await DailyReportAggregator.BuildAsync(
             _context, userId, org.Id, dateFrom, dateTo, membership.InitialOvertimeHours);
@@ -212,8 +222,10 @@ public class TimeEntryExportService : ITimeEntryExportService
             .Select(e => new { e.StartTime, e.EndTime })
             .ToListAsync();
 
+        var importClock = OrgClock.For(org);
         var existingSet = existingEntries
-            .Select(e => $"{e.StartTime:yyyy-MM-dd}|{e.StartTime:HH:mm}")
+            .Select(e => importClock.ToLocal(e.StartTime))
+            .Select(local => $"{local:yyyy-MM-dd}|{local:HH:mm}")
             .ToHashSet();
 
         var rows = new List<ImportPreviewRow>();
@@ -320,8 +332,9 @@ public class TimeEntryExportService : ITimeEntryExportService
             {
                 UserId = userId,
                 OrganizationId = org.Id,
-                StartTime = DateTime.SpecifyKind(startTime, DateTimeKind.Utc),
-                EndTime = DateTime.SpecifyKind(endTime, DateTimeKind.Utc),
+                // CSV times are the organization's local wall-clock times
+                StartTime = OrgClock.For(org).ToUtc(startTime),
+                EndTime = OrgClock.For(org).ToUtc(endTime),
                 IsRunning = false,
                 PauseDurationMinutes = Math.Max(0, entry.PauseMinutes),
                 Description = entry.Description,

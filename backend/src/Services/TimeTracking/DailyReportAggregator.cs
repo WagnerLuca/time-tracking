@@ -35,18 +35,24 @@ public static class DailyReportAggregator
         TimeTrackingDbContext context, int userId, int orgId,
         DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours)
     {
+        // Days are the organization's local days (an entry at 00:30 Berlin belongs to that
+        // day, not to the previous UTC day)
+        var timeZone = await context.Organizations.AsNoTracking()
+            .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
+        var clock = OrgClock.For(timeZone);
+
         // Only count days up to today — future days haven't happened yet and
         // would otherwise show as artificial "Missing" time with a misleading target.
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = clock.Today();
         if (dateTo > today) dateTo = today;
         if (dateFrom > dateTo) return [];
 
-        var rangeFromUtc = dateFrom.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var rangeToUtc = dateTo.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1);
+        var rangeFromUtc = clock.StartOfDayUtc(dateFrom);
+        var rangeToUtc = clock.StartOfDayUtc(dateTo.AddDays(1));
 
         var timeEntries = await context.TimeEntries.AsNoTracking()
             .Where(e => e.UserId == userId && e.OrganizationId == orgId && !e.IsRunning
-                     && e.StartTime >= rangeFromUtc && e.StartTime <= rangeToUtc)
+                     && e.StartTime >= rangeFromUtc && e.StartTime < rangeToUtc)
             .OrderBy(e => e.StartTime)
             .ToListAsync();
 
@@ -66,7 +72,7 @@ public static class DailyReportAggregator
             .ToListAsync();
 
         var entriesByDate = timeEntries
-            .GroupBy(e => DateOnly.FromDateTime(e.StartTime))
+            .GroupBy(e => clock.LocalDate(e.StartTime))
             .ToDictionary(g => g.Key, g => g.ToList());
 
         var holidaysByDate = new Dictionary<DateOnly, Holiday>();
@@ -147,7 +153,7 @@ public static class DailyReportAggregator
 
             var entrySummary = allDayEntries.Count > 0
                 ? string.Join(" | ", allDayEntries.Select(e =>
-                    $"{e.StartTime:HH:mm}-{e.EndTime?.ToString("HH:mm") ?? "?"}" +
+                    $"{clock.ToLocal(e.StartTime):HH:mm}-{(e.EndTime.HasValue ? clock.ToLocal(e.EndTime.Value).ToString("HH:mm") : "?")}" +
                     (e.IsFailure ? " [not stopped, needs correction]" : "") +
                     (string.IsNullOrEmpty(e.Description) ? "" : $" ({e.Description})")))
                 : "";

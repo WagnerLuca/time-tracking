@@ -626,11 +626,10 @@ public class OrganizationService : IOrganizationService
             visibleMemberIds = combined;
         }
 
-        var now = DateTime.UtcNow;
-        var dayOfWeek = (int)now.DayOfWeek;
-        if (dayOfWeek == 0) dayOfWeek = 7;
-        var weekStart = from ?? now.Date.AddDays(-(dayOfWeek - 1));
-        var weekEnd = to ?? weekStart.AddDays(7);
+        // Default: the current week in the organization's time zone
+        var (localWeekStart, localWeekEnd) = OrgClock.For(org).DayRangeUtc(null, null);
+        var weekStart = from ?? localWeekStart;
+        var weekEnd = to ?? localWeekEnd;
 
         var members = await _context.UserOrganizations
             .AsNoTracking()
@@ -727,11 +726,10 @@ public class OrganizationService : IOrganizationService
 
         (limit, offset) = PaginationDefaults.Normalize(limit, offset);
 
-        var now = DateTime.UtcNow;
-        var dayOfWeek = (int)now.DayOfWeek;
-        if (dayOfWeek == 0) dayOfWeek = 7;
-        var weekStart = from ?? now.Date.AddDays(-(dayOfWeek - 1));
-        var weekEnd = to ?? weekStart.AddDays(7);
+        // Default: the current week in the organization's time zone
+        var (localWeekStart, localWeekEnd) = OrgClock.For(org).DayRangeUtc(null, null);
+        var weekStart = from ?? localWeekStart;
+        var weekEnd = to ?? localWeekEnd;
 
         var query = _context.TimeEntries
             .Where(te => te.UserId == userId
