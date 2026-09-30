@@ -1,9 +1,11 @@
 import { timeTrackingApi, requestsApi } from '$lib/apiClient';
-import type { TimeEntryResponse, UpdateTimeEntryRequest, OrganizationDetailResponse } from '$lib/api';
+import type { TimeEntryResponse, UpdateTimeEntryRequest, OrganizationDetailResponse, EffectivePermissionsResponse } from '$lib/api';
 import { RequestType } from '$lib/api';
 import { toLocalDateTimeInput } from '$lib/utils/dateHelpers';
 import { extractErrorMessage } from '$lib/utils/errorHandler';
 import { canEditPause } from '$lib/utils/orgRules';
+import { confirmDialog } from '$lib/stores/confirm.svelte';
+import { toast } from '$lib/stores/toast.svelte';
 
 /**
  * Creates a reusable entry editing + request state manager.
@@ -11,6 +13,8 @@ import { canEditPause } from '$lib/utils/orgRules';
  */
 export function createEntryEditor(options: {
 	getOrgDetail: () => OrganizationDetailResponse | null;
+	/** The caller's effective permissions (group overrides applied); win over the org defaults. */
+	getPermissions?: () => EffectivePermissionsResponse | null;
 	getOrgSlug: () => string | null | undefined;
 	onSaved: () => Promise<void>;
 	onDeleted: () => Promise<void>;
@@ -30,11 +34,10 @@ export function createEntryEditor(options: {
 	let requestType = $state<'edit' | 'pause' | null>(null);
 	let requestMessage = $state('');
 	let requestSending = $state(false);
-	let requestSuccess = $state('');
+	let requestError = $state('');
 	let requestNewStart = $state('');
 	let requestNewEnd = $state('');
 	let requestNewPause = $state(0);
-	let actionError = $state('');
 
 	function startEditEntry(entry: TimeEntryResponse) {
 		editingEntryId = entry.id ?? null;
@@ -58,12 +61,13 @@ export function createEntryEditor(options: {
 			if (editStartTime) payload.startTime = new Date(editStartTime).toISOString();
 			if (editEndTime) payload.endTime = new Date(editEndTime).toISOString();
 			payload.description = editDescription.trim() || undefined;
-			if (canEditPause(options.getOrgDetail())) {
+			if (canEditPause(options.getPermissions?.(), options.getOrgDetail())) {
 				payload.pauseDurationMinutes = Math.max(0, Number(editPause) || 0);
 			}
 			await timeTrackingApi.apiV1TimeTrackingIdPut(entryId, payload);
-			await options.onSaved();
 			editingEntryId = null;
+			toast.success('Entry saved.');
+			await options.onSaved();
 		} catch (err) {
 			editError = extractErrorMessage(err, 'Failed to update entry.');
 		} finally {
@@ -72,12 +76,20 @@ export function createEntryEditor(options: {
 	}
 
 	async function deleteEntry(id: number) {
-		if (!confirm('Delete this time entry?')) return;
+		const confirmed = await confirmDialog({
+			title: 'Delete time entry?',
+			message: 'The entry is removed permanently.',
+			confirmLabel: 'Delete',
+			danger: true
+		});
+		if (!confirmed) return;
 		try {
 			await timeTrackingApi.apiV1TimeTrackingIdDelete(id);
+			if (editingEntryId === id) editingEntryId = null;
+			toast.success('Entry deleted.');
 			await options.onDeleted();
 		} catch (err) {
-			actionError = extractErrorMessage(err, 'Failed to delete entry.');
+			toast.error(err, 'Failed to delete entry.');
 		}
 	}
 
@@ -85,7 +97,7 @@ export function createEntryEditor(options: {
 		requestingEntryId = entryId;
 		requestType = type;
 		requestMessage = '';
-		requestSuccess = '';
+		requestError = '';
 		const entry = options.findEntry(entryId);
 		if (entry) {
 			if (type === 'edit') {
@@ -101,6 +113,7 @@ export function createEntryEditor(options: {
 		requestingEntryId = null;
 		requestType = null;
 		requestMessage = '';
+		requestError = '';
 	}
 
 	async function submitRequest() {
@@ -108,6 +121,7 @@ export function createEntryEditor(options: {
 		const slug = options.getOrgSlug();
 		if (!slug) return;
 		requestSending = true;
+		requestError = '';
 		try {
 			const rType = requestType === 'edit' ? RequestType.NUMBER_1 : RequestType.NUMBER_2;
 			let requestData: string | undefined;
@@ -125,13 +139,10 @@ export function createEntryEditor(options: {
 				requestData,
 				message: requestMessage || undefined
 			});
-			requestSuccess = 'Request submitted! An admin will review it.';
-			requestingEntryId = null;
-			requestType = null;
-			requestMessage = '';
-			setTimeout(() => (requestSuccess = ''), 4000);
+			toast.success('Request submitted. An admin will review it.');
+			cancelRequest();
 		} catch (err) {
-			actionError = extractErrorMessage(err, 'Failed to submit request.');
+			requestError = extractErrorMessage(err, 'Failed to submit request.');
 		} finally {
 			requestSending = false;
 		}
@@ -157,15 +168,13 @@ export function createEntryEditor(options: {
 		get requestMessage() { return requestMessage; },
 		set requestMessage(v: string) { requestMessage = v; },
 		get requestSending() { return requestSending; },
-		get requestSuccess() { return requestSuccess; },
+		get requestError() { return requestError; },
 		get requestNewStart() { return requestNewStart; },
 		set requestNewStart(v: string) { requestNewStart = v; },
 		get requestNewEnd() { return requestNewEnd; },
 		set requestNewEnd(v: string) { requestNewEnd = v; },
 		get requestNewPause() { return requestNewPause; },
 		set requestNewPause(v: number) { requestNewPause = v; },
-		get actionError() { return actionError; },
-		set actionError(v: string) { actionError = v; },
 
 		// Methods
 		startEditEntry,
@@ -177,3 +186,5 @@ export function createEntryEditor(options: {
 		submitRequest
 	};
 }
+
+export type EntryEditor = ReturnType<typeof createEntryEditor>;

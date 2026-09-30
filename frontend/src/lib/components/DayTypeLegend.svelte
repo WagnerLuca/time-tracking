@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { DAY_TYPE_CLASSES } from '$lib/utils/colors';
+
 	let {
 		holidayDates,
 		sickDayDates,
@@ -10,13 +12,19 @@
 		vacationDates: Set<string>;
 		otherAbsenceDates: Set<string>;
 	} = $props();
+
+	const items = $derived([
+		{ show: holidayDates.size > 0, dot: DAY_TYPE_CLASSES.holiday.dot, label: 'Holiday' },
+		{ show: sickDayDates.size > 0, dot: DAY_TYPE_CLASSES.sick.dot, label: 'Sick day' },
+		{ show: vacationDates.size > 0, dot: DAY_TYPE_CLASSES.vacation.dot, label: 'Vacation' },
+		{ show: otherAbsenceDates.size > 0, dot: DAY_TYPE_CLASSES['other-absence'].dot, label: 'Other absence' }
+	].filter((i) => i.show));
 </script>
 
-{#if holidayDates.size > 0 || sickDayDates.size > 0 || vacationDates.size > 0 || otherAbsenceDates.size > 0}
+{#if items.length > 0}
 	<div class="flex gap-4 flex-wrap text-xs text-base-content/60 mt-3">
-		{#if holidayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block bg-secondary"></span> Holiday</span>{/if}
-		{#if sickDayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block bg-error"></span> Sick Day</span>{/if}
-		{#if vacationDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block bg-accent"></span> Vacation</span>{/if}
-		{#if otherAbsenceDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block bg-base-content/40"></span> Other Absence</span>{/if}
+		{#each items as item (item.label)}
+			<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 inline-block {item.dot}" aria-hidden="true"></span> {item.label}</span>
+		{/each}
 	</div>
 {/if}
