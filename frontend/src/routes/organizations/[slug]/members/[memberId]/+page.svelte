@@ -4,7 +4,8 @@
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { organizationsApi, workScheduleApi, absenceDayApi, groupApi, reportsApi, apiKeysApi } from '$lib/apiClient';
-	import { formatHoursDecimal, formatDateFull, absenceTypeLabel, absenceTypeBadge, getInitials } from '$lib/utils/formatters';
+	import { formatHoursDecimal, formatDateFull, absenceTypeLabel, getInitials } from '$lib/utils/formatters';
+	import { absenceTypeClasses } from '$lib/utils/colors';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import MemberCalendar from '$lib/components/MemberCalendar.svelte';
 	import GroupTags from '$lib/components/GroupTags.svelte';
@@ -684,7 +685,7 @@
 							{#each yearAbsences as absence}
 								<div class="flex items-center gap-3 py-2 px-2.5 bg-base-200/30 rounded-md border border-base-200 text-sm">
 									<span class="font-medium text-base-content/70 min-w-[100px]">{formatDateFull(absence.date!)}</span>
-									<span class="badge badge-sm {absenceTypeBadge(absence.type) === 'badge-sick' ? 'badge-error' : absenceTypeBadge(absence.type) === 'badge-vacation' ? 'badge-info' : 'badge-accent'}">{absence.customTypeName ?? absenceTypeLabel(absence.type)}</span>
+									<span class="badge badge-sm {absenceTypeClasses(absence.type).badge}">{absence.customTypeName ?? absenceTypeLabel(absence.type)}</span>
 									{#if absence.isHalfDay}
 										<span class="badge badge-warning badge-xs">½ Day</span>
 									{/if}

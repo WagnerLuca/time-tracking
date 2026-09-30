@@ -1,13 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<script>
-			// Apply the shared Wagner Luca light/dark choice before first paint (see stores/theme.svelte.ts)
+			// Apply the shared Wagner Luca light/dark and language choices before first paint
+			// (see stores/theme.svelte.ts and stores/locale.svelte.ts). Storage may be blocked.
 			(function() {
-				var t = localStorage.getItem('wl-theme');
-				if (t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.classList.add('dark');
+				var theme = null, lang = null;
+				try { theme = localStorage.getItem('wl-theme'); lang = localStorage.getItem('wl-locale'); } catch (e) {}
+				if (theme ? theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.classList.add('dark');
+				document.documentElement.lang = lang === 'en' ? 'en' : 'de';
 			})();
 		</script>
 		%sveltekit.head%

@@ -556,7 +556,7 @@
 															<div class="text-xs text-base-content/50">{rs.description}</div>
 														</div>
 														<ModeSelector
-															options={withInherit(ruleModeOptions)}
+															options={withInherit(ruleModeOptions())}
 															value={value == null ? null : parseRuleMode(value)}
 															onselect={(v) => setPermValue(rs.key, v as number | null)}
 															disabled={permissionsSaving}
@@ -577,7 +577,7 @@
 															<div class="text-xs text-base-content/50">{vs.description}</div>
 														</div>
 														<ModeSelector
-															options={withInherit(visibilityModeOptions)}
+															options={withInherit(visibilityModeOptions())}
 															value={value == null ? null : parseVisibilityMode(value)}
 															onselect={(v) => setPermValue(vs.key, v as number | null)}
 															disabled={permissionsSaving}

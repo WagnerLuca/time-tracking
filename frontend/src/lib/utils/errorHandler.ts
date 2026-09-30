@@ -4,6 +4,7 @@
  * Replaces all `catch (err: any) { error = err.response?.data?.message || '...'; }` patterns
  * with a type-safe `catch (err) { error = extractErrorMessage(err, 'Failed to ...'); }`.
  */
+import { t } from '$lib/i18n';
 
 /**
  * Extract a human-readable error message from an unknown error object.
@@ -17,7 +18,7 @@
  * @example
  *   catch (err) { error = extractErrorMessage(err, 'Failed to start timer.'); }
  */
-export function extractErrorMessage(err: unknown, fallback = 'An unexpected error occurred.'): string {
+export function extractErrorMessage(err: unknown, fallback: string = t('common.unexpectedError')): string {
 	if (err && typeof err === 'object' && 'response' in err) {
 		const res = (err as { response?: { status?: number; data?: Record<string, unknown> | string } }).response;
 		if (res?.data) {
@@ -47,7 +48,7 @@ export function extractErrorMessage(err: unknown, fallback = 'An unexpected erro
 		}
 		// If we have a status but no parseable body, include the status code
 		if (res?.status) {
-			return `${fallback} (HTTP ${res.status})`;
+			return t('common.httpStatus', { message: fallback, status: res.status });
 		}
 	}
 	if (err instanceof Error) return err.message;

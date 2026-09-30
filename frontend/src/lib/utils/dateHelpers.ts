@@ -60,13 +60,6 @@ export function toLocalDateTimeInput(iso: string): string {
 }
 
 /**
- * Get today's date as a YYYY-MM-DD string.
- */
-export function todayKey(): string {
-	return dateKey(new Date());
-}
-
-/**
  * Sum net/gross minutes from an array of time entries.
  * Skips running entries.
  */

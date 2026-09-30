@@ -4,10 +4,10 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { timeTrackingApi, organizationsApi, workScheduleApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, StartTimeEntryRequest, WorkScheduleResponse, OrganizationDetailResponse } from '$lib/api';
-	import { formatHoursDecimal, formatDelta, formatDuration, formatTime, formatDateShort, formatWeekLabel, formatHours } from '$lib/utils/formatters';
+	import { formatHoursDecimal, formatDelta, formatDuration, formatTime, formatDateShort, formatWeekLabel, formatHours, dayNamesShort } from '$lib/utils/formatters';
 	import { dateKey, isToday, getWeekRange } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel } from '$lib/utils/scheduleHelpers';
-	import { DAY_NAMES, MAX_ENTRIES_FOR_OVERTIME } from '$lib/utils/constants';
+	import { MAX_ENTRIES_FOR_OVERTIME } from '$lib/utils/constants';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { canEditEntries, canRequestEditEntries, canEditPause, canRequestEditPause } from '$lib/utils/orgRules';
 	import { loadDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
@@ -91,7 +91,7 @@
 	});
 
 	function computeDailyTotals(entries: TimeEntryResponse[], range: { start: Date; end: Date }, schedule: WorkScheduleResponse | null) {
-		const days = DAY_NAMES;
+		const days = dayNamesShort();
 		const now = new Date();
 		now.setHours(23, 59, 59, 999);
 		const totals = days.map((name, i) => {

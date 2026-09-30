@@ -49,7 +49,7 @@ export async function loadDaysOff(orgSlug: string | null | undefined, userId?: n
 		for (const h of holRes.data) {
 			if (h.date) {
 				daysOffSet.add(h.date);
-				holidayDates.set(h.date, h.name ?? 'Holiday');
+				holidayDates.set(h.date, h.name ?? ''); // '' → getDayTypeLabel() shows the localized "Holiday"
 				if (h.isHalfDay) halfDayHolidays.add(h.date);
 			}
 		}

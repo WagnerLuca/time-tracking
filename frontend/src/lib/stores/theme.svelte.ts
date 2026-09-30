@@ -16,14 +16,15 @@ function createThemeStore() {
 
 	function load() {
 		if (typeof window === 'undefined') return;
-		const saved = localStorage.getItem(STORAGE_KEY);
+		let saved: string | null = null;
+		try { saved = localStorage.getItem(STORAGE_KEY); } catch { /* storage blocked */ }
 		isDark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
 		apply();
 	}
 
 	function set(dark: boolean) {
 		isDark = dark;
-		localStorage.setItem(STORAGE_KEY, dark ? 'dark' : 'light');
+		try { localStorage.setItem(STORAGE_KEY, dark ? 'dark' : 'light'); } catch { /* storage blocked */ }
 		apply();
 	}
 

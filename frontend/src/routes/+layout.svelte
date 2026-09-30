@@ -2,61 +2,82 @@
 	import '../app.css';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
+	import { timer } from '$lib/stores/timer.svelte';
+	import { theme } from '$lib/stores/theme.svelte';
+	import { locale, type Locale } from '$lib/stores/locale.svelte';
+	import { toast } from '$lib/stores/toast.svelte';
 	import { page } from '$app/state';
 	import { goto, afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
-	import { requestsApi, organizationsApi, timeTrackingApi } from '$lib/apiClient';
-	import type { OrgRequestResponse } from '$lib/api';
-	import { parseRequestData, formatRequestTypeFull, formatRequestType, formatTimeAgo } from '$lib/utils/formatters';
-	import { theme } from '$lib/stores/theme.svelte';
+	import { requestsApi, timeTrackingApi } from '$lib/apiClient';
+	import type { OrgRequestResponse, TimeEntryResponse } from '$lib/api';
+	import { parseRequestData, formatRequestTypeFull, formatRequestType, formatRequestStatus, formatTimeAgo, formatDateTime, formatClock, statusBadgeClass, roleLabel } from '$lib/utils/formatters';
+	import { dateKey } from '$lib/utils/dateHelpers';
+	import { t, tp } from '$lib/i18n';
+	import Modal from '$lib/components/Modal.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import Toaster from '$lib/components/Toaster.svelte';
 
 	let { children } = $props();
 
 	const publicRoutes = ['/login', '/register', '/health'];
 	const isPublicRoute = $derived(publicRoutes.some((r) => page.url.pathname.startsWith(r)));
 
-	// Notification state
-	let pendingCount = $state(0);
-	let pendingRequests = $state<OrgRequestResponse[]>([]);
-	let showNotifPanel = $state(false);
-	let notifLoading = $state(false);
+	// Which nav popup is open (one at a time); Esc or a click outside closes it
+	let openMenu = $state<'notifications' | 'org' | 'user' | 'mobile' | null>(null);
+	function toggleMenu(menu: NonNullable<typeof openMenu>) {
+		openMenu = openMenu === menu ? null : menu;
+	}
 
-	// User notification state (responses to my requests)
-	let userNotifCount = $state(0);
+	// Notification state
+	let pendingRequests = $state<OrgRequestResponse[]>([]);
 	let userNotifRequests = $state<OrgRequestResponse[]>([]);
-	let totalNotifCount = $derived(pendingCount + userNotifCount);
+	let totalNotifCount = $derived(pendingRequests.length + userNotifRequests.length);
+	let detailReq = $state<OrgRequestResponse | null>(null);
+	let responding = $state(false);
 
 	// Failure entries: timers auto-stopped at the business day end that still need a real end time
-	let failureCount = $state(0);
+	let failures = $state<TimeEntryResponse[]>([]);
+	const firstFailure = $derived(
+		[...failures].sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? ''))[0] ?? null
+	);
+	/** Deep link into History: opens the affected day and the entry editor for that entry. */
+	const failureLink = $derived(
+		firstFailure?.startTime ? `/history?date=${dateKey(new Date(firstFailure.startTime))}&entry=${firstFailure.id}` : '/history'
+	);
 
 	async function loadFailures() {
 		try {
 			const { data } = await timeTrackingApi.apiV1TimeTrackingFailuresGet();
-			failureCount = data.length;
+			failures = data;
 		} catch {
-			failureCount = 0;
+			failures = [];
 		}
 	}
 
-	// Re-check after every navigation so the hint disappears once entries are corrected
+	// Re-check after every navigation so the hint disappears once entries are corrected,
+	// and the timer indicator picks up timers started elsewhere (e.g. an RFID terminal)
 	afterNavigate(() => {
-		if (auth.isAuthenticated) loadFailures();
+		openMenu = null;
+		if (auth.isAuthenticated) {
+			loadFailures();
+			timer.refresh().catch(() => {});
+		}
 	});
 
-	// 2FA enforcement: check if selected org requires 2FA but user hasn't set it up
+	// 2FA enforcement: the selected org requires 2FA but the user hasn't set it up
 	let requires2faSetup = $derived.by(() => {
 		if (!auth.isAuthenticated || !auth.user) return false;
 		if (auth.user.twoFactorEnabled) return false;
-		const selectedOrg = orgContext.selectedOrg;
-		if (!selectedOrg) return false;
-		return selectedOrg.require2fa === true;
+		return orgContext.selectedOrg?.require2fa === true;
 	});
 
 	onMount(() => {
 		auth.init();
 		orgContext.init();
 		theme.load();
+		document.documentElement.lang = locale.current;
 	});
 
 	$effect(() => {
@@ -66,103 +87,95 @@
 		}
 	});
 
-	// Load orgs when user becomes authenticated
+	// Load orgs, notifications, failures and the running timer when the user becomes authenticated
 	$effect(() => {
 		if (auth.isAuthenticated && auth.user) {
-			orgContext.loadOrganizations(auth.user.id);
+			orgContext.loadOrganizations(auth.user.id!);
 			loadNotifications();
 			loadFailures();
+			timer.refresh().catch(() => {});
 		}
 	});
 
 	async function loadNotifications() {
-		try {
-			const { data } = await requestsApi.apiV1OrganizationsNotificationsGet();
-			pendingCount = data.pendingRequests ?? 0;
-			pendingRequests = data.requests ?? [];
-		} catch {
-			pendingCount = 0;
-			pendingRequests = [];
-		}
-		// Also load user notifications (responses to my requests)
-		try {
-			const { data } = await requestsApi.apiV1OrganizationsUserNotificationsGet();
-			userNotifCount = data.count ?? 0;
-			userNotifRequests = data.requests ?? [];
-		} catch {
-			userNotifCount = 0;
-			userNotifRequests = [];
-		}
-	}
-
-	function toggleNotifPanel() {
-		showNotifPanel = !showNotifPanel;
-	}
-
-	function closeNotifPanel() {
-		showNotifPanel = false;
+		const [adminRes, userRes] = await Promise.allSettled([
+			requestsApi.apiV1OrganizationsNotificationsGet(),
+			requestsApi.apiV1OrganizationsUserNotificationsGet()
+		]);
+		pendingRequests = adminRes.status === 'fulfilled' ? (adminRes.value.data.requests ?? []) : [];
+		userNotifRequests = userRes.status === 'fulfilled' ? (userRes.value.data.requests ?? []) : [];
 	}
 
 	async function respondToRequest(request: OrgRequestResponse, accept: boolean) {
 		if (!request.organizationSlug || !request.id) return;
+		responding = true;
 		try {
 			await requestsApi.apiV1OrganizationsSlugRequestsIdPut(request.organizationSlug, request.id, { accept });
+			toast.success(accept ? t('nav.notifications.accepted') : t('nav.notifications.declined'));
+			detailReq = null;
 			await loadNotifications();
-			if (accept && request.type === 'JoinOrganization') {
-				// Reload orgs if needed
-				if (auth.user?.id) orgContext.loadOrganizations(auth.user.id);
+			if (accept && request.type === 'JoinOrganization' && auth.user?.id) {
+				orgContext.loadOrganizations(auth.user.id);
 			}
 		} catch (err) {
-			console.error('Failed to respond to request', err);
+			toast.error(err, t('nav.notifications.respondFailed'));
+		} finally {
+			responding = false;
 		}
 	}
 
-	async function dismissUserNotif(requestId: number) {
+	async function dismissUserNotifs(ids: number[]) {
 		try {
-			await requestsApi.apiV1OrganizationsUserNotificationsMarkSeenPost([requestId]);
-			userNotifRequests = userNotifRequests.filter(r => r.id !== requestId);
-			userNotifCount = userNotifRequests.length;
-		} catch {
-			// ignore
+			await requestsApi.apiV1OrganizationsUserNotificationsMarkSeenPost(ids);
+			userNotifRequests = userNotifRequests.filter((r) => !ids.includes(r.id!));
+			detailReq = null;
+		} catch (err) {
+			toast.error(err, t('nav.notifications.dismissFailed'));
 		}
 	}
-
-	async function dismissAllUserNotifs() {
-		try {
-			await requestsApi.apiV1OrganizationsUserNotificationsMarkSeenPost(userNotifRequests.map(r => r.id!));
-			userNotifRequests = [];
-			userNotifCount = 0;
-		} catch {
-			// ignore
-		}
-	}
-
-	// Notification detail popup
-	let detailReq = $state<OrgRequestResponse | null>(null);
 
 	function openNotifDetail(req: OrgRequestResponse) {
+		openMenu = null;
 		detailReq = req;
 	}
 
-	function closeNotifDetail() {
-		detailReq = null;
-	}
-
-	function handleOverlayKeydown(event: KeyboardEvent, close: () => void) {
-		if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
-			event.preventDefault();
-			close();
-		}
+	function isActive(path: string) {
+		const current = page.url.pathname;
+		return path === '/' ? current === '/' : current === path || current.startsWith(`${path}/`);
 	}
 
 	function navLinkClass(path: string) {
-		const current = page.url.pathname;
-		const active = current === path || current.startsWith(`${path}/`);
-		return `rounded-lg px-3 py-1.5 text-sm font-medium no-underline transition-colors ${active ? 'bg-base-200 text-base-content' : 'text-base-content/70 hover:bg-base-200/60 hover:text-base-content'}`;
+		return `rounded-lg px-3 py-1.5 text-sm font-medium no-underline transition-colors ${isActive(path) ? 'bg-base-200 text-base-content' : 'text-base-content/70 hover:bg-base-200/60 hover:text-base-content'}`;
+	}
+
+	const navLinks = $derived([
+		{ href: '/time', label: t('nav.timer') },
+		{ href: '/history', label: t('nav.history') },
+		{ href: '/export', label: t('nav.export') },
+		...(orgContext.selectedOrgSlug ? [{ href: `/organizations/${orgContext.selectedOrgSlug}`, label: t('nav.organization') }] : [])
+	]);
+
+	/** Switch org context; on an org page, stay on the same sub-page of the new org. */
+	function switchOrg(orgId: number, slug: string | null | undefined) {
+		const oldSlug = orgContext.selectedOrgSlug;
+		orgContext.select(orgId);
+		openMenu = null;
+		const path = page.url.pathname;
+		if (slug && oldSlug && path.startsWith(`/organizations/${oldSlug}`)) {
+			// members/[id] of the old org makes no sense in the new one — go to that section's list
+			const rest = path.slice(`/organizations/${oldSlug}`.length).replace(/^\/members\/\d+.*/, '/members');
+			goto(`/organizations/${slug}${rest}`);
+		}
+	}
+
+	function setLocale(l: Locale) {
+		locale.set(l);
 	}
 
 	async function handleLogout() {
+		openMenu = null;
 		await auth.logout();
+		timer.reset();
 		goto('/login');
 	}
 </script>
@@ -171,251 +184,281 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
+<svelte:window onkeydown={(e) => { if (e.key === 'Escape' && openMenu) openMenu = null; }} />
+
+{#snippet languageToggle()}
+	<div class="join" role="group" aria-label={t('nav.switchLanguage')}>
+		{#each ['de', 'en'] as l (l)}
+			<button
+				type="button"
+				class="join-item btn btn-xs {locale.current === l ? 'btn-neutral' : 'btn-ghost'}"
+				aria-pressed={locale.current === l}
+				lang={l}
+				onclick={() => setLocale(l as Locale)}
+			>{l.toUpperCase()}</button>
+		{/each}
+	</div>
+{/snippet}
+
 {#if auth.loading}
 	<div class="min-h-screen flex items-center justify-center text-base-content/60">
-		<p>Loading...</p>
+		<span class="loading loading-spinner loading-md" aria-label={t('common.loading')}></span>
 	</div>
 {:else if auth.isAuthenticated}
-	<nav class="sticky top-0 z-50 border-b border-base-300 bg-base-100/95 shadow-sm backdrop-blur">
-		<div class="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
-			<div class="flex min-w-0 items-center gap-3 pr-2">
-				<!-- Port of @wagnerluca/ui's LogoLockup (accent="time") -->
-				<a href="/" class="flex items-center gap-2.5 text-base-content no-underline">
-					<svg width="28" height="28" viewBox="0 0 100 100" fill="none" aria-hidden="true">
-						<rect x="68" y="4" width="20" height="10" rx="5" style="fill: var(--accent-time)" />
-						<polyline points="6,26 24,88 42,30 60,88 78,26 78,88 96,88" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
-					</svg>
-					<span class="font-display text-lg font-bold tracking-tighter"><span class="opacity-60">WL</span> Time Tracking</span>
-				</a>
-				{#if orgContext.selectedOrg}
-					<span class="max-w-44 truncate rounded-md bg-base-200 px-2.5 py-1 text-xs font-medium text-base-content/60">{orgContext.selectedOrg.name}</span>
-				{/if}
-			</div>
-
-			<div class="flex flex-1 flex-wrap items-center gap-1 md:gap-2">
-				<a href="/time" class={navLinkClass('/time')}>Timer</a>
-				<a href="/history" class={navLinkClass('/history')}>History</a>
-				<a href="/export" class={navLinkClass('/export')}>Export</a>
-				{#if orgContext.selectedOrg}
-					<a href="/organizations/{orgContext.selectedOrgSlug}" class={navLinkClass(`/organizations/${orgContext.selectedOrgSlug}`)}>Organization</a>
-				{/if}
-			</div>
-
-			<div class="ml-auto flex items-center gap-2 sm:gap-3">
-			<!-- Notification bell -->
-			<div class="relative">
-				<button class="btn btn-ghost btn-sm btn-square" onclick={toggleNotifPanel} title="Notifications">
-					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-						<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-					</svg>
-					{#if totalNotifCount > 0}
-						<span class="badge badge-error badge-xs absolute -top-1 -right-1">{totalNotifCount}</span>
-					{/if}
-				</button>
-
-				{#if showNotifPanel}
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="fixed inset-0 z-[199]" onclick={closeNotifPanel} onkeydown={(e) => handleOverlayKeydown(e, closeNotifPanel)} tabindex="-1" role="button" aria-label="Close notifications"></div>
-					<div class="absolute top-full mt-2 right-0 w-80 max-h-[420px] bg-base-100 border border-base-300 rounded-xl shadow-xl z-[200] overflow-hidden flex flex-col">
-						<div class="flex items-center justify-between px-4 py-3 border-b border-base-200">
-							<span class="font-semibold text-sm">Notifications</span>
-							<button class="btn btn-ghost btn-xs btn-square" onclick={closeNotifPanel}>&times;</button>
-						</div>
-
-						<!-- User notifications (responses to my requests) -->
-						{#if userNotifRequests.length > 0}
-							<div class="py-1">
-								<div class="flex items-center justify-between px-3 py-2">
-									<span class="text-xs font-bold uppercase tracking-wider text-base-content/40">My Request Updates</span>
-									<button class="btn btn-ghost btn-xs text-primary" onclick={dismissAllUserNotifs}>Dismiss all</button>
-								</div>
-								<div class="overflow-y-auto max-h-[360px]">
-									{#each userNotifRequests as req}
-										<button class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors border-l-4 {req.status === 'Accepted' ? 'border-l-success' : req.status === 'Declined' ? 'border-l-error' : 'border-l-transparent'}" onclick={() => openNotifDetail(req)}>
-											<div class="flex flex-col gap-0.5 flex-1 min-w-0">
-												<span class="{req.status === 'Accepted' ? 'badge badge-success badge-xs' : 'badge badge-error badge-xs'}">
-													{req.status === 'Accepted' ? 'Accepted' : 'Declined'}
-												</span>
-												<span class="font-semibold text-xs text-primary">{formatRequestType(req.type)}</span>
-												<span class="text-xs text-base-content/50">{req.organizationName}</span>
-												{#if req.respondedByName}
-													<span class="text-xs text-base-content/40 italic truncate">by {req.respondedByName}</span>
-												{/if}
-												<span class="text-[0.7rem] text-base-content/40">{formatTimeAgo(req.respondedAt)}</span>
-											</div>
-											<span class="text-base-content/40 text-lg flex-shrink-0">›</span>
-										</button>
-									{/each}
-								</div>
-							</div>
-						{/if}
-
-						<!-- Admin pending requests -->
-						{#if pendingRequests.length > 0}
-							<div class="py-1">
-								<div class="flex items-center justify-between px-3 py-2">
-									<span class="text-xs font-bold uppercase tracking-wider text-base-content/40">Pending Requests</span>
-								</div>
-								<div class="overflow-y-auto max-h-[360px]">
-									{#each pendingRequests as req}
-										<button class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors border-l-4 border-l-transparent" onclick={() => openNotifDetail(req)}>
-											<div class="flex flex-col gap-0.5 flex-1 min-w-0">
-												<span class="font-semibold text-xs text-primary">{formatRequestType(req.type)}</span>
-												<span class="text-sm font-medium">{req.userFirstName} {req.userLastName}</span>
-												<span class="text-xs text-base-content/50">{req.organizationName}</span>
-												{#if req.groupName}
-													<span class="text-xs text-base-content/50">via <span class="font-medium">{req.groupName}</span></span>
-												{/if}
-												{#if req.message}
-													<span class="text-xs text-base-content/40 italic truncate">"{req.message}"</span>
-												{/if}
-												<span class="text-[0.7rem] text-base-content/40">{formatTimeAgo(req.createdAt)}</span>
-											</div>
-											<span class="text-base-content/40 text-lg flex-shrink-0">›</span>
-										</button>
-									{/each}
-								</div>
-							</div>
-						{/if}
-
-						{#if pendingRequests.length === 0 && userNotifRequests.length === 0}
-							<div class="py-8 px-4 text-center text-base-content/40 text-sm">No notifications</div>
-						{/if}
-					</div>
-				{/if}
-			</div>
-
-			<a href="/settings" class="rounded-md px-2 py-1 text-sm font-medium text-base-content no-underline transition-colors hover:bg-base-200" title="Settings">{auth.user?.firstName} {auth.user?.lastName}</a>
-
-			<button class="btn btn-ghost btn-sm" onclick={handleLogout}>Sign Out</button>
-		</div>
-		</div>
-	</nav>
-
-	<!-- Notification detail popup -->
-	{#if detailReq}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="fixed inset-0 bg-black/35 z-[299]" onclick={closeNotifDetail} onkeydown={(e) => handleOverlayKeydown(e, closeNotifDetail)} tabindex="-1" role="button" aria-label="Close notification details"></div>
-		<div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] max-w-[92vw] max-h-[80vh] bg-base-100 rounded-2xl shadow-2xl z-[300] flex flex-col overflow-hidden">
-			<div class="flex items-center justify-between px-5 py-4 border-b border-base-200">
-				<h3 class="text-base font-bold">{formatRequestTypeFull(detailReq.type)}</h3>
-				<button class="btn btn-ghost btn-xs btn-square" onclick={closeNotifDetail}>&times;</button>
-			</div>
-			<div class="px-5 py-4 overflow-y-auto flex-1">
-				{#if detailReq.status}
-					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
-						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Status</span>
-						<span class="text-sm font-medium text-right">
-							<span class="{detailReq.status === 'Accepted' ? 'badge badge-success badge-xs' : detailReq.status === 'Declined' ? 'badge badge-error badge-xs' : 'badge badge-warning badge-xs'}">
-								{detailReq.status === 'Accepted' ? 'Accepted' : detailReq.status === 'Declined' ? 'Declined' : 'Pending'}
-							</span>
-						</span>
-					</div>
-				{/if}
-
-				{#if detailReq.userFirstName || detailReq.userLastName}
-					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
-						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">User</span>
-						<span class="text-sm font-medium text-right">{detailReq.userFirstName} {detailReq.userLastName}</span>
-					</div>
-				{/if}
-
-				{#if detailReq.organizationName}
-					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
-						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Organization</span>
-						<span class="text-sm font-medium text-right">{detailReq.organizationName}</span>
-					</div>
-				{/if}
-
-				{#if detailReq.groupName}
-					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
-						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Routed via Group</span>
-						<span class="text-sm font-medium text-right">{detailReq.groupName}</span>
-					</div>
-				{/if}
-
-				{#if detailReq.createdAt}
-					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
-						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Created</span>
-						<span class="text-sm font-medium text-right">{new Date(detailReq.createdAt).toLocaleString()}</span>
-					</div>
-				{/if}
-
-				{#if detailReq.respondedAt}
-					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
-						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Responded</span>
-						<span class="text-sm font-medium text-right">{new Date(detailReq.respondedAt).toLocaleString()}</span>
-					</div>
-				{/if}
-
-				{#if detailReq.respondedByName}
-					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
-						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Responded by</span>
-						<span class="text-sm font-medium text-right">{detailReq.respondedByName}</span>
-					</div>
-				{/if}
-
-				{#if detailReq.message}
-					<div class="flex justify-between items-baseline py-1.5 border-b border-base-200/50 last:border-b-0">
-						<span class="text-xs text-base-content/50 font-medium shrink-0 mr-3">Message</span>
-						<span class="text-sm font-medium text-right italic text-base-content/50">"{detailReq.message}"</span>
-					</div>
-				{/if}
-
-				{#if parseRequestData(detailReq.type, detailReq.requestData).length > 0}
-					<div class="mt-3 pt-3 border-t border-base-300">
-						<span class="block text-xs font-bold uppercase tracking-wider text-base-content/40 mb-2">Request Details</span>
-						{#each parseRequestData(detailReq.type, detailReq.requestData) as line}
-							<div class="text-sm font-medium py-1">{line}</div>
-						{/each}
-					</div>
-				{/if}
-			</div>
-
-			<!-- Action buttons for pending admin requests -->
-			{#if detailReq.status === 'Pending' && pendingRequests.some(r => r.id === detailReq?.id)}
-				<div class="flex gap-2 px-5 py-3 border-t border-base-200">
-					<button class="btn btn-success flex-1" onclick={() => { respondToRequest(detailReq!, true); closeNotifDetail(); }}>Accept</button>
-					<button class="btn btn-error flex-1" onclick={() => { respondToRequest(detailReq!, false); closeNotifDetail(); }}>Decline</button>
-				</div>
-			{/if}
-
-			<!-- Dismiss button for user notifications -->
-			{#if detailReq.status !== 'Pending' && userNotifRequests.some(r => r.id === detailReq?.id)}
-				<div class="flex gap-2 px-5 py-3 border-t border-base-200">
-					<button class="btn btn-ghost flex-1" onclick={() => { dismissUserNotif(detailReq!.id!); closeNotifDetail(); }}>Dismiss Notification</button>
-				</div>
-			{/if}
-		</div>
+	{#if openMenu}
+		<!-- Transparent click-catcher: closes the open popup when clicking anywhere else -->
+		<button type="button" class="fixed inset-0 z-40 cursor-default" tabindex="-1" aria-label={t('common.close')} onclick={() => (openMenu = null)}></button>
 	{/if}
 
-	<main class="max-w-5xl mx-auto px-6 py-8">
+	<nav class="sticky top-0 z-50 border-b border-base-300 bg-base-100/95 shadow-sm backdrop-blur" aria-label={t('nav.menu')}>
+		<div class="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-2.5 sm:gap-3">
+			<!-- Mobile menu button -->
+			<button
+				type="button"
+				class="btn btn-ghost btn-sm btn-square md:hidden"
+				aria-label={t('nav.openMenu')}
+				aria-expanded={openMenu === 'mobile'}
+				aria-controls="mobile-menu"
+				onclick={() => toggleMenu('mobile')}
+			>
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+			</button>
+
+			<!-- Port of @wagnerluca/ui's LogoLockup (accent="time") -->
+			<a href="/" class="flex shrink-0 items-center gap-2.5 text-base-content no-underline" aria-label={t('nav.home')}>
+				<svg width="28" height="28" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+					<rect x="68" y="4" width="20" height="10" rx="5" style="fill: var(--accent-time)" />
+					<polyline points="6,26 24,88 42,30 60,88 78,26 78,88 96,88" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
+				</svg>
+				<span class="font-display text-lg font-bold tracking-tighter max-sm:hidden"><span class="opacity-60">WL</span> {t('nav.brand')}</span>
+			</a>
+
+			<!-- Org switcher -->
+			<div class="relative z-50 min-w-0">
+				<button
+					type="button"
+					class="flex max-w-44 items-center gap-1 truncate rounded-md bg-base-200 px-2.5 py-1 text-xs font-medium text-base-content/70 hover:bg-base-300"
+					aria-haspopup="menu"
+					aria-expanded={openMenu === 'org'}
+					aria-label={orgContext.selectedOrg ? t('nav.org.current', { name: orgContext.selectedOrg.name ?? '' }) : t('nav.org.switch')}
+					onclick={() => toggleMenu('org')}
+				>
+					<span class="truncate">{orgContext.selectedOrg?.name ?? t('nav.org.none')}</span>
+					<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+				</button>
+				{#if openMenu === 'org'}
+					<ul class="menu absolute left-0 top-full mt-2 w-64 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl" role="menu">
+						<li class="menu-title">{t('nav.org.switch')}</li>
+						{#each orgContext.organizations as org (org.organizationId)}
+							<li role="none">
+								<button type="button" role="menuitemradio" aria-checked={org.organizationId === orgContext.selectedOrgId} class={org.organizationId === orgContext.selectedOrgId ? 'menu-active' : ''} onclick={() => switchOrg(org.organizationId!, org.slug)}>
+									<span class="flex-1 truncate">{org.name}</span>
+									<span class="text-xs text-base-content/50">{roleLabel(org.role)}</span>
+								</button>
+							</li>
+						{/each}
+						<li role="none"><a role="menuitem" href="/organizations">{orgContext.organizations.length ? t('nav.org.manage') : t('nav.org.create')}</a></li>
+					</ul>
+				{/if}
+			</div>
+
+			<div class="hidden flex-1 items-center gap-1 md:flex lg:gap-2">
+				{#each navLinks as link (link.href)}
+					<a href={link.href} class={navLinkClass(link.href)} aria-current={isActive(link.href) ? 'page' : undefined}>{link.label}</a>
+				{/each}
+			</div>
+
+			<div class="ml-auto flex items-center gap-1.5 sm:gap-2">
+				<!-- Running timer indicator -->
+				{#if timer.current}
+					<a href="/time" class="flex items-center gap-1.5 rounded-full bg-success/15 px-2.5 py-1 text-xs font-semibold tabular-nums text-success no-underline hover:bg-success/25" title={t('nav.timerRunning', { elapsed: formatClock(timer.elapsedSeconds) })} aria-label={t('nav.timerRunning', { elapsed: formatClock(timer.elapsedSeconds) })}>
+						<span class="h-2 w-2 rounded-full bg-success animate-pulse" aria-hidden="true"></span>
+						<span aria-hidden="true">{formatClock(timer.elapsedSeconds)}</span>
+					</a>
+				{/if}
+
+				<!-- Notification bell -->
+				<div class="relative z-50">
+					<button type="button" class="btn btn-ghost btn-sm btn-square relative" onclick={() => toggleMenu('notifications')} aria-expanded={openMenu === 'notifications'} aria-label={totalNotifCount > 0 ? t('nav.notifications.openCount', { count: totalNotifCount }) : t('nav.notifications.open')}>
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+							<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+							<path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+						</svg>
+						{#if totalNotifCount > 0}
+							<span class="badge badge-error badge-xs absolute -top-1 -right-1" aria-hidden="true">{totalNotifCount}</span>
+						{/if}
+					</button>
+
+					{#if openMenu === 'notifications'}
+						<div class="absolute top-full mt-2 right-0 w-80 max-w-[calc(100vw-2rem)] max-h-[420px] bg-base-100 border border-base-300 rounded-xl shadow-xl overflow-hidden flex flex-col">
+							<div class="flex items-center justify-between px-4 py-3 border-b border-base-200">
+								<span class="font-semibold text-sm">{t('nav.notifications.title')}</span>
+								<button type="button" class="btn btn-ghost btn-xs btn-square" aria-label={t('common.close')} onclick={() => (openMenu = null)}>&times;</button>
+							</div>
+
+							<div class="overflow-y-auto">
+								<!-- User notifications (responses to my requests) -->
+								{#if userNotifRequests.length > 0}
+									<div class="py-1">
+										<div class="flex items-center justify-between px-3 py-2">
+											<span class="text-xs font-bold uppercase tracking-wider text-base-content/40">{t('nav.notifications.myUpdates')}</span>
+											<button type="button" class="btn btn-ghost btn-xs text-primary" onclick={() => dismissUserNotifs(userNotifRequests.map((r) => r.id!))}>{t('nav.notifications.dismissAll')}</button>
+										</div>
+										{#each userNotifRequests as req (req.id)}
+											<button type="button" class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors border-l-4 {req.status === 'Accepted' ? 'border-l-success' : req.status === 'Declined' ? 'border-l-error' : 'border-l-transparent'}" onclick={() => openNotifDetail(req)}>
+												<div class="flex flex-col gap-0.5 flex-1 min-w-0">
+													<span class="badge badge-xs {statusBadgeClass(req.status)}">{formatRequestStatus(req.status)}</span>
+													<span class="font-semibold text-xs text-primary">{formatRequestType(req.type)}</span>
+													<span class="text-xs text-base-content/50">{req.organizationName}</span>
+													{#if req.respondedByName}
+														<span class="text-xs text-base-content/40 italic truncate">{t('nav.notifications.by', { name: req.respondedByName })}</span>
+													{/if}
+													<span class="text-[0.7rem] text-base-content/40">{formatTimeAgo(req.respondedAt)}</span>
+												</div>
+												<span class="text-base-content/40 text-lg flex-shrink-0" aria-hidden="true">›</span>
+											</button>
+										{/each}
+									</div>
+								{/if}
+
+								<!-- Admin pending requests -->
+								{#if pendingRequests.length > 0}
+									<div class="py-1">
+										<div class="px-3 py-2">
+											<span class="text-xs font-bold uppercase tracking-wider text-base-content/40">{t('nav.notifications.pending')}</span>
+										</div>
+										{#each pendingRequests as req (req.id)}
+											<button type="button" class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors" onclick={() => openNotifDetail(req)}>
+												<div class="flex flex-col gap-0.5 flex-1 min-w-0">
+													<span class="font-semibold text-xs text-primary">{formatRequestType(req.type)}</span>
+													<span class="text-sm font-medium">{req.userFirstName} {req.userLastName}</span>
+													<span class="text-xs text-base-content/50">{req.organizationName}</span>
+													{#if req.groupName}
+														<span class="text-xs text-base-content/50">{t('nav.notifications.via', { group: req.groupName })}</span>
+													{/if}
+													{#if req.message}
+														<span class="text-xs text-base-content/40 italic truncate">"{req.message}"</span>
+													{/if}
+													<span class="text-[0.7rem] text-base-content/40">{formatTimeAgo(req.createdAt)}</span>
+												</div>
+												<span class="text-base-content/40 text-lg flex-shrink-0" aria-hidden="true">›</span>
+											</button>
+										{/each}
+									</div>
+								{/if}
+
+								{#if totalNotifCount === 0}
+									<div class="py-8 px-4 text-center text-base-content/40 text-sm">{t('nav.notifications.empty')}</div>
+								{/if}
+							</div>
+						</div>
+					{/if}
+				</div>
+
+				<div class="max-sm:hidden">{@render languageToggle()}</div>
+
+				<!-- User menu -->
+				<div class="relative z-50">
+					<button type="button" class="btn btn-ghost btn-sm max-w-40 truncate font-medium" aria-haspopup="menu" aria-expanded={openMenu === 'user'} aria-label={t('nav.userMenu')} onclick={() => toggleMenu('user')}>
+						<span class="truncate max-sm:hidden">{auth.user?.firstName} {auth.user?.lastName}</span>
+						<span class="sm:hidden avatar avatar-placeholder"><span class="w-7 rounded-full bg-base-200 text-xs">{(auth.user?.firstName?.[0] ?? '') + (auth.user?.lastName?.[0] ?? '')}</span></span>
+					</button>
+					{#if openMenu === 'user'}
+						<ul class="menu absolute right-0 top-full mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl" role="menu">
+							<li class="menu-title truncate">{auth.user?.email}</li>
+							<li role="none"><a role="menuitem" href="/settings" class={isActive('/settings') ? 'menu-active' : ''}>{t('nav.settings')}</a></li>
+							<li role="none" class="sm:hidden"><div class="flex items-center justify-between">{t('nav.language')} {@render languageToggle()}</div></li>
+							<li role="none"><button type="button" role="menuitem" onclick={handleLogout}>{t('nav.signOut')}</button></li>
+						</ul>
+					{/if}
+				</div>
+			</div>
+		</div>
+
+		<!-- Mobile menu -->
+		{#if openMenu === 'mobile'}
+			<ul id="mobile-menu" class="menu relative z-50 w-full border-t border-base-300 bg-base-100 px-4 py-2 md:hidden">
+				<li><a href="/" class={isActive('/') ? 'menu-active' : ''} aria-current={isActive('/') ? 'page' : undefined}>{t('nav.home')}</a></li>
+				{#each navLinks as link (link.href)}
+					<li><a href={link.href} class={isActive(link.href) ? 'menu-active' : ''} aria-current={isActive(link.href) ? 'page' : undefined}>{link.label}</a></li>
+				{/each}
+				<li><a href="/settings" class={isActive('/settings') ? 'menu-active' : ''}>{t('nav.settings')}</a></li>
+			</ul>
+		{/if}
+	</nav>
+
+	<!-- Notification detail -->
+	<Modal open={!!detailReq} title={detailReq ? formatRequestTypeFull(detailReq.type) : ''} onclose={() => (detailReq = null)}>
+		{#if detailReq}
+			{#snippet row(label: string, value: string, italic = false)}
+				<div class="flex justify-between items-baseline gap-3 py-1.5 border-b border-base-200/50 last:border-b-0">
+					<span class="text-xs text-base-content/50 font-medium shrink-0">{label}</span>
+					<span class="text-sm font-medium text-right {italic ? 'italic text-base-content/50' : ''}">{value}</span>
+				</div>
+			{/snippet}
+			<dl class="m-0">
+				{#if detailReq.status}
+					<div class="flex justify-between items-baseline gap-3 py-1.5 border-b border-base-200/50">
+						<span class="text-xs text-base-content/50 font-medium shrink-0">{t('nav.notifications.status')}</span>
+						<span class="badge badge-sm {statusBadgeClass(detailReq.status)}">{formatRequestStatus(detailReq.status)}</span>
+					</div>
+				{/if}
+				{#if detailReq.userFirstName || detailReq.userLastName}
+					{@render row(t('nav.notifications.user'), `${detailReq.userFirstName ?? ''} ${detailReq.userLastName ?? ''}`)}
+				{/if}
+				{#if detailReq.organizationName}{@render row(t('nav.notifications.organization'), detailReq.organizationName)}{/if}
+				{#if detailReq.groupName}{@render row(t('nav.notifications.routedVia'), detailReq.groupName)}{/if}
+				{#if detailReq.createdAt}{@render row(t('nav.notifications.created'), formatDateTime(detailReq.createdAt))}{/if}
+				{#if detailReq.respondedAt}{@render row(t('nav.notifications.responded'), formatDateTime(detailReq.respondedAt))}{/if}
+				{#if detailReq.respondedByName}{@render row(t('nav.notifications.respondedBy'), detailReq.respondedByName)}{/if}
+				{#if detailReq.message}{@render row(t('nav.notifications.message'), `"${detailReq.message}"`, true)}{/if}
+			</dl>
+
+			{@const dataLines = parseRequestData(detailReq.type, detailReq.requestData)}
+			{#if dataLines.length > 0}
+				<div class="mt-3 pt-3 border-t border-base-300">
+					<span class="block text-xs font-bold uppercase tracking-wider text-base-content/40 mb-2">{t('nav.notifications.details')}</span>
+					{#each dataLines as line, i (i)}
+						<div class="text-sm font-medium py-1">{line}</div>
+					{/each}
+				</div>
+			{/if}
+		{/if}
+
+		{#snippet actions()}
+			{#if detailReq?.status === 'Pending' && pendingRequests.some((r) => r.id === detailReq?.id)}
+				<button type="button" class="btn btn-error btn-outline" disabled={responding} onclick={() => respondToRequest(detailReq!, false)}>{t('nav.notifications.decline')}</button>
+				<button type="button" class="btn btn-success" disabled={responding} onclick={() => respondToRequest(detailReq!, true)}>{t('nav.notifications.accept')}</button>
+			{:else if detailReq && userNotifRequests.some((r) => r.id === detailReq?.id)}
+				<button type="button" class="btn btn-ghost" onclick={() => dismissUserNotifs([detailReq!.id!])}>{t('nav.notifications.dismiss')}</button>
+			{:else}
+				<button type="button" class="btn btn-ghost" onclick={() => (detailReq = null)}>{t('common.close')}</button>
+			{/if}
+		{/snippet}
+	</Modal>
+
+	<main class="max-w-5xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
 		{#if requires2faSetup && !page.url.pathname.startsWith('/settings')}
 			<div class="flex items-center justify-center min-h-[60vh]">
 				<div class="card bg-base-100 border border-warning shadow-lg w-full max-w-md">
 					<div class="card-body text-center">
-						<div class="text-4xl mb-3">🔐</div>
-						<h2 class="card-title justify-center text-lg">Two-Factor Authentication Required</h2>
-						<p class="text-sm text-base-content/60 mt-2">
-							Your organization requires two-factor authentication. Please set up 2FA in your account settings to continue.
-						</p>
+						<div class="text-4xl mb-3" aria-hidden="true">🔐</div>
+						<h2 class="card-title justify-center text-lg">{t('nav.twoFactor.title')}</h2>
+						<p class="text-sm text-base-content/60 mt-2">{t('nav.twoFactor.text')}</p>
 						<div class="mt-4">
-							<a href="/settings" class="btn btn-primary">Go to Settings</a>
+							<a href="/settings" class="btn btn-primary">{t('nav.twoFactor.goToSettings')}</a>
 						</div>
 					</div>
 				</div>
 			</div>
 		{:else}
-			{#if failureCount > 0}
-				<div role="alert" class="alert alert-error mb-6">
+			{#if failures.length > 0}
+				<div role="alert" class="alert alert-error mb-6 max-sm:alert-vertical">
 					<span>
-						<strong>{failureCount === 1 ? '1 timer was' : `${failureCount} timers were`} not stopped</strong>
-						and ended automatically at the end of the business day. {failureCount === 1 ? 'It does' : 'They do'} not count toward your hours until you correct the end time.
+						<strong>{tp('nav.failure.title', failures.length)}</strong>
+						{tp('nav.failure.text', failures.length)}
 					</span>
-					{#if !page.url.pathname.startsWith('/history')}
-						<a href="/history" class="btn btn-sm">Correct in History</a>
-					{/if}
+					<a href={failureLink} class="btn btn-sm">{t('nav.failure.correct')}</a>
 				</div>
 			{/if}
 			{@render children?.()}
@@ -430,3 +473,5 @@
 	</div>
 {/if}
 
+<ConfirmDialog />
+<Toaster />

@@ -420,7 +420,7 @@
 
 				<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
 					<!-- Toggle settings (booleans) -->
-					{#each toggleSettings as ts}
+					{#each toggleSettings() as ts}
 						{@const value = (org as Record<string, any>)[ts.key]}
 						<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
 							<div class="setting-info">
@@ -439,7 +439,7 @@
 					{/each}
 
 					<!-- Rule mode settings (segmented: click an option) -->
-					{#each ruleSettings as rs}
+					{#each ruleSettings() as rs}
 						{@const mode = (org as Record<string, any>)[rs.key] as string | null}
 						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
 							<div class="setting-info">
@@ -447,7 +447,7 @@
 								<div class="text-sm text-base-content/60 max-w-[400px]">{rs.description}</div>
 							</div>
 							<ModeSelector
-								options={rs.key === 'joinPolicy' ? joinPolicyOptions : ruleModeOptions}
+								options={rs.key === 'joinPolicy' ? joinPolicyOptions() : ruleModeOptions()}
 								value={parseRuleMode(mode)}
 								onselect={(v) => setSetting(rs.key, v as number)}
 								disabled={settingsSaving}
@@ -456,7 +456,7 @@
 					{/each}
 
 					<!-- Visibility settings -->
-					{#each visibilitySettings as vs}
+					{#each visibilitySettings() as vs}
 						{@const mode = (org as Record<string, any>)[vs.key] as string | null}
 						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
 							<div class="setting-info">
@@ -464,7 +464,7 @@
 								<div class="text-sm text-base-content/60 max-w-[400px]">{vs.description}</div>
 							</div>
 							<ModeSelector
-								options={visibilityModeOptions}
+								options={visibilityModeOptions()}
 								value={parseVisibilityMode(mode)}
 								onselect={(v) => setSetting(vs.key, v as number)}
 								disabled={settingsSaving}
@@ -912,7 +912,7 @@
 				<h2 class="text-xl text-base-content/70 mb-4">Organization Rules</h2>
 
 				<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-					{#each toggleSettings as ts}
+					{#each toggleSettings() as ts}
 						{@const value = (org as Record<string, any>)[ts.key]}
 						<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
 							<div class="setting-info">
@@ -923,7 +923,7 @@
 						</div>
 					{/each}
 
-					{#each ruleSettings as rs}
+					{#each ruleSettings() as rs}
 						{@const mode = (org as Record<string, any>)[rs.key] as string | null}
 						{@const label = rs.labelFn ? rs.labelFn(mode) : ruleModeLabel(mode)}
 						<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
@@ -935,7 +935,7 @@
 						</div>
 					{/each}
 
-					{#each visibilitySettings as vs}
+					{#each visibilitySettings() as vs}
 						{@const mode = (org as Record<string, any>)[vs.key] as string | null}
 						<div class="flex items-center justify-between p-4 border-b border-base-200 last:border-b-0">
 							<div class="setting-info">

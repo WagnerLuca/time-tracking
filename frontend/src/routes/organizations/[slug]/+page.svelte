@@ -4,7 +4,8 @@
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { organizationsApi, workScheduleApi, absenceDayApi, notificationsApi } from '$lib/apiClient';
-	import { absenceTypeLabel, absenceTypeBadge } from '$lib/utils/formatters';
+	import { absenceTypeLabel } from '$lib/utils/formatters';
+	import { absenceTypeClasses } from '$lib/utils/colors';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import {
@@ -816,7 +817,7 @@
 												{#each yearAbsences as a}
 													<div class="flex items-center gap-3 py-2 px-3 bg-base-200/30 rounded-md text-sm">
 														<span class="font-medium text-base-content/70 min-w-[90px]">{formatDateDisplay(a.date)}</span>
-														<span class="badge badge-sm {absenceTypeBadge(a.type) === 'badge-sick' ? 'badge-error' : absenceTypeBadge(a.type) === 'badge-vacation' ? 'badge-info' : 'badge-ghost'}">{absenceTypeLabel(a.type)}</span>
+														<span class="badge badge-sm {absenceTypeClasses(a.type).badge}">{absenceTypeLabel(a.type)}</span>
 														{#if a.isHalfDay}
 															<span class="badge badge-warning badge-xs">½ Day</span>
 														{/if}

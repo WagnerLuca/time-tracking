@@ -4,10 +4,10 @@
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { timeTrackingApi, organizationsApi, workScheduleApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, StartTimeEntryRequest, WorkScheduleResponse } from '$lib/api';
-	import { formatHours, formatDelta, barWidth, getMonthName } from '$lib/utils/formatters';
+	import { formatHours, formatDelta, barWidth, getMonthName, dayNamesShort } from '$lib/utils/formatters';
 	import { isToday, isFuture, sumMinutes, dateKey } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, absenceCreditsForRange, getDayType, getDayTypeLabel, getTargetForRange } from '$lib/utils/scheduleHelpers';
-	import { DAY_NAMES, MAX_ENTRIES_FOR_OVERTIME, WEEKLY_ENTRY_LIMIT, MONTHLY_ENTRY_LIMIT } from '$lib/utils/constants';
+	import { MAX_ENTRIES_FOR_OVERTIME, WEEKLY_ENTRY_LIMIT, MONTHLY_ENTRY_LIMIT } from '$lib/utils/constants';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { loadDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
 	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
@@ -163,7 +163,7 @@
 			monthTarget = getTargetForRange(monthStart, todayEnd, workSchedule, holidayDates, [], firstEntryDate, halfDayHolidays);
 
 			// Build weekly breakdown (Mon-Sun)
-			const dayNames = DAY_NAMES;
+			const dayNames = dayNamesShort();
 			const tempWeekDays: typeof weekDays = [];
 			for (let i = 0; i < 7; i++) {
 				const d = new Date(weekStart);

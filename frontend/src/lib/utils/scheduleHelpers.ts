@@ -8,6 +8,7 @@
  */
 
 import { dateKey } from './dateHelpers';
+import { t } from '$lib/i18n';
 
 /** Minimal schedule shape needed by helpers (matches WorkScheduleResponse fields). */
 export interface ScheduleLike {
@@ -218,23 +219,24 @@ export function getDayTypeLabel(
 	customTypeDates?: Map<string, { name: string }>
 ): string {
 	const key = typeof date === 'string' ? date : dateKey(date);
-	const otherLabel = customTypeDates?.get(key)?.name ?? 'Other Absence';
+	const otherLabel = customTypeDates?.get(key)?.name ?? t('format.dayType.otherAbsence');
+	const halfDay = ' ' + t('format.dayType.halfDay');
 	if (holidayDates.has(key)) {
-		const name = holidayDates.get(key) ?? 'Holiday';
+		const name = holidayDates.get(key) || t('format.dayType.holiday');
 		if (halfDayHolidays?.has(key)) {
 			// Show combined label when half-holiday + absence
-			const halfSuffix = halfDayAbsences?.has(key) ? ' (Half Day)' : '';
+			const halfSuffix = halfDayAbsences?.has(key) ? halfDay : '';
 			let absLabel = '';
-			if (sickDayDates.has(key)) absLabel = 'Sick Day' + halfSuffix;
-			else if (vacationDates.has(key)) absLabel = 'Vacation' + halfSuffix;
+			if (sickDayDates.has(key)) absLabel = t('format.dayType.sick') + halfSuffix;
+			else if (vacationDates.has(key)) absLabel = t('format.dayType.vacation') + halfSuffix;
 			else if (otherAbsenceDates.has(key)) absLabel = otherLabel + halfSuffix;
-			return absLabel ? `${name} (Half Day) / ${absLabel}` : `${name} (Half Day)`;
+			return absLabel ? `${name}${halfDay} / ${absLabel}` : `${name}${halfDay}`;
 		}
 		return name;
 	}
-	const halfSuffix = halfDayAbsences?.has(key) ? ' (Half Day)' : '';
-	if (sickDayDates.has(key)) return 'Sick Day' + halfSuffix;
-	if (vacationDates.has(key)) return 'Vacation' + halfSuffix;
+	const halfSuffix = halfDayAbsences?.has(key) ? halfDay : '';
+	if (sickDayDates.has(key)) return t('format.dayType.sick') + halfSuffix;
+	if (vacationDates.has(key)) return t('format.dayType.vacation') + halfSuffix;
 	if (otherAbsenceDates.has(key)) return otherLabel + halfSuffix;
 	return '';
 }
@@ -268,15 +270,3 @@ export function getTargetForRange(
 	return total;
 }
 
-/**
- * Get the heat map color for a calendar cell based on worked/target ratio.
- */
-export function getHeatColor(minutes: number, target: number): string {
-	if (minutes === 0) return 'transparent';
-	if (target === 0) return 'rgba(59, 130, 246, 0.3)';
-	const ratio = minutes / target;
-	if (ratio >= 1) return 'rgba(34, 197, 94, 0.5)';
-	if (ratio >= 0.75) return 'rgba(34, 197, 94, 0.3)';
-	if (ratio >= 0.5) return 'rgba(250, 204, 21, 0.3)';
-	return 'rgba(239, 68, 68, 0.2)';
-}

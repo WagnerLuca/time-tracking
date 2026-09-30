@@ -5,7 +5,8 @@
 	import type { TimeEntryResponse, WorkScheduleResponse, OrganizationDetailResponse, AbsenceTypeDefinitionResponse, EffectivePermissionsResponse } from '$lib/api';
 	import { formatHours, formatDelta, formatDuration, formatTime, formatDateFull, barWidth } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
-	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, getHeatColor, type CustomCreditSets } from '$lib/utils/scheduleHelpers';
+	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, type CustomCreditSets } from '$lib/utils/scheduleHelpers';
+	import { heatColor } from '$lib/utils/colors';
 	import { canEditEntries, canRequestEditEntries, canEditPause, canRequestEditPause } from '$lib/utils/orgRules';
 	import { loadDaysOff as fetchDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
 	import { createEntryEditor } from '$lib/utils/entryEditor.svelte';
@@ -641,7 +642,7 @@
 									<span class="text-xs font-semibold text-base-content">{formatHours(day.workedMinutes)}</span>
 									{#if day.targetMinutes > 0}
 										<div class="h-[3px] bg-base-200 rounded-sm overflow-hidden mt-auto">
-											<div class="h-full rounded-sm min-w-[2px]" style="width: {barWidth(day.workedMinutes, day.targetMinutes)}%; background: {getHeatColor(day.workedMinutes, day.targetMinutes)}"></div>
+											<div class="h-full rounded-sm min-w-[2px]" style="width: {barWidth(day.workedMinutes, day.targetMinutes)}%; background: {heatColor(day.workedMinutes, day.targetMinutes)}"></div>
 										</div>
 									{/if}
 								{:else if day.dayType}
