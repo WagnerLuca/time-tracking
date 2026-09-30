@@ -4,6 +4,7 @@
 	import { timer } from '$lib/stores/timer.svelte';
 	import { formatTime, formatDateShort, formatDuration, formatClock } from '$lib/utils/formatters';
 	import EntryEditForm from './EntryEditForm.svelte';
+	import { t } from '$lib/i18n';
 
 	/**
 	 * One time entry: time range, note, badges (org, running, needs correction, pause),
@@ -73,24 +74,24 @@
 					<span class="badge badge-info badge-sm">{entry.organizationName}</span>
 				{/if}
 				{#if entry.isRunning}
-					<span class="badge badge-success badge-sm font-semibold">Running</span>
+					<span class="badge badge-success badge-sm font-semibold">{t('entries.running')}</span>
 				{/if}
 				{#if entry.isFailure}
-					<span class="badge badge-error badge-sm" title="The timer ran past the business day end and was stopped automatically. It counts as 0 until you correct the end time.">Needs correction</span>
+					<span class="badge badge-error badge-sm" title={t('entries.needsCorrectionHint')}>{t('entries.needsCorrection')}</span>
 				{/if}
 				{#if !entry.isRunning}
 					{#if pause > 0}
 						{#if actionable && canEditPause}
-							<button type="button" class="badge badge-warning badge-sm badge-outline cursor-pointer hover:bg-warning/20" title="Edit pause" onclick={() => editor!.startEditEntry(entry)}>−{pause} min pause <span aria-hidden="true">✎</span></button>
+							<button type="button" class="badge badge-warning badge-sm badge-outline cursor-pointer hover:bg-warning/20" title={t('entries.editPause')} onclick={() => editor!.startEditEntry(entry)}>{t('entries.pauseBadge', { minutes: pause })} <span aria-hidden="true">✎</span></button>
 						{:else if actionable && canRequestEditPause}
-							<button type="button" class="badge badge-warning badge-sm badge-outline border-dashed cursor-pointer hover:bg-warning/10" title="Request pause edit" onclick={() => editor!.startRequest(entry.id!, 'pause')}>−{pause} min pause <span aria-hidden="true">✉</span></button>
+							<button type="button" class="badge badge-warning badge-sm badge-outline border-dashed cursor-pointer hover:bg-warning/10" title={t('entries.requestPauseEdit')} onclick={() => editor!.startRequest(entry.id!, 'pause')}>{t('entries.pauseBadge', { minutes: pause })} <span aria-hidden="true">✉</span></button>
 						{:else}
-							<span class="badge badge-warning badge-sm badge-outline">−{pause} min pause</span>
+							<span class="badge badge-warning badge-sm badge-outline">{t('entries.pauseBadge', { minutes: pause })}</span>
 						{/if}
 					{:else if actionable && canEditPause}
-						<button type="button" class="badge badge-ghost badge-sm cursor-pointer hover:badge-warning hover:badge-outline" title="Add pause" onclick={() => editor!.startEditEntry(entry)}>+ Pause <span aria-hidden="true">✎</span></button>
+						<button type="button" class="badge badge-ghost badge-sm cursor-pointer hover:badge-warning hover:badge-outline" title={t('entries.addPause')} onclick={() => editor!.startEditEntry(entry)}>{t('entries.addPauseBadge')} <span aria-hidden="true">✎</span></button>
 					{:else if actionable && canRequestEditPause}
-						<button type="button" class="badge badge-ghost badge-sm cursor-pointer border-dashed border-warning hover:bg-warning/10" title="Request pause" onclick={() => editor!.startRequest(entry.id!, 'pause')}>+ Pause <span aria-hidden="true">✉</span></button>
+						<button type="button" class="badge badge-ghost badge-sm cursor-pointer border-dashed border-warning hover:bg-warning/10" title={t('entries.requestPause')} onclick={() => editor!.startRequest(entry.id!, 'pause')}>{t('entries.addPauseBadge')} <span aria-hidden="true">✉</span></button>
 					{/if}
 				{/if}
 			</div>
@@ -111,11 +112,11 @@
 			</div>
 			{#if actionable}
 				{#if canEdit}
-					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary" title="Edit entry" aria-label="Edit entry" onclick={() => editor!.startEditEntry(entry)}>✎</button>
+					<button type="button" class="btn btn-ghost btn-sm btn-square text-primary" title={t('entries.editEntry')} aria-label={t('entries.editEntry')} onclick={() => editor!.startEditEntry(entry)}>✎</button>
 				{:else if canRequestEdit}
-					<button type="button" class="btn btn-ghost btn-sm btn-square text-warning" title="Request edit" aria-label="Request edit" onclick={() => editor!.startRequest(entry.id!, 'edit')}>✉</button>
+					<button type="button" class="btn btn-ghost btn-sm btn-square text-warning" title={t('entries.requestEdit')} aria-label={t('entries.requestEdit')} onclick={() => editor!.startRequest(entry.id!, 'edit')}>✉</button>
 				{/if}
-				<button type="button" class="btn btn-ghost btn-sm btn-square text-error" title="Delete entry" aria-label="Delete entry" onclick={() => editor!.deleteEntry(entry.id!)}>✕</button>
+				<button type="button" class="btn btn-ghost btn-sm btn-square text-error" title={t('entries.deleteEntry')} aria-label={t('entries.deleteEntry')} onclick={() => editor!.deleteEntry(entry.id!)}>✕</button>
 			{/if}
 		</div>
 	</div>

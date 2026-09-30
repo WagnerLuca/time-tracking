@@ -16,6 +16,7 @@
 	import EntryRow from '$lib/components/EntryRow.svelte';
 	import RequestModal from '$lib/components/RequestModal.svelte';
 	import AbsenceDialog from '$lib/components/AbsenceDialog.svelte';
+	import { t, tp } from '$lib/i18n';
 
 	/**
 	 * Shared month/year calendar of a member's tracked time, absences and holidays.
@@ -171,7 +172,7 @@
 				orgSlug, userId, from.toISOString(), to.toISOString(), limit);
 			return data.items ?? [];
 		} catch (err) {
-			loadError = extractErrorMessage(err, 'Could not load the time entries.');
+			loadError = extractErrorMessage(err, t('calendar.loadEntriesFailed'));
 			return [];
 		}
 	}
@@ -200,7 +201,7 @@
 			fetchedOrgDetail = data;
 		} catch (err) {
 			fetchedOrgDetail = null;
-			loadError = extractErrorMessage(err, 'Could not load the organization.');
+			loadError = extractErrorMessage(err, t('calendar.loadOrgFailed'));
 		}
 	}
 
@@ -227,7 +228,7 @@
 			workSchedule = data;
 		} catch (err) {
 			workSchedule = null;
-			loadError = extractErrorMessage(err, 'Could not load the work schedule.');
+			loadError = extractErrorMessage(err, t('calendar.loadScheduleFailed'));
 		}
 	}
 
@@ -239,7 +240,7 @@
 			schedulePeriods = data;
 		} catch (err) {
 			schedulePeriods = [];
-			loadError = extractErrorMessage(err, 'Could not load the work schedule.');
+			loadError = extractErrorMessage(err, t('calendar.loadScheduleFailed'));
 		}
 	}
 
@@ -580,16 +581,16 @@
 
 <div>
 	<div class="flex items-center justify-end mb-4">
-		<div class="join" role="group" aria-label="View">
-			<button type="button" class="join-item btn btn-sm {viewMode === 'month' ? 'btn-primary' : 'btn-ghost'}" aria-pressed={viewMode === 'month'} onclick={() => switchView('month')}>Month</button>
-			<button type="button" class="join-item btn btn-sm {viewMode === 'year' ? 'btn-primary' : 'btn-ghost'}" aria-pressed={viewMode === 'year'} onclick={() => switchView('year')}>Year</button>
+		<div class="join" role="group" aria-label={t('calendar.view')}>
+			<button type="button" class="join-item btn btn-sm {viewMode === 'month' ? 'btn-primary' : 'btn-ghost'}" aria-pressed={viewMode === 'month'} onclick={() => switchView('month')}>{t('calendar.month')}</button>
+			<button type="button" class="join-item btn btn-sm {viewMode === 'year' ? 'btn-primary' : 'btn-ghost'}" aria-pressed={viewMode === 'year'} onclick={() => switchView('year')}>{t('calendar.year')}</button>
 		</div>
 	</div>
 
 	{#if loadError}
 		<div role="alert" class="alert alert-error text-sm mb-4 max-sm:alert-vertical">
 			<span>{loadError}</span>
-			<button type="button" class="btn btn-sm" onclick={loadAll}>Try again</button>
+			<button type="button" class="btn btn-sm" onclick={loadAll}>{t('common.retry')}</button>
 		</div>
 	{/if}
 
@@ -600,31 +601,31 @@
 		<div>
 			<!-- Navigation -->
 			<div class="flex items-center justify-center gap-1 sm:gap-3 mb-5">
-				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={prevYear} title="Previous year" aria-label="Previous year">«</button>
-				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={prevMonth} title="Previous month" aria-label="Previous month">‹</button>
+				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={prevYear} title={t('calendar.prevYear')} aria-label={t('calendar.prevYear')}>«</button>
+				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={prevMonth} title={t('calendar.prevMonth')} aria-label={t('calendar.prevMonth')}>‹</button>
 				<h2 class="text-lg font-bold min-w-0 flex-1 sm:flex-none sm:min-w-[180px] text-center m-0" aria-live="polite">{monthName} {currentYear}</h2>
-				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={nextMonth} title="Next month" aria-label="Next month">›</button>
-				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={nextYear} title="Next year" aria-label="Next year">»</button>
+				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={nextMonth} title={t('calendar.nextMonth')} aria-label={t('calendar.nextMonth')}>›</button>
+				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={nextYear} title={t('calendar.nextYear')} aria-label={t('calendar.nextYear')}>»</button>
 			</div>
 
 			<!-- Month stats -->
 			<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-4">
-				{@render stat(formatHours(monthStats.totalWorked), 'Worked')}
-				{@render stat(formatHours(monthStats.totalCredits), 'Credits')}
-				{@render stat(formatHours(monthStats.totalTarget), 'Target')}
-				{@render stat(formatDelta(monthStats.totalDelta), 'Month balance', deltaClass(monthStats.totalDelta))}
-				{@render stat(formatDelta(currentMonthCumulative), 'Cumulative', deltaClass(currentMonthCumulative), 'border-l-3 border-l-secondary')}
-				{@render stat(formatHours(monthStats.avgPerDay), 'Avg / day')}
+				{@render stat(formatHours(monthStats.totalWorked), t('calendar.worked'))}
+				{@render stat(formatHours(monthStats.totalCredits), t('calendar.credits'))}
+				{@render stat(formatHours(monthStats.totalTarget), t('calendar.target'))}
+				{@render stat(formatDelta(monthStats.totalDelta), t('calendar.monthBalance'), deltaClass(monthStats.totalDelta))}
+				{@render stat(formatDelta(currentMonthCumulative), t('calendar.cumulative'), deltaClass(currentMonthCumulative), 'border-l-3 border-l-secondary')}
+				{@render stat(formatHours(monthStats.avgPerDay), t('calendar.avgPerDay'))}
 			</div>
 
 			<!-- Summary badges -->
 			{#if monthStats.workDays > 0 || monthStats.holidays > 0 || monthStats.sickDays > 0 || monthStats.vacationDays > 0}
 				<div class="flex flex-wrap gap-2 mb-5">
-					<span class="badge badge-ghost badge-sm">{monthStats.workDays} work days</span>
-					<span class="badge badge-info badge-sm">{monthStats.workedDays} days worked</span>
-					{#if monthStats.holidays > 0}<span class="badge badge-sm {DAY_TYPE_CLASSES.holiday.badge}">{monthStats.holidays} holidays</span>{/if}
-					{#if monthStats.sickDays > 0}<span class="badge badge-sm {DAY_TYPE_CLASSES.sick.badge}">{monthStats.sickDays} sick days</span>{/if}
-					{#if monthStats.vacationDays > 0}<span class="badge badge-sm {DAY_TYPE_CLASSES.vacation.badge}">{monthStats.vacationDays} vacation days</span>{/if}
+					<span class="badge badge-ghost badge-sm">{tp('calendar.workDays', monthStats.workDays)}</span>
+					<span class="badge badge-info badge-sm">{tp('calendar.daysWorked', monthStats.workedDays)}</span>
+					{#if monthStats.holidays > 0}<span class="badge badge-sm {DAY_TYPE_CLASSES.holiday.badge}">{tp('calendar.holidays', monthStats.holidays)}</span>{/if}
+					{#if monthStats.sickDays > 0}<span class="badge badge-sm {DAY_TYPE_CLASSES.sick.badge}">{tp('calendar.sickDays', monthStats.sickDays)}</span>{/if}
+					{#if monthStats.vacationDays > 0}<span class="badge badge-sm {DAY_TYPE_CLASSES.vacation.badge}">{tp('calendar.vacationDays', monthStats.vacationDays)}</span>{/if}
 				</div>
 			{/if}
 
@@ -641,14 +642,14 @@
 						<button
 							type="button"
 							class="min-h-[72px] p-1.5 border-r border-b border-base-200 [&:nth-child(7n)]:border-r-0 flex flex-col gap-0.5 relative transition-colors text-left {!day.isCurrentMonth ? 'opacity-30' : ''} {day.isWeekend ? 'bg-base-200/30' : ''} {dt.soft} {day.isToday ? 'outline-2 outline-primary -outline-offset-2 rounded' : ''} {day.key === selectedDayKey ? 'ring-2 ring-primary/40 bg-primary/10' : ''}"
-							title={(day.dayTypeLabel || (day.workedMinutes > 0 ? `${formatHours(day.workedMinutes)} worked` : '')) + (canAddAbsence && day.isCurrentMonth ? (mustRequest ? ' — click to request absence' : ' — click to add absence') : '')}
+							title={(day.dayTypeLabel || (day.workedMinutes > 0 ? t('calendar.workedValue', { value: formatHours(day.workedMinutes) }) : '')) + (canAddAbsence && day.isCurrentMonth ? (mustRequest ? t('calendar.clickToRequest') : t('calendar.clickToAdd')) : '')}
 							aria-pressed={day.key === selectedDayKey}
 							onclick={() => selectDay(day, 'dialog')}
 							disabled={!day.isCurrentMonth}
 						>
 							<span class="text-xs font-medium {day.isToday ? 'text-primary font-bold' : 'text-base-content/70'}">{day.dayOfMonth}</span>
 							{#if day.hasFailure}
-								<span class="absolute top-1 right-1 h-2 w-2 rounded-full bg-error" title="Timer not stopped – needs correction"></span>
+								<span class="absolute top-1 right-1 h-2 w-2 rounded-full bg-error" title={t('calendar.needsCorrection')}></span>
 							{/if}
 							{#if day.isCurrentMonth}
 								{#if day.workedMinutes > 0}
@@ -686,7 +687,7 @@
 								{#if day.dayType}<span class="inline-block w-2 h-2 rounded-full mr-1 {dt.dot}" aria-hidden="true"></span>{day.dayTypeLabel}{/if}
 							</span>
 							{#if day.hasFailure}
-								<span class="badge badge-error badge-xs" title="Timer not stopped – needs correction">!</span>
+								<span class="badge badge-error badge-xs" title={t('calendar.needsCorrection')}>!</span>
 							{/if}
 							<span class="text-sm tabular-nums whitespace-nowrap">
 								{#if day.workedMinutes > 0}
@@ -703,18 +704,18 @@
 
 			<!-- Legend -->
 			<div class="flex gap-4 flex-wrap text-xs text-base-content/60 mb-6">
-				{#if holidayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.holiday.dot}"></span> Holiday</span>{/if}
-				{#if sickDayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.sick.dot}"></span> Sick day</span>{/if}
-				{#if vacationDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.vacation.dot}"></span> Vacation</span>{/if}
-				{#if otherAbsenceDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES['other-absence'].dot}"></span> Other absence</span>{/if}
-				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background: {heatColor(1, 1)}"></span> Target met</span>
-				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background: {heatColor(1, 2)}"></span> Under target</span>
-				<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-error"></span> Needs correction</span>
+				{#if holidayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.holiday.dot}"></span> {t('format.dayType.holiday')}</span>{/if}
+				{#if sickDayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.sick.dot}"></span> {t('format.dayType.sick')}</span>{/if}
+				{#if vacationDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.vacation.dot}"></span> {t('format.dayType.vacation')}</span>{/if}
+				{#if otherAbsenceDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES['other-absence'].dot}"></span> {t('format.dayType.otherAbsence')}</span>{/if}
+				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background: {heatColor(1, 1)}"></span> {t('calendar.targetMet')}</span>
+				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background: {heatColor(1, 2)}"></span> {t('calendar.underTarget')}</span>
+				<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-error"></span> {t('calendar.correctionLegend')}</span>
 			</div>
 
 			<!-- Daily breakdown for month (the agenda list covers this on phones) -->
 			<div class="card bg-base-100 border border-base-300 p-4 hidden sm:flex">
-				<h3 class="text-[0.9375rem] font-bold mb-3 m-0">Daily breakdown</h3>
+				<h3 class="text-[0.9375rem] font-bold mb-3 m-0">{t('calendar.dailyBreakdown')}</h3>
 				<div class="flex flex-col gap-1.5">
 					{#each monthDays.filter((d) => d.workedMinutes > 0 || d.targetMinutes > 0 || d.dayType) as day (day.key)}
 						{@const dt = dayTypeClasses(day.dayType)}
@@ -742,26 +743,26 @@
 			{#if selectedDay}
 				{@const dayDetails = selectedDay}
 				{@const showUnderTarget = isPastOrToday(dayDetails.date) && dayDetails.targetMinutes > 0 && dayDetails.delta < 0}
-				<section bind:this={dayDetailsEl} class="card bg-base-100 border border-base-300 p-4 mt-4 scroll-mt-20" aria-label="Day details">
+				<section bind:this={dayDetailsEl} class="card bg-base-100 border border-base-300 p-4 mt-4 scroll-mt-20" aria-label={t('calendar.dayDetails')}>
 					<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
 						<div>
-							<h3 class="text-[0.9375rem] font-bold m-0">Day details</h3>
+							<h3 class="text-[0.9375rem] font-bold m-0">{t('calendar.dayDetails')}</h3>
 							<span class="text-sm text-base-content/70">{formatDateFull(dayDetails.date)}</span>
 						</div>
 						{#if canAddAbsence}
-							<button type="button" class="btn btn-outline btn-sm" onclick={() => openAbsenceDialog(dayDetails.key)}>{mustRequest ? 'Request absence' : 'Add absence'}</button>
+							<button type="button" class="btn btn-outline btn-sm" onclick={() => openAbsenceDialog(dayDetails.key)}>{mustRequest ? t('calendar.requestAbsence') : t('calendar.addAbsence')}</button>
 						{/if}
 					</div>
 
 					<div class="flex flex-wrap gap-2 mb-4">
-						<span class="badge badge-outline">Worked {formatHours(dayDetails.workedMinutes)}</span>
+						<span class="badge badge-outline">{t('calendar.workedBadge', { value: formatHours(dayDetails.workedMinutes) })}</span>
 						{#if dayDetails.creditedMinutes > 0}
-							<span class="badge badge-secondary badge-outline">Credits {formatHours(dayDetails.creditedMinutes)}</span>
+							<span class="badge badge-secondary badge-outline">{t('calendar.creditsBadge', { value: formatHours(dayDetails.creditedMinutes) })}</span>
 						{/if}
-						<span class="badge badge-outline">Target {formatHours(dayDetails.targetMinutes)}</span>
+						<span class="badge badge-outline">{t('calendar.targetBadge', { value: formatHours(dayDetails.targetMinutes) })}</span>
 						<span class="badge {dayDetails.delta > 0 ? 'badge-success' : dayDetails.delta < 0 ? 'badge-error' : 'badge-ghost'}">{formatDelta(dayDetails.delta)}</span>
 						{#if showUnderTarget}
-							<span class="badge badge-warning">Under target</span>
+							<span class="badge badge-warning">{t('calendar.underTarget')}</span>
 						{/if}
 						{#if dayDetails.dayType}
 							<span class="badge {dayTypeClasses(dayDetails.dayType).badge}">{dayDetails.dayTypeLabel}</span>
@@ -777,7 +778,7 @@
 							{/each}
 						</ul>
 					{:else}
-						<p class="text-sm text-base-content/60 m-0">No tracked entries for this day.</p>
+						<p class="text-sm text-base-content/60 m-0">{t('calendar.noEntries')}</p>
 					{/if}
 				</section>
 			{/if}
@@ -814,9 +815,9 @@
 		<!-- YEAR VIEW -->
 		<div>
 			<div class="flex items-center justify-center gap-3 mb-5">
-				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={prevYear} title="Previous year" aria-label="Previous year">‹</button>
+				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={prevYear} title={t('calendar.prevYear')} aria-label={t('calendar.prevYear')}>‹</button>
 				<h2 class="text-lg font-bold min-w-[120px] text-center m-0" aria-live="polite">{currentYear}</h2>
-				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={nextYear} title="Next year" aria-label="Next year">›</button>
+				<button type="button" class="btn btn-ghost btn-sm btn-square" onclick={nextYear} title={t('calendar.nextYear')} aria-label={t('calendar.nextYear')}>›</button>
 			</div>
 
 			{#if yearLoading}
@@ -833,17 +834,17 @@
 				{@const yearCumulative = getYearCumulative(currentYear)}
 
 				<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-4">
-					{@render stat(formatHours(yearTotal), 'Total worked')}
-					{@render stat(formatHours(yearCredits), 'Credits')}
-					{@render stat(formatHours(yearTarget), 'Total target')}
-					{@render stat(formatDelta(yearDelta), 'Year balance', deltaClass(yearDelta))}
-					{@render stat(formatDelta(yearCumulative), 'Cumulative', deltaClass(yearCumulative), 'border-l-3 border-l-secondary')}
+					{@render stat(formatHours(yearTotal), t('calendar.totalWorked'))}
+					{@render stat(formatHours(yearCredits), t('calendar.credits'))}
+					{@render stat(formatHours(yearTarget), t('calendar.totalTarget'))}
+					{@render stat(formatDelta(yearDelta), t('calendar.yearBalance'), deltaClass(yearDelta))}
+					{@render stat(formatDelta(yearCumulative), t('calendar.cumulative'), deltaClass(yearCumulative), 'border-l-3 border-l-secondary')}
 				</div>
 
 				<div class="flex flex-wrap gap-2 mb-5">
-					{#if yearHolidays > 0}<span class="badge badge-sm {DAY_TYPE_CLASSES.holiday.badge}">{yearHolidays} holidays</span>{/if}
-					{#if yearSick > 0}<span class="badge badge-sm {DAY_TYPE_CLASSES.sick.badge}">{yearSick} sick days</span>{/if}
-					{#if yearVacation > 0}<span class="badge badge-sm {DAY_TYPE_CLASSES.vacation.badge}">{yearVacation} vacation days</span>{/if}
+					{#if yearHolidays > 0}<span class="badge badge-sm {DAY_TYPE_CLASSES.holiday.badge}">{tp('calendar.holidays', yearHolidays)}</span>{/if}
+					{#if yearSick > 0}<span class="badge badge-sm {DAY_TYPE_CLASSES.sick.badge}">{tp('calendar.sickDays', yearSick)}</span>{/if}
+					{#if yearVacation > 0}<span class="badge badge-sm {DAY_TYPE_CLASSES.vacation.badge}">{tp('calendar.vacationDays', yearVacation)}</span>{/if}
 				</div>
 
 				<!-- Monthly cards -->
@@ -868,7 +869,7 @@
 								{/if}
 							</div>
 							{#if mo.creditedMinutes > 0}
-								<div class="text-xs text-base-content/60 mb-1">+{formatHours(mo.creditedMinutes)} credits</div>
+								<div class="text-xs text-base-content/60 mb-1">{t('calendar.creditsSuffix', { value: formatHours(mo.creditedMinutes) })}</div>
 							{/if}
 							{#if moCumulative !== undefined}
 								<div class="text-xs font-semibold mb-1 {deltaClass(moCumulative, 'text-base-content/60')}">Σ {formatDelta(moCumulative)}</div>

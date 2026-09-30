@@ -6,6 +6,7 @@ import { extractErrorMessage } from '$lib/utils/errorHandler';
 import { canEditPause } from '$lib/utils/orgRules';
 import { confirmDialog } from '$lib/stores/confirm.svelte';
 import { toast } from '$lib/stores/toast.svelte';
+import { t } from '$lib/i18n';
 
 /**
  * Creates a reusable entry editing + request state manager.
@@ -66,10 +67,10 @@ export function createEntryEditor(options: {
 			}
 			await timeTrackingApi.apiV1TimeTrackingIdPut(entryId, payload);
 			editingEntryId = null;
-			toast.success('Entry saved.');
+			toast.success(t('entries.saved'));
 			await options.onSaved();
 		} catch (err) {
-			editError = extractErrorMessage(err, 'Failed to update entry.');
+			editError = extractErrorMessage(err, t('entries.saveFailed'));
 		} finally {
 			editSaving = false;
 		}
@@ -77,19 +78,19 @@ export function createEntryEditor(options: {
 
 	async function deleteEntry(id: number) {
 		const confirmed = await confirmDialog({
-			title: 'Delete time entry?',
-			message: 'The entry is removed permanently.',
-			confirmLabel: 'Delete',
+			title: t('entries.deleteTitle'),
+			message: t('entries.deleteMessage'),
+			confirmLabel: t('common.delete'),
 			danger: true
 		});
 		if (!confirmed) return;
 		try {
 			await timeTrackingApi.apiV1TimeTrackingIdDelete(id);
 			if (editingEntryId === id) editingEntryId = null;
-			toast.success('Entry deleted.');
+			toast.success(t('entries.deleted'));
 			await options.onDeleted();
 		} catch (err) {
-			toast.error(err, 'Failed to delete entry.');
+			toast.error(err, t('entries.deleteFailed'));
 		}
 	}
 
@@ -139,10 +140,10 @@ export function createEntryEditor(options: {
 				requestData,
 				message: requestMessage || undefined
 			});
-			toast.success('Request submitted. An admin will review it.');
+			toast.success(t('entries.request.submitted'));
 			cancelRequest();
 		} catch (err) {
-			requestError = extractErrorMessage(err, 'Failed to submit request.');
+			requestError = extractErrorMessage(err, t('entries.request.submitFailed'));
 		} finally {
 			requestSending = false;
 		}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { DAY_TYPE_CLASSES } from '$lib/utils/colors';
+	import { t } from '$lib/i18n';
 
 	let {
 		holidayDates,
@@ -14,10 +15,10 @@
 	} = $props();
 
 	const items = $derived([
-		{ show: holidayDates.size > 0, dot: DAY_TYPE_CLASSES.holiday.dot, label: 'Holiday' },
-		{ show: sickDayDates.size > 0, dot: DAY_TYPE_CLASSES.sick.dot, label: 'Sick day' },
-		{ show: vacationDates.size > 0, dot: DAY_TYPE_CLASSES.vacation.dot, label: 'Vacation' },
-		{ show: otherAbsenceDates.size > 0, dot: DAY_TYPE_CLASSES['other-absence'].dot, label: 'Other absence' }
+		{ show: holidayDates.size > 0, dot: DAY_TYPE_CLASSES.holiday.dot, label: t('format.dayType.holiday') },
+		{ show: sickDayDates.size > 0, dot: DAY_TYPE_CLASSES.sick.dot, label: t('format.dayType.sick') },
+		{ show: vacationDates.size > 0, dot: DAY_TYPE_CLASSES.vacation.dot, label: t('format.dayType.vacation') },
+		{ show: otherAbsenceDates.size > 0, dot: DAY_TYPE_CLASSES['other-absence'].dot, label: t('format.dayType.otherAbsence') }
 	].filter((i) => i.show));
 </script>
 

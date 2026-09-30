@@ -1,4 +1,78 @@
-/** Strings for the entries area. Add keys to both objects; `en` is typed against `de`. */
-export const de = {};
+/** Strings for time entry rows, the inline editor and edit requests. `en` is typed against `de`. */
+export const de = {
+	start: 'Beginn',
+	end: 'Ende',
+	note: 'Notiz',
+	notePlaceholder: 'Notiz (optional)',
+	pauseMinutes: 'Pause (min)',
+	endAfterStart: 'Das Ende muss nach dem Beginn liegen.',
+	running: 'Läuft',
+	needsCorrection: 'Korrektur nötig',
+	needsCorrectionHint: 'Der Timer lief über das Ende des Arbeitstags und wurde automatisch gestoppt. Er zählt als 0, bis die Endzeit korrigiert ist.',
+	pauseBadge: '−{minutes} min Pause',
+	addPauseBadge: '+ Pause',
+	editPause: 'Pause bearbeiten',
+	requestPauseEdit: 'Pausenänderung beantragen',
+	addPause: 'Pause hinzufügen',
+	requestPause: 'Pause beantragen',
+	editEntry: 'Zeiteintrag bearbeiten',
+	requestEdit: 'Änderung beantragen',
+	deleteEntry: 'Zeiteintrag löschen',
+	deleteTitle: 'Zeiteintrag löschen?',
+	deleteMessage: 'Der Zeiteintrag wird endgültig entfernt.',
+	saved: 'Zeiteintrag gespeichert.',
+	deleted: 'Zeiteintrag gelöscht.',
+	saveFailed: 'Zeiteintrag konnte nicht gespeichert werden.',
+	deleteFailed: 'Zeiteintrag konnte nicht gelöscht werden.',
+	request: {
+		titleEdit: 'Änderung des Zeiteintrags beantragen',
+		titlePause: 'Pausenänderung beantragen',
+		intro: 'Neue Werte eintragen. Ein Admin prüft und übernimmt sie.',
+		newStart: 'Neuer Beginn',
+		newEnd: 'Neues Ende',
+		newPause: 'Neue Pause (Minuten)',
+		message: 'Nachricht an den Admin (optional)',
+		submit: 'Antrag absenden',
+		submitted: 'Antrag gesendet. Ein Admin prüft ihn.',
+		submitFailed: 'Antrag konnte nicht gesendet werden.'
+	}
+};
 
-export const en: typeof de = {};
+export const en: typeof de = {
+	start: 'Start',
+	end: 'End',
+	note: 'Note',
+	notePlaceholder: 'Note (optional)',
+	pauseMinutes: 'Pause (min)',
+	endAfterStart: 'End must be after start.',
+	running: 'Running',
+	needsCorrection: 'Needs correction',
+	needsCorrectionHint: 'The timer ran past the business day end and was stopped automatically. It counts as 0 until the end time is corrected.',
+	pauseBadge: '−{minutes} min pause',
+	addPauseBadge: '+ Pause',
+	editPause: 'Edit pause',
+	requestPauseEdit: 'Request pause change',
+	addPause: 'Add pause',
+	requestPause: 'Request pause',
+	editEntry: 'Edit time entry',
+	requestEdit: 'Request change',
+	deleteEntry: 'Delete time entry',
+	deleteTitle: 'Delete time entry?',
+	deleteMessage: 'The time entry is removed permanently.',
+	saved: 'Time entry saved.',
+	deleted: 'Time entry deleted.',
+	saveFailed: 'Could not save the time entry.',
+	deleteFailed: 'Could not delete the time entry.',
+	request: {
+		titleEdit: 'Request time entry change',
+		titlePause: 'Request pause change',
+		intro: 'Enter the new values. An admin will review and apply them.',
+		newStart: 'New start',
+		newEnd: 'New end',
+		newPause: 'New pause (minutes)',
+		message: 'Message for the admin (optional)',
+		submit: 'Submit request',
+		submitted: 'Request submitted. An admin will review it.',
+		submitFailed: 'Could not submit the request.'
+	}
+};

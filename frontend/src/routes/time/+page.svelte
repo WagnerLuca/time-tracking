@@ -20,6 +20,7 @@
 	import DayTypeLegend from '$lib/components/DayTypeLegend.svelte';
 	import EntryRow from '$lib/components/EntryRow.svelte';
 	import RequestModal from '$lib/components/RequestModal.svelte';
+	import { t } from '$lib/i18n';
 
 	let weekEntries = $state<TimeEntryResponse[]>([]);
 	let loading = $state(true);
@@ -145,7 +146,7 @@
 			weekEntries = data.items ?? [];
 		} catch (err) {
 			weekEntries = [];
-			weekError = extractErrorMessage(err, 'Could not load this week’s entries.');
+			weekError = extractErrorMessage(err, t('timer.weekLoadFailed'));
 		}
 	}
 
@@ -168,8 +169,8 @@
 		// Without effective permissions the org defaults apply (orgRules falls through to orgDetail)
 		perms = ep.status === 'fulfilled' ? ep.value.data : null;
 		daysOff = off.status === 'fulfilled' ? off.value : emptyDaysOff();
-		if (ws.status === 'rejected') toast.error(ws.reason, 'Could not load your work schedule.');
-		if (od.status === 'rejected') toast.error(od.reason, 'Could not load the organization.');
+		if (ws.status === 'rejected') toast.error(ws.reason, t('timer.scheduleLoadFailed'));
+		if (od.status === 'rejected') toast.error(od.reason, t('timer.orgLoadFailed'));
 	}
 
 	async function loadCumulativeOvertime() {
@@ -195,7 +196,7 @@
 			hasOvertimeData = true;
 		} catch (err) {
 			hasOvertimeData = false;
-			toast.error(err, 'Could not calculate your overtime balance.');
+			toast.error(err, t('timer.overtimeFailed'));
 		}
 	}
 
@@ -215,7 +216,7 @@
 	function handleStart() {
 		return runTimerAction(
 			() => timer.start({ description: note.trim() || undefined, organizationSlug: selectedSlug ?? undefined }),
-			'Failed to start timer.'
+			t('timer.startFailed')
 		);
 	}
 
@@ -223,16 +224,16 @@
 		return runTimerAction(async () => {
 			await timer.stop({ description: note.trim() || undefined });
 			note = '';
-		}, 'Failed to stop timer.');
+		}, t('timer.stopFailed'));
 	}
 
 	async function handleSwitch() {
-		const from = timer.current?.organizationName ?? 'another organization';
+		const from = timer.current?.organizationName ?? t('timer.anotherOrg');
 		const to = orgContext.selectedOrg?.name ?? '';
 		const confirmed = await confirmDialog({
-			title: 'Switch timer?',
-			message: `The running timer for ${from} is stopped and a new timer starts for ${to}.`,
-			confirmLabel: 'Switch timer'
+			title: t('timer.switchTitle'),
+			message: t('timer.switchMessage', { from, to }),
+			confirmLabel: t('timer.switchConfirm')
 		});
 		if (confirmed) await handleStart(); // the backend stops the running timer first
 	}
@@ -259,7 +260,7 @@
 </script>
 
 <svelte:head>
-	<title>Timer - Time Tracking</title>
+	<title>{t('common.pageTitle', { page: t('timer.pageTitle') })}</title>
 </svelte:head>
 
 <div class="max-w-3xl mx-auto">
@@ -271,40 +272,40 @@
 
 		{#if timer.current}
 			<div class="text-sm text-base-content/70 mb-5">
-				Running for <strong>{timer.current.organizationName ?? 'Personal (no organization)'}</strong>
+				{t('timer.runningFor', { org: timer.current.organizationName ?? t('timer.personal') })}
 			</div>
 		{:else if orgContext.selectedOrg}
-			<div class="text-sm text-base-content/70 mb-5">Tracking for <strong>{orgContext.selectedOrg.name}</strong></div>
+			<div class="text-sm text-base-content/70 mb-5">{t('timer.trackingFor', { org: orgContext.selectedOrg.name ?? '' })}</div>
 		{:else}
-			<div class="text-sm text-base-content/50 mb-5">Personal (no organization)</div>
+			<div class="text-sm text-base-content/50 mb-5">{t('timer.personal')}</div>
 		{/if}
 
 		{#if runsElsewhere}
 			<div role="status" class="alert alert-warning text-sm mb-4 text-left max-sm:alert-vertical">
-				<span>This timer runs for <strong>{timer.current?.organizationName}</strong>, not for the selected organization <strong>{orgContext.selectedOrg?.name}</strong>.</span>
-				<button type="button" class="btn btn-sm" onclick={handleSwitch} disabled={pending}>Switch to {orgContext.selectedOrg?.name}</button>
+				<span>{t('timer.runsElsewhere', { running: timer.current?.organizationName ?? t('timer.anotherOrg'), selected: orgContext.selectedOrg?.name ?? '' })}</span>
+				<button type="button" class="btn btn-sm" onclick={handleSwitch} disabled={pending}>{t('timer.switchTo', { org: orgContext.selectedOrg?.name ?? '' })}</button>
 			</div>
 		{/if}
 
 		<div class="mb-4">
 			{#if timer.current}
 				<button type="button" class="btn btn-error btn-lg min-w-40 text-lg font-bold" onclick={handleStop} disabled={pending}>
-					{pending ? 'Stopping…' : 'Stop timer'}
+					{pending ? t('timer.stopping') : t('timer.stop')}
 				</button>
 			{:else}
 				<button type="button" class="btn btn-success btn-lg min-w-40 text-lg font-bold" onclick={handleStart} disabled={pending || !timer.loaded}>
-					{pending ? 'Starting…' : 'Start timer'}
+					{pending ? t('timer.starting') : t('timer.start')}
 				</button>
 			{/if}
 		</div>
 
 		<div class="w-full max-w-[360px] mx-auto">
-			<label for="{noteListId}-note" class="sr-only">Note (optional)</label>
+			<label for="{noteListId}-note" class="sr-only">{t('timer.note')}</label>
 			<input
 				id="{noteListId}-note"
 				type="text"
 				bind:value={note}
-				placeholder="Note (optional)"
+				placeholder={t('timer.note')}
 				list={previousDescriptions.length > 0 ? `${noteListId}-suggestions` : undefined}
 				autocomplete="off"
 				class="input input-bordered input-sm w-full text-center bg-base-200/50"
@@ -322,9 +323,9 @@
 		<LoadingSpinner size="sm" />
 	{:else}
 		<!-- Weekly summary -->
-		<section class="card bg-base-100 border border-base-300 p-4 sm:p-5 mb-8" aria-label="Week summary">
+		<section class="card bg-base-100 border border-base-300 p-4 sm:p-5 mb-8" aria-label={t('timer.weekSummary')}>
 			<div class="flex items-center justify-between mb-4">
-				<button type="button" class="btn btn-ghost btn-sm btn-square text-xl" aria-label="Previous week" title="Previous week" onclick={() => changeWeek(-1)}>‹</button>
+				<button type="button" class="btn btn-ghost btn-sm btn-square text-xl" aria-label={t('timer.prevWeek')} title={t('timer.prevWeek')} onclick={() => changeWeek(-1)}>‹</button>
 				<div class="text-center">
 					<span class="block font-semibold text-base text-base-content">{formatWeekLabel(weekRange)}</span>
 					<span class="block text-sm text-base-content/60 mt-0.5">
@@ -338,13 +339,13 @@
 						<progress class="progress progress-primary h-1 w-36 mt-1.5" value={Math.min(weekTotal, weekTargetFull)} max={weekTargetFull}></progress>
 					{/if}
 				</div>
-				<button type="button" class="btn btn-ghost btn-sm btn-square text-xl" aria-label="Next week" title="Next week" onclick={() => changeWeek(1)} disabled={weekOffset >= 0}>›</button>
+				<button type="button" class="btn btn-ghost btn-sm btn-square text-xl" aria-label={t('timer.nextWeek')} title={t('timer.nextWeek')} onclick={() => changeWeek(1)} disabled={weekOffset >= 0}>›</button>
 			</div>
 
 			{#if weekError}
 				<div role="alert" class="alert alert-error text-sm mb-3 max-sm:alert-vertical">
 					<span>{weekError}</span>
-					<button type="button" class="btn btn-sm" onclick={loadWeek}>Try again</button>
+					<button type="button" class="btn btn-sm" onclick={loadWeek}>{t('common.retry')}</button>
 				</div>
 			{/if}
 
@@ -386,12 +387,12 @@
 			<div class="card bg-base-100 border-2 p-4 mb-8 {cumulativeOvertime > 0 ? 'border-success/50 bg-success/5' : cumulativeOvertime < 0 ? 'border-error/50 bg-error/5' : 'border-base-300'}">
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 					<div class="flex flex-col gap-1">
-						<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">Cumulative balance</span>
+						<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('timer.cumulativeBalance')}</span>
 						<span class="text-xl font-bold tabular-nums {deltaClass(cumulativeOvertime)}">{formatDelta(cumulativeOvertime)}</span>
-						<span class="text-xs text-base-content/50">As of today</span>
+						<span class="text-xs text-base-content/50">{t('timer.asOfToday')}</span>
 					</div>
 					<div class="flex flex-col gap-1 sm:border-l sm:border-base-300 sm:pl-4">
-						<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">End of selected week</span>
+						<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('timer.endOfWeek')}</span>
 						<span class="text-xl font-bold tabular-nums {deltaClass(cumulativeOvertimeWeekEnd)}">{formatDelta(cumulativeOvertimeWeekEnd)}</span>
 						<span class="text-xs text-base-content/50">{formatWeekLabel(weekRange)}</span>
 					</div>
@@ -401,10 +402,10 @@
 
 		<!-- Entries of the selected week -->
 		<section>
-			<h2 class="text-lg text-base-content/70 mb-4">Entries this week</h2>
+			<h2 class="text-lg text-base-content/70 mb-4">{t('timer.entriesThisWeek')}</h2>
 
 			{#if weekEntries.length === 0}
-				{#if !weekError}<p class="text-base-content/50">No entries this week. Start the timer above.</p>{/if}
+				{#if !weekError}<p class="text-base-content/50">{t('timer.noEntries')}</p>{/if}
 			{:else}
 				<ul class="card bg-base-100 border border-base-300 overflow-hidden">
 					{#each weekEntries as entry (entry.id)}

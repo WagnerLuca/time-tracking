@@ -4,6 +4,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import MemberCalendar from '$lib/components/MemberCalendar.svelte';
 	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+	import { t } from '$lib/i18n';
 
 	// Deep link from the failure banner: /history?date=YYYY-MM-DD&entry=<id>
 	const focusDate = $derived(page.url.searchParams.get('date'));
@@ -14,11 +15,11 @@
 </script>
 
 <svelte:head>
-	<title>History - Time Tracking</title>
+	<title>{t('common.pageTitle', { page: t('calendar.pageTitle') })}</title>
 </svelte:head>
 
 <div class="max-w-4xl mx-auto">
-	<h1 class="text-2xl font-bold text-base-content mb-4 m-0">History</h1>
+	<h1 class="text-2xl font-bold text-base-content mb-4 m-0">{t('calendar.pageTitle')}</h1>
 
 	{#if orgContext.selectedOrgSlug && auth.user?.id}
 		{#key `${orgContext.selectedOrgSlug}-${auth.user.id}`}
@@ -35,13 +36,13 @@
 		<LoadingSpinner size="sm" />
 	{:else}
 		<div class="card bg-base-100 border border-base-300 p-5">
-			<h2 class="text-base font-semibold m-0">No organization selected</h2>
+			<h2 class="text-base font-semibold m-0">{t('calendar.noOrgTitle')}</h2>
 			<p class="text-sm text-base-content/60 mt-1 mb-4">
 				{orgContext.organizations.length > 0
-					? 'Select an organization in the menu above to see your history.'
-					: 'Your history lives inside an organization. Create or join one first.'}
+					? t('calendar.selectOrg')
+					: t('calendar.noOrgs')}
 			</p>
-			<a href="/organizations" class="btn btn-primary btn-sm self-start">Go to organizations</a>
+			<a href="/organizations" class="btn btn-primary btn-sm self-start">{t('calendar.goToOrgs')}</a>
 		</div>
 	{/if}
 </div>

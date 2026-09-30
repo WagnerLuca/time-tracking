@@ -15,6 +15,7 @@
 	import { loadDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
 	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
 	import DayTypeLegend from '$lib/components/DayTypeLegend.svelte';
+	import { t } from '$lib/i18n';
 
 	interface Stats {
 		todayMinutes: number;
@@ -96,8 +97,8 @@
 			const credit = (d: Date) => getAbsenceCredit(d, schedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, [], halfDayAbsences, halfDayHolidays);
 			const creditRange = (from: Date, to: Date) => absenceCreditsForRange(from, to, schedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, [], halfDayAbsences, halfDayHolidays);
 			const inRange = (from: Date, to: Date) => (e: { startTime?: string }) => {
-				const t = new Date(e.startTime!);
-				return t >= from && t <= to;
+				const ts = new Date(e.startTime!);
+				return ts >= from && ts <= to;
 			};
 
 			const weekEntries = weekRes.data.items ?? [];
@@ -136,7 +137,7 @@
 				wkEnd.setHours(23, 59, 59, 999);
 				if (wkEnd > monthEnd) wkEnd = new Date(monthEnd);
 				monthWeeks.push({
-					label: `${wkStart.getDate()}.–${wkEnd.getDate()}.`,
+					label: t('dashboard.weekRange', { from: wkStart.getDate(), to: wkEnd.getDate() }),
 					worked: sumMinutes(monthEntries.filter(inRange(wkStart, wkEnd))),
 					target: getTargetForRange(wkStart, wkEnd, schedule, holidayDates, [], firstEntryDate, halfDayHolidays)
 				});
@@ -168,7 +169,7 @@
 			};
 		} catch (err) {
 			stats = null;
-			statsError = extractErrorMessage(err, 'Could not load your statistics.');
+			statsError = extractErrorMessage(err, t('dashboard.statsFailed'));
 		} finally {
 			statsLoading = false;
 		}
@@ -179,7 +180,7 @@
 		try {
 			await timer.start({ organizationSlug: selectedSlug ?? undefined });
 		} catch (err) {
-			toast.error(err, 'Failed to start timer.');
+			toast.error(err, t('timer.startFailed'));
 		} finally {
 			pending = false;
 		}
@@ -191,7 +192,7 @@
 			await timer.stop();
 			await loadStats(selectedSlug);
 		} catch (err) {
-			toast.error(err, 'Failed to stop timer.');
+			toast.error(err, t('timer.stopFailed'));
 		} finally {
 			pending = false;
 		}
@@ -203,38 +204,38 @@
 </script>
 
 <svelte:head>
-	<title>Dashboard - Time Tracking</title>
+	<title>{t('common.pageTitle', { page: t('dashboard.pageTitle') })}</title>
 </svelte:head>
 
 <div class="max-w-3xl mx-auto">
-	<h1 class="text-2xl font-bold text-base-content mb-5">Hello, {auth.user?.firstName}</h1>
+	<h1 class="text-2xl font-bold text-base-content mb-5">{t('dashboard.greeting', { name: auth.user?.firstName ?? '' })}</h1>
 
 	<!-- Timer: the primary action -->
-	<section class="card mb-6 border-2 p-5 sm:p-6 {timer.current ? 'border-success bg-success/5' : 'border-base-300 bg-base-100'}" aria-label="Timer">
+	<section class="card mb-6 border-2 p-5 sm:p-6 {timer.current ? 'border-success bg-success/5' : 'border-base-300 bg-base-100'}" aria-label={t('dashboard.timer')}>
 		<div class="flex flex-wrap items-center gap-4">
 			<div class="min-w-0 flex-1">
 				{#if timer.current}
 					<div class="flex items-center gap-2 text-sm font-semibold text-success">
 						<span class="w-2.5 h-2.5 bg-success rounded-full animate-pulse" aria-hidden="true"></span>
-						Timer running
+						{t('dashboard.running')}
 					</div>
 					<div class="text-4xl sm:text-5xl font-bold tabular-nums text-base-content tracking-wide mt-1" role="timer" aria-live="off">{formatClock(timer.elapsedSeconds)}</div>
-					<div class="text-sm text-base-content/60 mt-1 truncate">for {timer.current.organizationName ?? 'Personal (no organization)'}</div>
+					<div class="text-sm text-base-content/60 mt-1 truncate">{t('dashboard.forOrg', { org: timer.current.organizationName ?? t('timer.personal') })}</div>
 				{:else}
-					<div class="text-sm font-semibold text-base-content/50">No timer running</div>
+					<div class="text-sm font-semibold text-base-content/50">{t('dashboard.notRunning')}</div>
 					<div class="text-4xl sm:text-5xl font-bold tabular-nums text-base-content/30 tracking-wide mt-1">{formatClock(0)}</div>
 					<div class="text-sm text-base-content/60 mt-1 truncate">
-						{orgContext.selectedOrg ? `Starts for ${orgContext.selectedOrg.name}` : 'Starts without organization'}
+						{orgContext.selectedOrg ? t('dashboard.startsFor', { org: orgContext.selectedOrg.name ?? '' }) : t('dashboard.startsWithoutOrg')}
 					</div>
 				{/if}
 			</div>
 			<div class="flex flex-col items-stretch gap-2 max-sm:w-full">
 				{#if timer.current}
-					<button type="button" class="btn btn-error btn-lg min-w-40" onclick={handleStop} disabled={pending}>{pending ? 'Stopping…' : 'Stop timer'}</button>
+					<button type="button" class="btn btn-error btn-lg min-w-40" onclick={handleStop} disabled={pending}>{pending ? t('timer.stopping') : t('timer.stop')}</button>
 				{:else}
-					<button type="button" class="btn btn-success btn-lg min-w-40" onclick={handleStart} disabled={pending || !timer.loaded}>{pending ? 'Starting…' : 'Start timer'}</button>
+					<button type="button" class="btn btn-success btn-lg min-w-40" onclick={handleStart} disabled={pending || !timer.loaded}>{pending ? t('timer.starting') : t('timer.start')}</button>
 				{/if}
-				<a href="/time" class="btn btn-ghost btn-sm">Add a note / this week</a>
+				<a href="/time" class="btn btn-ghost btn-sm">{t('dashboard.noteAndWeek')}</a>
 			</div>
 		</div>
 	</section>
@@ -242,15 +243,15 @@
 	<!-- Actionable empty states -->
 	{#if noOrganizations}
 		<section class="card bg-base-100 border border-base-300 p-5 mb-6">
-			<h2 class="text-base font-semibold m-0">You are not in an organization yet</h2>
-			<p class="text-sm text-base-content/60 mt-1 mb-4">Targets, overtime, absences and reports work inside an organization. Create your own or join an existing one.</p>
+			<h2 class="text-base font-semibold m-0">{t('dashboard.noOrg.title')}</h2>
+			<p class="text-sm text-base-content/60 mt-1 mb-4">{t('dashboard.noOrg.text')}</p>
 			<div class="flex flex-wrap gap-2">
-				<a href="/organizations/new" class="btn btn-primary btn-sm">Create organization</a>
-				<a href="/organizations" class="btn btn-outline btn-sm">Join organization</a>
+				<a href="/organizations/new" class="btn btn-primary btn-sm">{t('dashboard.noOrg.create')}</a>
+				<a href="/organizations" class="btn btn-outline btn-sm">{t('dashboard.noOrg.join')}</a>
 			</div>
 		</section>
 	{:else if !orgContext.loading && !orgContext.selectedOrg}
-		<div role="status" class="alert alert-info mb-6 text-sm">Select an organization in the menu above to see targets and balances.</div>
+		<div role="status" class="alert alert-info mb-6 text-sm">{t('dashboard.selectOrg')}</div>
 	{/if}
 
 	{#if statsLoading && !stats}
@@ -258,49 +259,49 @@
 	{:else if statsError}
 		<div role="alert" class="alert alert-error mb-6 max-sm:alert-vertical">
 			<span>{statsError}</span>
-			<button type="button" class="btn btn-sm" onclick={() => loadStats(selectedSlug)}>Try again</button>
+			<button type="button" class="btn btn-sm" onclick={() => loadStats(selectedSlug)}>{t('common.retry')}</button>
 		</div>
 	{:else if stats}
 		{#if orgContext.selectedOrg && !hasSchedule}
 			<div role="status" class="alert alert-warning mb-6 max-sm:alert-vertical">
 				<span>
-					<strong>No work schedule set.</strong>
-					Targets and overtime need a work schedule with your weekly hours.
+					<strong>{t('dashboard.noSchedule.title')}</strong>
+					{t('dashboard.noSchedule.text')}
 				</span>
-				<a href="/organizations/{selectedSlug}" class="btn btn-sm">Set up work schedule</a>
+				<a href="/organizations/{selectedSlug}" class="btn btn-sm">{t('dashboard.noSchedule.action')}</a>
 			</div>
 		{/if}
 
 		<!-- Key figures -->
 		<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
 			<div class="card bg-base-100 border border-base-300 p-4">
-				<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">Today</span>
+				<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('dashboard.today')}</span>
 				<span class="text-2xl font-bold tabular-nums mt-1">
 					{formatHours(today)}{#if stats.todayTarget > 0}<span class="text-sm font-normal text-base-content/50"> / {formatHours(stats.todayTarget)}</span>{/if}
 				</span>
 				{#if stats.todayTarget > 0}
-					<progress class="progress {today >= stats.todayTarget ? 'progress-success' : 'progress-primary'} mt-2" value={Math.min(today, stats.todayTarget)} max={stats.todayTarget} aria-label="Today’s progress"></progress>
+					<progress class="progress {today >= stats.todayTarget ? 'progress-success' : 'progress-primary'} mt-2" value={Math.min(today, stats.todayTarget)} max={stats.todayTarget} aria-label={t('dashboard.todayProgress')}></progress>
 					<span class="text-xs mt-1 {deltaClass(today - stats.todayTarget)}">{formatDelta(today - stats.todayTarget)}</span>
 				{/if}
 			</div>
 			<div class="card bg-base-100 border border-base-300 p-4">
-				<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">Week balance</span>
+				<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('dashboard.weekBalance')}</span>
 				{#if stats.weekTarget > 0}
 					<span class="text-2xl font-bold tabular-nums mt-1 {deltaClass(week - stats.weekTarget)}">{formatDelta(week - stats.weekTarget)}</span>
-					<span class="text-xs text-base-content/50 mt-1">{formatHours(week)} of {formatHours(stats.weekTarget)} so far</span>
+					<span class="text-xs text-base-content/50 mt-1">{t('dashboard.weekOfTarget', { worked: formatHours(week), target: formatHours(stats.weekTarget) })}</span>
 				{:else}
 					<span class="text-2xl font-bold tabular-nums mt-1">{formatHours(week)}</span>
-					<span class="text-xs text-base-content/50 mt-1">worked this week</span>
+					<span class="text-xs text-base-content/50 mt-1">{t('dashboard.workedThisWeek')}</span>
 				{/if}
 			</div>
 			<div class="card border p-4 {cumulative == null ? 'bg-base-100 border-base-300' : cumulative > 0 ? 'border-success/50 bg-success/5' : cumulative < 0 ? 'border-error/50 bg-error/5' : 'bg-base-100 border-base-300'}">
-				<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">Cumulative balance</span>
+				<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('dashboard.cumulativeBalance')}</span>
 				{#if cumulative != null}
 					<span class="text-2xl font-bold tabular-nums mt-1 {deltaClass(cumulative)}">{formatDelta(cumulative)}</span>
-					<span class="text-xs text-base-content/50 mt-1">{stats.firstEntryDate ? `Since ${formatDate(stats.firstEntryDate)}` : 'Initial overtime'}</span>
+					<span class="text-xs text-base-content/50 mt-1">{stats.firstEntryDate ? t('dashboard.since', { date: formatDate(stats.firstEntryDate) }) : t('dashboard.initialOvertime')}</span>
 				{:else}
 					<span class="text-2xl font-bold tabular-nums mt-1 text-base-content/30">–</span>
-					<span class="text-xs text-base-content/50 mt-1">Needs a work schedule</span>
+					<span class="text-xs text-base-content/50 mt-1">{t('dashboard.needsSchedule')}</span>
 				{/if}
 			</div>
 		</div>
@@ -308,8 +309,8 @@
 		<!-- This week -->
 		<section class="card bg-base-100 border border-base-300 p-4 sm:p-5 mb-6">
 			<div class="flex items-center justify-between mb-3">
-				<h2 class="text-base font-semibold m-0">This week</h2>
-				<a href="/time" class="text-xs text-primary font-semibold">Open timer</a>
+				<h2 class="text-base font-semibold m-0">{t('dashboard.thisWeek')}</h2>
+				<a href="/time" class="text-xs text-primary font-semibold">{t('dashboard.openTimer')}</a>
 			</div>
 			<div class="flex flex-col gap-1.5">
 				{#each stats.weekDays as day (day.date.getTime())}
@@ -335,7 +336,7 @@
 		<section class="card bg-base-100 border border-base-300 p-4 sm:p-5 mb-6">
 			<div class="flex items-center justify-between mb-3">
 				<h2 class="text-base font-semibold m-0">{getMonthName()}</h2>
-				<a href="/history" class="text-xs text-primary font-semibold">Open history</a>
+				<a href="/history" class="text-xs text-primary font-semibold">{t('dashboard.openHistory')}</a>
 			</div>
 			<div class="flex flex-col gap-1.5">
 				{#each stats.monthWeeks as wk (wk.label)}
@@ -351,7 +352,7 @@
 				{/each}
 			</div>
 			<div class="flex justify-between items-center mt-3 pt-3 border-t border-base-200 text-sm font-semibold">
-				<span>Total: {formatHours(month)}</span>
+				<span>{t('dashboard.total', { value: formatHours(month) })}</span>
 				{#if stats.monthTarget > 0}
 					<span class={deltaClass(month - stats.monthTarget)}>{formatDelta(month - stats.monthTarget)}</span>
 				{/if}
