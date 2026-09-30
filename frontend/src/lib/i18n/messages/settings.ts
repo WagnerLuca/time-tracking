@@ -1,4 +1,186 @@
-/** Strings for the settings area. Add keys to both objects; `en` is typed against `de`. */
-export const de = {};
+/** Strings for the user settings page. Add keys to both objects; `en` is typed against `de`. */
+export const de = {
+	pageTitle: 'Einstellungen',
+	title: 'Einstellungen',
+	tabsLabel: 'Bereiche der Einstellungen',
+	tabs: {
+		profile: 'Profil',
+		organization: 'Organisation',
+		appearance: 'Darstellung'
+	},
+	profile: {
+		title: 'Profil',
+		firstName: 'Vorname',
+		lastName: 'Nachname',
+		email: 'E-Mail',
+		firstNameRequired: 'Bitte einen Vornamen eingeben.',
+		lastNameRequired: 'Bitte einen Nachnamen eingeben.',
+		emailRequired: 'Bitte eine E-Mail-Adresse eingeben.',
+		emailInvalid: 'Bitte eine gültige E-Mail-Adresse eingeben.',
+		save: 'Profil speichern',
+		saved: 'Profil gespeichert.',
+		saveFailed: 'Das Profil konnte nicht gespeichert werden.'
+	},
+	password: {
+		title: 'Passwort ändern',
+		current: 'Aktuelles Passwort',
+		new: 'Neues Passwort',
+		repeat: 'Neues Passwort wiederholen',
+		currentRequired: 'Bitte das aktuelle Passwort eingeben.',
+		minLength: 'Mindestens {min} Zeichen.',
+		mustDiffer: 'Das neue Passwort muss sich vom aktuellen unterscheiden.',
+		mismatch: 'Die Passwörter stimmen nicht überein.',
+		submit: 'Passwort ändern',
+		changed: 'Passwort geändert.',
+		failed: 'Das Passwort konnte nicht geändert werden.'
+	},
+	twoFactor: {
+		title: 'Zwei-Faktor-Authentifizierung',
+		on: 'Aktiv',
+		activeText: 'Die Zwei-Faktor-Authentifizierung schützt dein Konto.',
+		disablePassword: 'Passwort (zum Ausschalten von 2FA)',
+		disable: '2FA ausschalten',
+		disabling: 'Wird ausgeschaltet…',
+		intro: 'Zusätzlicher Schutz für dein Konto mit einer Authenticator-App (z. B. Google Authenticator, Authy).',
+		setup: '2FA einrichten',
+		settingUp: 'Wird eingerichtet…',
+		scan: 'Scanne diesen QR-Code mit deiner Authenticator-App oder gib den Schlüssel von Hand ein.',
+		qrAlt: 'QR-Code für die Authenticator-App',
+		manualKey: 'Oder diesen Schlüssel von Hand eingeben:',
+		codeLabel: '6-stelliger Code aus der App',
+		verify: 'Prüfen und einschalten',
+		verifying: 'Wird geprüft…',
+		backupWarning: 'Bewahre diese Backup-Codes sicher auf. Jeder Code funktioniert nur einmal, und sie werden nicht noch einmal angezeigt.',
+		backupSaved: 'Ich habe die Backup-Codes gespeichert',
+		enabled: 'Zwei-Faktor-Authentifizierung ist eingeschaltet.',
+		disabled: 'Zwei-Faktor-Authentifizierung ist ausgeschaltet.',
+		setupFailed: 'Die 2FA-Einrichtung konnte nicht gestartet werden.',
+		codeRequired: 'Bitte den 6-stelligen Code eingeben.',
+		invalidCode: 'Ungültiger Code. Bitte erneut versuchen.',
+		passwordRequired: 'Bitte dein Passwort eingeben, um 2FA auszuschalten.',
+		disableFailed: '2FA konnte nicht ausgeschaltet werden.'
+	},
+	account: {
+		title: 'Konto',
+		intro: 'Auf diesem Gerät abmelden oder das Konto dauerhaft löschen.',
+		signOut: 'Abmelden',
+		delete: 'Konto löschen',
+		deleteTitle: 'Konto löschen?',
+		deleteMessage: 'Dein Konto und alle deine Daten werden dauerhaft entfernt. Das lässt sich nicht rückgängig machen.',
+		deleteFailed: 'Das Konto konnte nicht gelöscht werden.'
+	},
+	org: {
+		title: 'Aktive Organisation',
+		intro: 'Wähle die Organisation, für die neue Zeiteinträge erfasst werden.',
+		personal: 'Persönlich (ohne Organisation)',
+		none: 'Noch keine Organisationen.',
+		createOne: 'Organisation anlegen',
+		browse: 'Organisationen durchsuchen',
+		create: '+ Organisation erstellen',
+		scheduleIn: 'Dein Arbeitszeitmodell in',
+		scheduleFailed: 'Dein Arbeitszeitmodell konnte nicht geladen werden.'
+	},
+	appearance: {
+		theme: 'Design',
+		themeIntro: 'Hell oder dunkel. Die Auswahl gilt auch für die anderen Wagner-Luca-Apps.',
+		light: 'Hell',
+		dark: 'Dunkel',
+		language: 'Sprache',
+		languageIntro: 'Deutsch oder Englisch. Die Auswahl gilt auch für die anderen Wagner-Luca-Apps.',
+		de: 'Deutsch',
+		en: 'English'
+	}
+};
 
-export const en: typeof de = {};
+export const en: typeof de = {
+	pageTitle: 'Settings',
+	title: 'Settings',
+	tabsLabel: 'Settings sections',
+	tabs: {
+		profile: 'Profile',
+		organization: 'Organization',
+		appearance: 'Appearance'
+	},
+	profile: {
+		title: 'Profile',
+		firstName: 'First name',
+		lastName: 'Last name',
+		email: 'Email',
+		firstNameRequired: 'Enter a first name.',
+		lastNameRequired: 'Enter a last name.',
+		emailRequired: 'Enter an email address.',
+		emailInvalid: 'Enter a valid email address.',
+		save: 'Save profile',
+		saved: 'Profile saved.',
+		saveFailed: 'Could not save the profile.'
+	},
+	password: {
+		title: 'Change password',
+		current: 'Current password',
+		new: 'New password',
+		repeat: 'Repeat new password',
+		currentRequired: 'Enter your current password.',
+		minLength: 'At least {min} characters.',
+		mustDiffer: 'The new password must differ from the current one.',
+		mismatch: 'The passwords do not match.',
+		submit: 'Change password',
+		changed: 'Password changed.',
+		failed: 'Could not change the password.'
+	},
+	twoFactor: {
+		title: 'Two-factor authentication',
+		on: 'On',
+		activeText: 'Two-factor authentication protects your account.',
+		disablePassword: 'Password (to turn off 2FA)',
+		disable: 'Turn off 2FA',
+		disabling: 'Turning off…',
+		intro: 'Add an extra layer of security with an authenticator app (e.g. Google Authenticator, Authy).',
+		setup: 'Set up 2FA',
+		settingUp: 'Setting up…',
+		scan: 'Scan this QR code with your authenticator app or enter the key manually.',
+		qrAlt: 'QR code for the authenticator app',
+		manualKey: 'Or enter this key manually:',
+		codeLabel: '6-digit code from the app',
+		verify: 'Verify and turn on',
+		verifying: 'Verifying…',
+		backupWarning: 'Keep these backup codes somewhere safe. Each code works once, and they are not shown again.',
+		backupSaved: 'I have saved the backup codes',
+		enabled: 'Two-factor authentication is on.',
+		disabled: 'Two-factor authentication is off.',
+		setupFailed: 'Could not start the 2FA setup.',
+		codeRequired: 'Enter the 6-digit code.',
+		invalidCode: 'Invalid code. Try again.',
+		passwordRequired: 'Enter your password to turn off 2FA.',
+		disableFailed: 'Could not turn off 2FA.'
+	},
+	account: {
+		title: 'Account',
+		intro: 'Sign out of this device or delete your account permanently.',
+		signOut: 'Sign out',
+		delete: 'Delete account',
+		deleteTitle: 'Delete account?',
+		deleteMessage: 'Your account and all your data are removed permanently. This cannot be undone.',
+		deleteFailed: 'Could not delete the account.'
+	},
+	org: {
+		title: 'Active organization',
+		intro: 'Choose the organization new time entries are tracked for.',
+		personal: 'Personal (no organization)',
+		none: 'No organizations yet.',
+		createOne: 'Create one',
+		browse: 'Browse organizations',
+		create: '+ Create organization',
+		scheduleIn: 'Your work schedule in',
+		scheduleFailed: 'Could not load your work schedule.'
+	},
+	appearance: {
+		theme: 'Theme',
+		themeIntro: 'Light or dark. The choice is shared with the other Wagner Luca apps.',
+		light: 'Light',
+		dark: 'Dark',
+		language: 'Language',
+		languageIntro: 'German or English. The choice is shared with the other Wagner Luca apps.',
+		de: 'Deutsch',
+		en: 'English'
+	}
+};

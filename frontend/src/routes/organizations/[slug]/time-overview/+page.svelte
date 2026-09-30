@@ -5,6 +5,7 @@
 	import type { MemberTimeOverviewResponse, OrganizationDetailResponse, TimeEntryResponse } from '$lib/api';
 	import { formatHoursDecimal, formatTime, formatDateShort, formatWeekLabel, formatDuration, formatNumber, roleLabel } from '$lib/utils/formatters';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { t } from '$lib/i18n';
 	import { getWeekRange } from '$lib/utils/dateHelpers';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 
@@ -39,7 +40,7 @@
 			orgName = org.name ?? '';
 		} catch (err) {
 			// Only the heading uses the name; the overview below reports its own errors
-			if (getErrorStatus(err) !== 403) toast.error(err, 'Could not load the organization.');
+			if (getErrorStatus(err) !== 403) toast.error(err, t('timeOverview.orgFailed'));
 		}
 	}
 
@@ -53,9 +54,9 @@
 			members = data;
 		} catch (err) {
 			if (getErrorStatus(err) === 403) {
-				error = 'You do not have permission to view time entries. An admin or group setting must grant visibility.';
+				error = t('timeOverview.noPermission');
 			} else {
-				error = extractErrorMessage(err, 'Failed to load time overview.');
+				error = extractErrorMessage(err, t('timeOverview.loadFailed'));
 			}
 		} finally {
 			loading = false;
@@ -85,7 +86,7 @@
 			memberEntries = data.items ?? [];
 		} catch (err) {
 			memberEntries = [];
-			entriesError = extractErrorMessage(err, 'Could not load the time entries.');
+			entriesError = extractErrorMessage(err, t('timeOverview.entriesFailed'));
 		} finally {
 			entriesLoading = false;
 		}
@@ -94,13 +95,13 @@
 </script>
 
 <svelte:head>
-	<title>Team time overview – {orgName || 'Organization'}</title>
+	<title>{t('common.pageTitle', { page: orgName ? `${t('timeOverview.pageTitle')} – ${orgName}` : t('timeOverview.pageTitle') })}</title>
 </svelte:head>
 
 <div class="max-w-5xl mx-auto px-4 sm:px-6 pb-6">
-	<a href="/organizations/{orgSlug}" class="text-base-content/60 text-sm inline-block mb-3 no-underline hover:text-primary">&larr; Back to {orgName || 'Organization'}</a>
+	<a href="/organizations/{orgSlug}" class="text-base-content/60 text-sm inline-block mb-3 no-underline hover:text-primary">&larr; {t('timeOverview.back', { org: orgName || t('timeOverview.fallbackOrg') })}</a>
 
-	<h1 class="text-xl font-bold mb-1">Team time overview</h1>
+	<h1 class="text-xl font-bold mb-1">{t('timeOverview.title')}</h1>
 	{#if orgName}<p class="text-base-content/60 text-sm mb-6">{orgName}</p>{/if}
 
 	{#if error}
@@ -108,26 +109,26 @@
 	{:else}
 		<!-- Week nav -->
 		<div class="flex items-center justify-center gap-4 mb-6">
-			<button type="button" class="btn btn-ghost btn-sm btn-square border border-base-300" onclick={() => changeWeek(-1)} aria-label="Previous week" title="Previous week">&lsaquo;</button>
+			<button type="button" class="btn btn-ghost btn-sm btn-square border border-base-300" onclick={() => changeWeek(-1)} aria-label={t('timeOverview.prevWeek')} title={t('timeOverview.prevWeek')}>&lsaquo;</button>
 			<span class="font-semibold text-base text-center" aria-live="polite">{formatWeekLabel(weekRange)}</span>
-			<button type="button" class="btn btn-ghost btn-sm btn-square border border-base-300" onclick={() => changeWeek(1)} disabled={weekOffset >= 0} aria-label="Next week" title="Next week">&rsaquo;</button>
+			<button type="button" class="btn btn-ghost btn-sm btn-square border border-base-300" onclick={() => changeWeek(1)} disabled={weekOffset >= 0} aria-label={t('timeOverview.nextWeek')} title={t('timeOverview.nextWeek')}>&rsaquo;</button>
 		</div>
 
 		{#if loading}
-			<p class="text-base-content/50 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Loading…</p>
+			<p class="text-base-content/50 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
 		{:else if members.length === 0}
-			<p class="text-base-content/50">No members found.</p>
+			<p class="text-base-content/50">{t('timeOverview.noMembers')}</p>
 		{:else}
 			<div class="bg-base-100 border border-base-300 rounded-xl overflow-x-auto">
 				<div class="min-w-[40rem]">
 				<div class="grid grid-cols-[2fr_0.7fr_0.7fr_0.8fr_0.8fr_0.6fr_0.8fr] gap-2 px-4 py-3 bg-base-200/50 text-[0.6875rem] font-bold text-base-content/60 uppercase tracking-wider border-b border-base-300">
-					<span class="overflow-hidden">Member</span>
-					<span class="text-center">Role</span>
-					<span class="text-center">Target</span>
-					<span class="text-center">Tracked</span>
-					<span class="text-center">Net</span>
-					<span class="text-center">Entries</span>
-					<span class="text-center">Status</span>
+					<span class="overflow-hidden">{t('timeOverview.cols.member')}</span>
+					<span class="text-center">{t('timeOverview.cols.role')}</span>
+					<span class="text-center">{t('timeOverview.cols.target')}</span>
+					<span class="text-center">{t('timeOverview.cols.tracked')}</span>
+					<span class="text-center">{t('timeOverview.cols.net')}</span>
+					<span class="text-center">{t('timeOverview.cols.entries')}</span>
+					<span class="text-center">{t('timeOverview.cols.status')}</span>
 				</div>
 
 				{#each members as member}
@@ -142,14 +143,14 @@
 							<span class="badge badge-sm {member.role === 'Owner' ? 'badge-warning' : member.role === 'Admin' ? 'badge-info' : 'badge-ghost'}">{roleLabel(member.role)}</span>
 						</span>
 						<span class="text-center">
-							{member.weeklyWorkHours ? `${formatNumber(member.weeklyWorkHours)}h` : '-'}
+							{member.weeklyWorkHours ? t('common.hoursShort', { value: formatNumber(member.weeklyWorkHours) }) : '-'}
 						</span>
 						<span class="text-center">{formatHoursDecimal(member.totalTrackedMinutes ?? 0)}</span>
 						<span class="text-center">{formatHoursDecimal(member.netTrackedMinutes ?? 0)}</span>
 						<span class="text-center">
 							{member.entryCount}
 							{#if (member.failureEntryCount ?? 0) > 0}
-								<span class="badge badge-error badge-xs ml-1" title="Timers stopped automatically at the business day end. Not counted until the member corrects them.">{member.failureEntryCount} to fix</span>
+								<span class="badge badge-error badge-xs ml-1" title={t('timeOverview.toFixTitle')}>{t('timeOverview.toFix', { count: member.failureEntryCount ?? 0 })}</span>
 							{/if}
 						</span>
 						<span class="text-center">
@@ -172,11 +173,11 @@
 					{#if expandedUserId === member.userId}
 						<div class="px-5 py-3 bg-base-200/50 border-b border-base-300">
 							{#if entriesLoading}
-								<p class="text-base-content/50 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Loading…</p>
+								<p class="text-base-content/50 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
 							{:else if entriesError}
 								<div class="alert alert-error text-sm py-2">{entriesError}</div>
 							{:else if memberEntries.length === 0}
-								<p class="text-base-content/50">No entries this week.</p>
+								<p class="text-base-content/50">{t('timeOverview.noEntries')}</p>
 							{:else}
 								<div class="flex flex-col gap-1.5">
 									{#each memberEntries as entry}
@@ -187,10 +188,10 @@
 											</span>
 											<span class="text-base-content/50 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{entry.description || ''}</span>
 											<span class="font-semibold min-w-[56px] text-right">
-												{entry.isRunning ? 'Running' : formatDuration(entry.netDurationMinutes ?? entry.durationMinutes ?? 0)}
+												{entry.isRunning ? t('timeOverview.running') : formatDuration(entry.netDurationMinutes ?? entry.durationMinutes ?? 0)}
 											</span>
 											{#if (entry.pauseDurationMinutes ?? 0) > 0}
-												<span class="text-[0.6875rem] text-warning bg-warning/10 px-1.5 rounded-full">-{entry.pauseDurationMinutes}m pause</span>
+												<span class="text-[0.6875rem] text-warning bg-warning/10 px-1.5 rounded-full">{t('timeOverview.pause', { minutes: entry.pauseDurationMinutes ?? 0 })}</span>
 											{/if}
 										</div>
 									{/each}

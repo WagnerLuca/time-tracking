@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { t } from '$lib/i18n';
 	import { organizationsApi, workScheduleApi, absenceDayApi, groupApi } from '$lib/apiClient';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
@@ -73,9 +74,9 @@
 		memberPerms = null;
 		try {
 			await loadOrg();
-			if (!member) error = 'Member not found.';
+			if (!member) error = t('memberDetail.notFound');
 		} catch (err) {
-			error = extractErrorMessage(err, 'Could not load the organization.');
+			error = extractErrorMessage(err, t('memberDetail.loadFailed'));
 		} finally {
 			loading = false;
 		}
@@ -97,7 +98,7 @@
 		try {
 			await loadOrg();
 		} catch (err) {
-			toast.error(err, 'Could not reload the member.');
+			toast.error(err, t('memberDetail.reloadFailed'));
 		}
 	}
 
@@ -107,7 +108,7 @@
 			absenceTypes = data;
 		} catch (err) {
 			absenceTypes = [];
-			toast.error(err, 'Could not load the absence types.');
+			toast.error(err, t('memberDetail.absenceTypesFailed'));
 		}
 	}
 
@@ -116,7 +117,7 @@
 			const { data } = await groupApi.apiV1OrganizationsSlugMembersMemberIdEffectivePermissionsGet(orgSlug, memberId);
 			memberPerms = data;
 		} catch (err) {
-			reportUnlessForbidden(err, 'Could not load the permissions.');
+			reportUnlessForbidden(err, t('memberDetail.permissionsFailed'));
 		}
 	}
 
@@ -127,14 +128,14 @@
 			const { data } = await organizationsApi.apiV1OrganizationsSlugTimeOverviewGet(orgSlug, '2000-01-01T00:00:00.000Z', '2099-12-31T23:59:59.999Z');
 			overview = data.find((m) => m.userId === memberId) ?? null;
 		} catch (err) {
-			reportUnlessForbidden(err, 'Could not load the time overview.');
+			reportUnlessForbidden(err, t('memberDetail.overviewFailed'));
 		}
 		try {
 			const { data } = await organizationsApi.apiV1OrganizationsSlugMemberEntriesMemberIdGet(orgSlug, memberId, '2000-01-01T00:00:00.000Z', '2099-12-31T23:59:59.999Z');
 			const starts = (data.items ?? []).filter((e) => e.startTime).map((e) => new Date(e.startTime!).getTime());
 			firstEntryDate = starts.length > 0 ? new Date(Math.min(...starts)) : null;
 		} catch (err) {
-			reportUnlessForbidden(err, 'Could not load the time entries.');
+			reportUnlessForbidden(err, t('memberDetail.entriesFailed'));
 		}
 		overviewLoading = false;
 	}
@@ -147,7 +148,7 @@
 			schedule = data;
 		} catch (err) {
 			schedule = null;
-			if (getErrorStatus(err) !== 404) scheduleError = extractErrorMessage(err, 'Could not load the schedule.');
+			if (getErrorStatus(err) !== 404) scheduleError = extractErrorMessage(err, t('memberDetail.scheduleFailed'));
 		} finally {
 			scheduleLoading = false;
 		}
@@ -155,19 +156,19 @@
 </script>
 
 <svelte:head>
-	<title>{memberName || 'Member'} – {org?.name ?? 'Organization'}</title>
+	<title>{t('common.pageTitle', { page: memberName || t('memberDetail.pageTitle') })}</title>
 </svelte:head>
 
 <div class="max-w-3xl mx-auto py-6 px-4 sm:px-6">
 	<a href="/organizations/{orgSlug}/members" class="inline-flex items-center gap-1.5 text-base-content/60 no-underline text-sm mb-6 transition-colors hover:text-primary">
 		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-		Back to members
+		{t('memberDetail.back')}
 	</a>
 
 	{#if loading}
 		<div class="text-center py-12">
 			<span class="loading loading-spinner loading-md"></span>
-			<p class="text-base-content/50 text-sm">Loading…</p>
+			<p class="text-base-content/50 text-sm">{t('common.loading')}</p>
 		</div>
 	{:else if error}
 		<div class="alert alert-error mb-4 text-sm">{error}</div>
@@ -176,7 +177,7 @@
 
 		{#if canViewTime}
 			<section class="card bg-base-100 border border-base-300 p-5 mb-5">
-				<h2 class="text-base font-bold text-base-content m-0 mb-4">Calendar</h2>
+				<h2 class="text-base font-bold text-base-content m-0 mb-4">{t('memberDetail.calendar')}</h2>
 				{#key `${orgSlug}-${memberId}`}
 					<MemberCalendar {orgSlug} orgId={org?.id} userId={memberId} {isSelf} orgDetail={org} />
 				{/key}
@@ -186,7 +187,7 @@
 		{/if}
 
 		{#if canGenerateReport}
-			<MemberReports {orgSlug} {memberId} subject={isSelf ? 'you' : memberName} />
+			<MemberReports {orgSlug} {memberId} subject={isSelf ? t('memberDetail.reports.subjectSelf') : memberName} />
 		{/if}
 
 		{#if isSelf || isAdmin}
@@ -194,7 +195,7 @@
 				class="mb-5"
 				{orgSlug}
 				userId={memberId}
-				title="Absences"
+				title={t('memberDetail.absences.title')}
 				canAdd={isAdmin}
 				canDelete={isAdmin}
 				{isAdmin}

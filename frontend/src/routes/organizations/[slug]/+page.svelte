@@ -5,6 +5,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
+	import { t } from '$lib/i18n';
 	import { organizationsApi, workScheduleApi, absenceDayApi, notificationsApi, groupApi } from '$lib/apiClient';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import { isOrgAdmin, ruleMode } from '$lib/utils/orgRules';
@@ -48,9 +49,9 @@
 	let editSubmitted = $state(false);
 	let editError = $state('');
 	let editSaving = $state(false);
-	let nameError = $derived(editSubmitted && !editName.trim() ? 'Name is required.' : '');
+	let nameError = $derived(editSubmitted && !editName.trim() ? t('orgHome.edit.nameRequired') : '');
 	let slugError = $derived(
-		!editSubmitted ? '' : !editSlug.trim() ? 'Slug is required.' : !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(editSlug.trim()) ? 'Use lowercase letters, digits and hyphens only.' : ''
+		!editSubmitted ? '' : !editSlug.trim() ? t('orgHome.edit.slugRequired') : !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(editSlug.trim()) ? t('orgHome.edit.slugInvalid') : ''
 	);
 
 	let deleting = $state(false);
@@ -73,7 +74,7 @@
 			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			org = data;
 		} catch (err) {
-			error = getErrorStatus(err) === 404 ? 'Organization not found.' : extractErrorMessage(err, 'Could not load the organization.');
+			error = getErrorStatus(err) === 404 ? t('orgHome.notFound') : extractErrorMessage(err, t('orgHome.loadFailed'));
 			loading = false;
 			return;
 		}
@@ -90,7 +91,7 @@
 			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			org = data;
 		} catch (err) {
-			toast.error(err, 'Could not reload the organization.');
+			toast.error(err, t('orgHome.reloadFailed'));
 		}
 	}
 
@@ -101,7 +102,7 @@
 			workSchedule = data;
 		} catch (err) {
 			workSchedule = null;
-			if (getErrorStatus(err) !== 404) scheduleError = extractErrorMessage(err, 'Could not load your schedule.');
+			if (getErrorStatus(err) !== 404) scheduleError = extractErrorMessage(err, t('orgHome.scheduleFailed'));
 		}
 	}
 
@@ -111,7 +112,7 @@
 			perms = data;
 		} catch (err) {
 			// The org defaults still apply (ruleMode falls back to org)
-			toast.error(err, 'Could not load your permissions.');
+			toast.error(err, t('orgHome.permissionsFailed'));
 		}
 	}
 
@@ -121,7 +122,7 @@
 			absenceTypes = data;
 		} catch (err) {
 			absenceTypes = [];
-			toast.error(err, 'Could not load the absence types.');
+			toast.error(err, t('orgHome.absenceTypesFailed'));
 		}
 	}
 
@@ -143,7 +144,7 @@
 		settingsNotificationIds = [];
 		const results = await Promise.allSettled(ids.map((id) => notificationsApi.apiV1NotificationsIdReadPut(id)));
 		const failed = results.find((r) => r.status === 'rejected');
-		if (failed) toast.error((failed as PromiseRejectedResult).reason, 'Could not mark the notification as read.');
+		if (failed) toast.error((failed as PromiseRejectedResult).reason, t('orgHome.markReadFailed'));
 	}
 
 	function startEdit() {
@@ -172,12 +173,12 @@
 				website: editWebsite.trim() || undefined
 			};
 			await organizationsApi.apiV1OrganizationsSlugPut(orgSlug, payload);
-			toast.success('Organization saved.');
+			toast.success(t('orgHome.edit.saved'));
 			editing = false;
 			if (newSlug !== orgSlug) await goto(`/organizations/${newSlug}`, { replaceState: true });
 			else await reloadOrg();
 		} catch (err) {
-			editError = extractErrorMessage(err, 'Could not save the organization.');
+			editError = extractErrorMessage(err, t('orgHome.edit.saveFailed'));
 		} finally {
 			editSaving = false;
 		}
@@ -185,63 +186,63 @@
 
 	async function deleteOrg() {
 		const ok = await confirmDialog({
-			title: `Delete ${org?.name ?? 'organization'}?`,
-			message: 'All members lose access and this cannot be undone.',
-			confirmLabel: 'Delete organization',
+			title: t('orgHome.delete.title', { name: org?.name ?? t('orgHome.fallbackName') }),
+			message: t('orgHome.delete.message'),
+			confirmLabel: t('orgHome.delete.confirm'),
 			danger: true
 		});
 		if (!ok) return;
 		deleting = true;
 		try {
 			await organizationsApi.apiV1OrganizationsSlugDelete(orgSlug);
-			toast.success('Organization deleted.');
+			toast.success(t('orgHome.delete.deleted'));
 			goto('/organizations');
 		} catch (err) {
-			toast.error(err, 'Could not delete the organization.');
+			toast.error(err, t('orgHome.delete.failed'));
 			deleting = false;
 		}
 	}
 </script>
 
 <svelte:head>
-	<title>{org?.name ?? 'Organization'} – Time Tracking</title>
+	<title>{t('common.pageTitle', { page: org?.name ?? t('orgHome.fallbackName') })}</title>
 </svelte:head>
 
 <div class="max-w-5xl mx-auto px-4 sm:px-6 pb-6">
 	{#if loading}
-		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>Loading…</span></div>
+		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>{t('common.loading')}</span></div>
 	{:else if error}
 		<div class="alert alert-error">{error}</div>
 	{:else if org}
 		{#if editing}
 			<div class="card bg-base-100 border border-base-300 p-5 sm:p-8 max-w-xl">
-				<h2 class="text-xl font-bold text-base-content mb-5">Edit organization</h2>
+				<h2 class="text-xl font-bold text-base-content mb-5">{t('orgHome.edit.title')}</h2>
 				{#if editError}
 					<div class="alert alert-error mb-4 text-sm">{editError}</div>
 				{/if}
 				<form onsubmit={saveEdit} novalidate class="flex flex-col gap-4">
 					<div>
-						<label for="editName" class="label text-sm font-medium text-base-content/70">Name</label>
+						<label for="editName" class="label text-sm font-medium text-base-content/70">{t('orgHome.edit.name')}</label>
 						<input id="editName" type="text" class="input input-bordered w-full" class:input-error={nameError} aria-invalid={!!nameError} bind:value={editName} disabled={editSaving} />
 						{#if nameError}<p class="text-error text-xs mt-1">{nameError}</p>{/if}
 					</div>
 					<div>
-						<label for="editSlug" class="label text-sm font-medium text-base-content/70">Slug</label>
+						<label for="editSlug" class="label text-sm font-medium text-base-content/70">{t('orgHome.edit.slug')}</label>
 						<input id="editSlug" type="text" class="input input-bordered w-full" class:input-error={slugError} aria-invalid={!!slugError} bind:value={editSlug} disabled={editSaving} />
 						{#if slugError}<p class="text-error text-xs mt-1">{slugError}</p>{/if}
 					</div>
 					<div>
-						<label for="editDesc" class="label text-sm font-medium text-base-content/70">Description</label>
+						<label for="editDesc" class="label text-sm font-medium text-base-content/70">{t('orgHome.edit.description')}</label>
 						<textarea id="editDesc" class="textarea textarea-bordered w-full" bind:value={editDescription} rows="3" disabled={editSaving}></textarea>
 					</div>
 					<div>
-						<label for="editWeb" class="label text-sm font-medium text-base-content/70">Website</label>
+						<label for="editWeb" class="label text-sm font-medium text-base-content/70">{t('orgHome.edit.website')}</label>
 						<input id="editWeb" type="url" class="input input-bordered w-full" bind:value={editWebsite} disabled={editSaving} />
 					</div>
 					<div class="flex gap-3 justify-end mt-2">
-						<button type="button" class="btn btn-ghost btn-sm" onclick={() => (editing = false)} disabled={editSaving}>Cancel</button>
+						<button type="button" class="btn btn-ghost btn-sm" onclick={() => (editing = false)} disabled={editSaving}>{t('common.cancel')}</button>
 						<button type="submit" class="btn btn-primary btn-sm" disabled={editSaving}>
-							{editSaving ? 'Saving…' : 'Save changes'}
+							{editSaving ? t('common.saving') : t('common.saveChanges')}
 						</button>
 					</div>
 				</form>
@@ -254,10 +255,10 @@
 				</div>
 				{#if isAdmin}
 					<div class="flex gap-2">
-						<button type="button" class="btn btn-outline btn-sm" onclick={startEdit}>Edit</button>
+						<button type="button" class="btn btn-outline btn-sm" onclick={startEdit}>{t('common.edit')}</button>
 						{#if isOwner}
 							<button type="button" class="btn btn-outline btn-error btn-sm" onclick={deleteOrg} disabled={deleting}>
-								{deleting ? 'Deleting…' : 'Delete'}
+								{deleting ? t('common.deleting') : t('common.delete')}
 							</button>
 						{/if}
 					</div>
@@ -267,15 +268,15 @@
 			{#if !isAdmin && org.memberTimeEntryVisibility}
 				<div class="alert alert-warning mb-4 text-sm">
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-					<span>The admins of this organization can see your tracked working hours.</span>
+					<span>{t('orgHome.visibilityWarning')}</span>
 				</div>
 			{/if}
 
 			{#if settingsNotificationIds.length > 0}
 				<div class="alert alert-info mb-4 text-sm">
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-					<span>The organization rules have changed. See <a href="/organizations/{orgSlug}/settings" class="link link-primary font-semibold" onclick={dismissSettingsNotifications}>Settings</a> for details.</span>
-					<button type="button" class="btn btn-ghost btn-xs btn-circle ml-auto" aria-label="Dismiss" title="Dismiss" onclick={dismissSettingsNotifications}>✕</button>
+					<span>{t('orgHome.rulesChangedBefore')} <a href="/organizations/{orgSlug}/settings" class="link link-primary font-semibold" onclick={dismissSettingsNotifications}>{t('orgHome.rulesChangedLink')}</a>{t('orgHome.rulesChangedAfter')}</span>
+					<button type="button" class="btn btn-ghost btn-xs btn-circle ml-auto" aria-label={t('common.dismiss')} title={t('common.dismiss')} onclick={dismissSettingsNotifications}>✕</button>
 				</div>
 			{/if}
 
@@ -286,7 +287,7 @@
 				<a href={org.website} target="_blank" rel="noopener noreferrer" class="link link-primary text-sm inline-block mb-4 break-all">{org.website}</a>
 			{/if}
 
-			<p class="text-base-content/60 text-sm mt-2 mb-5">Your personal work schedule, overtime balance, vacation and absences in this organization.</p>
+			<p class="text-base-content/60 text-sm mt-2 mb-5">{t('orgHome.intro')}</p>
 
 			{#if myMember}
 				<div class="flex flex-col gap-4">
@@ -304,7 +305,7 @@
 					<MemberAbsences
 						{orgSlug}
 						userId={myMember.id!}
-						title="My absences"
+						title={t('orgHome.myAbsences')}
 						canAdd={canAddAbsence}
 						canDelete={isAdmin || absenceMode === 'Allowed'}
 						{isAdmin}

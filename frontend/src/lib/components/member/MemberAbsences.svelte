@@ -9,6 +9,7 @@
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { t } from '$lib/i18n';
 
 	/** One person's absences in an org, grouped by year, with add (AbsenceDialog) and delete. */
 	interface Props {
@@ -52,7 +53,7 @@
 			const { data } = await absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, userId, undefined, undefined, 500);
 			absences = (data.items ?? []).filter((a) => a.userId === userId);
 		} catch (err) {
-			loadError = extractErrorMessage(err, 'Could not load absences.');
+			loadError = extractErrorMessage(err, t('memberDetail.absences.loadFailed'));
 		} finally {
 			loading = false;
 		}
@@ -70,7 +71,7 @@
 
 	function saved(requestMessage?: string) {
 		if (requestMessage) toast.info(requestMessage);
-		else toast.success('Absence added.');
+		else toast.success(t('memberDetail.absences.added'));
 		load();
 		onchanged?.();
 	}
@@ -78,20 +79,20 @@
 	async function remove(a: AbsenceDayResponse) {
 		if (!a.id) return;
 		const ok = await confirmDialog({
-			title: 'Delete absence?',
+			title: t('memberDetail.absences.deleteTitle'),
 			message: `${formatDateFull(a.date!)} · ${a.customTypeName ?? absenceTypeLabel(a.type)}`,
-			confirmLabel: 'Delete',
+			confirmLabel: t('common.delete'),
 			danger: true
 		});
 		if (!ok) return;
 		deletingId = a.id;
 		try {
 			await absenceDayApi.apiV1OrganizationsSlugAbsencesIdDelete(orgSlug, a.id);
-			toast.success('Absence deleted.');
+			toast.success(t('memberDetail.absences.deleted'));
 			await load();
 			onchanged?.();
 		} catch (err) {
-			toast.error(err, 'Could not delete the absence.');
+			toast.error(err, t('memberDetail.absences.deleteFailed'));
 		} finally {
 			deletingId = null;
 		}
@@ -103,20 +104,20 @@
 		<h2 class="text-base font-bold text-base-content m-0">{title}</h2>
 		{#if canAdd}
 			<button type="button" class="btn btn-primary btn-sm" onclick={() => (dialogOpen = true)}>
-				{mustRequest && !isAdmin ? '+ Request absence' : '+ Add absence'}
+				{mustRequest && !isAdmin ? t('memberDetail.absences.request') : t('memberDetail.absences.add')}
 			</button>
 		{/if}
 	</div>
 
 	{#if loading}
-		<p class="text-sm text-base-content/50 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Loading…</p>
+		<p class="text-sm text-base-content/50 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
 	{:else if loadError}
 		<div class="alert alert-error text-sm py-2">
 			<span>{loadError}</span>
-			<button type="button" class="btn btn-ghost btn-xs" onclick={load}>Try again</button>
+			<button type="button" class="btn btn-ghost btn-xs" onclick={load}>{t('common.retry')}</button>
 		</div>
 	{:else if absences.length === 0}
-		<p class="text-sm text-base-content/50">No absences recorded.</p>
+		<p class="text-sm text-base-content/50">{t('memberDetail.absences.empty')}</p>
 	{:else}
 		{#each byYear as [year, items] (year)}
 			<div class="mb-4 last:mb-0">
@@ -126,15 +127,15 @@
 						<li class="flex items-center gap-x-3 gap-y-1 flex-wrap py-2 px-3 bg-base-200/30 rounded-md border border-base-200 text-sm">
 							<span class="font-medium text-base-content/70 min-w-[6.5rem]">{formatDateFull(a.date!)}</span>
 							<span class="badge badge-sm {absenceTypeClasses(a.type).badge}">{a.customTypeName ?? absenceTypeLabel(a.type)}</span>
-							{#if a.isHalfDay}<span class="badge badge-outline badge-xs">½ day</span>{/if}
+							{#if a.isHalfDay}<span class="badge badge-outline badge-xs">{t('memberDetail.absences.halfDay')}</span>{/if}
 							{#if a.note}<span class="text-base-content/50 text-xs italic flex-1 min-w-0 truncate">{a.note}</span>{/if}
 							{#if showAudit && (a.createdByName || a.createdViaRequestId)}
 								<span class="text-[10px] text-base-content/40 whitespace-nowrap">
-									{a.createdByName ? `by ${a.createdByName}` : ''}{a.createdViaRequestId ? ` (request #${a.createdViaRequestId})` : ''}
+									{a.createdByName ? t('memberDetail.absences.by', { name: a.createdByName }) : ''}{a.createdViaRequestId ? ` ${t('memberDetail.absences.viaRequest', { id: a.createdViaRequestId })}` : ''}
 								</span>
 							{/if}
 							{#if canDelete}
-								<button type="button" class="btn btn-ghost btn-xs ml-auto text-base-content/40 hover:text-error" aria-label="Delete absence" title="Delete absence" onclick={() => remove(a)} disabled={deletingId === a.id}>
+								<button type="button" class="btn btn-ghost btn-xs ml-auto text-base-content/40 hover:text-error" aria-label={t('memberDetail.absences.delete')} title={t('memberDetail.absences.delete')} onclick={() => remove(a)} disabled={deletingId === a.id}>
 									{#if deletingId === a.id}<span class="loading loading-spinner loading-xs"></span>{:else}✕{/if}
 								</button>
 							{/if}

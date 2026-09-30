@@ -1,4 +1,220 @@
-/** Strings for the memberDetail area. Add keys to both objects; `en` is typed against `de`. */
-export const de = {};
+/** Strings for the member detail page and its section components (src/lib/components/member/). Add keys to both objects; `en` is typed against `de`. */
+export const de = {
+	pageTitle: 'Mitglied',
+	back: 'Zurück zu den Mitgliedern',
+	calendar: 'Kalender',
+	notFound: 'Mitglied nicht gefunden.',
+	loadFailed: 'Die Organisation konnte nicht geladen werden.',
+	reloadFailed: 'Das Mitglied konnte nicht neu geladen werden.',
+	absenceTypesFailed: 'Die Abwesenheitsarten konnten nicht geladen werden.',
+	permissionsFailed: 'Die Berechtigungen konnten nicht geladen werden.',
+	overviewFailed: 'Die Zeitübersicht konnte nicht geladen werden.',
+	entriesFailed: 'Die Zeiteinträge konnten nicht geladen werden.',
+	scheduleFailed: 'Das Arbeitszeitmodell konnte nicht geladen werden.',
+	header: {
+		joined: 'Beigetreten am {date}',
+		you: 'Du',
+		role: 'Rolle',
+		remove: 'Entfernen',
+		removeTitle: '{name} entfernen?',
+		removeMessage: 'Das Mitglied verliert den Zugang zu dieser Organisation.',
+		removed: '{name} wurde entfernt.',
+		removeFailed: 'Das Mitglied konnte nicht entfernt werden.',
+		roleChanged: 'Rolle geändert: {role}.',
+		roleFailed: 'Die Rolle konnte nicht geändert werden.'
+	},
+	summary: {
+		title: 'Gesamtübersicht',
+		calculating: 'Wird berechnet…',
+		cumulative: 'Überstunden-Saldo (geschätzt)',
+		netTracked: 'Netto erfasst (gesamt)',
+		entries: 'Zeiteinträge',
+		initialOvertime: 'Anfangsüberstunden',
+		vacationLeft: 'Resturlaub (Tage)',
+		none: 'Keine Gesamtdaten verfügbar.'
+	},
+	reports: {
+		title: 'Berichte',
+		intro: 'PDF-Arbeitszeitberichte für {subject} zum Ausdrucken: Tag für Tag für einen Monat oder Monat für Monat für ein Jahr.',
+		subjectSelf: 'dich',
+		monthly: 'Monatsbericht',
+		yearly: 'Jahresbericht',
+		month: 'Monat',
+		year: 'Jahr',
+		yearRange: '2000–2100',
+		download: 'PDF herunterladen',
+		creating: 'Wird erstellt…',
+		monthlyDone: 'Monatsbericht heruntergeladen.',
+		yearlyDone: 'Jahresbericht heruntergeladen.',
+		monthlyFailed: 'Der Monatsbericht konnte nicht erstellt werden.',
+		yearlyFailed: 'Der Jahresbericht konnte nicht erstellt werden.'
+	},
+	absences: {
+		title: 'Abwesenheiten',
+		add: '+ Abwesenheit eintragen',
+		request: '+ Abwesenheit beantragen',
+		empty: 'Keine Abwesenheiten erfasst.',
+		halfDay: '½ Tag',
+		by: 'von {name}',
+		viaRequest: '(Antrag #{id})',
+		delete: 'Abwesenheit löschen',
+		deleteTitle: 'Abwesenheit löschen?',
+		added: 'Abwesenheit eingetragen.',
+		deleted: 'Abwesenheit gelöscht.',
+		loadFailed: 'Die Abwesenheiten konnten nicht geladen werden.',
+		deleteFailed: 'Die Abwesenheit konnte nicht gelöscht werden.'
+	},
+	permissions: {
+		title: 'Berechtigungen',
+		titleSelf: 'Deine Berechtigungen',
+		manage: 'Über Gruppen verwalten →',
+		intro: 'Effektive Rechte aus den Regeln der Organisation und den Gruppen-Überschreibungen.',
+		actions: 'Aktionen',
+		visibility: 'Sichtbarkeit',
+		timeEntryVisibility: 'Sichtbarkeit von Zeiteinträgen',
+		capabilities: 'Genehmigungen & Admin-Rechte',
+		caps: {
+			approveAbsences: 'Abwesenheitsanträge genehmigen',
+			approveTimeEdits: 'Zeitänderungen genehmigen',
+			approveScheduleChanges: 'Änderungen am Arbeitszeitmodell genehmigen',
+			manageGroupMembers: 'Gruppenmitglieder verwalten',
+			viewAllTimeEntries: 'Alle Zeiteinträge sehen',
+			exportData: 'Daten exportieren'
+		}
+	},
+	vacation: {
+		title: 'Urlaubstage',
+		daysPerYear: 'Tage pro Jahr',
+		range: 'Bitte 0–365 Tage eingeben.',
+		saved: 'Urlaubstage gespeichert.',
+		saveFailed: 'Die Urlaubstage konnten nicht gespeichert werden.',
+		remaining: 'übrig',
+		taken: 'genommen',
+		planned: 'geplant',
+		total: 'gesamt',
+		barLabel: '{taken} genommen, {planned} geplant von {total} Tagen',
+		legendTaken: 'Genommen',
+		legendPlanned: 'Geplant für den Rest des Jahres',
+		none: 'Kein Urlaubsanspruch hinterlegt.',
+		askAdmin: 'Ein Admin kann ihn festlegen.'
+	},
+	badge: {
+		title: 'Terminal-Ausweis',
+		label: 'Ausweis-ID',
+		placeholder: 'RFID-Tag / Ausweis-ID',
+		saved: 'Ausweis-ID gespeichert.',
+		removed: 'Ausweis-ID entfernt.',
+		saveFailed: 'Die Ausweis-ID konnte nicht gespeichert werden.',
+		hint: 'Wird dieser Ausweis an einem Terminal gescannt, startet oder stoppt der Timer dieses Mitglieds. Terminal-Schlüssel werden in den Einstellungen der Organisation verwaltet.'
+	}
+};
 
-export const en: typeof de = {};
+export const en: typeof de = {
+	pageTitle: 'Member',
+	back: 'Back to members',
+	calendar: 'Calendar',
+	notFound: 'Member not found.',
+	loadFailed: 'Could not load the organization.',
+	reloadFailed: 'Could not reload the member.',
+	absenceTypesFailed: 'Could not load the absence types.',
+	permissionsFailed: 'Could not load the permissions.',
+	overviewFailed: 'Could not load the time overview.',
+	entriesFailed: 'Could not load the time entries.',
+	scheduleFailed: 'Could not load the work schedule.',
+	header: {
+		joined: 'Joined {date}',
+		you: 'You',
+		role: 'Role',
+		remove: 'Remove',
+		removeTitle: 'Remove {name}?',
+		removeMessage: 'The member loses access to this organization.',
+		removed: '{name} was removed.',
+		removeFailed: 'Could not remove the member.',
+		roleChanged: 'Role changed to {role}.',
+		roleFailed: 'Could not change the role.'
+	},
+	summary: {
+		title: 'Cumulative summary',
+		calculating: 'Calculating…',
+		cumulative: 'Overtime balance (estimate)',
+		netTracked: 'Net tracked (all time)',
+		entries: 'Time entries',
+		initialOvertime: 'Initial overtime',
+		vacationLeft: 'Vacation days left',
+		none: 'No cumulative data available.'
+	},
+	reports: {
+		title: 'Reports',
+		intro: 'Printable PDF working-hours reports for {subject}: day by day for a month, or month by month for a year.',
+		subjectSelf: 'you',
+		monthly: 'Monthly report',
+		yearly: 'Yearly report',
+		month: 'Month',
+		year: 'Year',
+		yearRange: '2000–2100',
+		download: 'Download PDF',
+		creating: 'Creating…',
+		monthlyDone: 'Monthly report downloaded.',
+		yearlyDone: 'Yearly report downloaded.',
+		monthlyFailed: 'Could not create the monthly report.',
+		yearlyFailed: 'Could not create the yearly report.'
+	},
+	absences: {
+		title: 'Absences',
+		add: '+ Add absence',
+		request: '+ Request absence',
+		empty: 'No absences recorded.',
+		halfDay: '½ day',
+		by: 'by {name}',
+		viaRequest: '(request #{id})',
+		delete: 'Delete absence',
+		deleteTitle: 'Delete absence?',
+		added: 'Absence added.',
+		deleted: 'Absence deleted.',
+		loadFailed: 'Could not load the absences.',
+		deleteFailed: 'Could not delete the absence.'
+	},
+	permissions: {
+		title: 'Permissions',
+		titleSelf: 'Your permissions',
+		manage: 'Manage via groups →',
+		intro: 'Effective rights from the organization rules and group overrides.',
+		actions: 'Actions',
+		visibility: 'Visibility',
+		timeEntryVisibility: 'Time entry visibility',
+		capabilities: 'Approval & admin capabilities',
+		caps: {
+			approveAbsences: 'Approve absence requests',
+			approveTimeEdits: 'Approve time edits',
+			approveScheduleChanges: 'Approve schedule changes',
+			manageGroupMembers: 'Manage group members',
+			viewAllTimeEntries: 'View all time entries',
+			exportData: 'Export data'
+		}
+	},
+	vacation: {
+		title: 'Vacation days',
+		daysPerYear: 'Days per year',
+		range: 'Enter 0–365 days.',
+		saved: 'Vacation days saved.',
+		saveFailed: 'Could not save the vacation days.',
+		remaining: 'remaining',
+		taken: 'taken',
+		planned: 'planned',
+		total: 'total',
+		barLabel: '{taken} taken, {planned} planned of {total} days',
+		legendTaken: 'Taken',
+		legendPlanned: 'Planned for the rest of the year',
+		none: 'No vacation allowance set.',
+		askAdmin: 'An admin can set it.'
+	},
+	badge: {
+		title: 'Terminal badge',
+		label: 'Badge ID',
+		placeholder: 'RFID tag / badge ID',
+		saved: 'Badge ID saved.',
+		removed: 'Badge ID removed.',
+		saveFailed: 'Could not save the badge ID.',
+		hint: "Scanning this badge at a terminal starts or stops this member's timer. Terminal keys are managed in the organization settings."
+	}
+};

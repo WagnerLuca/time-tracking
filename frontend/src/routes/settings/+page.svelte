@@ -10,6 +10,7 @@
 	import { locale, type Locale } from '$lib/stores/locale.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
+	import { t } from '$lib/i18n';
 	import SchedulePeriodEditor from '$lib/components/SchedulePeriodEditor.svelte';
 	import InitialOvertimeEditor from '$lib/components/InitialOvertimeEditor.svelte';
 
@@ -26,10 +27,10 @@
 	let profileSubmitted = $state(false);
 	let profileSaving = $state(false);
 	let profileError = $state('');
-	let firstNameError = $derived(profileSubmitted && !profileFirstName.trim() ? 'First name is required.' : '');
-	let lastNameError = $derived(profileSubmitted && !profileLastName.trim() ? 'Last name is required.' : '');
+	let firstNameError = $derived(profileSubmitted && !profileFirstName.trim() ? t('settings.profile.firstNameRequired') : '');
+	let lastNameError = $derived(profileSubmitted && !profileLastName.trim() ? t('settings.profile.lastNameRequired') : '');
 	let emailError = $derived(
-		!profileSubmitted ? '' : !profileEmail.trim() ? 'Email is required.' : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail.trim()) ? 'Enter a valid email address.' : ''
+		!profileSubmitted ? '' : !profileEmail.trim() ? t('settings.profile.emailRequired') : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileEmail.trim()) ? t('settings.profile.emailInvalid') : ''
 	);
 
 	// Password
@@ -39,11 +40,11 @@
 	let passwordSubmitted = $state(false);
 	let passwordSaving = $state(false);
 	let passwordError = $state('');
-	let currentPasswordError = $derived(passwordSubmitted && !currentPassword ? 'Enter your current password.' : '');
+	let currentPasswordError = $derived(passwordSubmitted && !currentPassword ? t('settings.password.currentRequired') : '');
 	let newPasswordError = $derived(
-		!passwordSubmitted ? '' : newPassword.length < MIN_PASSWORD_LENGTH ? `At least ${MIN_PASSWORD_LENGTH} characters.` : newPassword === currentPassword ? 'The new password must differ from the current one.' : ''
+		!passwordSubmitted ? '' : newPassword.length < MIN_PASSWORD_LENGTH ? t('settings.password.minLength', { min: MIN_PASSWORD_LENGTH }) : newPassword === currentPassword ? t('settings.password.mustDiffer') : ''
 	);
-	let confirmPasswordError = $derived(passwordSubmitted && confirmPassword !== newPassword ? 'The passwords do not match.' : '');
+	let confirmPasswordError = $derived(passwordSubmitted && confirmPassword !== newPassword ? t('settings.password.mismatch') : '');
 
 	// Two-factor authentication
 	let twoFactorStep = $state<'idle' | 'setup' | 'backup'>('idle');
@@ -91,7 +92,7 @@
 			if (slug === orgContext.selectedOrgSlug) currentSchedule = data;
 		} catch (err) {
 			currentSchedule = null;
-			if (getErrorStatus(err) !== 404) scheduleError = extractErrorMessage(err, 'Could not load your schedule.');
+			if (getErrorStatus(err) !== 404) scheduleError = extractErrorMessage(err, t('settings.org.scheduleFailed'));
 		} finally {
 			scheduleLoading = false;
 		}
@@ -116,9 +117,9 @@
 			profileEmail = updatedUser.email ?? '';
 			await auth.fetchCurrentUser();
 			profileSubmitted = false;
-			toast.success('Profile saved.');
+			toast.success(t('settings.profile.saved'));
 		} catch (err) {
-			profileError = extractErrorMessage(err, 'Could not save the profile.');
+			profileError = extractErrorMessage(err, t('settings.profile.saveFailed'));
 		} finally {
 			profileSaving = false;
 		}
@@ -136,9 +137,9 @@
 			newPassword = '';
 			confirmPassword = '';
 			passwordSubmitted = false;
-			toast.success('Password changed.');
+			toast.success(t('settings.password.changed'));
 		} catch (err) {
-			passwordError = extractErrorMessage(err, 'Could not change the password.');
+			passwordError = extractErrorMessage(err, t('settings.password.failed'));
 		} finally {
 			passwordSaving = false;
 		}
@@ -152,7 +153,7 @@
 			twoFactorSetup = data;
 			twoFactorStep = 'setup';
 		} catch (err) {
-			twoFactorError = extractErrorMessage(err, 'Could not start the 2FA setup.');
+			twoFactorError = extractErrorMessage(err, t('settings.twoFactor.setupFailed'));
 		} finally {
 			twoFactorSaving = false;
 		}
@@ -161,7 +162,7 @@
 	async function handleConfirm2FA(e: Event) {
 		e.preventDefault();
 		if (!/^\d{6}$/.test(twoFactorConfirmCode)) {
-			twoFactorError = 'Enter the 6-digit code.';
+			twoFactorError = t('settings.twoFactor.codeRequired');
 			return;
 		}
 		twoFactorError = '';
@@ -173,7 +174,7 @@
 			twoFactorConfirmCode = '';
 			await auth.fetchCurrentUser();
 		} catch (err) {
-			twoFactorError = extractErrorMessage(err, 'Invalid code. Try again.');
+			twoFactorError = extractErrorMessage(err, t('settings.twoFactor.invalidCode'));
 		} finally {
 			twoFactorSaving = false;
 		}
@@ -183,13 +184,13 @@
 		twoFactorStep = 'idle';
 		twoFactorSetup = null;
 		twoFactorBackupCodes = [];
-		toast.success('Two-factor authentication is on.');
+		toast.success(t('settings.twoFactor.enabled'));
 	}
 
 	async function handleDisable2FA(e: Event) {
 		e.preventDefault();
 		if (!twoFactorDisablePassword) {
-			twoFactorError = 'Enter your password to turn off 2FA.';
+			twoFactorError = t('settings.twoFactor.passwordRequired');
 			return;
 		}
 		twoFactorError = '';
@@ -198,9 +199,9 @@
 			await authApi.apiV1Auth2faDisablePost({ currentPassword: twoFactorDisablePassword, newPassword: twoFactorDisablePassword });
 			twoFactorDisablePassword = '';
 			await auth.fetchCurrentUser();
-			toast.success('Two-factor authentication is off.');
+			toast.success(t('settings.twoFactor.disabled'));
 		} catch (err) {
-			twoFactorError = extractErrorMessage(err, 'Could not turn off 2FA.');
+			twoFactorError = extractErrorMessage(err, t('settings.twoFactor.disableFailed'));
 		} finally {
 			twoFactorSaving = false;
 		}
@@ -222,9 +223,9 @@
 	async function handleDeleteAccount() {
 		// TODO(backend): account deletion should require the current password (and anonymize the account) — add a password field here once the endpoint accepts it.
 		const ok = await confirmDialog({
-			title: 'Delete account?',
-			message: 'Your account and all your data are removed permanently. This cannot be undone.',
-			confirmLabel: 'Delete account',
+			title: t('settings.account.deleteTitle'),
+			message: t('settings.account.deleteMessage'),
+			confirmLabel: t('settings.account.delete'),
 			danger: true
 		});
 		if (!ok) return;
@@ -234,34 +235,31 @@
 			await auth.logout();
 			goto('/register');
 		} catch (err) {
-			toast.error(err, 'Could not delete the account.');
+			toast.error(err, t('settings.account.deleteFailed'));
 			deleteAccountSaving = false;
 		}
 	}
 
-	const LOCALES: { value: Locale; label: string }[] = [
-		{ value: 'de', label: 'Deutsch' },
-		{ value: 'en', label: 'English' }
-	];
+	const LOCALES: Locale[] = ['de', 'en'];
 </script>
 
 <svelte:head>
-	<title>Settings – Time Tracking</title>
+	<title>{t('common.pageTitle', { page: t('settings.pageTitle') })}</title>
 </svelte:head>
 
 <div class="max-w-3xl mx-auto">
-	<h1 class="text-2xl font-bold mb-4">Settings</h1>
+	<h1 class="text-2xl font-bold mb-4">{t('settings.title')}</h1>
 
-	<div class="tabs tabs-boxed p-1 bg-base-200/70 mb-6 w-full md:w-fit flex-wrap" role="tablist" aria-label="Settings sections">
-		{#each [{ id: 'profile', label: 'Profile' }, { id: 'organization', label: 'Organization' }, { id: 'appearance', label: 'Appearance' }] as const as tab}
+	<div class="tabs tabs-boxed p-1 bg-base-200/70 mb-6 w-full md:w-fit flex-wrap" role="tablist" aria-label={t('settings.tabsLabel')}>
+		{#each ['profile', 'organization', 'appearance'] as const as tab}
 			<button
 				type="button"
 				role="tab"
-				class="tab {activeTab === tab.id ? 'tab-active' : ''}"
-				onclick={() => (activeTab = tab.id)}
-				aria-selected={activeTab === tab.id}
+				class="tab {activeTab === tab ? 'tab-active' : ''}"
+				onclick={() => (activeTab = tab)}
+				aria-selected={activeTab === tab}
 			>
-				{tab.label}
+				{t(`settings.tabs.${tab}`)}
 			</button>
 		{/each}
 	</div>
@@ -269,30 +267,30 @@
 	{#if activeTab === 'profile'}
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<form class="card-body" onsubmit={handleSaveProfile} novalidate>
-				<h2 class="card-title text-base">Profile</h2>
+				<h2 class="card-title text-base">{t('settings.profile.title')}</h2>
 				{#if profileError}
 					<div class="alert alert-error text-sm">{profileError}</div>
 				{/if}
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 					<div>
-						<label for="profileFirstName" class="block text-sm font-medium text-base-content/80 mb-1.5">First name</label>
+						<label for="profileFirstName" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.profile.firstName')}</label>
 						<input id="profileFirstName" type="text" autocomplete="given-name" bind:value={profileFirstName} class="input input-bordered w-full" class:input-error={firstNameError} aria-invalid={!!firstNameError} disabled={profileSaving} />
 						{#if firstNameError}<p class="text-error text-xs mt-1">{firstNameError}</p>{/if}
 					</div>
 					<div>
-						<label for="profileLastName" class="block text-sm font-medium text-base-content/80 mb-1.5">Last name</label>
+						<label for="profileLastName" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.profile.lastName')}</label>
 						<input id="profileLastName" type="text" autocomplete="family-name" bind:value={profileLastName} class="input input-bordered w-full" class:input-error={lastNameError} aria-invalid={!!lastNameError} disabled={profileSaving} />
 						{#if lastNameError}<p class="text-error text-xs mt-1">{lastNameError}</p>{/if}
 					</div>
 				</div>
 				<div>
-					<label for="profileEmail" class="block text-sm font-medium text-base-content/80 mb-1.5">Email</label>
+					<label for="profileEmail" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.profile.email')}</label>
 					<input id="profileEmail" type="email" autocomplete="email" bind:value={profileEmail} class="input input-bordered w-full max-w-md" class:input-error={emailError} aria-invalid={!!emailError} disabled={profileSaving} />
 					{#if emailError}<p class="text-error text-xs mt-1">{emailError}</p>{/if}
 				</div>
 				<div>
 					<button type="submit" class="btn btn-primary btn-sm" disabled={profileSaving}>
-						{profileSaving ? 'Saving…' : 'Save profile'}
+						{profileSaving ? t('common.saving') : t('settings.profile.save')}
 					</button>
 				</div>
 			</form>
@@ -300,28 +298,28 @@
 
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<form class="card-body" onsubmit={handleChangePassword} novalidate>
-				<h2 class="card-title text-base">Change password</h2>
+				<h2 class="card-title text-base">{t('settings.password.title')}</h2>
 				{#if passwordError}
 					<div class="alert alert-error text-sm">{passwordError}</div>
 				{/if}
 				<div>
-					<label for="currentPw" class="block text-sm font-medium text-base-content/80 mb-1.5">Current password</label>
+					<label for="currentPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.password.current')}</label>
 					<input id="currentPw" type="password" autocomplete="current-password" bind:value={currentPassword} class="input input-bordered w-full max-w-xs" class:input-error={currentPasswordError} aria-invalid={!!currentPasswordError} disabled={passwordSaving} />
 					{#if currentPasswordError}<p class="text-error text-xs mt-1">{currentPasswordError}</p>{/if}
 				</div>
 				<div>
-					<label for="newPw" class="block text-sm font-medium text-base-content/80 mb-1.5">New password</label>
+					<label for="newPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.password.new')}</label>
 					<input id="newPw" type="password" autocomplete="new-password" minlength={MIN_PASSWORD_LENGTH} bind:value={newPassword} class="input input-bordered w-full max-w-xs" class:input-error={newPasswordError} aria-invalid={!!newPasswordError} aria-describedby="newPwHint" disabled={passwordSaving} />
-					<p id="newPwHint" class="text-xs mt-1 {newPasswordError ? 'text-error' : 'text-base-content/50'}">{newPasswordError || `At least ${MIN_PASSWORD_LENGTH} characters.`}</p>
+					<p id="newPwHint" class="text-xs mt-1 {newPasswordError ? 'text-error' : 'text-base-content/50'}">{newPasswordError || t('settings.password.minLength', { min: MIN_PASSWORD_LENGTH })}</p>
 				</div>
 				<div>
-					<label for="confirmPw" class="block text-sm font-medium text-base-content/80 mb-1.5">Repeat new password</label>
+					<label for="confirmPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.password.repeat')}</label>
 					<input id="confirmPw" type="password" autocomplete="new-password" bind:value={confirmPassword} class="input input-bordered w-full max-w-xs" class:input-error={confirmPasswordError} aria-invalid={!!confirmPasswordError} disabled={passwordSaving} />
 					{#if confirmPasswordError}<p class="text-error text-xs mt-1">{confirmPasswordError}</p>{/if}
 				</div>
 				<div>
 					<button type="submit" class="btn btn-primary btn-sm" disabled={passwordSaving}>
-						{passwordSaving ? 'Saving…' : 'Change password'}
+						{passwordSaving ? t('common.saving') : t('settings.password.submit')}
 					</button>
 				</div>
 			</form>
@@ -329,7 +327,7 @@
 
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
-				<h2 class="card-title text-base">Two-factor authentication</h2>
+				<h2 class="card-title text-base">{t('settings.twoFactor.title')}</h2>
 
 				{#if twoFactorError}
 					<div class="alert alert-error text-sm">{twoFactorError}</div>
@@ -338,12 +336,12 @@
 				{#if twoFactorStep === 'idle'}
 					{#if auth.user?.twoFactorEnabled}
 						<div class="flex items-center gap-2 flex-wrap">
-							<span class="badge badge-success badge-sm">On</span>
-							<span class="text-sm text-base-content/60">Two-factor authentication protects your account.</span>
+							<span class="badge badge-success badge-sm">{t('settings.twoFactor.on')}</span>
+							<span class="text-sm text-base-content/60">{t('settings.twoFactor.activeText')}</span>
 						</div>
 						<form class="flex gap-2 items-end flex-wrap" onsubmit={handleDisable2FA}>
 							<div>
-								<label for="disable2faPassword" class="block text-sm font-medium text-base-content/80 mb-1.5">Password (to turn off 2FA)</label>
+								<label for="disable2faPassword" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.twoFactor.disablePassword')}</label>
 								<input
 									id="disable2faPassword"
 									type="password"
@@ -354,40 +352,40 @@
 								/>
 							</div>
 							<button type="submit" class="btn btn-error btn-sm" disabled={twoFactorSaving || !twoFactorDisablePassword}>
-								{twoFactorSaving ? 'Turning off…' : 'Turn off 2FA'}
+								{twoFactorSaving ? t('settings.twoFactor.disabling') : t('settings.twoFactor.disable')}
 							</button>
 						</form>
 					{:else}
-						<p class="text-sm text-base-content/60">Add an extra layer of security with an authenticator app (e.g. Google Authenticator, Authy).</p>
+						<p class="text-sm text-base-content/60">{t('settings.twoFactor.intro')}</p>
 						<div>
 							<button type="button" class="btn btn-primary btn-sm" onclick={handleSetup2FA} disabled={twoFactorSaving}>
-								{twoFactorSaving ? 'Setting up…' : 'Set up 2FA'}
+								{twoFactorSaving ? t('settings.twoFactor.settingUp') : t('settings.twoFactor.setup')}
 							</button>
 						</div>
 					{/if}
 				{:else if twoFactorStep === 'setup'}
-					<p class="text-sm text-base-content/60">Scan this QR code with your authenticator app or enter the key manually.</p>
+					<p class="text-sm text-base-content/60">{t('settings.twoFactor.scan')}</p>
 
 					{#if twoFactorSetup}
 						<div class="flex flex-col items-center gap-4 p-4 bg-base-200/50 rounded-lg border border-base-300">
 							<div class="bg-white p-3 rounded-lg">
 								<img
 									src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={encodeURIComponent(twoFactorSetup.authenticatorUri ?? '')}"
-									alt="QR code for the authenticator app"
+									alt={t('settings.twoFactor.qrAlt')}
 									width="200"
 									height="200"
 									class="block"
 								/>
 							</div>
 							<div class="text-center max-w-full">
-								<p class="text-xs text-base-content/50 mb-1">Or enter this key manually:</p>
+								<p class="text-xs text-base-content/50 mb-1">{t('settings.twoFactor.manualKey')}</p>
 								<code class="text-sm font-mono bg-base-300 px-3 py-1.5 rounded select-all break-all">{twoFactorSetup.sharedKey}</code>
 							</div>
 						</div>
 
 						<form class="flex gap-2 items-end flex-wrap" onsubmit={handleConfirm2FA}>
 							<div>
-								<label for="confirm2faCode" class="block text-sm font-medium text-base-content/80 mb-1.5">6-digit code from the app</label>
+								<label for="confirm2faCode" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.twoFactor.codeLabel')}</label>
 								<input
 									id="confirm2faCode"
 									type="text"
@@ -401,17 +399,17 @@
 								/>
 							</div>
 							<button type="submit" class="btn btn-primary btn-sm" disabled={twoFactorSaving || twoFactorConfirmCode.length !== 6}>
-								{twoFactorSaving ? 'Verifying…' : 'Verify and turn on'}
+								{twoFactorSaving ? t('settings.twoFactor.verifying') : t('settings.twoFactor.verify')}
 							</button>
 						</form>
 					{/if}
 
 					<div>
-						<button type="button" class="btn btn-ghost btn-sm" onclick={cancelSetup2FA} disabled={twoFactorSaving}>Cancel</button>
+						<button type="button" class="btn btn-ghost btn-sm" onclick={cancelSetup2FA} disabled={twoFactorSaving}>{t('common.cancel')}</button>
 					</div>
 				{:else if twoFactorStep === 'backup'}
 					<div class="alert alert-warning text-sm">
-						<span>Keep these backup codes somewhere safe. Each code works once, and they are not shown again.</span>
+						<span>{t('settings.twoFactor.backupWarning')}</span>
 					</div>
 					<div class="grid grid-cols-2 gap-2 p-4 bg-base-200/50 rounded-lg border border-base-300 max-w-xs">
 						{#each twoFactorBackupCodes as code}
@@ -419,7 +417,7 @@
 						{/each}
 					</div>
 					<div>
-						<button type="button" class="btn btn-primary btn-sm" onclick={handleFinish2FASetup}>I have saved the backup codes</button>
+						<button type="button" class="btn btn-primary btn-sm" onclick={handleFinish2FASetup}>{t('settings.twoFactor.backupSaved')}</button>
 					</div>
 				{/if}
 			</div>
@@ -427,12 +425,12 @@
 
 		<section class="card bg-base-100 border border-error/30 shadow-sm mb-5">
 			<div class="card-body gap-4">
-				<h2 class="card-title text-base">Account</h2>
-				<p class="text-sm text-base-content/60 m-0">Sign out of this device or delete your account permanently.</p>
+				<h2 class="card-title text-base">{t('settings.account.title')}</h2>
+				<p class="text-sm text-base-content/60 m-0">{t('settings.account.intro')}</p>
 				<div class="flex flex-wrap gap-3">
-					<button type="button" class="btn btn-outline btn-sm" onclick={handleLogout}>Sign out</button>
+					<button type="button" class="btn btn-outline btn-sm" onclick={handleLogout}>{t('settings.account.signOut')}</button>
 					<button type="button" class="btn btn-error btn-sm" onclick={handleDeleteAccount} disabled={deleteAccountSaving}>
-						{deleteAccountSaving ? 'Deleting…' : 'Delete account'}
+						{deleteAccountSaving ? t('common.deleting') : t('settings.account.delete')}
 					</button>
 				</div>
 			</div>
@@ -440,10 +438,10 @@
 	{:else if activeTab === 'organization'}
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
-				<h2 class="card-title text-base">Active organization</h2>
-				<p class="text-sm text-base-content/60 mb-2">Choose the organization new time entries are tracked for.</p>
+				<h2 class="card-title text-base">{t('settings.org.title')}</h2>
+				<p class="text-sm text-base-content/60 mb-2">{t('settings.org.intro')}</p>
 
-				<div class="flex flex-col gap-2" role="radiogroup" aria-label="Active organization">
+				<div class="flex flex-col gap-2" role="radiogroup" aria-label={t('settings.org.title')}>
 					<button
 						type="button"
 						role="radio"
@@ -452,7 +450,7 @@
 						onclick={() => orgContext.select(null)}
 					>
 						<input type="radio" class="radio radio-primary radio-sm pointer-events-none" checked={orgContext.selectedOrgId === null} tabindex="-1" aria-hidden="true" />
-						<span class="text-sm font-medium">Personal (no organization)</span>
+						<span class="text-sm font-medium">{t('settings.org.personal')}</span>
 					</button>
 
 					{#each orgContext.organizations as org (org.organizationId)}
@@ -472,21 +470,21 @@
 					{/each}
 
 					{#if orgContext.organizations.length === 0 && !orgContext.loading}
-						<p class="text-sm text-base-content/50">No organizations yet. <a href="/organizations/new" class="link link-primary">Create one</a>.</p>
+						<p class="text-sm text-base-content/50">{t('settings.org.none')} <a href="/organizations/new" class="link link-primary">{t('settings.org.createOne')}</a></p>
 					{/if}
 				</div>
 
 				<div class="flex gap-4 mt-4 pt-4 border-t border-base-200 flex-wrap">
-					<a href="/organizations" class="text-sm link link-primary font-medium no-underline hover:underline">Browse organizations</a>
-					<a href="/organizations/new" class="text-sm link link-primary font-medium no-underline hover:underline">+ Create organization</a>
+					<a href="/organizations" class="text-sm link link-primary font-medium no-underline hover:underline">{t('settings.org.browse')}</a>
+					<a href="/organizations/new" class="text-sm link link-primary font-medium no-underline hover:underline">{t('settings.org.create')}</a>
 				</div>
 			</div>
 		</section>
 
 		{#if orgContext.selectedOrgSlug}
-			<p class="text-sm text-base-content/60 mb-3">Your work schedule in <strong>{orgContext.selectedOrg?.name}</strong>:</p>
+			<p class="text-sm text-base-content/60 mb-3">{t('settings.org.scheduleIn')} <strong>{orgContext.selectedOrg?.name}</strong>:</p>
 			{#if scheduleLoading && !currentSchedule}
-				<p class="text-sm text-base-content/50 flex items-center gap-2 mb-5"><span class="loading loading-spinner loading-xs"></span> Loading…</p>
+				<p class="text-sm text-base-content/50 flex items-center gap-2 mb-5"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
 			{:else if scheduleError}
 				<div class="alert alert-error text-sm mb-5">{scheduleError}</div>
 			{:else if currentSchedule}
@@ -512,10 +510,10 @@
 	{:else}
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
-				<h2 class="card-title text-base">Theme</h2>
-				<p class="text-sm text-base-content/60 mb-2">Light or dark. The choice is shared with the other Wagner Luca apps.</p>
+				<h2 class="card-title text-base">{t('settings.appearance.theme')}</h2>
+				<p class="text-sm text-base-content/60 mb-2">{t('settings.appearance.themeIntro')}</p>
 				<div class="join">
-					{#each [{ dark: false, label: 'Light' }, { dark: true, label: 'Dark' }] as opt}
+					{#each [{ dark: false, label: t('settings.appearance.light') }, { dark: true, label: t('settings.appearance.dark') }] as opt}
 						<button
 							type="button"
 							class="btn btn-sm join-item {theme.isDark === opt.dark ? 'btn-neutral' : 'btn-ghost border-base-300'}"
@@ -529,17 +527,17 @@
 
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
-				<h2 class="card-title text-base">Language</h2>
-				<p class="text-sm text-base-content/60 mb-2">German or English. The choice is shared with the other Wagner Luca apps.</p>
+				<h2 class="card-title text-base">{t('settings.appearance.language')}</h2>
+				<p class="text-sm text-base-content/60 mb-2">{t('settings.appearance.languageIntro')}</p>
 				<div class="join">
-					{#each LOCALES as opt}
+					{#each LOCALES as l}
 						<button
 							type="button"
-							lang={opt.value}
-							class="btn btn-sm join-item {locale.current === opt.value ? 'btn-neutral' : 'btn-ghost border-base-300'}"
-							onclick={() => locale.set(opt.value)}
-							aria-pressed={locale.current === opt.value}
-						>{opt.label}</button>
+							lang={l}
+							class="btn btn-sm join-item {locale.current === l ? 'btn-neutral' : 'btn-ghost border-base-300'}"
+							onclick={() => locale.set(l)}
+							aria-pressed={locale.current === l}
+						>{t(`settings.appearance.${l}`)}</button>
 					{/each}
 				</div>
 			</div>

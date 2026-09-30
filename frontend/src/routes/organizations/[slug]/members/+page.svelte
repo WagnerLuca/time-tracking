@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { t, tp } from '$lib/i18n';
 	import GroupTags from '$lib/components/GroupTags.svelte';
 	import { organizationsApi } from '$lib/apiClient';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
@@ -39,7 +40,7 @@
 			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
 			org = data;
 		} catch (err) {
-			error = getErrorStatus(err) === 404 ? 'Organization not found.' : extractErrorMessage(err, 'Could not load the organization.');
+			error = getErrorStatus(err) === 404 ? t('memberList.notFound') : extractErrorMessage(err, t('memberList.loadFailed'));
 		} finally {
 			loading = false;
 		}
@@ -53,7 +54,7 @@
 			overviewByUser = new Map(data.filter((m) => m.userId != null).map((m) => [m.userId!, m]));
 		} catch (err) {
 			// 403 = time entries are not visible to the caller; the list works without them
-			if (getErrorStatus(err) !== 403) toast.error(err, "Could not load this week's hours.");
+			if (getErrorStatus(err) !== 403) toast.error(err, t('memberList.weekFailed'));
 		}
 	}
 
@@ -80,33 +81,33 @@
 </script>
 
 <svelte:head>
-	<title>Members – {org?.name ?? 'Organization'} – Time Tracking</title>
+	<title>{t('common.pageTitle', { page: org?.name ? `${t('memberList.pageTitle')} – ${org.name}` : t('memberList.pageTitle') })}</title>
 </svelte:head>
 
 <div class="max-w-5xl mx-auto px-4 sm:px-6 pb-6">
 	{#if loading}
-		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>Loading…</span></div>
+		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>{t('common.loading')}</span></div>
 	{:else if error}
 		<div class="alert alert-error">{error}</div>
 	{:else if org}
 		<p class="text-base-content/60 text-sm mt-2 mb-5">
-			{isAdmin ? 'Open a member for details, schedule editing and absence history.' : 'Open a member to see their profile.'}
+			{isAdmin ? t('memberList.introAdmin') : t('memberList.introMember')}
 		</p>
 
 		<section>
 			<div class="flex items-center justify-between mb-4 flex-wrap gap-2">
 				<h2 class="text-xl text-base-content/70 m-0">
-					Members ({members.length}{groupFilter !== null ? ` of ${(org.members ?? []).length}` : ''})
+					{groupFilter !== null ? t('memberList.headingFiltered', { count: members.length, total: (org.members ?? []).length }) : t('memberList.heading', { count: members.length })}
 				</h2>
 				{#if groupOptions.length > 0}
 					<label class="flex items-center gap-2 text-sm">
-						<span class="sr-only">Filter by group</span>
+						<span class="sr-only">{t('memberList.filterLabel')}</span>
 						<select bind:value={groupFilter} class="select select-bordered select-sm">
-							<option value={null}>All groups</option>
+							<option value={null}>{t('memberList.allGroups')}</option>
 							{#each groupOptions as g (g.id)}
 								<option value={g.id}>{g.name}</option>
 							{/each}
-							<option value="none">No group</option>
+							<option value="none">{t('memberList.noGroup')}</option>
 						</select>
 					</label>
 				{/if}
@@ -127,7 +128,7 @@
 								<div class="font-semibold text-[0.9375rem] flex items-center gap-1.5 flex-wrap">
 									<span class="break-words">{member.firstName} {member.lastName}</span>
 									{#if member.id === auth.user?.id}
-										<span class="badge badge-info badge-xs font-semibold">You</span>
+										<span class="badge badge-info badge-xs font-semibold">{t('memberList.you')}</span>
 									{/if}
 									<GroupTags groups={member.groups} />
 								</div>
@@ -135,15 +136,16 @@
 								<div class="flex gap-x-3 gap-y-1 mt-1.5 flex-wrap items-center text-xs text-base-content/60">
 									<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>
 									{#if member.vacationVisible !== false && (member.vacationDaysPerYear ?? 0) > 0}
-										<span title="Vacation: {formatNumber(member.vacationDaysUsed ?? 0)}/{formatNumber(member.vacationDaysPerYear ?? 0)} used">
-											{formatNumber(member.vacationDaysRemaining ?? member.vacationDaysPerYear ?? 0)} vacation days left
+										{@const left = member.vacationDaysRemaining ?? member.vacationDaysPerYear ?? 0}
+										<span title={t('memberList.vacationTitle', { used: formatNumber(member.vacationDaysUsed ?? 0), total: formatNumber(member.vacationDaysPerYear ?? 0) })}>
+											{tp('memberList.vacationLeft', left, { days: formatNumber(left) })}
 										</span>
 									{/if}
 									{#if overview}
-										<span title="Tracked this week">{formatHours(overview.netTrackedMinutes)} this week</span>
-										<span>{formatNumber(overview.entryCount ?? 0)} entries</span>
+										<span title={t('memberList.trackedTitle')}>{t('memberList.thisWeek', { hours: formatHours(overview.netTrackedMinutes) })}</span>
+										<span>{tp('memberList.entries', overview.entryCount ?? 0)}</span>
 										{#if overview.weeklyWorkHours}
-											<span title="Weekly target">{formatNumber(overview.weeklyWorkHours)} h/week</span>
+											<span title={t('memberList.weeklyTargetTitle')}>{t('common.perWeek', { value: formatNumber(overview.weeklyWorkHours) })}</span>
 										{/if}
 									{/if}
 								</div>

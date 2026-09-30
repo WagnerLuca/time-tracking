@@ -6,6 +6,7 @@
 	import { formatDateFull, getInitials, roleLabel } from '$lib/utils/formatters';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { t } from '$lib/i18n';
 
 	/** Avatar, name, role and groups of a member; admins change the role or remove the member. */
 	interface Props {
@@ -34,11 +35,11 @@
 		pending = true;
 		try {
 			await organizationsApi.apiV1OrganizationsSlugMembersMemberIdPut(orgSlug, member.id!, { role: newRole as OrganizationRole });
-			toast.success(`Role changed to ${roleLabel(ROLES[newRole])}.`);
+			toast.success(t('memberDetail.header.roleChanged', { role: roleLabel(ROLES[newRole]) }));
 			onchanged?.();
 		} catch (err) {
 			select.value = String(roleValue);
-			toast.error(err, 'Could not change the role.');
+			toast.error(err, t('memberDetail.header.roleFailed'));
 		} finally {
 			pending = false;
 		}
@@ -46,19 +47,19 @@
 
 	async function remove() {
 		const ok = await confirmDialog({
-			title: `Remove ${name}?`,
-			message: 'The member loses access to this organization.',
-			confirmLabel: 'Remove',
+			title: t('memberDetail.header.removeTitle', { name }),
+			message: t('memberDetail.header.removeMessage'),
+			confirmLabel: t('memberDetail.header.remove'),
 			danger: true
 		});
 		if (!ok) return;
 		pending = true;
 		try {
 			await organizationsApi.apiV1OrganizationsSlugMembersMemberIdDelete(orgSlug, member.id!);
-			toast.success(`${name} was removed.`);
+			toast.success(t('memberDetail.header.removed', { name }));
 			goto(`/organizations/${orgSlug}/members`);
 		} catch (err) {
-			toast.error(err, 'Could not remove the member.');
+			toast.error(err, t('memberDetail.header.removeFailed'));
 			pending = false;
 		}
 	}
@@ -76,22 +77,22 @@
 				<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>
 				<GroupTags groups={member.groups} size="sm" />
 				{#if member.joinedAt}
-					<span class="text-base-content/40 text-xs">Joined {formatDateFull(member.joinedAt)}</span>
+					<span class="text-base-content/40 text-xs">{t('memberDetail.header.joined', { date: formatDateFull(member.joinedAt) })}</span>
 				{/if}
-				{#if isSelf}<span class="badge badge-success badge-xs font-semibold">You</span>{/if}
+				{#if isSelf}<span class="badge badge-success badge-xs font-semibold">{t('memberDetail.header.you')}</span>{/if}
 			</div>
 		</div>
 	</div>
 
 	{#if canManage}
 		<div class="flex items-center gap-2 shrink-0">
-			<label for="member-role" class="sr-only">Role</label>
+			<label for="member-role" class="sr-only">{t('memberDetail.header.role')}</label>
 			<select id="member-role" class="select select-bordered select-sm" value={roleValue} onchange={changeRole} disabled={pending}>
 				<option value={0}>{roleLabel('Member')}</option>
 				<option value={1}>{roleLabel('Admin')}</option>
 				{#if callerIsOwner}<option value={2}>{roleLabel('Owner')}</option>{/if}
 			</select>
-			<button type="button" class="btn btn-outline btn-error btn-sm" onclick={remove} disabled={pending}>Remove</button>
+			<button type="button" class="btn btn-outline btn-error btn-sm" onclick={remove} disabled={pending}>{t('memberDetail.header.remove')}</button>
 		</div>
 	{/if}
 </div>
