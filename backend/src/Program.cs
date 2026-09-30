@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -94,6 +95,15 @@ if (jwtSettings == null || string.IsNullOrEmpty(jwtSettings.Secret))
     throw new InvalidOperationException("JWT settings are not properly configured.");
 }
 
+// Outside development/tests, refuse to run with the shipped placeholder or a weak secret
+var isDevOrTest = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing");
+if (!isDevOrTest && (jwtSettings.Secret.StartsWith("CHANGE_THIS", StringComparison.OrdinalIgnoreCase)
+                     || Encoding.UTF8.GetByteCount(jwtSettings.Secret) < 32))
+{
+    throw new InvalidOperationException(
+        "JwtSettings:Secret is the placeholder or shorter than 32 bytes. Set JwtSettings__Secret to a random value, e.g. `openssl rand -base64 48`.");
+}
+
 // Add Authentication
 builder.Services.AddAuthentication(options =>
 {
@@ -116,30 +126,11 @@ builder.Services.AddAuthentication(options =>
 
     options.Events = new JwtBearerEvents
     {
+        // Never log tokens or Authorization headers; an expired token is routine, not an error
         OnAuthenticationFailed = context =>
         {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError(context.Exception, "Authentication failed");
-            
-            if (context.Exception.GetType() == typeof(SecurityTokenExpiredException))
-            {
+            if (context.Exception is SecurityTokenExpiredException)
                 context.Response.Headers.Append("Token-Expired", "true");
-            }
-            return Task.CompletedTask;
-        },
-        OnTokenValidated = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Token validated successfully for user: {User}", 
-                context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value);
-            return Task.CompletedTask;
-        },
-        OnMessageReceived = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            var authHeader = context.Request.Headers.Authorization.FirstOrDefault();
-            logger.LogInformation("Authorization header received: {Header}", 
-                authHeader != null ? $"{authHeader.Substring(0, Math.Min(20, authHeader.Length))}..." : "null");
             return Task.CompletedTask;
         }
     };
@@ -176,32 +167,15 @@ builder.Services.AddDbContext<TimeTrackingDbContext>(options =>
     }
     else
     {
-        // Check for DATABASE_URL environment variable first (Docker/production)
-        var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL");
-        
-        // If DATABASE_URL is in postgres:// format, convert it to EF Core format
-        if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgres://"))
-        {
-            var uri = new Uri(connectionString);
-            var host = uri.Host;
-            var port = uri.Port;
-            var database = uri.AbsolutePath.TrimStart('/');
-            var username = uri.UserInfo.Split(':')[0];
-            var password = uri.UserInfo.Split(':')[1];
-            
-            connectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password}";
-        }
-        else
-        {
-            // Fallback to appsettings.json (local development)
-            connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-        }
-        
+        // DATABASE_URL (postgres:// or postgresql://) wins, else ConnectionStrings:DefaultConnection
+        var connectionString = DatabaseUrl.ToConnectionString(Environment.GetEnvironmentVariable("DATABASE_URL"))
+                               ?? builder.Configuration.GetConnectionString("DefaultConnection");
+
         if (string.IsNullOrEmpty(connectionString))
         {
             throw new InvalidOperationException("Database connection string not found. Set DATABASE_URL, ConnectionStrings:DefaultConnection, or set UseInMemoryDatabase=true.");
         }
-        
+
         options.UseNpgsql(connectionString);
     }
 });
@@ -218,9 +192,9 @@ builder.Services.AddCors(options =>
                     .AllowAnyHeader()
                     .AllowAnyMethod();
         }
-        else
+        else if (builder.Environment.IsDevelopment())
         {
-            // Fallback for development — allow any origin
+            // Development convenience only — production must list its origins explicitly
             policy.AllowAnyOrigin()
                   .AllowAnyHeader()
                   .AllowAnyMethod();
@@ -228,38 +202,44 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Add Rate Limiting
+// Add Rate Limiting — partitioned per client IP (auth) or per user (data access), so one
+// noisy client cannot exhaust everybody else's budget
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // Strict policy for login/register (prevent brute-force & credential stuffing)
-    options.AddFixedWindowLimiter("AuthStrict", opt =>
+    static string ClientIp(HttpContext ctx) => ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    static string UserOrIp(HttpContext ctx) =>
+        ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value is { } id ? $"user:{id}" : $"ip:{ClientIp(ctx)}";
+    static FixedWindowRateLimiterOptions Window(int permits) => new()
     {
-        opt.PermitLimit = 10;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit = 0;
-    });
+        PermitLimit = permits,
+        Window = TimeSpan.FromMinutes(1),
+        QueueLimit = 0
+    };
 
-    // Moderate policy for token refresh & other auth actions
-    options.AddFixedWindowLimiter("AuthModerate", opt =>
-    {
-        opt.PermitLimit = 30;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit = 0;
-    });
+    // Strict policy for login/register/2FA (brute-force & credential stuffing), per IP
+    options.AddPolicy("AuthStrict", ctx => RateLimitPartition.GetFixedWindowLimiter(ClientIp(ctx), _ => Window(10)));
 
-    // General policy for data-access endpoints (prevent rapid enumeration)
-    options.AddFixedWindowLimiter("General", opt =>
-    {
-        opt.PermitLimit = 300;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit = 0;
-    });
+    // Moderate policy for token refresh & other auth actions, per IP
+    options.AddPolicy("AuthModerate", ctx => RateLimitPartition.GetFixedWindowLimiter(ClientIp(ctx), _ => Window(30)));
+
+    // General policy for data-access endpoints (prevent rapid enumeration), per user
+    options.AddPolicy("General", ctx => RateLimitPartition.GetFixedWindowLimiter(UserOrIp(ctx), _ => Window(300)));
 });
+
+// Behind a reverse proxy, take the client IP from X-Forwarded-For — only when explicitly
+// enabled, otherwise any client could spoof its IP and dodge the rate limits
+var trustForwardedHeaders = builder.Configuration.GetValue<bool>("ReverseProxy:TrustForwardedHeaders");
+if (trustForwardedHeaders)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(o =>
+    {
+        o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        o.KnownIPNetworks.Clear();
+        o.KnownProxies.Clear();
+    });
+}
 
 var app = builder.Build();
 
@@ -270,7 +250,7 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<TimeTrackingDbContext>();
-        
+
         if (app.Configuration.GetValue<bool>("UseInMemoryDatabase"))
         {
             // InMemory database - just ensure created (no migrations)
@@ -281,25 +261,35 @@ using (var scope = app.Services.CreateScope())
             // Apply all pending migrations (this will also create the database if needed)
             context.Database.Migrate();
         }
-        
-        // Seed the database with test data
-        await DbSeeder.SeedAsync(context);
+
+        // Demo data (users with known passwords!) only for the in-memory dev database or when asked for
+        if (app.Configuration.GetValue<bool>("UseInMemoryDatabase") || app.Configuration.GetValue<bool>("SeedDemoData"))
+            await DbSeeder.SeedAsync(context);
     }
     catch (Exception ex)
     {
         var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while migrating or seeding the database.");
+        logger.LogCritical(ex, "An error occurred while migrating or seeding the database.");
+        // Never serve requests on a half-migrated schema
+        throw;
     }
 }
 
 // Configure the HTTP request pipeline.
+if (trustForwardedHeaders)
+    app.UseForwardedHeaders();
+
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Serilog HTTP request logging (replaces default Microsoft request logging)
 app.UseSerilogRequestLogging();
 
-app.UseSwagger();
-app.UseSwaggerUI();
+// API docs only in development unless explicitly enabled (Swagger:Enabled)
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Swagger:Enabled"))
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 // Enable CORS
 app.UseCors("AllowOrigins");
@@ -322,13 +312,13 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Health check endpoint
-app.MapGet("/health", () => Results.Ok(new
+// Health check endpoint — 503 when the database is unreachable
+app.MapGet("/health", async (TimeTrackingDbContext db, CancellationToken ct) =>
 {
-    status = "healthy",
-    timestamp = DateTime.UtcNow,
-    service = "dotnet-time-tracking-backend"
-}));
+    var dbOk = await db.Database.CanConnectAsync(ct);
+    var body = new { status = dbOk ? "healthy" : "unhealthy", database = dbOk, timestamp = DateTime.UtcNow, service = "dotnet-time-tracking-backend" };
+    return dbOk ? Results.Ok(body) : Results.Json(body, statusCode: StatusCodes.Status503ServiceUnavailable);
+});
 
 app.Run();
 
