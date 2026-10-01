@@ -153,6 +153,41 @@ public static class DailyReportAggregator
     }
 
     /// <summary>
+    /// Builds the report's display rows (clipped to [dateFrom, dateTo]) whose
+    /// <see cref="DailyReportRow.CumulativeOvertime"/> reflects the member's true,
+    /// never-reset running balance since their very first tracked entry — not just
+    /// a total reset at the start of the requested period. Also returns that overall
+    /// balance as of the end of the period (or "today" if the period is still ongoing,
+    /// since <see cref="BuildAsync"/> clamps internally). Used by the PDF reports, the balance
+    /// endpoint and the daily CSV, so all of them show the same running total.
+    /// </summary>
+    public static async Task<(List<DailyReportRow> Rows, double OverallCumulative)> BuildWithRunningTotalAsync(
+        TimeTrackingDbContext context, int userId, int orgId,
+        DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours)
+    {
+        var firstEntry = await context.TimeEntries.AsNoTracking()
+            .Where(e => e.UserId == userId && e.OrganizationId == orgId && !e.IsRunning)
+            .OrderBy(e => e.StartTime)
+            .Select(e => (DateTime?)e.StartTime)
+            .FirstOrDefaultAsync();
+
+        // The balance runs from the first tracked entry: days before someone started tracking
+        // are not "missing" work. Without any entry there is nothing to count yet.
+        if (firstEntry == null)
+            return ([], initialOvertimeHours);
+
+        var timeZone = await context.Organizations.AsNoTracking()
+            .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
+        var loopFrom = OrgClock.For(timeZone).LocalDate(firstEntry.Value);
+
+        var allRows = await BuildAsync(context, userId, orgId, loopFrom, dateTo, initialOvertimeHours);
+        var displayRows = allRows.Where(r => r.Date >= dateFrom).ToList();
+        var overallCumulative = allRows.Count > 0 ? allRows[^1].CumulativeOvertime : initialOvertimeHours;
+
+        return (displayRows, overallCumulative);
+    }
+
+    /// <summary>
     /// Hours an absence takes off the day's target. Vacation, sick days and plain "other"
     /// absences credit the (half) target; custom types follow their <see cref="AbsenceCreditMode"/>:
     /// None credits nothing, FullCredit the (half) target, FillToTarget only what is missing

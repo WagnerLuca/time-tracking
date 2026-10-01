@@ -52,6 +52,39 @@ public class BalanceTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     [Fact]
+    public async Task DailyCsv_CumulativeOvertime_IsTheTrueRunningTotal_NotRestartedAtTheRangeStart()
+    {
+        var (owner, login) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "balance-csv@bal.test");
+        var org = await TestHelpers.CreateOrganizationAsync(owner, "Balance Org CSV", "balance-org-csv");
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/settings", new { csvImportMode = 2 })).EnsureSuccessStatusCode();
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members/{login.User.Id}/initial-overtime",
+            new { initialOvertimeHours = 2 })).EnsureSuccessStatusCode();
+        var today = OrgClock.For("Europe/Berlin").Today();
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedules",
+            new { validFrom = today.AddMonths(-3).ToString("yyyy-MM-dd"), weeklyWorkHours = 40, distributeEvenly = true })).EnsureSuccessStatusCode();
+        // Tracking started six weeks ago with a long day; the export only asks for today
+        (await owner.PostAsJsonAsync($"/api/v1/ExportImport/import/confirm?orgSlug={org.Slug}", new[]
+        {
+            new { date = today.AddDays(-42).ToString("yyyy-MM-dd"), startTime = "06:00", endTime = "20:00", pauseMinutes = 60, description = "start" },
+            new { date = today.ToString("yyyy-MM-dd"), startTime = "08:00", endTime = "09:00", pauseMinutes = 0, description = "today" }
+        })).EnsureSuccessStatusCode();
+
+        var balance = await owner.GetFromJsonAsync<JsonElement>($"/api/v1/organizations/{org.Slug}/members/{login.User.Id}/balance");
+        var csv = await (await owner.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily", organizationSlug = org.Slug, columns = new[] { "Date", "CumulativeOvertime" },
+            from = today.ToString("yyyy-MM-dd"), to = today.ToString("yyyy-MM-dd")
+        })).Content.ReadAsStringAsync();
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().HaveCount(2);
+        var cumulative = double.Parse(lines[1].Split(',')[1], CultureInfo.InvariantCulture);
+
+        cumulative.Should().BeApproximately(balance.GetProperty("cumulativeOvertimeHours").GetDouble(), 0.01);
+        // A restarted total would be the initial 2 h plus today's −7 h
+        cumulative.Should().NotBeApproximately(2 - 7, 0.01);
+    }
+
+    [Fact]
     public async Task Balance_OfAnotherMember_IsForbiddenForPlainMembers()
     {
         var (owner, ownerLogin) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "balance-owner@bal.test");

@@ -38,7 +38,7 @@ public class PdfReportService : IPdfReportService
         var dateFrom = new DateOnly(year, month, 1);
         var dateTo = dateFrom.AddMonths(1).AddDays(-1);
 
-        var (rows, overallCumulative) = await BuildDisplayRowsAsync(
+        var (rows, overallCumulative) = await DailyReportAggregator.BuildWithRunningTotalAsync(
             _context, targetUserId, context.Org!.Id, dateFrom, dateTo, context.Membership!.InitialOvertimeHours);
 
         var period = $"{MonthNames[month - 1]} {year}";
@@ -60,7 +60,7 @@ public class PdfReportService : IPdfReportService
         var dateFrom = new DateOnly(year, 1, 1);
         var dateTo = new DateOnly(year, 12, 31);
 
-        var (rows, overallCumulative) = await BuildDisplayRowsAsync(
+        var (rows, overallCumulative) = await DailyReportAggregator.BuildWithRunningTotalAsync(
             _context, targetUserId, context.Org!.Id, dateFrom, dateTo, context.Membership!.InitialOvertimeHours);
 
         var monthSummaries = rows
@@ -106,7 +106,7 @@ public class PdfReportService : IPdfReportService
         var monthStart = new DateOnly(today.Year, today.Month, 1);
         var periodStart = weekStart < monthStart ? weekStart : monthStart;
 
-        var (rows, cumulative) = await BuildDisplayRowsAsync(
+        var (rows, cumulative) = await DailyReportAggregator.BuildWithRunningTotalAsync(
             _context, targetUserId, context.Org!.Id, periodStart, today, context.Membership!.InitialOvertimeHours);
 
         PeriodBalance Period(DateOnly from)
@@ -158,40 +158,6 @@ public class PdfReportService : IPdfReportService
                 "You do not have permission to export this member's report.");
 
         return new ReportContext(org, membership, membership.User, null, null);
-    }
-
-    /// <summary>
-    /// Builds the report's display rows (clipped to [dateFrom, dateTo]) whose
-    /// <see cref="DailyReportRow.CumulativeOvertime"/> reflects the member's true,
-    /// never-reset running balance since their very first tracked entry — not just
-    /// a total reset at the start of the requested period. Also returns that overall
-    /// balance as of the end of the period (or "today" if the period is still ongoing,
-    /// since <see cref="DailyReportAggregator.BuildAsync"/> clamps internally).
-    /// </summary>
-    private static async Task<(List<DailyReportRow> Rows, double OverallCumulative)> BuildDisplayRowsAsync(
-        TimeTrackingDbContext context, int userId, int orgId,
-        DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours)
-    {
-        var firstEntry = await context.TimeEntries.AsNoTracking()
-            .Where(e => e.UserId == userId && e.OrganizationId == orgId && !e.IsRunning)
-            .OrderBy(e => e.StartTime)
-            .Select(e => (DateTime?)e.StartTime)
-            .FirstOrDefaultAsync();
-
-        // The balance runs from the first tracked entry: days before someone started tracking
-        // are not "missing" work. Without any entry there is nothing to count yet.
-        if (firstEntry == null)
-            return ([], initialOvertimeHours);
-
-        var timeZone = await context.Organizations.AsNoTracking()
-            .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
-        var loopFrom = OrgClock.For(timeZone).LocalDate(firstEntry.Value);
-
-        var allRows = await DailyReportAggregator.BuildAsync(context, userId, orgId, loopFrom, dateTo, initialOvertimeHours);
-        var displayRows = allRows.Where(r => r.Date >= dateFrom).ToList();
-        var overallCumulative = allRows.Count > 0 ? allRows[^1].CumulativeOvertime : initialOvertimeHours;
-
-        return (displayRows, overallCumulative);
     }
 
     // ────────────────────────────────────────────────────
