@@ -14,6 +14,7 @@
 	import { loadDaysOff as fetchDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
 	import { createEntryEditor } from '$lib/utils/entryEditor.svelte';
 	import { fetchAllPages } from '$lib/utils/pagination';
+	import { dayPress } from '$lib/utils/dayPress';
 	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
 	import EntryRow from '$lib/components/EntryRow.svelte';
 	import RequestModal from '$lib/components/RequestModal.svelte';
@@ -334,16 +335,23 @@
 		selectedDayKey = `${monthPrefix}01`;
 	}
 
-	/** Select a day; the grid opens the absence dialog, the list scrolls to the day details. */
-	async function selectDay(day: CalendarDay, mode: 'dialog' | 'scroll' | 'none') {
+	/** Left click: select the day and bring its details into view (`block`). */
+	async function selectDay(day: CalendarDay, block: ScrollLogicalPosition) {
 		if (!day.isCurrentMonth) return;
+		if (selectedDayKey !== day.key) editor.cancelEditEntry();
 		selectedDayKey = day.key;
-		editor.cancelEditEntry();
-		if (mode === 'dialog' && canAddAbsence) openAbsenceDialog(day.key);
-		if (mode === 'scroll') {
-			await tick();
-			dayDetailsEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-		}
+		await tick();
+		dayDetailsEl?.scrollIntoView({ behavior: 'smooth', block });
+	}
+
+	/** Right click / long press: select the day and open the absence dialog for it. */
+	function dayOpenHandler(day: CalendarDay): (() => void) | undefined {
+		if (!canAddAbsence || !day.isCurrentMonth) return undefined;
+		return () => {
+			if (selectedDayKey !== day.key) editor.cancelEditEntry();
+			selectedDayKey = day.key;
+			openAbsenceDialog(day.key);
+		};
 	}
 
 	function openAbsenceDialog(key: string) {
@@ -593,7 +601,8 @@
 							class="min-h-[72px] p-1.5 border-r border-b border-base-200 [&:nth-child(7n)]:border-r-0 flex flex-col gap-0.5 relative transition-colors text-left {!day.isCurrentMonth ? 'opacity-30' : ''} {day.isWeekend ? 'bg-base-200/30' : ''} {dt.soft} {day.isToday ? 'outline-2 outline-primary -outline-offset-2 rounded' : ''} {day.key === selectedDayKey ? 'ring-2 ring-primary/40 bg-primary/10' : ''}"
 							title={(day.dayTypeLabel || (day.workedMinutes > 0 ? t('calendar.workedValue', { value: formatHours(day.workedMinutes) }) : '')) + (canAddAbsence && day.isCurrentMonth ? (mustRequest ? t('calendar.clickToRequest') : t('calendar.clickToAdd')) : '')}
 							aria-pressed={day.key === selectedDayKey}
-							onclick={() => selectDay(day, 'dialog')}
+							data-day={day.key}
+							use:dayPress={{ onselect: () => selectDay(day, 'nearest'), onopen: dayOpenHandler(day) }}
 							disabled={!day.isCurrentMonth}
 						>
 							<span class="text-xs font-medium {day.isToday ? 'text-primary font-bold' : 'text-base-content/70'}">{day.dayOfMonth}</span>
@@ -628,7 +637,7 @@
 							type="button"
 							class="w-full flex items-center gap-2 px-3 py-2 text-left {dt.soft} {day.isWeekend && !day.dayType ? 'bg-base-200/30' : ''} {day.key === selectedDayKey ? 'ring-2 ring-inset ring-primary/40 bg-primary/10' : ''}"
 							aria-pressed={day.key === selectedDayKey}
-							onclick={() => selectDay(day, 'scroll')}
+							use:dayPress={{ onselect: () => selectDay(day, 'start'), onopen: dayOpenHandler(day) }}
 						>
 							<span class="w-8 text-xs text-base-content/60 shrink-0">{formatDate(day.date, { weekday: 'short' })}</span>
 							<span class="w-6 text-sm tabular-nums shrink-0 {day.isToday ? 'text-primary font-bold' : 'font-medium'}">{day.dayOfMonth}</span>
@@ -651,48 +660,14 @@
 				{/each}
 			</ul>
 
-			<!-- Legend -->
-			<div class="flex gap-4 flex-wrap text-xs text-base-content/60 mb-6">
-				{#if holidayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.holiday.dot}"></span> {t('format.dayType.holiday')}</span>{/if}
-				{#if sickDayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.sick.dot}"></span> {t('format.dayType.sick')}</span>{/if}
-				{#if vacationDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.vacation.dot}"></span> {t('format.dayType.vacation')}</span>{/if}
-				{#if otherAbsenceDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES['other-absence'].dot}"></span> {t('format.dayType.otherAbsence')}</span>{/if}
-				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background: {heatColor(1, 1)}"></span> {t('calendar.targetMet')}</span>
-				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background: {heatColor(1, 2)}"></span> {t('calendar.underTarget')}</span>
-				<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-error"></span> {t('calendar.correctionLegend')}</span>
-			</div>
-
-			<!-- Daily breakdown for month (the agenda list covers this on phones) -->
-			<div class="card bg-base-100 border border-base-300 p-4 hidden sm:flex">
-				<h3 class="text-[0.9375rem] font-bold mb-3 m-0">{t('calendar.dailyBreakdown')}</h3>
-				<div class="flex flex-col gap-1.5">
-					{#each monthDays.filter((d) => d.workedMinutes > 0 || d.targetMinutes > 0 || d.dayType) as day (day.key)}
-						{@const dt = dayTypeClasses(day.dayType)}
-						<button
-							type="button"
-							class="flex items-center gap-2 py-1 px-1.5 rounded text-left transition-colors {dt.soft} {day.isToday ? 'font-semibold' : ''} {day.key === selectedDayKey ? 'ring-2 ring-primary/30 bg-primary/10' : ''}"
-							aria-pressed={day.key === selectedDayKey}
-							onclick={() => selectDay(day, 'none')}
-						>
-							<span class="w-7 text-xs text-base-content/60 shrink-0">{formatDate(day.date, { weekday: 'short' })}</span>
-							<span class="w-5 text-xs text-base-content/40 shrink-0 text-right">{day.dayOfMonth}</span>
-							<span class="w-2 h-2 rounded-full shrink-0 {dt.dot}" title={day.dayTypeLabel || undefined}></span>
-							<div class="flex-1 h-1.5 bg-base-200 rounded-full overflow-hidden">
-								<div class="h-full {day.workedMinutes > day.targetMinutes && day.targetMinutes > 0 ? 'bg-success' : 'bg-primary'} rounded-full transition-all duration-300" style="width: {barWidth(day.workedMinutes, day.targetMinutes)}%"></div>
-							</div>
-							<span class="text-xs text-base-content/70 min-w-[36px] text-right">{formatHours(day.workedMinutes)}</span>
-							{#if day.targetMinutes > 0}
-								<span class="text-xs text-base-content/40">/ {formatHours(day.targetMinutes)}</span>
-							{/if}
-						</button>
-					{/each}
-				</div>
-			</div>
+			<p class="text-xs text-base-content/50 -mt-3 mb-4">
+				{t('calendar.hintSelect')}{#if canAddAbsence}{' · '}{t('calendar.hintOpen')}{/if}
+			</p>
 
 			{#if selectedDay}
 				{@const dayDetails = selectedDay}
 				{@const showUnderTarget = isPastOrToday(dayDetails.date) && dayDetails.targetMinutes > 0 && dayDetails.delta < 0}
-				<section bind:this={dayDetailsEl} class="card bg-base-100 border border-base-300 p-4 mt-4 scroll-mt-20" aria-label={t('calendar.dayDetails')}>
+				<section bind:this={dayDetailsEl} class="card bg-base-100 border border-base-300 p-4 mb-5 scroll-mt-20" aria-label={t('calendar.dayDetails')} data-testid="day-details">
 					<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
 						<div>
 							<h3 class="text-[0.9375rem] font-bold m-0">{t('calendar.dayDetails')}</h3>
@@ -731,6 +706,45 @@
 					{/if}
 				</section>
 			{/if}
+
+			<!-- Legend -->
+			<div class="flex gap-4 flex-wrap text-xs text-base-content/60 mb-6">
+				{#if holidayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.holiday.dot}"></span> {t('format.dayType.holiday')}</span>{/if}
+				{#if sickDayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.sick.dot}"></span> {t('format.dayType.sick')}</span>{/if}
+				{#if vacationDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.vacation.dot}"></span> {t('format.dayType.vacation')}</span>{/if}
+				{#if otherAbsenceDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES['other-absence'].dot}"></span> {t('format.dayType.otherAbsence')}</span>{/if}
+				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background: {heatColor(1, 1)}"></span> {t('calendar.targetMet')}</span>
+				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background: {heatColor(1, 2)}"></span> {t('calendar.underTarget')}</span>
+				<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-error"></span> {t('calendar.correctionLegend')}</span>
+			</div>
+
+			<!-- Daily breakdown for month (the agenda list covers this on phones) -->
+			<div class="card bg-base-100 border border-base-300 p-4 hidden sm:flex">
+				<h3 class="text-[0.9375rem] font-bold mb-3 m-0">{t('calendar.dailyBreakdown')}</h3>
+				<div class="flex flex-col gap-1.5">
+					{#each monthDays.filter((d) => d.workedMinutes > 0 || d.targetMinutes > 0 || d.dayType) as day (day.key)}
+						{@const dt = dayTypeClasses(day.dayType)}
+						<button
+							type="button"
+							class="flex items-center gap-2 py-1 px-1.5 rounded text-left transition-colors {dt.soft} {day.isToday ? 'font-semibold' : ''} {day.key === selectedDayKey ? 'ring-2 ring-primary/30 bg-primary/10' : ''}"
+							aria-pressed={day.key === selectedDayKey}
+							use:dayPress={{ onselect: () => selectDay(day, 'start'), onopen: dayOpenHandler(day) }}
+						>
+							<span class="w-7 text-xs text-base-content/60 shrink-0">{formatDate(day.date, { weekday: 'short' })}</span>
+							<span class="w-5 text-xs text-base-content/40 shrink-0 text-right">{day.dayOfMonth}</span>
+							<span class="w-2 h-2 rounded-full shrink-0 {dt.dot}" title={day.dayTypeLabel || undefined}></span>
+							<div class="flex-1 h-1.5 bg-base-200 rounded-full overflow-hidden">
+								<div class="h-full {day.workedMinutes > day.targetMinutes && day.targetMinutes > 0 ? 'bg-success' : 'bg-primary'} rounded-full transition-all duration-300" style="width: {barWidth(day.workedMinutes, day.targetMinutes)}%"></div>
+							</div>
+							<span class="text-xs text-base-content/70 min-w-[36px] text-right">{formatHours(day.workedMinutes)}</span>
+							{#if day.targetMinutes > 0}
+								<span class="text-xs text-base-content/40">/ {formatHours(day.targetMinutes)}</span>
+							{/if}
+						</button>
+					{/each}
+				</div>
+			</div>
+
 
 			<AbsenceDialog
 				open={showAbsenceDialog}

@@ -9,9 +9,9 @@ export const de = {
 	loadHolidaysFailed: 'Feiertage konnten nicht geladen werden.',
 	loadFailed: 'Abwesenheiten konnten nicht geladen werden.',
 	intro: {
-		admin: 'Kalenderübersicht der Abwesenheiten und Urlaubstage aller Mitglieder. Einen Tag anklicken, um eine Abwesenheit einzutragen.',
-		request: 'Kalenderübersicht der für dich sichtbaren Abwesenheiten. Einen Tag anklicken, um eine Abwesenheit zu beantragen – ein Gruppen- oder Organisations-Admin genehmigt sie.',
-		self: 'Kalenderübersicht der für dich sichtbaren Abwesenheiten. Einen Tag anklicken, um eine eigene Abwesenheit einzutragen.',
+		admin: 'Kalenderübersicht der Abwesenheiten und Urlaubstage aller Mitglieder. Rechtsklick auf einen Tag (oder lange drücken), um eine Abwesenheit einzutragen.',
+		request: 'Kalenderübersicht der für dich sichtbaren Abwesenheiten. Rechtsklick auf einen Tag (oder lange drücken), um eine Abwesenheit zu beantragen – ein Gruppen- oder Organisations-Admin genehmigt sie.',
+		self: 'Kalenderübersicht der für dich sichtbaren Abwesenheiten. Rechtsklick auf einen Tag (oder lange drücken), um eine eigene Abwesenheit einzutragen.',
 		readOnly: 'Kalenderübersicht der für dich sichtbaren Abwesenheiten.'
 	},
 	deleteTitle: 'Abwesenheit löschen?',
@@ -28,8 +28,8 @@ export const de = {
 	youSuffix: ' (du)',
 	requestAbsence: 'Abwesenheit beantragen',
 	addAbsence: 'Abwesenheit eintragen',
-	cellLabel: '{action}: {date}',
 	emptyMonth: 'Keine Abwesenheiten oder Feiertage in diesem Monat.',
+	emptyDay: 'An diesem Tag ist niemand abwesend.',
 	halfDay: 'Halber Tag',
 	days: { one: '1 Tag', other: '{count} Tage' },
 	legend: {
@@ -100,9 +100,9 @@ export const en: typeof de = {
 	loadHolidaysFailed: 'Could not load holidays.',
 	loadFailed: 'Could not load absences.',
 	intro: {
-		admin: 'Calendar overview of absences and vacation days across all members. Click a day to add an absence.',
-		request: 'Calendar overview of absences visible to you. Click a day to request an absence – a group or org admin approves it.',
-		self: 'Calendar overview of absences visible to you. Click a day to add your own absence.',
+		admin: 'Calendar overview of absences and vacation days across all members. Right-click (or long-press) a day to add an absence.',
+		request: 'Calendar overview of absences visible to you. Right-click (or long-press) a day to request an absence – a group or org admin approves it.',
+		self: 'Calendar overview of absences visible to you. Right-click (or long-press) a day to add your own absence.',
 		readOnly: 'Calendar overview of absences visible to you.'
 	},
 	deleteTitle: 'Delete absence?',
@@ -119,8 +119,8 @@ export const en: typeof de = {
 	youSuffix: ' (you)',
 	requestAbsence: 'Request absence',
 	addAbsence: 'Add absence',
-	cellLabel: '{action}: {date}',
 	emptyMonth: 'No absences or holidays this month.',
+	emptyDay: 'Nobody is absent on this day.',
 	halfDay: 'Half day',
 	days: { one: '1 day', other: '{count} days' },
 	legend: {

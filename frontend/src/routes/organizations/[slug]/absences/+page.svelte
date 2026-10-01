@@ -6,7 +6,8 @@
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { organizationsApi, holidayApi, absenceDayApi, groupApi } from '$lib/apiClient';
 	import { t, tp } from '$lib/i18n';
-	import { absenceTypeLabel, dayNamesShort, formatDate, formatDateShort, formatNumber, getInitials } from '$lib/utils/formatters';
+	import { absenceTypeLabel, dayNamesShort, formatDate, formatDateFull, formatDateShort, formatNumber, getInitials } from '$lib/utils/formatters';
+	import { dayPress } from '$lib/utils/dayPress';
 	import { dateKey, expandHolidays } from '$lib/utils/dateHelpers';
 	import { fetchAllPages } from '$lib/utils/pagination';
 	import { DAY_TYPE_CLASSES, dayTypeClasses, personChipStyle, personDotStyle, tintStyle } from '$lib/utils/colors';
@@ -54,7 +55,8 @@
 	let selectedListYear = $state(new Date().getFullYear());
 	let deletingSpan = $state<string | null>(null);
 
-	// Day-click add-absence dialog
+	// Left click selects a day (panel below the calendar), right click / long press opens the dialog
+	let selectedDayKey = $state(dateKey(new Date()));
 	let showDayDialog = $state(false);
 	let dayDialogDate = $state('');
 
@@ -220,8 +222,13 @@
 	}
 
 	function openDayDialog(key: string) {
+		selectedDayKey = key;
 		dayDialogDate = key;
 		showDayDialog = true;
+	}
+
+	function dayHandlers(key: string) {
+		return { onselect: () => (selectedDayKey = key), onopen: canOpenDayDialog ? () => openDayDialog(key) : undefined };
 	}
 
 	/** Mobile "add" button: today in the current month, otherwise the 1st of the visible month. */
@@ -421,6 +428,18 @@
 		return items.sort((a, b) => a.date.localeCompare(b.date));
 	});
 
+	/** The selected day's holidays and the visible members' absences (only while it is in the shown month). */
+	let selectedDay = $derived.by(() => {
+		if (selectedDayKey < monthStart || selectedDayKey > monthEnd) return null;
+		return {
+			key: selectedDayKey,
+			holidays: holidayMap.get(selectedDayKey) ?? [],
+			absences: calendarAbsences
+				.filter((a) => a.date === selectedDayKey)
+				.sort((a, b) => `${a.userFirstName} ${a.userLastName}`.localeCompare(`${b.userFirstName} ${b.userLastName}`))
+		};
+	});
+
 	let dayNames = $derived(dayNamesShort());
 	let today = dateKey(new Date());
 </script>
@@ -513,15 +532,18 @@
 					<ul class="flex flex-col gap-1.5">
 						{#each agenda as item (item.kind === 'holiday' ? `h${item.holiday.id}-${item.date}` : `a${spanKey(item.span)}`)}
 							{#if item.kind === 'holiday'}
-								<li class="flex items-center gap-2 p-2.5 rounded-lg border border-base-300 text-sm {DAY_TYPE_CLASSES.holiday.soft}">
+								<li><button type="button" use:dayPress={dayHandlers(item.date)} aria-pressed={item.date === selectedDayKey} class="w-full text-left flex items-center gap-2 p-2.5 rounded-lg border border-base-300 text-sm {DAY_TYPE_CLASSES.holiday.soft} {item.date === selectedDayKey ? 'ring-2 ring-primary/40' : ''}">
 									<span class="w-2.5 h-2.5 rounded-full shrink-0 {DAY_TYPE_CLASSES.holiday.dot}" aria-hidden="true"></span>
 									<span class="text-base-content/60 shrink-0">{formatDate(item.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
 									<span class="font-medium truncate">{item.holiday.name}</span>
 									{#if item.holiday.isHalfDay}<span class="badge badge-xs badge-outline" title={t('absences.halfDay')}>½</span>{/if}
-								</li>
+								</button></li>
 							{:else}
 								{@const span = item.span}
-								<li class="flex flex-col gap-1 p-2.5 bg-base-100 rounded-lg border border-base-300 text-sm">
+								{@const pressed = selectedDayKey >= span.startDate && selectedDayKey <= span.endDate}
+								<!-- A span selects its first day in this month; the member link inside keeps working -->
+								<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+								<li class="flex flex-col gap-1 p-2.5 bg-base-100 rounded-lg border border-base-300 text-sm cursor-pointer {pressed ? 'ring-2 ring-primary/40' : ''}" use:dayPress={dayHandlers(span.startDate < monthStart ? monthStart : span.startDate)}>
 									<div class="flex items-center justify-between gap-2">
 										<span class="text-base-content/60">
 											{span.days === 1
@@ -566,16 +588,18 @@
 								{@const key = dateKey(date)}
 								{@const isToday = key === today}
 								{@const isWeekend = date.getDay() === 0 || date.getDay() === 6}
-								{@const clickable = canOpenDayDialog && inMonth}
-								<!-- role is "button" whenever the cell is focusable -->
-								<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+								{@const selected = inMonth && key === selectedDayKey}
+								<!-- In-month cells are buttons (a div: they contain member links); Enter/Space select, the context menu key opens the dialog -->
+								<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_static_element_interactions -->
 								<div
-									class="min-h-[60px] p-1 pt-1.5 pb-3 flex flex-col transition-colors {clickable ? 'cursor-pointer hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary' : ''} {inMonth && !isWeekend ? 'bg-base-100' : ''} {inMonth && isWeekend ? 'bg-base-200/40' : ''} {!inMonth ? 'bg-base-200/70' : ''}"
-									role={clickable ? 'button' : undefined}
-									tabindex={clickable ? 0 : undefined}
-									aria-label={clickable ? t('absences.cellLabel', { action: mustRequest ? t('absences.requestAbsence') : t('absences.addAbsence'), date: formatDate(date) }) : undefined}
-									onclick={() => { if (clickable) openDayDialog(key); }}
-									onkeydown={(e) => { if (clickable && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDayDialog(key); } }}
+									class="min-h-[60px] p-1 pt-1.5 pb-3 flex flex-col transition-colors {inMonth ? 'cursor-pointer hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary' : ''} {inMonth && !isWeekend && !selected ? 'bg-base-100' : ''} {inMonth && isWeekend && !selected ? 'bg-base-200/40' : ''} {!inMonth ? 'bg-base-200/70' : ''} {selected ? 'ring-2 ring-inset ring-primary/50 bg-primary/10' : ''}"
+									role={inMonth ? 'button' : undefined}
+									tabindex={inMonth ? 0 : undefined}
+									aria-label={inMonth ? formatDate(date) : undefined}
+									aria-pressed={inMonth ? selected : undefined}
+									data-day={inMonth ? key : undefined}
+									use:dayPress={inMonth ? dayHandlers(key) : { onselect: () => {} }}
+									onkeydown={(e) => { if (inMonth && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selectedDayKey = key; } }}
 								>
 									<div class="flex items-center justify-between mb-1.5">
 										<span class="text-[10px] font-medium leading-none {isToday ? 'bg-primary text-primary-content rounded-full w-5 h-5 flex items-center justify-center' : ''} {!inMonth ? 'text-base-content/30' : isWeekend ? 'text-base-content/50' : 'text-base-content'}">
@@ -634,6 +658,52 @@
 					{/each}
 				</div>
 			</div>
+
+			<p class="text-xs text-base-content/50 mt-2 mb-0">
+				{t('calendar.hintSelect')}{#if canOpenDayDialog}{' · '}{t('calendar.hintOpen')}{/if}
+			</p>
+
+			{#if selectedDay}
+				<section class="card bg-base-100 border border-base-300 p-4 mt-3" aria-label={t('calendar.dayDetails')} data-testid="day-details">
+					<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+						<div>
+							<h3 class="text-[0.9375rem] font-bold m-0">{t('calendar.dayDetails')}</h3>
+							<span class="text-sm text-base-content/70">{formatDateFull(selectedDay.key)}</span>
+						</div>
+						{#if canOpenDayDialog}
+							<button type="button" class="btn btn-outline btn-sm" onclick={() => openDayDialog(selectedDay.key)}>{mustRequest ? t('absences.requestAbsence') : t('absences.addAbsence')}</button>
+						{/if}
+					</div>
+					{#if selectedDay.holidays.length > 0}
+						<div class="flex flex-wrap gap-2 mb-2">
+							{#each selectedDay.holidays as h (h.id)}
+								<span class="badge {DAY_TYPE_CLASSES.holiday.badge}">{h.name}{h.isHalfDay ? ' ½' : ''}</span>
+							{/each}
+						</div>
+					{/if}
+					{#if selectedDay.absences.length === 0}
+						<p class="text-sm text-base-content/60 m-0">{t('absences.emptyDay')}</p>
+					{:else}
+						<ul class="flex flex-col gap-1.5">
+							{#each selectedDay.absences as a (a.id)}
+								<li class="flex items-center gap-x-3 gap-y-1 p-2 rounded-lg border border-base-300 bg-base-200/40 text-sm flex-wrap">
+									<span class="flex items-center gap-1.5 font-medium">
+										<span class="w-2.5 h-2.5 rounded-full shrink-0" style={personDotStyle(a.userId ?? 0)} aria-hidden="true"></span>
+										{#if canEdit}
+											<a href="/organizations/{orgSlug}/members/{a.userId}" class="link link-hover">{a.userFirstName} {a.userLastName}</a>
+										{:else}
+											{a.userFirstName} {a.userLastName}
+										{/if}
+									</span>
+									<AbsenceTypeBadge type={a.type ?? ''} customTypeName={a.customTypeName} customTypeColor={a.customTypeColor} size="xs" />
+									{#if a.isHalfDay}<span class="badge badge-xs badge-outline" title={t('absences.halfDay')}>½</span>{/if}
+									{#if a.note}<span class="text-xs text-base-content/50 truncate min-w-0 flex-1">{a.note}</span>{/if}
+								</li>
+							{/each}
+						</ul>
+					{/if}
+				</section>
+			{/if}
 
 			<!-- Legend -->
 			<div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-base-content/60">
