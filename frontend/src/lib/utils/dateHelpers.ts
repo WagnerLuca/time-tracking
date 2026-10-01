@@ -68,3 +68,36 @@ export function sumMinutes(entries: Array<{ isRunning?: boolean; netDurationMinu
 		.filter(e => !e.isRunning && (e.netDurationMinutes ?? e.durationMinutes))
 		.reduce((s, e) => s + (e.netDurationMinutes ?? e.durationMinutes ?? 0), 0);
 }
+
+/**
+ * The date ('YYYY-MM-DD') a holiday falls on in `year`, mirroring the backend's
+ * `Holiday.DateIn`: a one-off holiday only in its own year, a recurring one every
+ * year on the same month/day (Feb 29 only in leap years).
+ */
+export function holidayDateIn(h: { date?: string | null; isRecurring?: boolean }, year: number): string | null {
+	if (!h.date) return null;
+	if (!h.isRecurring) return h.date.startsWith(`${year}-`) ? h.date : null;
+	const monthDay = h.date.substring(5);
+	const isLeap = new Date(year, 1, 29).getMonth() === 1;
+	if (monthDay === '02-29' && !isLeap) return null;
+	return `${year}-${monthDay}`;
+}
+
+/** Every occurrence of the given holidays in the years `fromYear`…`toYear`, as date → holidays on it. */
+export function expandHolidays<T extends { date?: string | null; isRecurring?: boolean }>(
+	holidays: T[],
+	fromYear: number,
+	toYear: number
+): Map<string, T[]> {
+	const map = new Map<string, T[]>();
+	for (let year = fromYear; year <= toYear; year++) {
+		for (const h of holidays) {
+			const key = holidayDateIn(h, year);
+			if (!key) continue;
+			const list = map.get(key) ?? [];
+			list.push(h);
+			map.set(key, list);
+		}
+	}
+	return map;
+}

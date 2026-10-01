@@ -1,6 +1,8 @@
 import { holidayApi, absenceDayApi } from '$lib/apiClient';
 import { toast } from '$lib/stores/toast.svelte';
 import { t } from '$lib/i18n';
+import { dateKey, expandHolidays } from '$lib/utils/dateHelpers';
+import { fetchAllPages } from '$lib/utils/pagination';
 
 export interface DaysOffData {
 	daysOffSet: Set<string>;
@@ -33,13 +35,21 @@ export function emptyDaysOff(): DaysOffData {
 	};
 }
 
-export async function loadDaysOff(orgSlug: string | null | undefined, userId?: number): Promise<DaysOffData> {
+/**
+ * Holidays and absences between `from` and `to` (inclusive, local days). Recurring
+ * holidays are expanded into every year of the range; absences are paged through,
+ * so the API's 200-item cap never hides any.
+ */
+export async function loadDaysOff(orgSlug: string | null | undefined, userId: number | undefined, from: Date, to: Date): Promise<DaysOffData> {
 	if (!orgSlug) return emptyDaysOff();
 
 	try {
-		const [holRes, absRes] = await Promise.all([
+		const fromKey = dateKey(from);
+		const toKey = dateKey(to);
+		const [holRes, absences] = await Promise.all([
 			holidayApi.apiV1OrganizationsSlugHolidaysGet(orgSlug),
-			absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, userId, undefined, undefined, 200)
+			fetchAllPages((limit, offset) =>
+				absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, userId, fromKey, toKey, limit, offset).then((r) => r.data))
 		]);
 
 		const result = emptyDaysOff();
@@ -48,15 +58,13 @@ export async function loadDaysOff(orgSlug: string | null | undefined, userId?: n
 			otherAbsenceDates, halfDayAbsences, customTypeDates, customNoCreditDates, customTopUpDates
 		} = result;
 
-		for (const h of holRes.data) {
-			if (h.date) {
-				daysOffSet.add(h.date);
-				holidayDates.set(h.date, h.name ?? ''); // '' → getDayTypeLabel() shows the localized "Holiday"
-				if (h.isHalfDay) halfDayHolidays.add(h.date);
-			}
+		for (const [date, list] of expandHolidays(holRes.data, from.getFullYear(), to.getFullYear())) {
+			if (date < fromKey || date > toKey) continue;
+			daysOffSet.add(date);
+			holidayDates.set(date, list[0].name ?? ''); // '' → getDayTypeLabel() shows the localized "Holiday"
+			if (list.every((h) => h.isHalfDay)) halfDayHolidays.add(date);
 		}
 
-		const absences = absRes.data.items ?? [];
 		for (const a of absences) {
 			if (!a.date) continue;
 			daysOffSet.add(a.date);

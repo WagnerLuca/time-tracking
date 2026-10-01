@@ -9,7 +9,8 @@
 	import { formatHours, formatDelta, formatClock, barWidth, getMonthName, dayNamesShort } from '$lib/utils/formatters';
 	import { isToday, isFuture, sumMinutes, dateKey } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, getTargetForRange } from '$lib/utils/scheduleHelpers';
-	import { WEEKLY_ENTRY_LIMIT, MONTHLY_ENTRY_LIMIT } from '$lib/utils/constants';
+	import { WEEKLY_ENTRY_LIMIT } from '$lib/utils/constants';
+	import { fetchAllPages } from '$lib/utils/pagination';
 	import { balanceToMinutes } from '$lib/utils/balance';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { dayTypeClasses } from '$lib/utils/colors';
@@ -85,11 +86,11 @@
 
 			const orgId = orgContext.selectedOrgId ?? undefined;
 			const userId = auth.user?.id;
-			const [schedule, off, weekRes, monthRes, balanceRes] = await Promise.all([
+			const [schedule, off, weekRes, monthEntries, balanceRes] = await Promise.all([
 				slug ? workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(slug).then((r) => r.data) : Promise.resolve(null),
-				loadDaysOff(slug, auth.user?.id),
+				loadDaysOff(slug, auth.user?.id, weekStart < monthStart ? weekStart : monthStart, weekEnd > monthEnd ? weekEnd : monthEnd),
 				timeTrackingApi.apiV1TimeTrackingGet(orgId, weekStart.toISOString(), weekEnd.toISOString(), WEEKLY_ENTRY_LIMIT),
-				timeTrackingApi.apiV1TimeTrackingGet(orgId, monthStart.toISOString(), monthEnd.toISOString(), MONTHLY_ENTRY_LIMIT),
+				fetchAllPages((limit, offset) => timeTrackingApi.apiV1TimeTrackingGet(orgId, monthStart.toISOString(), monthEnd.toISOString(), limit, offset).then((r) => r.data)),
 				slug && userId ? reportsApi.apiV1OrganizationsSlugMembersMemberIdBalanceGet(slug, userId).then((r) => balanceToMinutes(r.data)) : Promise.resolve(null)
 			]);
 			workSchedule = schedule;
@@ -102,7 +103,6 @@
 			};
 
 			const weekEntries = weekRes.data.items ?? [];
-			const monthEntries = monthRes.data.items ?? [];
 
 			const dayNames = dayNamesShort();
 			const weekDays: Stats['weekDays'] = dayNames.map((label, i) => {

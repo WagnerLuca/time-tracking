@@ -135,7 +135,7 @@
 			workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(slug),
 			organizationsApi.apiV1OrganizationsSlugGet(slug),
 			groupApi.apiV1OrganizationsSlugEffectivePermissionsGet(slug),
-			loadDaysOff(slug, auth.user?.id)
+			loadDaysOffFor(slug)
 		]);
 		workSchedule = ws.status === 'fulfilled' ? ws.value.data : null;
 		orgDetail = od.status === 'fulfilled' ? od.value.data : null;
@@ -203,6 +203,17 @@
 	function changeWeek(dir: number) {
 		weekOffset += dir;
 		loadWeek();
+		// Holidays/absences are loaded per year; fetch the older year once a week reaches into it
+		if (selectedSlug && weekRange.start.getFullYear() < daysOffFromYear) {
+			loadDaysOffFor(selectedSlug).then((off) => (daysOff = off)).catch(() => {});
+		}
+	}
+
+	/** First year covered by `daysOff` (from Jan 1 of the shown week's year up to the end of this year). */
+	let daysOffFromYear = $state(new Date().getFullYear());
+	function loadDaysOffFor(slug: string) {
+		daysOffFromYear = weekRange.start.getFullYear();
+		return loadDaysOff(slug, auth.user?.id, new Date(daysOffFromYear, 0, 1), new Date(new Date().getFullYear(), 11, 31));
 	}
 
 	// Shared entry editing + request logic

@@ -7,7 +7,8 @@
 	import { organizationsApi, holidayApi, absenceDayApi, groupApi } from '$lib/apiClient';
 	import { t, tp } from '$lib/i18n';
 	import { absenceTypeLabel, dayNamesShort, formatDate, formatDateShort, formatNumber, getInitials } from '$lib/utils/formatters';
-	import { dateKey } from '$lib/utils/dateHelpers';
+	import { dateKey, expandHolidays } from '$lib/utils/dateHelpers';
+	import { fetchAllPages } from '$lib/utils/pagination';
 	import { DAY_TYPE_CLASSES, dayTypeClasses, personChipStyle, personDotStyle, tintStyle } from '$lib/utils/colors';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
 	import AbsenceDialog from '$lib/components/AbsenceDialog.svelte';
@@ -70,11 +71,12 @@
 	async function loadOrg() {
 		loading = true;
 		error = '';
+		absences = [];
+		loadedYears = null;
 		try {
 			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
-			org = data;
+			org = data; // → the effect below loads the absences
 			loadHolidays();
-			loadAbsences();
 			loadEffectivePermissions();
 			loadAbsenceTypes();
 		} catch (err) {
@@ -124,17 +126,42 @@
 		}
 	}
 
-	async function loadAbsences() {
+	/**
+	 * Absences are loaded for a range of years — the calendar's and the list's year —
+	 * and paged through, so the API's 200-item cap never hides the newest ones.
+	 */
+	interface YearRange { from: number; to: number }
+	let loadedYears = $state<YearRange | null>(null);
+	let absencesRequest = 0;
+	const neededYears = $derived<YearRange>({ from: Math.min(calendarYear, selectedListYear), to: Math.max(calendarYear, selectedListYear) });
+
+	$effect(() => {
+		const years = neededYears;
+		if (!org) return;
+		untrack(() => {
+			if (!loadedYears || years.from < loadedYears.from || years.to > loadedYears.to) loadAbsences(years);
+		});
+	});
+
+	async function loadAbsences(years: YearRange = loadedYears ?? neededYears) {
+		const request = ++absencesRequest;
 		absencesLoading = true;
 		absencesError = '';
+		// A few days either side: the month grid shows the neighbouring years' first/last week
+		const from = `${years.from - 1}-12-25`;
+		const to = `${years.to + 1}-01-07`;
 		try {
-			const { data } = await absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, undefined, undefined, undefined, 200);
-			absences = [...(data.items ?? [])].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+			const items = await fetchAllPages((limit, offset) =>
+				absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, undefined, from, to, limit, offset).then((r) => r.data));
+			if (request !== absencesRequest) return;
+			absences = items.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
+			loadedYears = years;
 		} catch (err) {
+			if (request !== absencesRequest) return;
 			absences = [];
 			absencesError = extractErrorMessage(err, t('absences.loadFailed'));
 		} finally {
-			absencesLoading = false;
+			if (request === absencesRequest) absencesLoading = false;
 		}
 	}
 
@@ -179,18 +206,6 @@
 			days.push({ date: new Date(year, month + 1, days.length - last.getDate() - startDay + 1), inMonth: false });
 		}
 		return days;
-	}
-
-	function buildHolidayMap(holidayList: HolidayResponse[]): Map<string, HolidayResponse[]> {
-		const map = new Map<string, HolidayResponse[]>();
-		for (const h of holidayList) {
-			if (!h.date) continue;
-			// Recurring holidays repeat in the visible calendar year
-			const key = h.isRecurring ? `${calendarYear}-${h.date.substring(5)}` : h.date;
-			if (!map.has(key)) map.set(key, []);
-			map.get(key)!.push(h);
-		}
-		return map;
 	}
 
 	function navigateMonth(delta: number) {
@@ -363,9 +378,10 @@
 		return (spanMap.get(dayKey) ?? []).find((e) => e.span.userId === lane.userId) ?? null;
 	}
 
+	/** Next year back to five years ago (absences are loaded per selected year, so not derived from them). */
 	function getAvailableAbsenceYears(): number[] {
-		const years = new Set(absences.map((a) => parseInt((a.date ?? '').substring(0, 4))).filter((y) => !isNaN(y)));
-		years.add(new Date().getFullYear());
+		const now = new Date().getFullYear();
+		const years = new Set([selectedListYear, ...Array.from({ length: 7 }, (_, i) => now + 1 - i)]);
 		return [...years].sort((a, b) => b - a);
 	}
 
@@ -388,7 +404,8 @@
 	let calendarAbsences = $derived(calendarUserFilter === null ? absences : absences.filter((a) => a.userId === calendarUserFilter));
 	let calendarSpans = $derived(buildAbsenceSpans(calendarAbsences));
 	let spanMap = $derived(buildSpanMap(calendarSpans, calendarAbsences));
-	let holidayMap = $derived(buildHolidayMap(holidays));
+	// Recurring holidays repeat every year; ±1 year for the grid's overflow days
+	let holidayMap = $derived(expandHolidays(holidays, calendarYear - 1, calendarYear + 1));
 	let monthStart = $derived(dateKey(new Date(calendarYear, calendarMonth, 1)));
 	let monthEnd = $derived(dateKey(new Date(calendarYear, calendarMonth + 1, 0)));
 
@@ -443,7 +460,7 @@
 		{#if absencesError}
 			<div class="alert alert-error text-sm mb-4" role="alert">
 				<span>{absencesError}</span>
-				<button class="btn btn-sm" onclick={loadAbsences}>{t('common.retry')}</button>
+				<button class="btn btn-sm" onclick={() => loadAbsences()}>{t('common.retry')}</button>
 			</div>
 		{/if}
 

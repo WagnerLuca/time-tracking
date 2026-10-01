@@ -13,6 +13,7 @@
 	import { isOrgAdmin, canEditEntries, canRequestEditEntries, canEditPause, canRequestEditPause } from '$lib/utils/orgRules';
 	import { loadDaysOff as fetchDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
 	import { createEntryEditor } from '$lib/utils/entryEditor.svelte';
+	import { fetchAllPages } from '$lib/utils/pagination';
 	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
 	import EntryRow from '$lib/components/EntryRow.svelte';
 	import RequestModal from '$lib/components/RequestModal.svelte';
@@ -161,16 +162,13 @@
 		return `${year}-${String(month1).padStart(2, '0')}`;
 	}
 
-	async function fetchEntriesRange(from: Date, to: Date, limit: number): Promise<TimeEntryResponse[]> {
+	async function fetchEntriesRange(from: Date, to: Date): Promise<TimeEntryResponse[]> {
 		try {
-			if (isSelf) {
-				const { data } = await timeTrackingApi.apiV1TimeTrackingGet(
-					orgId ?? undefined, from.toISOString(), to.toISOString(), limit);
-				return data.items ?? [];
-			}
-			const { data } = await organizationsApi.apiV1OrganizationsSlugMemberEntriesMemberIdGet(
-				orgSlug, userId, from.toISOString(), to.toISOString(), limit);
-			return data.items ?? [];
+			return await fetchAllPages((limit, offset) =>
+				(isSelf
+					? timeTrackingApi.apiV1TimeTrackingGet(orgId ?? undefined, from.toISOString(), to.toISOString(), limit, offset)
+					: organizationsApi.apiV1OrganizationsSlugMemberEntriesMemberIdGet(orgSlug, userId, from.toISOString(), to.toISOString(), limit, offset)
+				).then((r) => r.data));
 		} catch (err) {
 			loadError = extractErrorMessage(err, t('calendar.loadEntriesFailed'));
 			return [];
@@ -181,10 +179,10 @@
 		loading = true;
 		loadError = '';
 		await Promise.all([
+			loadDaysOff(), // first: marks the year as loaded, so loadEntries doesn't fetch it again
 			loadEntries(),
 			loadWorkSchedule(),
 			loadOrgDetail(),
-			loadDaysOff(),
 			loadSchedulePeriods(),
 			loadAbsenceTypes(),
 			loadEffectivePermissions(),
@@ -208,7 +206,8 @@
 	async function loadEntries() {
 		const from = new Date(currentYear, currentMonth, 1);
 		const to = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
-		entries = await fetchEntriesRange(from, to, 5000);
+		if (daysOffYear !== currentYear) loadDaysOff();
+		entries = await fetchEntriesRange(from, to);
 		ensureSelectedDayForCurrentMonth();
 	}
 
@@ -216,7 +215,8 @@
 		yearLoading = true;
 		const from = new Date(currentYear, 0, 1);
 		const to = new Date(currentYear, 11, 31, 23, 59, 59, 999);
-		yearEntries = await fetchEntriesRange(from, to, 50000);
+		if (daysOffYear !== currentYear) loadDaysOff();
+		yearEntries = await fetchEntriesRange(from, to);
 		yearLoading = false;
 	}
 
@@ -244,8 +244,12 @@
 		}
 	}
 
+	/** Holidays/absences are loaded for the shown year (month and year view never leave it). */
+	let daysOffYear = $state<number | null>(null);
 	async function loadDaysOff() {
-		daysOff = await fetchDaysOff(orgSlug, userId);
+		const year = (daysOffYear = currentYear);
+		const data = await fetchDaysOff(orgSlug, userId, new Date(year, 0, 1), new Date(year, 11, 31));
+		if (year === currentYear) daysOff = data; // ignore a slow response for a year already left
 	}
 
 	async function loadAbsenceTypes() {

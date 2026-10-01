@@ -7,6 +7,7 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { t } from '$lib/i18n';
 	import { getWeekRange } from '$lib/utils/dateHelpers';
+	import { fetchAllPages } from '$lib/utils/pagination';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 
 	const orgSlug = $derived(page.params.slug ?? '');
@@ -82,8 +83,8 @@
 		try {
 			const from = weekRange.start.toISOString();
 			const to = weekRange.end.toISOString();
-			const { data } = await organizationsApi.apiV1OrganizationsSlugMemberEntriesMemberIdGet(orgSlug, userId, from, to);
-			memberEntries = data.items ?? [];
+			memberEntries = await fetchAllPages((limit, offset) =>
+				organizationsApi.apiV1OrganizationsSlugMemberEntriesMemberIdGet(orgSlug, userId, from, to, limit, offset).then((r) => r.data));
 		} catch (err) {
 			memberEntries = [];
 			entriesError = extractErrorMessage(err, t('timeOverview.entriesFailed'));

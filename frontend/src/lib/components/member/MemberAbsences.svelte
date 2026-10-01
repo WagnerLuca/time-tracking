@@ -7,6 +7,7 @@
 	import { absenceTypeClasses } from '$lib/utils/colors';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
+	import { fetchAllPages } from '$lib/utils/pagination';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { t } from '$lib/i18n';
@@ -50,8 +51,9 @@
 		loading = true;
 		loadError = '';
 		try {
-			const { data } = await absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, userId, undefined, undefined, 500);
-			absences = (data.items ?? []).filter((a) => a.userId === userId);
+			const all = await fetchAllPages((limit, offset) =>
+				absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, userId, undefined, undefined, limit, offset).then((r) => r.data));
+			absences = all.filter((a) => a.userId === userId);
 		} catch (err) {
 			loadError = extractErrorMessage(err, t('memberDetail.absences.loadFailed'));
 		} finally {
