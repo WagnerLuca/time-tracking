@@ -20,6 +20,8 @@
 	import { t, tp } from '$lib/i18n';
 	import type * as ExportMessages from '$lib/i18n/messages/export';
 	import Modal from '$lib/components/Modal.svelte';
+	import { locale } from '$lib/stores/locale.svelte';
+	import { downloadBlob } from '$lib/utils/download';
 
 	// ── Tab state ──
 	let activeTab = $state<'export' | 'import' | 'report'>('export');
@@ -200,7 +202,8 @@
 				targetUserId: targetUserId ?? undefined,
 				from: from ? new Date(from).toISOString() : undefined,
 				to: to ? new Date(to).toISOString() : undefined,
-				columns
+				columns,
+				lang: locale.current
 			};
 
 			const response = await exportImportApi.apiV1ExportImportExportPost(request, {
@@ -359,15 +362,6 @@
 		return Number.isInteger(y) && y >= 2000 && y <= 2100;
 	}
 
-	function downloadBlob(data: BlobPart, type: string, filename: string) {
-		const blob = new Blob([data], { type });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = filename;
-		a.click();
-		URL.revokeObjectURL(url);
-	}
 
 	async function downloadMonthlyReport() {
 		const orgSlug = orgContext.selectedOrgSlug;
@@ -378,7 +372,7 @@
 		reportError = '';
 		try {
 			const response = await reportsApi.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(
-				orgSlug, memberId, reportMonthYear, reportMonth, { responseType: 'blob' }
+				orgSlug, memberId, reportMonthYear, reportMonth, locale.current, { responseType: 'blob' }
 			);
 			downloadBlob(response.data as unknown as BlobPart, 'application/pdf', `time-report-${orgSlug}-${reportMonthYear}-${String(reportMonth).padStart(2, '0')}.pdf`);
 			toast.success(t('export.report.downloaded'));
@@ -398,7 +392,7 @@
 		reportError = '';
 		try {
 			const response = await reportsApi.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(
-				orgSlug, memberId, reportYear, { responseType: 'blob' }
+				orgSlug, memberId, reportYear, locale.current, { responseType: 'blob' }
 			);
 			downloadBlob(response.data as unknown as BlobPart, 'application/pdf', `time-report-${orgSlug}-${reportYear}.pdf`);
 			toast.success(t('export.report.downloaded'));
@@ -406,6 +400,31 @@
 			reportError = extractErrorMessage(e, t('export.report.yearlyFailed'));
 		} finally {
 			yearlyReportDownloading = false;
+		}
+	}
+
+	// ── Payroll CSV (org admins, while admins may see members' hours) ──
+	let payrollMonth = $state(now.getMonth() + 1);
+	let payrollYear = $state(now.getFullYear());
+	let payrollDownloading = $state(false);
+	let payrollError = $state('');
+	let canPayroll = $derived(isOrgAdmin(orgContext.selectedOrg?.role) && !!orgDetail?.memberTimeEntryVisibility);
+
+	async function downloadPayroll() {
+		const orgSlug = orgContext.selectedOrgSlug;
+		if (!orgSlug || !validYear(payrollYear)) return;
+		payrollDownloading = true;
+		payrollError = '';
+		try {
+			const from = dateKey(new Date(payrollYear, payrollMonth - 1, 1));
+			const to = dateKey(new Date(payrollYear, payrollMonth, 0));
+			const response = await exportImportApi.apiV1ExportImportPayrollPost({ orgSlug, from, to, lang: locale.current }, { responseType: 'blob' });
+			downloadBlob(response.data as unknown as BlobPart, 'text/csv', `payroll-${orgSlug}-${from.slice(0, 7)}.csv`);
+			toast.success(t('export.downloaded'));
+		} catch (e) {
+			payrollError = extractErrorMessage(e, t('export.payroll.failed'));
+		} finally {
+			payrollDownloading = false;
 		}
 	}
 
@@ -707,6 +726,31 @@
 					{t('export.download')}
 				{/if}
 			</button>
+
+			{#if canPayroll}
+				<div class="card bg-base-100 border border-base-300 shadow-sm">
+					<div class="card-body p-5 space-y-3">
+						<h2 class="text-base font-semibold">{t('export.payroll.title')}</h2>
+						<p class="text-sm text-base-content/60">{t('export.payroll.text', { org: orgContext.selectedOrg?.name ?? '' })}</p>
+						<div class="flex items-center gap-2 flex-wrap">
+							<select class="select select-bordered select-sm" bind:value={payrollMonth} aria-label={t('export.payroll.month')}>
+								{#each Array.from({ length: 12 }, (_, i) => i + 1) as m (m)}
+									<option value={m}>{getMonthName(new Date(2000, m - 1))}</option>
+								{/each}
+							</select>
+							<input type="number" class="input input-bordered input-sm w-24" class:input-error={!validYear(payrollYear)} bind:value={payrollYear} min="2000" max="2100" aria-label={t('export.payroll.year')} aria-invalid={!validYear(payrollYear)} />
+							<button type="button" class="btn btn-primary btn-sm" onclick={downloadPayroll} disabled={payrollDownloading || !validYear(payrollYear)}>
+								{#if payrollDownloading}
+									<span class="loading loading-spinner loading-xs"></span> {t('export.exporting')}
+								{:else}
+									{t('export.download')}
+								{/if}
+							</button>
+						</div>
+						{#if payrollError}<div class="alert alert-error text-sm">{payrollError}</div>{/if}
+					</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 

@@ -3,6 +3,8 @@
 	import { getMonthName } from '$lib/utils/formatters';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { t } from '$lib/i18n';
+	import { locale } from '$lib/stores/locale.svelte';
+	import { downloadBlob } from '$lib/utils/download';
 
 	/** Monthly (day by day) and yearly (month by month) PDF working-hours reports for one member. */
 	interface Props {
@@ -24,21 +26,13 @@
 		return y != null && Number.isInteger(y) && y >= 2000 && y <= 2100;
 	}
 
-	function downloadBlob(data: BlobPart, filename: string) {
-		const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = filename;
-		a.click();
-		URL.revokeObjectURL(url);
-	}
 
 	async function downloadMonthly() {
 		if (!validYear(monthYear)) return;
 		monthlyBusy = true;
 		try {
-			const res = await reportsApi.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(orgSlug, memberId, monthYear, month, { responseType: 'blob' });
-			downloadBlob(res.data as unknown as BlobPart, `time-report-${orgSlug}-${monthYear}-${String(month).padStart(2, '0')}.pdf`);
+			const res = await reportsApi.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(orgSlug, memberId, monthYear, month, locale.current, { responseType: 'blob' });
+			downloadBlob(res.data as unknown as BlobPart, 'application/pdf', `time-report-${orgSlug}-${monthYear}-${String(month).padStart(2, '0')}.pdf`);
 			toast.success(t('memberDetail.reports.monthlyDone'));
 		} catch (err) {
 			toast.error(err, t('memberDetail.reports.monthlyFailed'));
@@ -51,8 +45,8 @@
 		if (!validYear(year)) return;
 		yearlyBusy = true;
 		try {
-			const res = await reportsApi.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(orgSlug, memberId, year, { responseType: 'blob' });
-			downloadBlob(res.data as unknown as BlobPart, `time-report-${orgSlug}-${year}.pdf`);
+			const res = await reportsApi.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(orgSlug, memberId, year, locale.current, { responseType: 'blob' });
+			downloadBlob(res.data as unknown as BlobPart, 'application/pdf', `time-report-${orgSlug}-${year}.pdf`);
 			toast.success(t('memberDetail.reports.yearlyDone'));
 		} catch (err) {
 			toast.error(err, t('memberDetail.reports.yearlyFailed'));

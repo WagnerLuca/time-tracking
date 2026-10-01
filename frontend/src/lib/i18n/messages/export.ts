@@ -75,6 +75,13 @@ export const de = {
 	download: 'CSV herunterladen',
 	downloaded: 'CSV-Datei heruntergeladen.',
 	failed: 'Der Export ist fehlgeschlagen.',
+	payroll: {
+		title: 'Lohnabrechnung (alle Mitglieder)',
+		text: 'Eine CSV-Datei für die Lohnbuchhaltung: pro aktivem Mitglied von {org} Soll, Ist, Überstunden, Saldo, Abwesenheiten und offene Korrekturen eines Monats. Deutsches Format (Semikolon, Dezimalkomma).',
+		month: 'Monat der Lohnabrechnung',
+		year: 'Jahr der Lohnabrechnung',
+		failed: 'Die Lohnabrechnung konnte nicht exportiert werden.'
+	},
 	import: {
 		disabled: 'Der CSV-Import ist für dich in dieser Organisation deaktiviert.',
 		title: 'CSV-Datei importieren',
@@ -213,6 +220,13 @@ export const en: typeof de = {
 	download: 'Download CSV',
 	downloaded: 'CSV file downloaded.',
 	failed: 'Export failed.',
+	payroll: {
+		title: 'Payroll (all members)',
+		text: 'One CSV file for payroll: target, worked, overtime, balance, absences and open corrections of a month for every active member of {org}. German format (semicolon, decimal comma).',
+		month: 'Payroll month',
+		year: 'Payroll year',
+		failed: 'The payroll export failed.'
+	},
 	import: {
 		disabled: 'CSV import is disabled for you in this organization.',
 		title: 'Import CSV file',
