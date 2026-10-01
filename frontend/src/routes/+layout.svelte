@@ -10,9 +10,11 @@
 	import { goto, afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
-	import { authApi, requestsApi, timeTrackingApi } from '$lib/apiClient';
-	import type { OrgRequestResponse, TimeEntryResponse } from '$lib/api';
-	import { parseRequestData, formatRequestTypeFull, formatRequestType, formatRequestStatus, formatTimeAgo, formatDateTime, formatClock, statusBadgeClass, roleLabel } from '$lib/utils/formatters';
+	import { authApi, requestsApi, timeTrackingApi, notificationsApi } from '$lib/apiClient';
+	import type { NotificationResponse, OrgRequestResponse, TimeEntryResponse } from '$lib/api';
+	import { failureNotificationTarget } from '$lib/utils/notifications';
+	import { invalidateOrgDetail } from '$lib/stores/orgDetail';
+	import { parseRequestData, formatRequestTypeFull, formatRequestType, formatRequestStatus, formatTimeAgo, formatDate, formatDateTime, formatClock, statusBadgeClass, roleLabel } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import { t, tp } from '$lib/i18n';
 	import Modal from '$lib/components/Modal.svelte';
@@ -33,7 +35,9 @@
 	// Notification state
 	let pendingRequests = $state<OrgRequestResponse[]>([]);
 	let userNotifRequests = $state<OrgRequestResponse[]>([]);
-	let totalNotifCount = $derived(pendingRequests.length + userNotifRequests.length);
+	/** Unread "timer stopped automatically" notifications (the Notification table, not requests). */
+	let failureNotifs = $state<NotificationResponse[]>([]);
+	let totalNotifCount = $derived(pendingRequests.length + userNotifRequests.length + failureNotifs.length);
 	let detailReq = $state<OrgRequestResponse | null>(null);
 	let responding = $state(false);
 
@@ -63,7 +67,27 @@
 		if (auth.isAuthenticated) {
 			loadFailures();
 			timer.refresh().catch(() => {});
+			refreshNotifications();
 		}
+	});
+
+	// The bell refreshes on navigation (throttled) and every minute while the tab is visible
+	const NOTIF_THROTTLE_MS = 30_000;
+	let notifsLoadedAt = 0;
+	function refreshNotifications() {
+		if (!auth.isAuthenticated || Date.now() - notifsLoadedAt < NOTIF_THROTTLE_MS) return;
+		loadNotifications();
+	}
+	onMount(() => {
+		const interval = setInterval(() => {
+			if (document.visibilityState === 'visible' && auth.isAuthenticated) loadNotifications();
+		}, 60_000);
+		const onVisible = () => { if (document.visibilityState === 'visible') refreshNotifications(); };
+		document.addEventListener('visibilitychange', onVisible);
+		return () => {
+			clearInterval(interval);
+			document.removeEventListener('visibilitychange', onVisible);
+		};
 	});
 
 	// Unconfirmed email: a dismissible hint with a resend button (undefined = older cached user → no hint)
@@ -115,12 +139,27 @@
 	});
 
 	async function loadNotifications() {
-		const [adminRes, userRes] = await Promise.allSettled([
+		notifsLoadedAt = Date.now();
+		const [adminRes, userRes, notifRes] = await Promise.allSettled([
 			requestsApi.apiV1OrganizationsNotificationsGet(),
-			requestsApi.apiV1OrganizationsUserNotificationsGet()
+			requestsApi.apiV1OrganizationsUserNotificationsGet(),
+			notificationsApi.apiV1NotificationsGet(true, 50)
 		]);
 		pendingRequests = adminRes.status === 'fulfilled' ? (adminRes.value.data.requests ?? []) : [];
 		userNotifRequests = userRes.status === 'fulfilled' ? (userRes.value.data.requests ?? []) : [];
+		failureNotifs = notifRes.status === 'fulfilled' ? (notifRes.value.data.items ?? []).filter((n) => n.type === 'FailureEntry' && !n.isRead) : [];
+	}
+
+	/** Opens History at the stopped entry and marks the notification read. */
+	async function openFailureNotif(n: NotificationResponse) {
+		openMenu = null;
+		failureNotifs = failureNotifs.filter((x) => x.id !== n.id);
+		goto(failureNotificationTarget(n.message, n.organizationId, failures).href);
+		try {
+			if (n.id != null) await notificationsApi.apiV1NotificationsIdReadPut(n.id);
+		} catch (err) {
+			toast.error(err, t('nav.notifications.dismissFailed'));
+		}
 	}
 
 	async function respondToRequest(request: OrgRequestResponse, accept: boolean) {
@@ -128,6 +167,7 @@
 		responding = true;
 		try {
 			await requestsApi.apiV1OrganizationsSlugRequestsIdPut(request.organizationSlug, request.id, { accept });
+			invalidateOrgDetail(request.organizationSlug); // e.g. vacation counts, new members
 			toast.success(accept ? t('nav.notifications.accepted') : t('nav.notifications.declined'));
 			detailReq = null;
 			await loadNotifications();
@@ -314,6 +354,26 @@
 							</div>
 
 							<div class="overflow-y-auto">
+								<!-- Timers stopped at the business day end -->
+								{#if failureNotifs.length > 0}
+									<div class="py-1">
+										<div class="px-3 py-2">
+											<span class="text-xs font-bold uppercase tracking-wider text-base-content/40">{t('nav.notifications.failures')}</span>
+										</div>
+										{#each failureNotifs as n (n.id)}
+											{@const target = failureNotificationTarget(n.message, n.organizationId, failures)}
+											<button type="button" class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors border-l-4 border-l-error" onclick={() => openFailureNotif(n)}>
+												<div class="flex flex-col gap-0.5 flex-1 min-w-0">
+													<span class="font-semibold text-xs text-error">{t('nav.notifications.failureTitle')}</span>
+													<span class="text-xs text-base-content/60">{target.date ? t('nav.notifications.failureStarted', { date: formatDate(target.date) }) : t('nav.notifications.failureCorrect')}</span>
+													<span class="text-[0.7rem] text-base-content/40">{formatTimeAgo(n.createdAt)}</span>
+												</div>
+												<span class="text-base-content/40 text-lg flex-shrink-0" aria-hidden="true">›</span>
+											</button>
+										{/each}
+									</div>
+								{/if}
+
 								<!-- User notifications (responses to my requests) -->
 								{#if userNotifRequests.length > 0}
 									<div class="py-1">
