@@ -18,10 +18,29 @@ namespace TimeTracking.Api.Controllers;
 public class ExportImportController : OrganizationBaseController
 {
     private readonly ITimeEntryExportService _exportService;
+    private readonly PayrollExportService _payroll;
 
-    public ExportImportController(ITimeEntryExportService exportService)
+    public ExportImportController(ITimeEntryExportService exportService, PayrollExportService payroll)
     {
         _exportService = exportService;
+        _payroll = payroll;
+    }
+
+    /// <summary>
+    /// Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):
+    /// target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing
+    /// correction. German format (<c>;</c>, decimal comma, UTF-8 BOM); <c>lang</c> = "de" (default) or "en" for the headers.
+    /// Org admins only, while the organization lets admins see members' hours.
+    /// </summary>
+    [HttpPost("payroll")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportPayroll([FromBody] PayrollExportRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        var result = await _payroll.ExportAsync(userId.Value, request);
+        if (!result.IsSuccess) return ToResponse(result);
+        return File(result.Data!, "text/csv; charset=utf-8", $"payroll-{request.OrgSlug}-{request.From:yyyy-MM-dd}-{request.To:yyyy-MM-dd}.csv");
     }
 
     /// <summary>Export time entries or daily report as CSV file.</summary>
