@@ -62,6 +62,21 @@ public class AutoPauseTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     [Fact]
+    public async Task ALaterGap_RemovesTheEarlierAutomaticBreak()
+    {
+        var (client, _, orgId) = await OrgWithRulesAsync("regap");
+        var day = Berlin.Today().AddDays(-9);
+
+        var morning = await TrackAsync(client, orgId, day, "08:00", "14:30");
+        morning.PauseDurationMinutes.Should().Be(30);   // 6.5 h alone
+        // 8.5 h in total need 30 min, and the 30 min gap already is that break
+        (await TrackAsync(client, orgId, day, "15:00", "17:00")).PauseDurationMinutes.Should().Be(0);
+
+        var history = await client.GetFromJsonAsync<PaginatedResponseDto<TimeEntryResponseDto>>("/api/v1/TimeTracking", TestHelpers.JsonOptions);
+        history!.Items.Single(e => e.Id == morning.Id).PauseDurationMinutes.Should().Be(0);
+    }
+
+    [Fact]
     public async Task OneLongEntry_GetsTheFullBreak()
     {
         var (client, _, orgId) = await OrgWithRulesAsync("long");

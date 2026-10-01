@@ -36,8 +36,12 @@ public class MemberEntryService(TimeTrackingDbContext context, ILogger<MemberEnt
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
-        if (request.PauseDurationMinutes.HasValue) entry.PauseDurationMinutes = request.PauseDurationMinutes.Value;
-        else await PauseRules.ApplyAsync(context, entry);
+        if (request.PauseDurationMinutes.HasValue)
+        {
+            entry.PauseDurationMinutes = request.PauseDurationMinutes.Value;
+            entry.PauseIsManual = true;
+        }
+        await PauseRules.ApplyAsync(context, entry);
 
         context.TimeEntries.Add(entry);
         await context.SaveChangesAsync();
@@ -69,8 +73,12 @@ public class MemberEntryService(TimeTrackingDbContext context, ILogger<MemberEnt
         if (timesChanged && await EntryTimes.OverlapsAsync(context, memberId, entry.StartTime, entry.EndTime!.Value, entry.Id))
             return ServiceResult.Conflict<TimeEntryResponse>("The entry overlaps an existing entry of the member.");
 
-        if (request.PauseDurationMinutes.HasValue) entry.PauseDurationMinutes = request.PauseDurationMinutes.Value;
-        else if (timesChanged) await PauseRules.ApplyAsync(context, entry);
+        if (request.PauseDurationMinutes.HasValue)
+        {
+            entry.PauseDurationMinutes = request.PauseDurationMinutes.Value;
+            entry.PauseIsManual = true;
+        }
+        if (timesChanged || request.PauseDurationMinutes.HasValue) await PauseRules.ApplyAsync(context, entry);
         entry.UpdatedAt = DateTime.UtcNow;
 
         await context.SaveChangesAsync();

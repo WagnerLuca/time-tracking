@@ -342,6 +342,7 @@ public class TimeEntryExportService : ITimeEntryExportService
                 EndTime = endUtc,
                 IsRunning = false,
                 PauseDurationMinutes = entry.PauseMinutes,
+                PauseIsManual = true,   // imported records keep their pause
                 Description = entry.Description,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow

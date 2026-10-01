@@ -10,19 +10,15 @@ public static class PauseRules
     public const int MinCreditedGapMinutes = 15;
 
     /// <summary>
-    /// Sets the entry's automatic pause per organization-local day (ArbZG §4): the required break
-    /// is that of the rule with the highest threshold the day's total work <em>exceeds</em> (gross
-    /// time of all finished, non-failure entries of the user in that organization on the entry's
-    /// local start day). Gaps of at least 15 minutes between those entries already are breaks, as
-    /// are the pauses the day's other entries already carry; only the remaining deficit is put on
-    /// <paramref name="entry"/>. The other entries are never changed, so a pause someone set by
-    /// hand stays. No-op without an end time, without an organization or when auto-pause is off.
-    /// Shared by stop, auto-stop on start, direct edits and approved edit requests.
-    /// <para>
-    /// ponytail: the day's other pauses are credited as they are, because the model cannot tell an
-    /// automatic pause from a manual one. An earlier auto pause that a later gap makes superfluous
-    /// therefore stays until that entry is recomputed; a <c>PauseIsManual</c> flag would fix it.
-    /// </para>
+    /// Recomputes the automatic pauses of the entry's organization-local day (ArbZG §4): the
+    /// required break is that of the rule with the highest threshold the day's total work
+    /// <em>exceeds</em> (gross time of all finished, non-failure entries of the user in that
+    /// organization on that day). Gaps of at least 15 minutes between those entries and manual
+    /// pauses (<see cref="TimeEntry.PauseIsManual"/>) already count; the remaining deficit goes on
+    /// the day's longest entry with an automatic pause, the other automatic pauses become 0.
+    /// No-op without an end time, without an organization or when auto-pause is off.
+    /// Shared by stop, auto-stop on start, direct edits, manual entries and approved requests.
+    /// ponytail: moving or deleting an entry does not recompute the day it left.
     /// </summary>
     public static async Task ApplyAsync(TimeTrackingDbContext context, TimeEntry entry)
     {
@@ -39,18 +35,14 @@ public static class PauseRules
         var dayStartUtc = clock.StartOfDayUtc(day);
         var dayEndUtc = clock.StartOfDayUtc(day.AddDays(1));
 
-        var others = await context.TimeEntries.AsNoTracking()
+        // Tracked: their automatic pauses may change too
+        var others = await context.TimeEntries
             .Where(e => e.Id != entry.Id && e.UserId == entry.UserId && e.OrganizationId == entry.OrganizationId
                      && !e.IsRunning && !e.IsFailure && e.EndTime != null
                      && e.StartTime >= dayStartUtc && e.StartTime < dayEndUtc)
-            .Select(e => new { e.StartTime, EndTime = e.EndTime!.Value, e.PauseDurationMinutes })
             .ToListAsync();
-
-        var dayEntries = others.Select(e => (e.StartTime, e.EndTime))
-            .Append((StartTime: entry.StartTime, EndTime: entry.EndTime.Value))
-            .OrderBy(e => e.StartTime)
-            .ToList();
-        var workHours = dayEntries.Sum(e => (e.EndTime - e.StartTime).TotalHours);
+        var dayEntries = others.Append(entry).OrderBy(e => e.StartTime).ToList();
+        var workHours = dayEntries.Sum(e => (e.EndTime!.Value - e.StartTime).TotalHours);
 
         var required = await context.PauseRules.AsNoTracking()
             .Where(pr => pr.OrganizationId == entry.OrganizationId && pr.MinHours < workHours)
@@ -58,7 +50,14 @@ public static class PauseRules
             .Select(pr => (int?)pr.PauseMinutes)
             .FirstOrDefaultAsync() ?? 0;
 
-        entry.PauseDurationMinutes = Math.Max(0, required - CreditedGapMinutes(dayEntries) - others.Sum(e => e.PauseDurationMinutes));
+        var deficit = Math.Max(0, required
+            - CreditedGapMinutes(dayEntries.Select(e => (e.StartTime, e.EndTime!.Value)).ToList())
+            - dayEntries.Where(e => e.PauseIsManual).Sum(e => e.PauseDurationMinutes));
+
+        var automatic = dayEntries.Where(e => !e.PauseIsManual).ToList();
+        foreach (var e in automatic) e.PauseDurationMinutes = 0;
+        var carrier = automatic.OrderByDescending(e => e.EndTime!.Value - e.StartTime).ThenByDescending(e => e.StartTime).FirstOrDefault();
+        if (carrier != null) carrier.PauseDurationMinutes = deficit;
     }
 
     /// <summary>Minutes between consecutive (possibly overlapping) entries, counting only gaps of at least 15 minutes.</summary>

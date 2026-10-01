@@ -487,8 +487,12 @@ public class RequestService : IRequestService
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
-                if (manual.PauseDurationMinutes.HasValue) manualEntry.PauseDurationMinutes = manual.PauseDurationMinutes.Value;
-                else await PauseRules.ApplyAsync(_context, manualEntry);
+                if (manual.PauseDurationMinutes.HasValue)
+                {
+                    manualEntry.PauseDurationMinutes = manual.PauseDurationMinutes.Value;
+                    manualEntry.PauseIsManual = true;
+                }
+                await PauseRules.ApplyAsync(_context, manualEntry);
                 _context.TimeEntries.Add(manualEntry);
                 break;
 
@@ -502,6 +506,8 @@ public class RequestService : IRequestService
                     if (pauseEntry != null && int.TryParse(orgRequest.RequestData, out var pauseMinutes))
                     {
                         pauseEntry.PauseDurationMinutes = Math.Max(0, pauseMinutes);
+                        pauseEntry.PauseIsManual = true;
+                        await PauseRules.ApplyAsync(_context, pauseEntry);
                         pauseEntry.UpdatedAt = DateTime.UtcNow;
                     }
                 }
@@ -650,6 +656,7 @@ public class RequestService : IRequestService
                 EndTime = endUtc,
                 IsRunning = false,
                 PauseDurationMinutes = entry.PauseMinutes,
+                PauseIsManual = true,   // imported records keep their pause
                 Description = entry.Description,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow

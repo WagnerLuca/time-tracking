@@ -708,6 +708,9 @@ namespace TimeTracking.Api.Migrations
                     b.Property<int>("PauseDurationMinutes")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("PauseIsManual")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("timestamp with time zone");
 

@@ -238,13 +238,11 @@ public class TimeTrackingService : ITimeTrackingService
                 }
             }
             entry.PauseDurationMinutes = Math.Max(0, request.PauseDurationMinutes.Value);
+            entry.PauseIsManual = true;
         }
-        else if (timesChanged)
-        {
-            // New times, no explicit pause: recompute it from the rules. Otherwise keep the
-            // current pause, so editing e.g. the description never wipes a manually set pause.
+        // A manual pause stays; the day's automatic pauses follow the new times
+        if (timesChanged || request.PauseDurationMinutes.HasValue)
             await ApplyPauseRulesAsync(entry);
-        }
 
         await _context.SaveChangesAsync();
         _logger.LogInformation("Time entry {EntryId} updated by user {UserId}", entry.Id, userId);
@@ -323,8 +321,12 @@ public class TimeTrackingService : ITimeTrackingService
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
-        if (request.PauseDurationMinutes.HasValue) entry.PauseDurationMinutes = request.PauseDurationMinutes.Value;
-        else await ApplyPauseRulesAsync(entry);
+        if (request.PauseDurationMinutes.HasValue)
+        {
+            entry.PauseDurationMinutes = request.PauseDurationMinutes.Value;
+            entry.PauseIsManual = true;
+        }
+        await ApplyPauseRulesAsync(entry);
 
         _context.TimeEntries.Add(entry);
         await _context.SaveChangesAsync();
