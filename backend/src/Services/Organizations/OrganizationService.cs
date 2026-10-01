@@ -570,7 +570,8 @@ public class OrganizationService : IOrganizationService
         }
 
         // Default: the current week in the organization's time zone
-        var (localWeekStart, localWeekEnd) = OrgClock.For(org).DayRangeUtc(null, null);
+        var clock = OrgClock.For(org);
+        var (localWeekStart, localWeekEnd) = clock.DayRangeUtc(null, null);
         var weekStart = from ?? localWeekStart;
         var weekEnd = to ?? localWeekEnd;
 
@@ -594,7 +595,7 @@ public class OrganizationService : IOrganizationService
                       && te.StartTime < weekEnd)
             .ToListAsync();
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = clock.Today();
         var schedules = await _context.WorkSchedules
             .AsNoTracking()
             .Where(s => memberIds.Contains(s.UserId)
@@ -609,7 +610,9 @@ public class OrganizationService : IOrganizationService
             var entries = memberEntries.Where(te => !te.IsFailure).ToList();
             var totalMinutes = entries.Sum(e =>
                 e.EndTime.HasValue ? (e.EndTime.Value - e.StartTime).TotalMinutes : 0);
-            var totalPause = entries.Sum(e => e.PauseDurationMinutes);
+            // Net per local day, clamped at 0 like DailyReportAggregator, so both agree
+            var netMinutes = entries.GroupBy(e => clock.LocalDate(e.StartTime)).Sum(day => Math.Max(0,
+                day.Sum(e => e.EndTime.HasValue ? (e.EndTime.Value - e.StartTime).TotalMinutes : 0) - day.Sum(e => e.PauseDurationMinutes)));
 
             var schedule = schedules
                 .Where(s => s.UserId == m.UserId)
@@ -625,7 +628,7 @@ public class OrganizationService : IOrganizationService
                 Role = m.Role.ToString(),
                 WeeklyWorkHours = schedule?.WeeklyWorkHours,
                 TotalTrackedMinutes = Math.Round(totalMinutes, 1),
-                NetTrackedMinutes = Math.Round(totalMinutes - totalPause, 1),
+                NetTrackedMinutes = Math.Round(netMinutes, 1),
                 FailureEntryCount = memberEntries.Count - entries.Count,
                 EntryCount = entries.Count
             };
