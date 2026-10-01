@@ -64,6 +64,7 @@ export function setAuthHandlers(handlers: AuthHandlers): void {
 
 installRefreshInterceptor(axiosInstance, {
     getRefreshToken: () => localStorage.getItem('refreshToken'),
+    getAccessToken: () => localStorage.getItem('authToken'),
     refresh: async (refreshToken) => {
         const { data } = await authApi.apiV1AuthRefreshPost({ refreshToken });
         return { accessToken: data.accessToken!, refreshToken: data.refreshToken! };

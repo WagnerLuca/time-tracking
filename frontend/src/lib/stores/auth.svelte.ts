@@ -1,4 +1,5 @@
 import { authApi, setAuthHandlers } from '$lib/apiClient';
+import { orgContext } from '$lib/stores/orgContext.svelte';
 import type { TwoFactorRequiredResponse } from '$lib/apiClient';
 import type { LoginRequest, LoginResponse, RegisterRequest, UserInfo } from '$lib/api';
 
@@ -30,6 +31,37 @@ function createAuthStore() {
 			}
 		}
 		loading = false;
+		window.addEventListener('storage', syncFromOtherTab);
+	}
+
+	/** Another tab logged in, logged out or rotated the tokens (localStorage is shared). */
+	function syncFromOtherTab(e: StorageEvent) {
+		if (e.storageArea !== localStorage || (e.key !== null && e.key !== TOKEN_KEY && e.key !== USER_KEY)) return;
+		const savedToken = localStorage.getItem(TOKEN_KEY);
+		const savedUser = localStorage.getItem(USER_KEY);
+		if (!savedToken) {
+			// Logged out elsewhere: the root layout now redirects this tab to /login
+			if (token) {
+				token = null;
+				user = null;
+				orgContext.select(null);
+			}
+			return;
+		}
+		if (!savedUser) return; // login in progress in the other tab; the user key follows
+		let next: UserInfo;
+		try {
+			next = JSON.parse(savedUser);
+		} catch {
+			return;
+		}
+		// A different account signed in elsewhere: drop everything loaded for the old one
+		if (user && user.id !== next.id) {
+			window.location.reload();
+			return;
+		}
+		token = savedToken;
+		user = next;
 	}
 
 	function setAuth(loginResponse: LoginResponse) {
@@ -96,6 +128,8 @@ function createAuthStore() {
 			// Ignore logout errors
 		} finally {
 			clear();
+			// The next account on this browser must not land in the previous one's org
+			orgContext.select(null);
 		}
 	}
 

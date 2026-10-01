@@ -9,6 +9,11 @@ import type { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axio
  * the refresh itself fails (or a retried request is still 401) is `onAuthFailure`
  * called, which clears the session and sends the user to /login.
  *
+ * Across tabs the refresh runs under a Web Lock: two tabs exchanging the same refresh
+ * token would trip the backend's reuse detection and revoke the whole session. Inside the
+ * lock the stored refresh token is read again — if another tab rotated it meanwhile, its
+ * new access token is used instead of refreshing a second time.
+ *
  * Kept free of SvelteKit imports so it can be unit-tested with a mock adapter.
  */
 export interface RefreshedTokens {
@@ -18,9 +23,20 @@ export interface RefreshedTokens {
 
 export interface RefreshDeps {
 	getRefreshToken: () => string | null;
+	getAccessToken: () => string | null;
 	refresh: (refreshToken: string) => Promise<RefreshedTokens>;
 	onRefreshed: (tokens: RefreshedTokens) => void;
 	onAuthFailure: () => void;
+	/** Cross-tab mutual exclusion; defaults to navigator.locks, or none where unsupported. */
+	lock?: <T>(fn: () => Promise<T>) => Promise<T>;
+}
+
+const LOCK_NAME = 'tt-auth-refresh';
+
+function webLock<T>(fn: () => Promise<T>): Promise<T> {
+	const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+	// ponytail: without Web Locks (very old browsers) two tabs can still race; the loser is logged out
+	return locks ? (locks.request(LOCK_NAME, fn) as Promise<T>) : fn();
 }
 
 /**
@@ -36,13 +52,18 @@ export function installRefreshInterceptor(instance: AxiosInstance, deps: Refresh
 	let inflight: Promise<string> | null = null;
 
 	function refreshOnce(): Promise<string> {
-		inflight ??= (async () => {
+		const seen = deps.getRefreshToken();
+		const lock = deps.lock ?? webLock;
+		inflight ??= lock(async () => {
 			const refreshToken = deps.getRefreshToken();
 			if (!refreshToken) throw new Error('No refresh token');
+			const accessToken = deps.getAccessToken();
+			// Another tab refreshed while we waited for the lock: use its tokens
+			if (refreshToken !== seen && accessToken) return accessToken;
 			const tokens = await deps.refresh(refreshToken);
 			deps.onRefreshed(tokens);
 			return tokens.accessToken;
-		})().finally(() => {
+		}).finally(() => {
 			inflight = null;
 		});
 		return inflight;
