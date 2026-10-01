@@ -237,16 +237,12 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var newClient = _factory.CreateClient();
         var newUser = await TestHelpers.RegisterAsync(newClient, "addme@test.com", "Password123!", "Add", "Me");
 
-        var response = await client.PostAsJsonAsync("/api/v1/Organizations/member-test-org/members", new
-        {
-            userId = newUser.User.Id,
-            role = 0 // Member
-        });
+        var response = await TestHelpers.AddMemberAsync(_factory, client, "member-test-org", newUser);
         response.EnsureSuccessStatusCode();
 
-        var member = await response.Content.ReadFromJsonAsync<OrganizationMemberResponseDto>(TestHelpers.JsonOptions);
-        member!.Email.Should().Be("addme@test.com");
-        member.Role.Should().Be("Member");
+        var accepted = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        accepted.GetProperty("organizationSlug").GetString().Should().Be("member-test-org");
+        accepted.GetProperty("role").GetString().Should().Be("Member");
     }
 
     [Fact]
@@ -286,11 +282,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var newClient = _factory.CreateClient();
         var newUser = await TestHelpers.RegisterAsync(newClient, "removeme@test.com", "Password123!", "Rem", "Ove");
 
-        await client.PostAsJsonAsync("/api/v1/Organizations/remove-test-org/members", new
-        {
-            userId = newUser.User.Id,
-            role = 0
-        });
+        await TestHelpers.AddMemberAsync(_factory, client, "remove-test-org", newUser);
 
         var response = await client.DeleteAsync(
             $"/api/v1/Organizations/remove-test-org/members/{newUser.User.Id}");
@@ -435,7 +427,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         var memberClient = _factory.CreateClient();
         var member = await TestHelpers.RegisterAsync(memberClient, "vacvis-member@test.com", "Password123!", "Vac", "Member");
         TestHelpers.SetBearerToken(memberClient, member.AccessToken);
-        await ownerClient.PostAsJsonAsync("/api/v1/Organizations/vac-vis-org/members", new { userId = member.User.Id, role = 0 });
+        await TestHelpers.AddMemberAsync(_factory, ownerClient, "vac-vis-org", member);
         // Set the member's own allowance
         await ownerClient.PutAsJsonAsync($"/api/v1/Organizations/vac-vis-org/members/{member.User.Id}/vacation-days", new { days = 30 });
 

@@ -57,7 +57,7 @@ public class BalanceTests : IClassFixture<TimeTrackingApiFactory>
         var (owner, ownerLogin) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "balance-owner@bal.test");
         var org = await TestHelpers.CreateOrganizationAsync(owner, "Balance Org 2", "balance-org-2");
         var (member, m) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "balance-m@bal.test");
-        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members", new { userId = m.User.Id })).EnsureSuccessStatusCode();
+        (await TestHelpers.AddMemberAsync(_factory, owner, org.Slug, m)).EnsureSuccessStatusCode();
 
         (await member.GetAsync($"/api/v1/organizations/{org.Slug}/members/{ownerLogin.User.Id}/balance"))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);

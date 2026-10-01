@@ -84,6 +84,23 @@ public static class TestHelpers
         return (await response.Content.ReadFromJsonAsync<OrganizationResponseDto>(JsonOptions))!;
     }
 
+    /// <summary>
+    /// Adds <paramref name="member"/> to the organization the real way: <paramref name="admin"/>
+    /// invites their email, the invitee accepts with the mailed token. Returns the accept response.
+    /// </summary>
+    public static async Task<HttpResponseMessage> AddMemberAsync(
+        Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory, HttpClient admin, string slug,
+        LoginResponseDto member, int role = 0)
+    {
+        var invite = await admin.PostAsJsonAsync($"/api/v1/organizations/{slug}/invitations", new { email = member.User.Email, role });
+        if (!invite.IsSuccessStatusCode) return invite;
+
+        var token = ((IMailCapturingFactory)factory).Mail.LinkToken(member.User.Email, "invite");
+        var invitee = factory.CreateClient();
+        SetBearerToken(invitee, member.AccessToken);
+        return await invitee.PostAsJsonAsync("/api/v1/invitations/accept", new { token });
+    }
+
     /// <summary>Register a new user, log them in, and return the client with auth set.</summary>
     public static async Task<(HttpClient Client, LoginResponseDto Login)> CreateAuthenticatedUserAsync(
         Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory, string email, string firstName = "Test", string lastName = "User")

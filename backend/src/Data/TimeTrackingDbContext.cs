@@ -26,6 +26,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<GroupMember> GroupMembers { get; set; }
     public DbSet<ApiKey> ApiKeys { get; set; }
     public DbSet<UserToken> UserTokens { get; set; }
+    public DbSet<OrgInvitation> OrgInvitations { get; set; }
 
     /// <summary>
     /// Every DateTime is stored and compared as UTC. Values arriving without a kind (e.g.
@@ -99,6 +100,9 @@ public class TimeTrackingDbContext : DbContext
 
             // Create unique index on UserId and OrganizationId combination
             entity.HasIndex(e => new { e.UserId, e.OrganizationId }).IsUnique();
+
+            // Defense in depth for the API's strict enum parsing: no role outside Member..Owner
+            entity.ToTable(t => t.HasCheckConstraint("CK_UserOrganizations_Role", "\"Role\" BETWEEN 0 AND 2"));
 
             // A badge identifies one member per organization (NULLs are not unique-checked)
             entity.Property(e => e.BadgeId).HasMaxLength(100);
@@ -419,6 +423,7 @@ public class TimeTrackingDbContext : DbContext
 
             // A user can only be in a group once
             entity.HasIndex(e => new { e.GroupId, e.UserId }).IsUnique();
+            entity.ToTable(t => t.HasCheckConstraint("CK_GroupMembers_Role", "\"Role\" BETWEEN 0 AND 1"));
 
             entity.HasOne(e => e.Group)
                 .WithMany(g => g.Members)
@@ -429,6 +434,21 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure OrgInvitation entity (joining an organization by invitation)
+        modelBuilder.Entity<OrgInvitation>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Email).IsRequired().HasMaxLength(256);
+            entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(64);
+            entity.HasIndex(e => e.TokenHash).IsUnique();
+            entity.HasIndex(e => new { e.OrganizationId, e.Email });
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(e => e.Organization.IsActive);
         });
 
         // Configure UserToken entity (email verification / password reset links)

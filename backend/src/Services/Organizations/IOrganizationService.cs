@@ -16,7 +16,6 @@ public interface IOrganizationService
     Task<ServiceResult> DeleteOrganizationAsync(string slug, int callerUserId);
 
     // ── Member management ──
-    Task<ServiceResult<OrganizationMemberResponse>> AddMemberAsync(string slug, int callerUserId, AddMemberRequest request);
     Task<ServiceResult<OrganizationMemberResponse>> UpdateMemberRoleAsync(string slug, int callerUserId, int userId, UpdateMemberRoleRequest request);
     Task<ServiceResult> RemoveMemberAsync(string slug, int callerUserId, int userId);
 

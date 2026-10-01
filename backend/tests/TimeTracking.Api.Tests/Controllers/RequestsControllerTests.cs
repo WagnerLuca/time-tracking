@@ -207,11 +207,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
         // Add Tom as a member
         var tomLogin = await TestHelpers.LoginAsync(_factory.CreateClient(), TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
 
-        await client.PostAsJsonAsync("/api/v1/Organizations/wsc-test-org/members", new
-        {
-            userId = tomLogin.User.Id,
-            role = 0
-        });
+        await TestHelpers.AddMemberAsync(_factory, client, "wsc-test-org", tomLogin);
 
         // Tom creates a work schedule change request
         var tomClient = _factory.CreateClient();

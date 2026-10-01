@@ -64,7 +64,7 @@ public class AccountSecurityTests : IClassFixture<TimeTrackingApiFactory>
         var (owner, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "anon-owner@sec.test");
         var org = await TestHelpers.CreateOrganizationAsync(owner, "Anon Org", "anon-org");
         var (member, m) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "anon-member@sec.test", "Erika", "Muster");
-        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members", new { userId = m.User.Id })).EnsureSuccessStatusCode();
+        (await TestHelpers.AddMemberAsync(_factory, owner, org.Slug, m)).EnsureSuccessStatusCode();
         (await member.PostAsJsonAsync("/api/v1/TimeTracking/start", new { organizationId = org.Id })).EnsureSuccessStatusCode();
         (await member.PostAsJsonAsync("/api/v1/TimeTracking/stop", (object?)null)).EnsureSuccessStatusCode();
 
@@ -144,7 +144,7 @@ public class AccountSecurityTests : IClassFixture<TimeTrackingApiFactory>
         (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/settings", new { require2fa = true })).EnsureSuccessStatusCode();
 
         var (member, m) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "req2fa-m@sec.test");
-        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members", new { userId = m.User.Id })).EnsureSuccessStatusCode();
+        (await TestHelpers.AddMemberAsync(_factory, owner, org.Slug, m)).EnsureSuccessStatusCode();
 
         var blocked = await member.GetAsync($"/api/v1/organizations/{org.Slug}/holidays");
         blocked.StatusCode.Should().Be(HttpStatusCode.Forbidden);

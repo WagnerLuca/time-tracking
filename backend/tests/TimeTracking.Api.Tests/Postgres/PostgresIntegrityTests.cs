@@ -97,7 +97,7 @@ public class PostgresIntegrityTests
         var org = await TestHelpers.CreateOrganizationAsync(owner, "Approve Org", "pg-approve-org");
         (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/settings", new { csvImportMode = 1 /* RequiresApproval */ })).EnsureSuccessStatusCode();
         var (member, m) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "pg-approve-m@pg.test");
-        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members", new { userId = m.User.Id })).EnsureSuccessStatusCode();
+        (await TestHelpers.AddMemberAsync(_factory, owner, org.Slug, m)).EnsureSuccessStatusCode();
 
         var data = JsonSerializer.Serialize(new
         {

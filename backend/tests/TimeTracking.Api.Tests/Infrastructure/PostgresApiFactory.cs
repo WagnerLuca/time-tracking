@@ -15,7 +15,7 @@ namespace TimeTracking.Api.Tests.Infrastructure;
 /// production must — because superusers would silently bypass the RLS policies.
 /// Startup runs the real migrations and the demo seed.
 /// </summary>
-public class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
+public class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime, IMailCapturingFactory
 {
     public const string AppRole = "tt_app";
     public const string AppPassword = "tt_app_pw";

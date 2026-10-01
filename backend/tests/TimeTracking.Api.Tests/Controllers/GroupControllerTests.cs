@@ -24,8 +24,8 @@ public class GroupControllerTests : IClassFixture<TimeTrackingApiFactory>
         var (groupAdmin, ga) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, $"{prefix}-ga@test.com");
         var (_, a) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, $"{prefix}-a@test.com");
         var (_, b) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, $"{prefix}-b@test.com");
-        foreach (var id in new[] { ga.User.Id, a.User.Id, b.User.Id })
-            (await owner.PostAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members", new { userId = id })).EnsureSuccessStatusCode();
+        foreach (var login in new[] { ga, a, b })
+            (await TestHelpers.AddMemberAsync(_factory, owner, org.Slug, login)).EnsureSuccessStatusCode();
 
         var created = await owner.PostAsJsonAsync($"/api/v1/Organizations/{org.Slug}/groups", new { name = "Team" });
         created.EnsureSuccessStatusCode();

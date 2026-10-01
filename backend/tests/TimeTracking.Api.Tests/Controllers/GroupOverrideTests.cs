@@ -30,7 +30,7 @@ public class GroupOverrideTests : IClassFixture<TimeTrackingApiFactory>
     private async Task<(HttpClient Client, int UserId)> MemberAsync(HttpClient owner, string slug, string email)
     {
         var (client, login) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, email);
-        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{slug}/members", new { userId = login.User.Id })).EnsureSuccessStatusCode();
+        (await TestHelpers.AddMemberAsync(_factory, owner, slug, login)).EnsureSuccessStatusCode();
         return (client, login.User.Id);
     }
 

@@ -78,11 +78,7 @@ public class AbsenceDayControllerTests : IClassFixture<TimeTrackingApiFactory>
         var member = await TestHelpers.RegisterAsync(memberClient, "selfservice@test.com", "Password123!", "Self", "Service");
         TestHelpers.SetBearerToken(memberClient, member.AccessToken);
         // Owner adds the new user as a regular member
-        await ownerClient.PostAsJsonAsync("/api/v1/organizations/self-service-org/members", new
-        {
-            userId = member.User.Id,
-            role = 0 // Member
-        });
+        await TestHelpers.AddMemberAsync(_factory, ownerClient, "self-service-org", member);
 
         var response = await memberClient.PostAsJsonAsync(
             "/api/v1/organizations/self-service-org/absences", new

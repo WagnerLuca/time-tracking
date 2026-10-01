@@ -113,11 +113,7 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
         TestHelpers.SetBearerToken(empClient, empLogin.AccessToken);
 
         // Owner adds employee
-        var addResp = await ownerClient.PostAsJsonAsync("/api/v1/Organizations/multi-user-org/members", new
-        {
-            userId = empLogin.User.Id,
-            role = 0
-        });
+        var addResp = await TestHelpers.AddMemberAsync(_factory, ownerClient, "multi-user-org", empLogin);
         addResp.EnsureSuccessStatusCode();
 
         // Employee tracks time
@@ -238,11 +234,7 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
             memClient, "habmember@test.com", "Password123!", "HAB", "Member");
         TestHelpers.SetBearerToken(memClient, memLogin.AccessToken);
 
-        await ownerClient.PostAsJsonAsync("/api/v1/Organizations/hab-org/members", new
-        {
-            userId = memLogin.User.Id,
-            role = 0
-        });
+        await TestHelpers.AddMemberAsync(_factory, ownerClient, "hab-org", memLogin);
 
         // Owner adds holiday
         var holResp = await ownerClient.PostAsJsonAsync("/api/v1/organizations/hab-org/holidays", new
@@ -302,22 +294,14 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
         var adminLogin = await TestHelpers.RegisterAsync(
             adminClient, "rbacadmin@test.com", "Password123!", "RBAC", "Admin");
         TestHelpers.SetBearerToken(adminClient, adminLogin.AccessToken);
-        await ownerClient.PostAsJsonAsync("/api/v1/Organizations/rbac-org/members", new
-        {
-            userId = adminLogin.User.Id,
-            role = 1 // Admin
-        });
+        await TestHelpers.AddMemberAsync(_factory, ownerClient, "rbac-org", adminLogin, role: 1);
 
         // Add member
         var memberClient = _factory.CreateClient();
         var memberLogin = await TestHelpers.RegisterAsync(
             memberClient, "rbacmember@test.com", "Password123!", "RBAC", "Member");
         TestHelpers.SetBearerToken(memberClient, memberLogin.AccessToken);
-        await ownerClient.PostAsJsonAsync("/api/v1/Organizations/rbac-org/members", new
-        {
-            userId = memberLogin.User.Id,
-            role = 0 // Member
-        });
+        await TestHelpers.AddMemberAsync(_factory, ownerClient, "rbac-org", memberLogin);
 
         // Member can't update org
         var updateResp = await memberClient.PutAsJsonAsync("/api/v1/Organizations/rbac-org", new

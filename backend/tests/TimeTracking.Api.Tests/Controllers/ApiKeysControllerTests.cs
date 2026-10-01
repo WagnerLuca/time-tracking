@@ -21,7 +21,7 @@ public class ApiKeysControllerTests : IClassFixture<TimeTrackingApiFactory>
         var (owner, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, $"{prefix}-owner@test.com");
         var org = await TestHelpers.CreateOrganizationAsync(owner, $"{prefix} Org", $"{prefix}-org");
         var (member, m) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, $"{prefix}-m@test.com", "Mia", "Member");
-        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members", new { userId = m.User.Id })).EnsureSuccessStatusCode();
+        (await TestHelpers.AddMemberAsync(_factory, owner, org.Slug, m)).EnsureSuccessStatusCode();
         (await owner.PutAsJsonAsync($"/api/v1/organizations/{org.Slug}/members/{m.User.Id}/badge", new { badgeId = badge })).EnsureSuccessStatusCode();
 
         var created = await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/api-keys", new { name = "Entrance" });
@@ -105,7 +105,7 @@ public class ApiKeysControllerTests : IClassFixture<TimeTrackingApiFactory>
     {
         var (owner, _, slug, _, _, _) = await SetupAsync("dup-badge");
         var (_, other) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "dup-badge-2@test.com");
-        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{slug}/members", new { userId = other.User.Id })).EnsureSuccessStatusCode();
+        (await TestHelpers.AddMemberAsync(_factory, owner, slug, other)).EnsureSuccessStatusCode();
 
         var dup = await owner.PutAsJsonAsync($"/api/v1/organizations/{slug}/members/{other.User.Id}/badge", new { badgeId = "RFID-1" });
         dup.StatusCode.Should().Be(HttpStatusCode.Conflict);

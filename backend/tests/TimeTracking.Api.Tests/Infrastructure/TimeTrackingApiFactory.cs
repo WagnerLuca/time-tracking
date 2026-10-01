@@ -12,7 +12,7 @@ namespace TimeTracking.Api.Tests.Infrastructure;
 /// Custom WebApplicationFactory that uses a unique InMemory database per test class
 /// and seeds fresh data for each test run.
 /// </summary>
-public class TimeTrackingApiFactory : WebApplicationFactory<Program>
+public class TimeTrackingApiFactory : WebApplicationFactory<Program>, IMailCapturingFactory
 {
     private readonly string _databaseName = Guid.NewGuid().ToString();
 

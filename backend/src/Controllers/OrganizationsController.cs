@@ -91,18 +91,6 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.DeleteOrganizationAsync(slug, userId.Value));
     }
 
-    /// <summary>Add a member to the organization (admin only).</summary>
-    /// <param name="slug">Organization URL slug.</param>
-    [HttpPost("{slug}/members")]
-    [RequireOrgRole(OrganizationRole.Admin)]
-    [ProducesResponseType(typeof(OrganizationMemberResponse), StatusCodes.Status201Created)]
-    public async Task<IActionResult> AddMember(string slug, [FromBody] AddMemberRequest request)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized();
-        return ToCreatedResponse(await _service.AddMemberAsync(slug, userId.Value, request));
-    }
-
     /// <summary>Update a member's role in the organization (admin only).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="memberId">Member ID to update.</param>

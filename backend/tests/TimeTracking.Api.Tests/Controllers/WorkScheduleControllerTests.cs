@@ -168,11 +168,7 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
         var newUser = await TestHelpers.RegisterAsync(newClient, "ws-disabled@test.com", "Password123!", "WS", "Disabled");
 
         // Add as member
-        await client.PostAsJsonAsync("/api/v1/Organizations/ws-disabled-test/members", new
-        {
-            userId = newUser.User.Id,
-            role = 0
-        });
+        await TestHelpers.AddMemberAsync(_factory, client, "ws-disabled-test", newUser);
 
         TestHelpers.SetBearerToken(newClient, newUser.AccessToken);
 
@@ -197,11 +193,7 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         // Add Tom
         var tomLogin = await TestHelpers.LoginAsync(_factory.CreateClient(), TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
-        await client.PostAsJsonAsync("/api/v1/Organizations/admin-ws-test/members", new
-        {
-            userId = tomLogin.User.Id,
-            role = 0
-        });
+        await TestHelpers.AddMemberAsync(_factory, client, "admin-ws-test", tomLogin);
 
         var response = await client.PostAsJsonAsync(
             $"/api/v1/organizations/admin-ws-test/members/{tomLogin.User.Id}/work-schedules", new

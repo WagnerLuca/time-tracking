@@ -143,12 +143,12 @@ public class ReportsControllerTests : IClassFixture<TimeTrackingApiFactory>
         var groupAdminClient = _factory.CreateClient();
         var groupAdmin = await TestHelpers.RegisterAsync(groupAdminClient, "report-groupadmin@test.com", "Password123!", "Group", "Admin");
         TestHelpers.SetBearerToken(groupAdminClient, groupAdmin.AccessToken);
-        await ownerClient.PostAsJsonAsync("/api/v1/Organizations/report-export-org/members", new { userId = groupAdmin.User.Id, role = 0 });
+        await TestHelpers.AddMemberAsync(_factory, ownerClient, "report-export-org", groupAdmin);
 
         var memberClient = _factory.CreateClient();
         var member = await TestHelpers.RegisterAsync(memberClient, "report-member@test.com", "Password123!", "Plain", "Member");
         TestHelpers.SetBearerToken(memberClient, member.AccessToken);
-        await ownerClient.PostAsJsonAsync("/api/v1/Organizations/report-export-org/members", new { userId = member.User.Id, role = 0 });
+        await TestHelpers.AddMemberAsync(_factory, ownerClient, "report-export-org", member);
 
         // Create a group, add both, promote groupAdmin to Admin, enable export capability
         var createGroupResp = await ownerClient.PostAsJsonAsync("/api/v1/organizations/report-export-org/groups", new

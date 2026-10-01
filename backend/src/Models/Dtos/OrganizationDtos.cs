@@ -139,13 +139,6 @@ public record UpdateOrganizationRequest
     public string? LogoUrl { get; init; }
 }
 
-/// <summary>Request payload for adding a user to an organization.</summary>
-public record AddMemberRequest
-{
-    public int UserId { get; init; }
-    public OrganizationRole Role { get; init; } = OrganizationRole.Member;
-}
-
 /// <summary>Request payload for changing a member's role.</summary>
 public record UpdateMemberRoleRequest
 {

@@ -109,7 +109,7 @@ public class RowLevelSecurityTests
         (await owner.PostAsJsonAsync("/api/v1/TimeTracking/stop", (object?)null)).EnsureSuccessStatusCode();
 
         var (_, member) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "rls-leave-m@rls.test");
-        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members", new { userId = member.User.Id })).EnsureSuccessStatusCode();
+        (await TestHelpers.AddMemberAsync(_factory, owner, org.Slug, member)).EnsureSuccessStatusCode();
 
         await using (var asMember = await OpenAsAsync(member.User.Id))
             (await CountAsync(asMember, "SELECT count(*) FROM \"TimeEntries\" WHERE \"OrganizationId\" = @org", org.Id)).Should().BeGreaterThan(0);

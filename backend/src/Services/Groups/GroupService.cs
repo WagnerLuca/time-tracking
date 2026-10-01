@@ -200,7 +200,7 @@ public class GroupService : IGroupService
         if (group.Members.Any(m => m.UserId == request.UserId))
             return ServiceResult.BadRequest<GroupMemberResponse>("User is already in this group.");
 
-        if (!Enum.TryParse<GroupRole>(request.Role, ignoreCase: true, out var role))
+        if (!Enum.TryParse<GroupRole>(request.Role, ignoreCase: true, out var role) || !Enum.IsDefined(role))
             role = GroupRole.Member;
 
         // Granting the group admin role stays with org admins, like UpdateMemberRoleAsync
@@ -239,7 +239,7 @@ public class GroupService : IGroupService
 
         if (groupMember is null) return ServiceResult.NotFound<GroupMemberResponse>("Member not found in group.");
 
-        if (!Enum.TryParse<GroupRole>(request.Role, ignoreCase: true, out var role))
+        if (!Enum.TryParse<GroupRole>(request.Role, ignoreCase: true, out var role) || !Enum.IsDefined(role))
             return ServiceResult.BadRequest<GroupMemberResponse>("Invalid role. Use 'Admin' or 'Member'.");
 
         groupMember.Role = role;

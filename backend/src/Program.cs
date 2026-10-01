@@ -37,7 +37,9 @@ builder.Services.AddControllers(options =>
 {
     // Reject requests from deactivated users on every authenticated request
     options.Filters.Add<ActiveUserFilter>();
-});
+})
+// Undefined enum values (e.g. role 3, "above" Owner) are a 400, not silently accepted
+.AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new TimeTracking.Api.Infrastructure.StrictEnumConverterFactory()));
 builder.Services.AddEndpointsApiExplorer();
 
 // Add API Versioning
@@ -151,6 +153,7 @@ if (string.IsNullOrWhiteSpace(emailSettings.Smtp.Host))
 else
     builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+builder.Services.AddScoped<IInvitationService, InvitationService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddScoped<ITimeTrackingService, TimeTrackingService>();
 builder.Services.AddScoped<ITimeEntryExportService, TimeEntryExportService>();

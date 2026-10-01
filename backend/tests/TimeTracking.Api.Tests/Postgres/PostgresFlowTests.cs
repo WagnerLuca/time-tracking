@@ -26,7 +26,7 @@ public class PostgresFlowTests
         var (owner, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "pg-punch-owner@pg.test");
         var org = await TestHelpers.CreateOrganizationAsync(owner, "Punch Org", "pg-punch-org");
         var (member, m) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "pg-punch-m@pg.test");
-        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members", new { userId = m.User.Id })).EnsureSuccessStatusCode();
+        (await TestHelpers.AddMemberAsync(_factory, owner, org.Slug, m)).EnsureSuccessStatusCode();
         (await owner.PutAsJsonAsync($"/api/v1/organizations/{org.Slug}/members/{m.User.Id}/badge", new { badgeId = "PG-1" })).EnsureSuccessStatusCode();
         var key = (await (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/api-keys", new { name = "Door" }))
             .Content.ReadFromJsonAsync<JsonElement>()).GetProperty("key").GetString();
