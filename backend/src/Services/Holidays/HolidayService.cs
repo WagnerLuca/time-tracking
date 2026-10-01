@@ -133,21 +133,21 @@ public class HolidayService : IHolidayService
         if (callerRole == null || callerRole < OrganizationRole.Admin)
             return ServiceResult.Forbidden<List<HolidayResponse>>();
 
-        var targetYear = year ?? DateTime.UtcNow.Year;
+        var targetYear = year ?? OrgClock.For(org).Today().Year;
         var presetHolidays = GetPresetHolidays(preset, targetYear);
         if (presetHolidays == null)
             return ServiceResult.BadRequest<List<HolidayResponse>>(
                 $"Unknown preset: {preset}. Available: de, at, ch");
 
-        var existingDates = await _context.Holidays
+        var existing = await _context.Holidays
             .Where(h => h.OrganizationId == org.Id)
-            .Select(h => h.Date)
             .ToListAsync();
 
         var added = new List<HolidayResponse>();
         foreach (var (date, name, isRecurring) in presetHolidays)
         {
-            if (existingDates.Contains(date)) continue;
+            // Already there: on that date, or as a recurring holiday on that month/day (an earlier import)
+            if (existing.Any(h => h.DateIn(date.Year) == date)) continue;
 
             var holiday = new Holiday
             {
