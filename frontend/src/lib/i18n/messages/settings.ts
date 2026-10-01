@@ -36,7 +36,7 @@ export const de = {
 		mustDiffer: 'Das neue Passwort muss sich vom aktuellen unterscheiden.',
 		mismatch: 'Die Passwörter stimmen nicht überein.',
 		submit: 'Passwort ändern',
-		changed: 'Passwort geändert.',
+		changedSignIn: 'Passwort geändert. Aus Sicherheitsgründen wurdest du überall abgemeldet – bitte melde dich mit dem neuen Passwort an.',
 		failed: 'Das Passwort konnte nicht geändert werden.'
 	},
 	twoFactor: {
@@ -63,12 +63,18 @@ export const de = {
 		codeRequired: 'Bitte den 6-stelligen Code eingeben.',
 		invalidCode: 'Ungültiger Code. Bitte erneut versuchen.',
 		passwordRequired: 'Bitte dein Passwort eingeben, um 2FA auszuschalten.',
-		disableFailed: '2FA konnte nicht ausgeschaltet werden.'
+		disableFailed: '2FA konnte nicht ausgeschaltet werden.',
+		disableCode: 'Code aus der App oder Backup-Code',
+		disableCodeHint: 'Zum Ausschalten brauchst du dein Passwort und einen aktuellen Code aus der Authenticator-App oder einen Backup-Code.',
+		disableCodeRequired: 'Bitte einen Code aus der App oder einen Backup-Code eingeben.'
 	},
 	account: {
 		title: 'Konto',
-		intro: 'Auf diesem Gerät abmelden oder das Konto dauerhaft löschen.',
+		intro: 'Auf diesem Gerät abmelden, alle über dich gespeicherten Daten herunterladen oder das Konto dauerhaft löschen.',
 		signOut: 'Abmelden',
+		export: 'Meine Daten herunterladen',
+		exported: 'Deine Daten wurden als JSON-Datei heruntergeladen.',
+		exportFailed: 'Deine Daten konnten nicht exportiert werden.',
 		delete: 'Konto löschen',
 		deleteTitle: 'Konto löschen?',
 		deleteMessage: 'Deine persönlichen Daten (Name, E-Mail-Adresse, Anmeldedaten) werden entfernt und das Konto anonymisiert. Deine Zeiteinträge und Abwesenheiten bleiben bei den Organisationen erhalten. Das lässt sich nicht rückgängig machen.',
@@ -138,7 +144,7 @@ export const en: typeof de = {
 		mustDiffer: 'The new password must differ from the current one.',
 		mismatch: 'The passwords do not match.',
 		submit: 'Change password',
-		changed: 'Password changed.',
+		changedSignIn: 'Password changed. For your security you were signed out everywhere – please sign in with the new password.',
 		failed: 'Could not change the password.'
 	},
 	twoFactor: {
@@ -165,12 +171,18 @@ export const en: typeof de = {
 		codeRequired: 'Enter the 6-digit code.',
 		invalidCode: 'Invalid code. Try again.',
 		passwordRequired: 'Enter your password to turn off 2FA.',
-		disableFailed: 'Could not turn off 2FA.'
+		disableFailed: 'Could not turn off 2FA.',
+		disableCode: 'Code from the app or backup code',
+		disableCodeHint: 'To turn it off you need your password and a current code from the authenticator app or a backup code.',
+		disableCodeRequired: 'Please enter a code from the app or a backup code.'
 	},
 	account: {
 		title: 'Account',
-		intro: 'Sign out of this device or delete your account permanently.',
+		intro: 'Sign out of this device, download all data stored about you, or delete your account permanently.',
 		signOut: 'Sign out',
+		export: 'Download my data',
+		exported: 'Your data was downloaded as a JSON file.',
+		exportFailed: 'Your data could not be exported.',
 		delete: 'Delete account',
 		deleteTitle: 'Delete account?',
 		deleteMessage: 'Your personal data (name, email address, sign-in data) is removed and the account is anonymized. Your time entries and absences stay with the organizations. This cannot be undone.',

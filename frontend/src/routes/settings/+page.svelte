@@ -14,6 +14,8 @@
 	import SchedulePeriodEditor from '$lib/components/SchedulePeriodEditor.svelte';
 	import InitialOvertimeEditor from '$lib/components/InitialOvertimeEditor.svelte';
 	import Modal from '$lib/components/Modal.svelte';
+	import { downloadBlob } from '$lib/utils/download';
+	import { dateKey } from '$lib/utils/dateHelpers';
 
 	/** The backend's minimum (RegisterRequest / ChangePasswordRequest). */
 	const MIN_PASSWORD_LENGTH = 8;
@@ -67,6 +69,10 @@
 	let twoFactorError = $state('');
 	let twoFactorSaving = $state(false);
 	let twoFactorDisablePassword = $state('');
+	let twoFactorDisableCode = $state('');
+
+	// GDPR data export (JSON download of everything stored about the account)
+	let exportingData = $state(false);
 
 	// Account deletion (password-confirmed)
 	let deleteOpen = $state(false);
@@ -152,11 +158,10 @@
 		passwordSaving = true;
 		try {
 			await authApi.apiV1AuthChangePasswordPost({ currentPassword, newPassword });
-			currentPassword = '';
-			newPassword = '';
-			confirmPassword = '';
-			passwordSubmitted = false;
-			toast.success(t('settings.password.changed'));
+			// The backend ends every session, this one included: sign out cleanly instead of running into 401s
+			await auth.logout();
+			toast.success(t('settings.password.changedSignIn'));
+			goto('/login');
 		} catch (err) {
 			passwordError = extractErrorMessage(err, t('settings.password.failed'));
 		} finally {
@@ -212,11 +217,16 @@
 			twoFactorError = t('settings.twoFactor.passwordRequired');
 			return;
 		}
+		if (!twoFactorDisableCode.trim()) {
+			twoFactorError = t('settings.twoFactor.disableCodeRequired');
+			return;
+		}
 		twoFactorError = '';
 		twoFactorSaving = true;
 		try {
-			await authApi.apiV1Auth2faDisablePost({ currentPassword: twoFactorDisablePassword, newPassword: twoFactorDisablePassword });
+			await authApi.apiV1Auth2faDisablePost({ currentPassword: twoFactorDisablePassword, code: twoFactorDisableCode.trim() });
 			twoFactorDisablePassword = '';
+			twoFactorDisableCode = '';
 			await auth.fetchCurrentUser();
 			toast.success(t('settings.twoFactor.disabled'));
 		} catch (err) {
@@ -237,6 +247,19 @@
 	async function handleLogout() {
 		await auth.logout();
 		goto('/login');
+	}
+
+	async function handleExportData() {
+		exportingData = true;
+		try {
+			const res = await authApi.apiV1AuthMeExportGet({ responseType: 'blob' });
+			downloadBlob(res.data as unknown as BlobPart, 'application/json', `my-data-${dateKey(new Date())}.json`);
+			toast.success(t('settings.account.exported'));
+		} catch (err) {
+			toast.error(err, t('settings.account.exportFailed'));
+		} finally {
+			exportingData = false;
+		}
 	}
 
 	function openDeleteAccount() {
@@ -386,10 +409,24 @@
 									disabled={twoFactorSaving}
 								/>
 							</div>
-							<button type="submit" class="btn btn-error btn-sm" disabled={twoFactorSaving || !twoFactorDisablePassword}>
+							<div>
+								<label for="disable2faCode" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.twoFactor.disableCode')}</label>
+								<input
+									id="disable2faCode"
+									type="text"
+									autocomplete="one-time-code"
+									bind:value={twoFactorDisableCode}
+									class="input input-bordered input-sm w-[180px] font-mono"
+									aria-describedby="disable2faCodeHint"
+									maxlength="20"
+									disabled={twoFactorSaving}
+								/>
+							</div>
+							<button type="submit" class="btn btn-error btn-sm" disabled={twoFactorSaving || !twoFactorDisablePassword || !twoFactorDisableCode.trim()}>
 								{twoFactorSaving ? t('settings.twoFactor.disabling') : t('settings.twoFactor.disable')}
 							</button>
 						</form>
+						<p id="disable2faCodeHint" class="text-xs text-base-content/50">{t('settings.twoFactor.disableCodeHint')}</p>
 					{:else}
 						<p class="text-sm text-base-content/60">{t('settings.twoFactor.intro')}</p>
 						<div>
@@ -464,6 +501,10 @@
 				<p class="text-sm text-base-content/60 m-0">{t('settings.account.intro')}</p>
 				<div class="flex flex-wrap gap-3">
 					<button type="button" class="btn btn-outline btn-sm" onclick={handleLogout}>{t('settings.account.signOut')}</button>
+					<button type="button" class="btn btn-outline btn-sm" onclick={handleExportData} disabled={exportingData}>
+						{#if exportingData}<span class="loading loading-spinner loading-xs"></span>{/if}
+						{t('settings.account.export')}
+					</button>
 					<button type="button" class="btn btn-error btn-sm" onclick={openDeleteAccount}>{t('settings.account.delete')}</button>
 				</div>
 			</div>
