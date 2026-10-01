@@ -178,14 +178,14 @@ public class PdfReportService : IPdfReportService
             .Select(e => (DateTime?)e.StartTime)
             .FirstOrDefaultAsync();
 
-        var loopFrom = dateFrom;
-        if (firstEntry != null)
-        {
-            var timeZone = await context.Organizations.AsNoTracking()
-                .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
-            var firstEntryDate = OrgClock.For(timeZone).LocalDate(firstEntry.Value);
-            if (firstEntryDate < loopFrom) loopFrom = firstEntryDate;
-        }
+        // The balance runs from the first tracked entry: days before someone started tracking
+        // are not "missing" work. Without any entry there is nothing to count yet.
+        if (firstEntry == null)
+            return ([], initialOvertimeHours);
+
+        var timeZone = await context.Organizations.AsNoTracking()
+            .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
+        var loopFrom = OrgClock.For(timeZone).LocalDate(firstEntry.Value);
 
         var allRows = await DailyReportAggregator.BuildAsync(context, userId, orgId, loopFrom, dateTo, initialOvertimeHours);
         var displayRows = allRows.Where(r => r.Date >= dateFrom).ToList();

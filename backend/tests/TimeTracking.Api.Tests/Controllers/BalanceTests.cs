@@ -64,4 +64,25 @@ public class BalanceTests : IClassFixture<TimeTrackingApiFactory>
         (await member.GetAsync($"/api/v1/organizations/{org.Slug}/members/{m.User.Id}/balance")).EnsureSuccessStatusCode();
         (await owner.GetAsync($"/api/v1/organizations/{org.Slug}/members/{m.User.Id}/balance")).EnsureSuccessStatusCode();
     }
+
+    [Fact]
+    public async Task Balance_StartsAtTheFirstTrackedEntry_NotAtTheStartOfTheWeek()
+    {
+        var (owner, login) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "balance-start@bal.test");
+        var org = await TestHelpers.CreateOrganizationAsync(owner, "Balance Org 3", "balance-org-3");
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/settings", new { csvImportMode = 2 })).EnsureSuccessStatusCode();
+        var today = OrgClock.For("Europe/Berlin").Today();
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedules",
+            new { validFrom = today.AddMonths(-2).ToString("yyyy-MM-dd"), weeklyWorkHours = 40, distributeEvenly = true })).EnsureSuccessStatusCode();
+        (await owner.PostAsJsonAsync($"/api/v1/ExportImport/import/confirm?orgSlug={org.Slug}",
+            new[] { new { date = today.ToString("yyyy-MM-dd"), startTime = "08:00", endTime = "10:00", pauseMinutes = 0, description = "first ever" } })).EnsureSuccessStatusCode();
+
+        var balance = await owner.GetFromJsonAsync<JsonElement>($"/api/v1/organizations/{org.Slug}/members/{login.User.Id}/balance");
+
+        // Nothing before today was tracked, so earlier weekdays of this week are not missing work
+        balance.GetProperty("cumulativeOvertimeHours").GetDouble()
+            .Should().BeApproximately(balance.GetProperty("today").GetProperty("overtimeHours").GetDouble(), 0.01);
+        balance.GetProperty("week").GetProperty("overtimeHours").GetDouble()
+            .Should().BeApproximately(balance.GetProperty("today").GetProperty("overtimeHours").GetDouble(), 0.01);
+    }
 }
