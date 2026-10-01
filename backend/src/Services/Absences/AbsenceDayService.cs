@@ -255,9 +255,15 @@ public class AbsenceDayService : IAbsenceDayService
         if (absence == null)
             return ServiceResult.NotFound("Absence not found");
 
-        // Members can only delete their own
-        if (callerRole < OrganizationRole.Admin && absence.UserId != callerUserId)
-            return ServiceResult.Forbidden();
+        // Members can only delete their own, self-entered absences: one an admin entered or that
+        // came from an approved request is part of the approval trail
+        if (callerRole < OrganizationRole.Admin)
+        {
+            if (absence.UserId != callerUserId)
+                return ServiceResult.Forbidden();
+            if (absence.CreatedViaRequestId != null || (absence.CreatedByUserId != null && absence.CreatedByUserId != callerUserId))
+                return ServiceResult.Forbidden("This absence was approved or entered by an admin. Ask an admin to remove it.");
+        }
 
         _context.AbsenceDays.Remove(absence);
         await _context.SaveChangesAsync();

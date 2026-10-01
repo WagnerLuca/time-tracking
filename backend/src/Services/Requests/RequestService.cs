@@ -206,11 +206,15 @@ public class RequestService : IRequestService
             if (!orgRequest.GroupId.HasValue)
                 return ServiceResult.Forbidden<OrgRequestResponse>();
 
-            var isGroupAdmin = await _context.GroupMembers
-                .AnyAsync(gm => gm.GroupId == orgRequest.GroupId.Value
-                             && gm.UserId == callerUserId
-                             && gm.Role == GroupRole.Admin);
-            if (!isGroupAdmin)
+            // Still a member, still admin of the (active) group, and the group still grants this approval
+            var group = callerRole == null ? null : await _context.GroupMembers
+                .Where(gm => gm.GroupId == orgRequest.GroupId.Value
+                          && gm.UserId == callerUserId
+                          && gm.Role == GroupRole.Admin
+                          && gm.Group.IsActive)
+                .Select(gm => gm.Group)
+                .FirstOrDefaultAsync();
+            if (group == null || !GroupCanApprove(group, orgRequest.Type))
                 return ServiceResult.Forbidden<OrgRequestResponse>();
         }
 
@@ -297,11 +301,19 @@ public class RequestService : IRequestService
             .Select(uo => uo.OrganizationId)
             .ToListAsync();
 
-        // Group-level admin: sees pending requests routed to their groups
-        var groupAdminGroupIds = await _context.GroupMembers
-            .Where(gm => gm.UserId == userId && gm.Role == GroupRole.Admin)
-            .Select(gm => gm.GroupId)
+        // Group-level admin: sees pending requests routed to their (active) groups, only while
+        // still a member of the organization and only for request types the group may approve
+        var adminGroups = await _context.GroupMembers
+            .Where(gm => gm.UserId == userId && gm.Role == GroupRole.Admin && gm.Group.IsActive
+                      && _context.UserOrganizations.Any(uo => uo.UserId == userId && uo.OrganizationId == gm.Group.OrganizationId))
+            .Select(gm => gm.Group)
             .ToListAsync();
+        var groupAdminGroupIds = adminGroups.Select(g => g.Id).ToList();
+
+        // Organizations that require 2FA show nothing to callers without it
+        var hasTwoFactor = await _context.Users.Where(u => u.Id == userId).Select(u => u.TwoFactorEnabled).FirstOrDefaultAsync();
+        var blockedOrgIds = hasTwoFactor ? new List<int>() : await _context.Organizations
+            .Where(o => o.Require2fa).Select(o => o.Id).ToListAsync();
 
         if (adminOrgIds.Count == 0 && groupAdminGroupIds.Count == 0)
             return ServiceResult.Ok(new AdminNotificationResponse
@@ -316,10 +328,15 @@ public class RequestService : IRequestService
             .Include(r => r.Organization)
             .Include(r => r.Group)
             .Where(r => r.Status == RequestStatus.Pending
+                     && !blockedOrgIds.Contains(r.OrganizationId)
                      && (adminOrgIds.Contains(r.OrganizationId)
                          || (r.GroupId.HasValue && groupAdminGroupIds.Contains(r.GroupId.Value))))
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
+        pendingRequests = pendingRequests
+            .Where(r => adminOrgIds.Contains(r.OrganizationId)
+                     || adminGroups.Any(g => g.Id == r.GroupId && GroupCanApprove(g, r.Type)))
+            .ToList();
 
         return ServiceResult.Ok(new AdminNotificationResponse
         {
@@ -660,18 +677,7 @@ public class RequestService : IRequestService
 
         foreach (var group in userGroups)
         {
-            var hasCapability = requestType switch
-            {
-                RequestType.EditPastEntry => group.GroupAdminCanApproveTimeEdits == true,
-                RequestType.EditPause => group.GroupAdminCanApproveTimeEdits == true,
-                RequestType.CsvImport => group.GroupAdminCanApproveTimeEdits == true,
-                RequestType.SetInitialOvertime => group.GroupAdminCanApproveTimeEdits == true,
-                RequestType.WorkScheduleChange => group.GroupAdminCanApproveScheduleChanges == true,
-                RequestType.RequestAbsence => group.GroupAdminCanApproveAbsences == true,
-                _ => false
-            };
-
-            if (hasCapability)
+            if (GroupCanApprove(group, requestType))
             {
                 // Verify the group actually has at least one Group Admin
                 var hasGroupAdmin = await _context.GroupMembers
@@ -683,6 +689,16 @@ public class RequestService : IRequestService
 
         return null;
     }
+
+    /// <summary>Whether a group's admins may approve this kind of request.</summary>
+    private static bool GroupCanApprove(Group group, RequestType type) => type switch
+    {
+        RequestType.EditPastEntry or RequestType.EditPause or RequestType.CsvImport or RequestType.SetInitialOvertime
+            => group.GroupAdminCanApproveTimeEdits == true,
+        RequestType.WorkScheduleChange => group.GroupAdminCanApproveScheduleChanges == true,
+        RequestType.RequestAbsence => group.GroupAdminCanApproveAbsences == true,
+        _ => false
+    };
 
     /// <summary>
     /// Returns the IDs of groups where the user is a Group Admin within the given org,

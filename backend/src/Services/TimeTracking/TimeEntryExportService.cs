@@ -442,6 +442,9 @@ public class TimeEntryExportService : ITimeEntryExportService
     private static string EscapeCsv(string value)
     {
         if (string.IsNullOrEmpty(value)) return value;
+        // Spreadsheets execute cells starting with these characters as formulas (CSV injection)
+        if (value[0] is '=' or '+' or '-' or '@' or '\t' or '\r')
+            value = "'" + value;
         if (value.Contains('"') || value.Contains(',') || value.Contains('\n') || value.Contains('\r'))
             return $"\"{value.Replace("\"", "\"\"")}\"";
         return value;

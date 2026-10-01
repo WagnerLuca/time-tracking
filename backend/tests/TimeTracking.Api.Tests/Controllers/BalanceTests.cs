@@ -62,6 +62,9 @@ public class BalanceTests : IClassFixture<TimeTrackingApiFactory>
         (await member.GetAsync($"/api/v1/organizations/{org.Slug}/members/{ownerLogin.User.Id}/balance"))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await member.GetAsync($"/api/v1/organizations/{org.Slug}/members/{m.User.Id}/balance")).EnsureSuccessStatusCode();
+        // The org decides whether admins may see members' hours
+        (await owner.GetAsync($"/api/v1/organizations/{org.Slug}/members/{m.User.Id}/balance")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/settings", new { memberTimeEntryVisibility = true })).EnsureSuccessStatusCode();
         (await owner.GetAsync($"/api/v1/organizations/{org.Slug}/members/{m.User.Id}/balance")).EnsureSuccessStatusCode();
     }
 

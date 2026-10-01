@@ -141,7 +141,14 @@ public class ApiKeyService : IApiKeyService
         // may treat the rest of this request as that member (row-level security)
         var userId = membership.UserId;
         _rls.ActAsUser(userId);
-        var isRunning = await _context.TimeEntries.AnyAsync(e => e.UserId == userId && e.IsRunning);
+        var running = await _context.TimeEntries
+            .Where(e => e.UserId == userId && e.IsRunning)
+            .Select(e => new { e.OrganizationId })
+            .FirstOrDefaultAsync();
+        // A terminal of organization A must neither stop nor reveal a timer elsewhere
+        if (running != null && running.OrganizationId != key.OrganizationId)
+            return ServiceResult.Conflict<PunchResponse>("A timer is running outside this organization. Stop it in the app first.");
+        var isRunning = running != null;
         var result = isRunning
             ? await _timeTracking.StopAsync(userId, null)
             : await _timeTracking.StartAsync(userId, new StartTimeEntryRequest { OrganizationId = key.OrganizationId });

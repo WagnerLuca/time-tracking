@@ -81,7 +81,13 @@ public static class EffectiveRuleResolver
             .Select(uo => (OrganizationRole?)uo.Role)
             .FirstOrDefaultAsync();
 
-        if (callerRole >= OrganizationRole.Admin) return true;
+        if (callerRole == null) return false;
+
+        // "Admins may see members' time entries" is the organization's own privacy setting;
+        // exports, PDFs and balances are just other ways of seeing the same hours
+        if (callerRole >= OrganizationRole.Admin)
+            return await context.Organizations.AsNoTracking()
+                .Where(o => o.Id == orgId).Select(o => o.MemberTimeEntryVisibility).FirstOrDefaultAsync();
 
         var callerAdminGroupIds = await context.GroupMembers
             .AsNoTracking()

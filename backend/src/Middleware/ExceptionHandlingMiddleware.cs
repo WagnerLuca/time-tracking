@@ -36,10 +36,10 @@ public class ExceptionHandlingMiddleware
     {
         var (statusCode, title, detail) = exception switch
         {
-            ArgumentException        => (StatusCodes.Status400BadRequest,            "Bad Request",            exception.Message),
+            ArgumentException        => (StatusCodes.Status400BadRequest,            "Bad Request",            "The request is invalid."),
             UnauthorizedAccessException => (StatusCodes.Status401Unauthorized,       "Unauthorized",           "Authentication is required to access this resource."),
             KeyNotFoundException     => (StatusCodes.Status404NotFound,              "Not Found",              "The requested resource was not found."),
-            InvalidOperationException => (StatusCodes.Status409Conflict,             "Conflict",               exception.Message),
+            InvalidOperationException => (StatusCodes.Status409Conflict,             "Conflict",               "The request conflicts with the current state."),
             _                        => (StatusCodes.Status500InternalServerError,   "Internal Server Error",  "An unexpected error occurred.")
         };
 

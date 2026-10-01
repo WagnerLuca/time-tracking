@@ -430,6 +430,9 @@ public class OrganizationService : IOrganizationService
         }
 
         membership.IsActive = false;
+        // Leaving ends group roles too (they must not come back on rejoining) and frees the badge
+        membership.BadgeId = null;
+        _context.GroupMembers.RemoveRange(_context.GroupMembers.Where(gm => gm.UserId == userId && gm.Group.OrganizationId == org.Id));
 
         _logger.LogInformation("Member {UserId} removed from org {OrgId} by user {CallerId}", userId, org.Id, callerUserId);
 

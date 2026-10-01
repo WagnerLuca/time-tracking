@@ -200,6 +200,9 @@ public class GroupService : IGroupService
         if (group.Members.Any(m => m.UserId == request.UserId))
             return ServiceResult.BadRequest<GroupMemberResponse>("User is already in this group.");
 
+        if (!isOrgAdmin && targetMembership.Role >= OrganizationRole.Admin)
+            return ServiceResult.Forbidden<GroupMemberResponse>("Only org admins can add admins or the owner to a group.");
+
         if (!Enum.TryParse<GroupRole>(request.Role, ignoreCase: true, out var role) || !Enum.IsDefined(role))
             role = GroupRole.Member;
 

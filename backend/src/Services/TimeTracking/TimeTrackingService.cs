@@ -186,19 +186,17 @@ public class TimeTrackingService : ITimeTrackingService
         if (entry.IsRunning)
             return ServiceResult.BadRequest<TimeEntryResponse>("Cannot edit a running time entry. Stop it first.");
 
-        // Check org-level editing rules
-        if (entry.OrganizationId.HasValue)
+        // Editing needs edit rights in the entry's organization and, when the entry moves, in
+        // the target one too — otherwise a personal entry could be "edited into" an organization
+        // that forbids changing past entries
+        int? targetOrgId = request.OrganizationId.HasValue
+            ? (request.OrganizationId.Value == 0 ? null : request.OrganizationId.Value)
+            : entry.OrganizationId;
+        foreach (var orgId in new[] { entry.OrganizationId, targetOrgId }.Distinct())
         {
-            var org = await _context.Organizations
-                .AsNoTracking()
-                .FirstOrDefaultAsync(o => o.Id == entry.OrganizationId);
-
-            if (org != null)
-            {
-                var check = OrgRuleHelper.EnforceAllowed<TimeEntryResponse>(
-                    await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.EditPastEntry), "Editing past entries");
-                if (check != null) return check;
-            }
+            if (orgId is not int id) continue;
+            var denied = await CheckPastEntryAccessAsync(userId, id);
+            if (denied != null) return ServiceResult.Fail<TimeEntryResponse>(denied.Value.Type, denied.Value.Message);
         }
 
         var timesChanged = (request.StartTime.HasValue && request.StartTime.Value != entry.StartTime)
@@ -211,28 +209,11 @@ public class TimeTrackingService : ITimeTrackingService
             entry.IsFailure = false;   // the member supplied the real end time
         }
         if (request.Description != null) entry.Description = request.Description;
-        if (request.OrganizationId.HasValue)
-        {
-            int? newOrganizationId = request.OrganizationId.Value == 0 ? null : request.OrganizationId.Value;
+        entry.OrganizationId = targetOrgId;
 
-            if (newOrganizationId.HasValue)
-            {
-                var orgExists = await _context.Organizations
-                    .AsNoTracking()
-                    .AnyAsync(o => o.Id == newOrganizationId.Value);
-                if (!orgExists)
-                    return ServiceResult.BadRequest<TimeEntryResponse>("Organization not found.");
-
-                var isMember = await _context.UserOrganizations
-                    .AsNoTracking()
-                    .AnyAsync(uo => uo.OrganizationId == newOrganizationId.Value && uo.UserId == userId);
-                if (!isMember)
-                    return ServiceResult.Forbidden<TimeEntryResponse>("You are not a member of this organization.");
-            }
-
-            entry.OrganizationId = newOrganizationId;
-        }
-
+        var timesError = EntryTimes.Validate(entry.StartTime, entry.EndTime);
+        if (timesError != null)
+            return ServiceResult.BadRequest<TimeEntryResponse>(timesError);
         if (entry.EndTime.HasValue && entry.EndTime.Value <= entry.StartTime)
             return ServiceResult.BadRequest<TimeEntryResponse>("End time must be after start time.");
 
@@ -275,18 +256,11 @@ public class TimeTrackingService : ITimeTrackingService
         if (entry == null)
             return ServiceResult.NotFound("Time entry not found.");
 
-        // Deleting a past entry changes the record as much as editing it, so the same rule applies
-        if (entry.OrganizationId.HasValue && !entry.IsRunning)
+        // Deleting a past entry changes the record as much as editing it, so the same access applies
+        if (entry.OrganizationId is int orgId && !entry.IsRunning)
         {
-            var org = await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == entry.OrganizationId);
-            if (org != null)
-            {
-                var mode = await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.EditPastEntry);
-                if (mode != RuleMode.Allowed)
-                    return ServiceResult.Forbidden(mode == RuleMode.Disabled
-                        ? "Editing past entries is disabled in this organization."
-                        : "Editing past entries requires admin approval in this organization. Please submit a request.");
-            }
+            var denied = await CheckPastEntryAccessAsync(userId, orgId);
+            if (denied != null) return ServiceResult.Fail(denied.Value.Type, denied.Value.Message);
         }
 
         _context.TimeEntries.Remove(entry);
@@ -299,6 +273,32 @@ public class TimeTrackingService : ITimeTrackingService
     // ────────────────────────────────────────────────────
     //  Private helpers
     // ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// May the user change past entries of this organization? They must be an active member,
+    /// meet its 2FA requirement and have the "edit past entries" rule effectively Allowed.
+    /// </summary>
+    private async Task<(ServiceErrorType Type, string Message)?> CheckPastEntryAccessAsync(int userId, int orgId)
+    {
+        var org = await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Id == orgId);
+        if (org == null) return (ServiceErrorType.BadRequest, "Organization not found.");
+
+        var membership = await _context.UserOrganizations.AsNoTracking()
+            .Where(uo => uo.OrganizationId == orgId && uo.UserId == userId)
+            .Select(uo => new { uo.User.TwoFactorEnabled })
+            .FirstOrDefaultAsync();
+        if (membership == null) return (ServiceErrorType.Forbidden, "You are not a member of this organization.");
+        if (org.Require2fa && !membership.TwoFactorEnabled)
+            return (ServiceErrorType.Forbidden, "This organization requires two-factor authentication. Enable it in your account settings to continue.");
+
+        var mode = await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.EditPastEntry);
+        return mode switch
+        {
+            RuleMode.Disabled => (ServiceErrorType.Forbidden, "Editing past entries is disabled in this organization."),
+            RuleMode.RequiresApproval => (ServiceErrorType.Forbidden, "Editing past entries requires admin approval in this organization. Please submit a request."),
+            _ => null
+        };
+    }
 
     private Task ApplyPauseRulesAsync(TimeEntry entry) => PauseRules.ApplyAsync(_context, entry);
 
