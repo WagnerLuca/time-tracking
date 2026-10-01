@@ -1,11 +1,12 @@
 <script lang="ts">
+	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { timer } from '$lib/stores/timer.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
-	import { timeTrackingApi, organizationsApi, workScheduleApi, groupApi, reportsApi } from '$lib/apiClient';
+	import { timeTrackingApi, workScheduleApi, groupApi, reportsApi } from '$lib/apiClient';
 	import type { TimeEntryResponse, WorkScheduleResponse, OrganizationDetailResponse, EffectivePermissionsResponse } from '$lib/api';
 	import { formatHoursDecimal, formatDelta, formatDateShort, formatWeekLabel, formatClock, dayNamesShort } from '$lib/utils/formatters';
 	import { isToday, getWeekRange } from '$lib/utils/dateHelpers';
@@ -133,7 +134,7 @@
 		}
 		const [ws, od, ep, off] = await Promise.allSettled([
 			workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(slug),
-			organizationsApi.apiV1OrganizationsSlugGet(slug),
+			getOrgDetail(slug).then((data) => ({ data })),
 			groupApi.apiV1OrganizationsSlugEffectivePermissionsGet(slug),
 			loadDaysOffFor(slug)
 		]);

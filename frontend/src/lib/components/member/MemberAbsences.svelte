@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { invalidateOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { absenceDayApi } from '$lib/apiClient';
 	import type { AbsenceDayResponse, AbsenceTypeDefinitionResponse } from '$lib/api';
@@ -74,6 +75,7 @@
 	function saved(requestMessage?: string) {
 		if (requestMessage) toast.info(requestMessage);
 		else toast.success(t('memberDetail.absences.added'));
+		invalidateOrgDetail(orgSlug);
 		load();
 		onchanged?.();
 	}
@@ -89,6 +91,7 @@
 		if (!ok) return;
 		deletingId = a.id;
 		try {
+			invalidateOrgDetail(orgSlug); // member/vacation figures change
 			await absenceDayApi.apiV1OrganizationsSlugAbsencesIdDelete(orgSlug, a.id);
 			toast.success(t('memberDetail.absences.deleted'));
 			await load();

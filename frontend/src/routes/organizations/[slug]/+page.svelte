@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getOrgDetail, invalidateOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
@@ -71,7 +72,7 @@
 		perms = null;
 		settingsNotificationIds = [];
 		try {
-			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
+			const data = await getOrgDetail(orgSlug);
 			org = data;
 		} catch (err) {
 			error = getErrorStatus(err) === 404 ? t('orgHome.notFound') : extractErrorMessage(err, t('orgHome.loadFailed'));
@@ -88,7 +89,7 @@
 	/** Reload org data without the page spinner (keeps the scroll position). */
 	async function reloadOrg() {
 		try {
-			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
+			const data = await getOrgDetail(orgSlug, { fresh: true });
 			org = data;
 		} catch (err) {
 			toast.error(err, t('orgHome.reloadFailed'));
@@ -175,6 +176,7 @@
 			await organizationsApi.apiV1OrganizationsSlugPut(orgSlug, payload);
 			toast.success(t('orgHome.edit.saved'));
 			editing = false;
+			if (newSlug !== orgSlug) invalidateOrgDetail(orgSlug);
 			if (newSlug !== orgSlug) await goto(`/organizations/${newSlug}`, { replaceState: true });
 			else await reloadOrg();
 		} catch (err) {
@@ -195,6 +197,7 @@
 		deleting = true;
 		try {
 			await organizationsApi.apiV1OrganizationsSlugDelete(orgSlug);
+			invalidateOrgDetail(orgSlug);
 			toast.success(t('orgHome.delete.deleted'));
 			goto('/organizations');
 		} catch (err) {
@@ -283,7 +286,8 @@
 			{#if org.description}
 				<p class="text-base-content/70 my-3">{org.description}</p>
 			{/if}
-			{#if org.website}
+			<!-- Only http(s) becomes a link: a javascript:/data: URL must never be clickable -->
+			{#if org.website && /^https?:\/\//i.test(org.website)}
 				<a href={org.website} target="_blank" rel="noopener noreferrer" class="link link-primary text-sm inline-block mb-4 break-all">{org.website}</a>
 			{/if}
 

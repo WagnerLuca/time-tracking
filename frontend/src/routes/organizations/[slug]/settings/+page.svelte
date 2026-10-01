@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
@@ -73,7 +74,7 @@
 		loading = true;
 		error = '';
 		try {
-			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
+			const data = await getOrgDetail(orgSlug);
 			org = data;
 			if (isOrgAdmin(data.members?.find((m) => m.id === auth.user?.id)?.role)) {
 				loadRequestHistory();
@@ -90,7 +91,7 @@
 	/** Refreshes the settings in place (no page spinner); returns false when that failed. */
 	async function reloadOrg(): Promise<boolean> {
 		try {
-			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
+			const data = await getOrgDetail(orgSlug, { fresh: true });
 			org = data;
 			return true;
 		} catch (err) {

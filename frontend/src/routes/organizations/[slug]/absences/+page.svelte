@@ -1,10 +1,11 @@
 <script lang="ts">
+	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
-	import { organizationsApi, holidayApi, absenceDayApi, groupApi } from '$lib/apiClient';
+	import { holidayApi, absenceDayApi, groupApi } from '$lib/apiClient';
 	import { t, tp } from '$lib/i18n';
 	import { absenceTypeLabel, dayNamesShort, formatDate, formatDateFull, formatDateShort, formatNumber, getInitials } from '$lib/utils/formatters';
 	import { dayPress } from '$lib/utils/dayPress';
@@ -76,7 +77,7 @@
 		absences = [];
 		loadedYears = null;
 		try {
-			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
+			const data = await getOrgDetail(orgSlug);
 			org = data; // → the effect below loads the absences
 			loadHolidays();
 			loadEffectivePermissions();
@@ -111,7 +112,7 @@
 
 	async function reloadOrg() {
 		try {
-			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
+			const data = await getOrgDetail(orgSlug, { fresh: true });
 			org = data;
 		} catch (err) {
 			toast.error(err, t('absences.refreshFailed'));

@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { exportImportApi, groupApi, organizationsApi, requestsApi, reportsApi } from '$lib/apiClient';
+	import { exportImportApi, groupApi, requestsApi, reportsApi } from '$lib/apiClient';
 	import type {
 		EffectivePermissionsResponse,
 		ExportRequest,
@@ -56,7 +57,7 @@
 		orgLoadError = '';
 		try {
 			const [detail, effective] = await Promise.all([
-				organizationsApi.apiV1OrganizationsSlugGet(slug),
+				getOrgDetail(slug).then((data) => ({ data })),
 				groupApi.apiV1OrganizationsSlugEffectivePermissionsGet(slug)
 			]);
 			if (slug !== orgContext.selectedOrgSlug) return; // org switched meanwhile

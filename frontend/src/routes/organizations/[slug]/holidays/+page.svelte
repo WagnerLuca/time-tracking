@@ -1,10 +1,11 @@
 <script lang="ts">
+	import { getOrgDetail, invalidateOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
-	import { organizationsApi, holidayApi } from '$lib/apiClient';
+	import { holidayApi } from '$lib/apiClient';
 	import { t } from '$lib/i18n';
 	import { formatDate } from '$lib/utils/formatters';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
@@ -72,7 +73,7 @@
 		loading = true;
 		error = '';
 		try {
-			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
+			const data = await getOrgDetail(orgSlug);
 			org = data;
 			loadHolidays();
 		} catch (err) {
@@ -105,6 +106,7 @@
 		addingHoliday = true;
 		addError = '';
 		try {
+			invalidateOrgDetail(orgSlug); // member/vacation figures change
 			await holidayApi.apiV1OrganizationsSlugHolidaysPost(orgSlug, {
 				date: newHolidayDate,
 				name: newHolidayName.trim(),
@@ -143,6 +145,7 @@
 		editHolidaySaving = true;
 		editError = '';
 		try {
+			invalidateOrgDetail(orgSlug); // member/vacation figures change
 			await holidayApi.apiV1OrganizationsSlugHolidaysIdPut(orgSlug, id, {
 				date: editHolidayDate,
 				name: editHolidayName.trim(),
@@ -170,6 +173,7 @@
 		if (!ok) return;
 		deletingId = h.id;
 		try {
+			invalidateOrgDetail(orgSlug); // member/vacation figures change
 			await holidayApi.apiV1OrganizationsSlugHolidaysIdDelete(orgSlug, h.id);
 			toast.success(t('holidays.deleted'));
 			await loadHolidays();

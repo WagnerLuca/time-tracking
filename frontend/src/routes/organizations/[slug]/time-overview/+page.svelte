@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { organizationsApi } from '$lib/apiClient';
@@ -37,7 +38,7 @@
 
 	async function loadOrg() {
 		try {
-			const { data: org } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
+			const org = await getOrgDetail(orgSlug);
 			orgName = org.name ?? '';
 		} catch (err) {
 			// Only the heading uses the name; the overview below reports its own errors

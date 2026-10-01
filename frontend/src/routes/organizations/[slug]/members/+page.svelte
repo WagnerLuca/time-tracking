@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
@@ -37,7 +38,7 @@
 		groupFilter = null;
 		overviewByUser = new Map();
 		try {
-			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
+			const data = await getOrgDetail(orgSlug);
 			org = data;
 		} catch (err) {
 			error = getErrorStatus(err) === 404 ? t('memberList.notFound') : extractErrorMessage(err, t('memberList.loadFailed'));

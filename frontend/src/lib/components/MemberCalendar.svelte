@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getOrgDetail, invalidateOrgDetail } from '$lib/stores/orgDetail';
 	import { onMount, tick, untrack } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -196,7 +197,7 @@
 	async function loadOrgDetail() {
 		if (orgDetail) return;
 		try {
-			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
+			const data = await getOrgDetail(orgSlug);
 			fetchedOrgDetail = data;
 		} catch (err) {
 			fetchedOrgDetail = null;
@@ -276,6 +277,7 @@
 			toast.success(requestMessage);
 			return;
 		}
+		invalidateOrgDetail(orgSlug); // vacation counts changed
 		await Promise.all([loadDaysOff(), loadEntries()]);
 		await loadCumulativeBalance();
 	}

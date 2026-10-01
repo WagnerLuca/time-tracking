@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { getOrgDetail, invalidateOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { groupApi, organizationsApi } from '$lib/apiClient';
+	import { groupApi } from '$lib/apiClient';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
@@ -126,6 +127,7 @@
 		creating = true;
 		createError = '';
 		try {
+			invalidateOrgDetail(orgSlug); // member/vacation figures change
 			await groupApi.apiV1OrganizationsSlugGroupsPost(orgSlug, {
 				name: createName.trim(),
 				description: createDescription.trim() || undefined,
@@ -163,6 +165,7 @@
 		editSaving = true;
 		editError = '';
 		try {
+			invalidateOrgDetail(orgSlug); // member/vacation figures change
 			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPut(orgSlug, selectedGroup.id, {
 				name: editName.trim(),
 				description: editDescription.trim() || undefined,
@@ -189,6 +192,7 @@
 		});
 		if (!ok) return;
 		try {
+			invalidateOrgDetail(orgSlug); // member/vacation figures change
 			await groupApi.apiV1OrganizationsSlugGroupsGroupIdDelete(orgSlug, selectedGroup.id);
 			toast.success(t('groups.deleted'));
 			selectedGroup = null;
@@ -201,7 +205,7 @@
 	async function loadOrgMembers() {
 		if (orgMembers.length > 0) return;
 		try {
-			const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
+			const data = await getOrgDetail(orgSlug);
 			orgMembers = (data.members ?? []).map((m) => ({
 				id: m.id!,
 				firstName: m.firstName ?? '',
@@ -232,6 +236,7 @@
 		addingMember = true;
 		addMemberError = '';
 		try {
+			invalidateOrgDetail(orgSlug); // member/vacation figures change
 			await groupApi.apiV1OrganizationsSlugGroupsGroupIdMembersPost(orgSlug, selectedGroup.id, {
 				userId: addMemberUserId
 			});
@@ -257,6 +262,7 @@
 		});
 		if (!ok) return;
 		try {
+			invalidateOrgDetail(orgSlug); // member/vacation figures change
 			await groupApi.apiV1OrganizationsSlugGroupsGroupIdMembersTargetUserIdDelete(orgSlug, selectedGroup.id, userId);
 			toast.success(t('groups.members.removed'));
 			await refreshGroup(selectedGroup.id);
@@ -312,6 +318,7 @@
 		try {
 			// "Inherit" (null) is transmitted as -1; the backend clears the override
 			const payload = value === null ? -1 : value;
+			invalidateOrgDetail(orgSlug); // member/vacation figures change
 			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, selectedGroup.id, { [key]: payload } as any);
 			toast.success(t('groups.perm.saved'));
 			await loadPermissions(selectedGroup.id);

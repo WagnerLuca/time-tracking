@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
@@ -89,8 +90,8 @@
 		loadSchedule();
 	}
 
-	async function loadOrg() {
-		const { data } = await organizationsApi.apiV1OrganizationsSlugGet(orgSlug);
+	async function loadOrg(fresh = false) {
+		const data = await getOrgDetail(orgSlug, { fresh });
 		org = data;
 		member = data.members?.find((m) => m.id === memberId) ?? null;
 	}
@@ -98,7 +99,7 @@
 	/** Refresh org + member after a change without the page-level spinner. */
 	async function reloadOrg() {
 		try {
-			await loadOrg();
+			await loadOrg(true);
 		} catch (err) {
 			toast.error(err, t('memberDetail.reloadFailed'));
 		}
