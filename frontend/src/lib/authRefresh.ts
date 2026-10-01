@@ -23,8 +23,12 @@ export interface RefreshDeps {
 	onAuthFailure: () => void;
 }
 
-/** Endpoints whose 401 means "wrong credentials", not "expired access token". */
-const AUTH_ENDPOINT = /\/auth\/(login|register|refresh|logout|2fa\/verify)(\?|$)/;
+/**
+ * Endpoints whose 401 means "wrong credentials", not "expired access token". Case-insensitive:
+ * the generated client calls `/api/v1/Auth/refresh`, and a refresh 401 that slipped through
+ * would wait on the very refresh that is running — a deadlock that left the app loading forever.
+ */
+const AUTH_ENDPOINT = /\/auth\/(login|register|refresh|logout|2fa\/verify)(\?|$)/i;
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean };
 

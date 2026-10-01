@@ -83,6 +83,22 @@ describe('installRefreshInterceptor', () => {
 		expect(s.storedRefresh).toBeNull();
 	});
 
+	it('a rejected refresh sent through the same instance (real /Auth/refresh casing) ends the session instead of hanging', async () => {
+		const s = setup();
+		s.rotateServerToken('never-valid');
+		// Like apiClient.ts: the refresh call itself goes through the intercepted instance
+		vi.mocked(s.deps.refresh).mockImplementationOnce(async (rt) => {
+			const { data } = await s.instance.post('/api/v1/Auth/refresh', { refreshToken: rt });
+			return data;
+		});
+		const outcome = await Promise.race([
+			s.instance.get('/api/v1/TimeTracking/current').then(() => 'resolved', () => 'rejected'),
+			new Promise((r) => setTimeout(() => r('hung'), 1000))
+		]);
+		expect(outcome).toBe('rejected');
+		expect(s.deps.onAuthFailure).toHaveBeenCalledTimes(1);
+	});
+
 	it('does not try to refresh for the auth endpoints themselves (e.g. wrong password)', async () => {
 		const s = setup();
 		s.rotateServerToken('never-valid');
