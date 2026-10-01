@@ -105,4 +105,28 @@ public static class EffectiveRuleResolver
             .AsNoTracking()
             .AnyAsync(gm => gm.UserId == targetUserId && callerAdminGroupIds.Contains(gm.GroupId));
     }
+
+    /// <summary>
+    /// True when the caller may see the target member's time entries in this org (the rule of the
+    /// member-entries endpoint, for admins): the member themselves, an org Admin/Owner while the org
+    /// lets admins see members' entries, or a Group Admin of a shared group that may view all time
+    /// entries. The caller must meet the org's 2FA requirement.
+    /// </summary>
+    public static async Task<bool> CanViewMemberEntriesAsync(
+        TimeTrackingDbContext context, int orgId, int callerUserId, int targetUserId)
+    {
+        var caller = await context.UserOrganizations.AsNoTracking()
+            .Where(uo => uo.OrganizationId == orgId && uo.UserId == callerUserId)
+            .Select(uo => new { uo.Role, uo.Organization.Require2fa, uo.Organization.MemberTimeEntryVisibility, uo.User.TwoFactorEnabled })
+            .FirstOrDefaultAsync();
+        if (caller == null || (caller.Require2fa && !caller.TwoFactorEnabled)) return false;
+        if (callerUserId == targetUserId) return true;
+        if (caller.Role >= OrganizationRole.Admin && caller.MemberTimeEntryVisibility) return true;
+
+        return await context.GroupMembers.AsNoTracking()
+            .AnyAsync(gm => gm.UserId == callerUserId && gm.Role == GroupRole.Admin
+                         && gm.Group.OrganizationId == orgId && gm.Group.IsActive
+                         && gm.Group.GroupAdminCanViewAllTimeEntries == true
+                         && gm.Group.Members.Any(m => m.UserId == targetUserId));
+    }
 }

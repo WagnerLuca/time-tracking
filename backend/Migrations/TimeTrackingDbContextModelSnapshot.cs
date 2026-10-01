@@ -730,6 +730,47 @@ namespace TimeTracking.Api.Migrations
                     b.ToTable("TimeEntries");
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.TimeEntryChange", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ChangedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Changes")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("OrganizationId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TimeEntryId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedByUserId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TimeEntryId", "ChangedAt");
+
+                    b.ToTable("TimeEntryChanges");
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -1153,6 +1194,24 @@ namespace TimeTracking.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Organization");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TimeTracking.Api.Models.TimeEntryChange", b =>
+                {
+                    b.HasOne("TimeTracking.Api.Models.User", "ChangedByUser")
+                        .WithMany()
+                        .HasForeignKey("ChangedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TimeTracking.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChangedByUser");
 
                     b.Navigation("User");
                 });

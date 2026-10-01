@@ -17,7 +17,7 @@ namespace TimeTracking.Api.Migrations
     {
         private const string CurrentUser = "NULLIF(current_setting('app.user_id', true), '')::int";
 
-        private static string Policy(string table) => $@"
+        internal static string Policy(string table) => $@"
             ALTER TABLE ""{table}"" ENABLE ROW LEVEL SECURITY;
             ALTER TABLE ""{table}"" FORCE ROW LEVEL SECURITY;
             CREATE POLICY org_isolation ON ""{table}""
@@ -34,7 +34,7 @@ namespace TimeTracking.Api.Migrations
                         SELECT uo.""OrganizationId"" FROM ""UserOrganizations"" uo
                         WHERE uo.""UserId"" = {CurrentUser} AND uo.""IsActive""));";
 
-        private static string DropPolicy(string table) => $@"
+        internal static string DropPolicy(string table) => $@"
             DROP POLICY IF EXISTS org_isolation ON ""{table}"";
             ALTER TABLE ""{table}"" NO FORCE ROW LEVEL SECURITY;
             ALTER TABLE ""{table}"" DISABLE ROW LEVEL SECURITY;";

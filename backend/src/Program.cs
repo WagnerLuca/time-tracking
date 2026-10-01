@@ -160,6 +160,7 @@ builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 builder.Services.AddScoped<IInvitationService, InvitationService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddScoped<ITimeTrackingService, TimeTrackingService>();
+builder.Services.AddScoped<MemberEntryService>();
 builder.Services.AddScoped<ITimeEntryExportService, TimeEntryExportService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IRequestService, RequestService>();

@@ -107,4 +107,29 @@ public class TimeTrackingController : OrganizationBaseController
         if (userId == null) return Unauthorized();
         return ToResponse(await _service.DeleteAsync(userId.Value, id));
     }
+
+    /// <summary>
+    /// Add a finished entry by hand (e.g. a forgotten day). Follows the organization's "edit past
+    /// entries" rule: Allowed creates it (<c>entry</c>), RequiresApproval creates an AddManualEntry
+    /// request (<c>request</c>) that creates it on approval, Disabled is 403. Personal entries are always allowed.
+    /// </summary>
+    [HttpPost("manual")]
+    [ProducesResponseType(typeof(ManualEntryResponse), StatusCodes.Status201Created)]
+    public async Task<IActionResult> CreateManual([FromBody] CreateManualEntryRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToCreatedResponse(await _service.CreateManualAsync(userId.Value, request));
+    }
+
+    /// <summary>Edit history of a time entry (owner, or admins who may see the owner's entries).</summary>
+    /// <param name="id">Time entry ID (also works for deleted entries).</param>
+    [HttpGet("{id}/history")]
+    [ProducesResponseType(typeof(List<TimeEntryChangeResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetEntryHistory(int id)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.GetEntryHistoryAsync(userId.Value, id));
+    }
 }

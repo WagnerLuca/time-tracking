@@ -231,6 +231,7 @@ public class RequestService : IRequestService
         // the status below, so an approval applies completely or not at all.
         if (request.Accept)
         {
+            _context.EntryChangeKindOverride = TimeEntryChangeKind.ApprovedRequest;
             var error = await ApplyAcceptanceSideEffectsAsync(orgRequest, org);
             if (error != null)
                 return ServiceResult.BadRequest<OrgRequestResponse>(
@@ -466,6 +467,29 @@ public class RequestService : IRequestService
                         entry.UpdatedAt = DateTime.UtcNow;
                     }
                 }
+                break;
+
+            case RequestType.AddManualEntry:
+                var manual = orgRequest.RequestData == null ? null
+                    : JsonSerializer.Deserialize<ManualEntryRequestData>(orgRequest.RequestData, RequestDataJson);
+                if (manual == null) return "Its data is invalid.";
+                if (EntryTimes.Validate(manual.StartTime, manual.EndTime) is { } manualError) return manualError;
+                if (manual.Description?.Length > 500 || manual.PauseDurationMinutes is < 0 or > 1440) return "Its data is invalid.";
+                if (await EntryTimes.OverlapsAsync(_context, orgRequest.UserId, manual.StartTime, manual.EndTime))
+                    return "It overlaps an existing time entry.";
+                var manualEntry = new TimeEntry
+                {
+                    UserId = orgRequest.UserId,
+                    OrganizationId = org.Id,
+                    StartTime = manual.StartTime,
+                    EndTime = manual.EndTime,
+                    Description = manual.Description,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                if (manual.PauseDurationMinutes.HasValue) manualEntry.PauseDurationMinutes = manual.PauseDurationMinutes.Value;
+                else await PauseRules.ApplyAsync(_context, manualEntry);
+                _context.TimeEntries.Add(manualEntry);
                 break;
 
             case RequestType.EditPause:

@@ -5,10 +5,25 @@ namespace TimeTracking.Api.Data;
 
 public class TimeTrackingDbContext : DbContext
 {
+    private readonly RlsContext? _rls;
+
     public TimeTrackingDbContext(DbContextOptions<TimeTrackingDbContext> options)
         : base(options)
     {
     }
+
+    /// <summary>Used by DI: the acting user is recorded in the time entry history.</summary>
+    public TimeTrackingDbContext(DbContextOptions<TimeTrackingDbContext> options, RlsContext rls)
+        : base(options)
+    {
+        _rls = rls;
+    }
+
+    /// <summary>
+    /// Kind recorded for the time entry changes of the next save instead of created/updated/deleted
+    /// (set by request approvals to <see cref="TimeEntryChangeKind.ApprovedRequest"/>).
+    /// </summary>
+    public TimeEntryChangeKind? EntryChangeKindOverride { get; set; }
 
     public DbSet<User> Users { get; set; }
     public DbSet<Organization> Organizations { get; set; }
@@ -27,6 +42,28 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<ApiKey> ApiKeys { get; set; }
     public DbSet<UserToken> UserTokens { get; set; }
     public DbSet<OrgInvitation> OrgInvitations { get; set; }
+    public DbSet<TimeEntryChange> TimeEntryChanges { get; set; }
+
+    /// <summary>
+    /// Saves, and records every change a user made to a finished time entry in
+    /// <see cref="TimeEntryChanges"/> (see <see cref="TimeEntryHistory"/>). Trusted system work
+    /// (seed, background jobs) is not recorded. The history rows need the ids of new entries, so
+    /// they are a second save inside the same transaction.
+    /// </summary>
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        var pending = _rls is { IsSystem: false } ? TimeEntryHistory.Capture(this, EntryChangeKindOverride) : [];
+        if (pending.Count == 0) return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+
+        await using var transaction = Database.IsRelational() && Database.CurrentTransaction == null
+            ? await Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        var saved = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        TimeEntryChanges.AddRange(TimeEntryHistory.Rows(pending, _rls!.UserId));
+        await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        if (transaction != null) await transaction.CommitAsync(cancellationToken);
+        return saved;
+    }
 
     /// <summary>
     /// Every DateTime is stored and compared as UTC. Values arriving without a kind (e.g.
@@ -450,6 +487,22 @@ public class TimeTrackingDbContext : DbContext
                 .HasForeignKey(e => e.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasQueryFilter(e => e.Organization.IsActive);
+        });
+
+        // Configure TimeEntryChange entity (edit history of time entries)
+        modelBuilder.Entity<TimeEntryChange>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Changes).IsRequired();
+            entity.HasIndex(e => new { e.TimeEntryId, e.ChangedAt });
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.ChangedByUser)
+                .WithMany()
+                .HasForeignKey(e => e.ChangedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Configure UserToken entity (email verification / password reset links)

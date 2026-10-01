@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using TimeTracking.Api.Data;
+
 namespace TimeTracking.Api.Services;
 
 /// <summary>
@@ -41,4 +44,13 @@ public static class EntryTimes
         }
         return null;
     }
+
+    /// <summary>
+    /// True when [start, end) overlaps another entry of the user (in any organization, running
+    /// timers included), apart from <paramref name="exceptEntryId"/>.
+    /// </summary>
+    public static Task<bool> OverlapsAsync(TimeTrackingDbContext context, int userId, DateTime startUtc, DateTime endUtc, int? exceptEntryId = null) =>
+        context.TimeEntries.AsNoTracking()
+            .AnyAsync(e => e.UserId == userId && e.Id != exceptEntryId
+                        && e.StartTime < endUtc && (e.IsRunning || e.EndTime > startUtc));
 }
