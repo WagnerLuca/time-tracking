@@ -33,9 +33,12 @@ public record DailyReportRow(
 /// </summary>
 public static class DailyReportAggregator
 {
+    /// <summary>Appended to a failure entry in <see cref="DailyReportRow.EntrySummary"/>; <see cref="ReportText.EntrySummary"/> translates it.</summary>
+    public const string FailureMarker = " [not stopped, needs correction]";
+
     public static async Task<List<DailyReportRow>> BuildAsync(
         TimeTrackingDbContext context, int userId, int orgId,
-        DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours)
+        DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours, bool includeFuture = false)
     {
         // Days are the organization's local days (an entry at 00:30 Berlin belongs to that
         // day, not to the previous UTC day)
@@ -45,8 +48,9 @@ public static class DailyReportAggregator
 
         // Only count days up to today — future days haven't happened yet and
         // would otherwise show as artificial "Missing" time with a misleading target.
+        // (includeFuture: only for planned targets; such rows must not feed a balance.)
         var today = clock.Today();
-        if (dateTo > today) dateTo = today;
+        if (dateTo > today && !includeFuture) dateTo = today;
         if (dateFrom > dateTo) return [];
 
         var rangeFromUtc = clock.StartOfDayUtc(dateFrom);
@@ -132,7 +136,7 @@ public static class DailyReportAggregator
             var entrySummary = allDayEntries.Count > 0
                 ? string.Join(" | ", allDayEntries.Select(e =>
                     $"{clock.ToLocal(e.StartTime):HH:mm}-{(e.EndTime.HasValue ? clock.ToLocal(e.EndTime.Value).ToString("HH:mm") : "?")}" +
-                    (e.IsFailure ? " [not stopped, needs correction]" : "") +
+                    (e.IsFailure ? FailureMarker : "") +
                     (string.IsNullOrEmpty(e.Description) ? "" : $" ({e.Description})")))
                 : "";
 
@@ -150,6 +154,41 @@ public static class DailyReportAggregator
         }
 
         return rows;
+    }
+
+    /// <summary>
+    /// Builds the report's display rows (clipped to [dateFrom, dateTo]) whose
+    /// <see cref="DailyReportRow.CumulativeOvertime"/> reflects the member's true,
+    /// never-reset running balance since their very first tracked entry — not just
+    /// a total reset at the start of the requested period. Also returns that overall
+    /// balance as of the end of the period (or "today" if the period is still ongoing,
+    /// since <see cref="BuildAsync"/> clamps internally). Used by the PDF reports, the balance
+    /// endpoint and the daily CSV, so all of them show the same running total.
+    /// </summary>
+    public static async Task<(List<DailyReportRow> Rows, double OverallCumulative)> BuildWithRunningTotalAsync(
+        TimeTrackingDbContext context, int userId, int orgId,
+        DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours)
+    {
+        var firstEntry = await context.TimeEntries.AsNoTracking()
+            .Where(e => e.UserId == userId && e.OrganizationId == orgId && !e.IsRunning)
+            .OrderBy(e => e.StartTime)
+            .Select(e => (DateTime?)e.StartTime)
+            .FirstOrDefaultAsync();
+
+        // The balance runs from the first tracked entry: days before someone started tracking
+        // are not "missing" work. Without any entry there is nothing to count yet.
+        if (firstEntry == null)
+            return ([], initialOvertimeHours);
+
+        var timeZone = await context.Organizations.AsNoTracking()
+            .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
+        var loopFrom = OrgClock.For(timeZone).LocalDate(firstEntry.Value);
+
+        var allRows = await BuildAsync(context, userId, orgId, loopFrom, dateTo, initialOvertimeHours);
+        var displayRows = allRows.Where(r => r.Date >= dateFrom).ToList();
+        var overallCumulative = allRows.Count > 0 ? allRows[^1].CumulativeOvertime : initialOvertimeHours;
+
+        return (displayRows, overallCumulative);
     }
 
     /// <summary>

@@ -34,13 +34,13 @@ public class ExceptionHandlingMiddleware
 
     private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        var (statusCode, title, detail) = exception switch
+        var (statusCode, title, detail, code) = exception switch
         {
-            ArgumentException        => (StatusCodes.Status400BadRequest,            "Bad Request",            "The request is invalid."),
-            UnauthorizedAccessException => (StatusCodes.Status401Unauthorized,       "Unauthorized",           "Authentication is required to access this resource."),
-            KeyNotFoundException     => (StatusCodes.Status404NotFound,              "Not Found",              "The requested resource was not found."),
-            InvalidOperationException => (StatusCodes.Status409Conflict,             "Conflict",               "The request conflicts with the current state."),
-            _                        => (StatusCodes.Status500InternalServerError,   "Internal Server Error",  "An unexpected error occurred.")
+            ArgumentException        => (StatusCodes.Status400BadRequest,            "Bad Request",            "The request is invalid.", "common.badRequest"),
+            UnauthorizedAccessException => (StatusCodes.Status401Unauthorized,       "Unauthorized",           "Authentication is required to access this resource.", "common.unauthorized"),
+            KeyNotFoundException     => (StatusCodes.Status404NotFound,              "Not Found",              "The requested resource was not found.", "common.notFound"),
+            InvalidOperationException => (StatusCodes.Status409Conflict,             "Conflict",               "The request conflicts with the current state.", "common.conflict"),
+            _                        => (StatusCodes.Status500InternalServerError,   "Internal Server Error",  "An unexpected error occurred.", "common.unexpected")
         };
 
         var problem = new ProblemDetails
@@ -49,7 +49,8 @@ public class ExceptionHandlingMiddleware
             Title = title,
             Status = statusCode,
             Detail = detail,
-            Instance = context.Request.Path
+            Instance = context.Request.Path,
+            Extensions = { ["code"] = code }
         };
 
         context.Response.StatusCode = statusCode;

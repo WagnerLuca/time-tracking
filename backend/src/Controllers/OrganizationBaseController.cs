@@ -57,12 +57,16 @@ public abstract class OrganizationBaseController : ControllerBase
             _ => StatusCodes.Status500InternalServerError
         };
 
-        return Problem(
+        var problem = Problem(
             type: $"https://httpstatuses.io/{statusCode}",
             title: result.ErrorType.ToString(),
             statusCode: statusCode,
             detail: result.ErrorMessage,
             instance: HttpContext.Request.Path
         );
+        // Stable code the frontend translates (see ErrorCodes)
+        if (result.Code != null && problem is ObjectResult { Value: ProblemDetails details })
+            details.Extensions["code"] = result.Code;
+        return problem;
     }
 }

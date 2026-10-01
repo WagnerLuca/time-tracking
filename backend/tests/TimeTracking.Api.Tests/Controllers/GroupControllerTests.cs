@@ -44,6 +44,21 @@ public class GroupControllerTests : IClassFixture<TimeTrackingApiFactory>
             new { groupAdminCanManageMembers = true });
 
     [Fact]
+    public async Task AllGroupPermissions_InOneRequest_ForEveryMember()
+    {
+        var (owner, groupAdmin, slug, groupId, _, _) = await SetupAsync("grp-allperms");
+        (await owner.PostAsJsonAsync($"/api/v1/Organizations/{slug}/groups", new { name = "Another" })).EnsureSuccessStatusCode();
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/permissions", new { csvImportMode = 2 })).EnsureSuccessStatusCode();
+
+        var all = await groupAdmin.GetFromJsonAsync<List<JsonElement>>($"/api/v1/Organizations/{slug}/groups/permissions");
+        all!.Select(g => g.GetProperty("groupName").GetString()).Should().Equal("Another", "Team");
+        all.Single(g => g.GetProperty("groupId").GetInt32() == groupId).GetProperty("csvImportMode").GetString().Should().Be("Allowed");
+
+        var (stranger, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "grp-allperms-x@test.com");
+        (await stranger.GetAsync($"/api/v1/Organizations/{slug}/groups/permissions")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
     public async Task GroupAdmin_WithoutManageRight_CannotAddOrRemoveMembers()
     {
         var (_, groupAdmin, slug, groupId, memberA, memberB) = await SetupAsync("grp-noright");

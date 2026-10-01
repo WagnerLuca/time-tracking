@@ -48,12 +48,12 @@ public class ReportsController : OrganizationBaseController
     [HttpGet("{slug}/members/{memberId}/reports/monthly")]
     [RequireOrgRole]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMonthlyReport(string slug, int memberId, [FromQuery] int year, [FromQuery] int month)
+    public async Task<IActionResult> GetMonthlyReport(string slug, int memberId, [FromQuery] int year, [FromQuery] int month, [FromQuery] string? lang = null)
     {
         var callerId = GetCurrentUserId();
         if (callerId == null) return Unauthorized();
 
-        var result = await _reportService.GenerateMonthlyReportAsync(slug, callerId.Value, memberId, year, month);
+        var result = await _reportService.GenerateMonthlyReportAsync(slug, callerId.Value, memberId, year, month, lang);
         if (!result.IsSuccess) return ToResponse(result);
 
         var fileName = $"time-report-{slug}-member{memberId}-{year:0000}-{month:00}.pdf";
@@ -70,12 +70,12 @@ public class ReportsController : OrganizationBaseController
     [HttpGet("{slug}/members/{memberId}/reports/yearly")]
     [RequireOrgRole]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetYearlyReport(string slug, int memberId, [FromQuery] int year)
+    public async Task<IActionResult> GetYearlyReport(string slug, int memberId, [FromQuery] int year, [FromQuery] string? lang = null)
     {
         var callerId = GetCurrentUserId();
         if (callerId == null) return Unauthorized();
 
-        var result = await _reportService.GenerateYearlyReportAsync(slug, callerId.Value, memberId, year);
+        var result = await _reportService.GenerateYearlyReportAsync(slug, callerId.Value, memberId, year, lang);
         if (!result.IsSuccess) return ToResponse(result);
 
         var fileName = $"time-report-{slug}-member{memberId}-{year:0000}.pdf";

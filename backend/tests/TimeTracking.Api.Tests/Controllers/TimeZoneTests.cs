@@ -55,12 +55,12 @@ public class TimeZoneTests : IClassFixture<TimeTrackingApiFactory>
 
         // Entries export shows the local day and times
         var entriesCsv = await (await client.PostAsJsonAsync("/api/v1/ExportImport/export",
-            new { type = "entries", organizationSlug = org.Slug, from = "2026-03-02", to = "2026-03-02" })).Content.ReadAsStringAsync();
+            new { lang = "en", type = "entries", organizationSlug = org.Slug, from = "2026-03-02", to = "2026-03-02" })).Content.ReadAsStringAsync();
         entriesCsv.Should().Contain("2026-03-02,Mon,00:30,02:00");
 
         // Daily report puts it on the local day
         var dailyCsv = await (await client.PostAsJsonAsync("/api/v1/ExportImport/export",
-            new { type = "daily", organizationSlug = org.Slug, from = "2026-03-01", to = "2026-03-02" })).Content.ReadAsStringAsync();
+            new { lang = "en", type = "daily", organizationSlug = org.Slug, from = "2026-03-01", to = "2026-03-02" })).Content.ReadAsStringAsync();
         var lines = dailyCsv.Split('\n');
         lines.Single(l => l.StartsWith("2026-03-02")).Should().Contain(",1.50,");
         lines.Single(l => l.StartsWith("2026-03-01")).Should().Contain(",0.00,");

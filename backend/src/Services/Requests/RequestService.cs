@@ -205,7 +205,7 @@ public class RequestService : IRequestService
         if (!isOrgAdmin)
         {
             if (!orgRequest.GroupId.HasValue)
-                return ServiceResult.Forbidden<OrgRequestResponse>();
+                return ServiceResult.Forbidden<OrgRequestResponse>(code: "request.cannotRespond");
 
             // Still a member, still admin of the (active) group, and the group still grants this approval
             var group = callerRole == null ? null : await _context.GroupMembers
@@ -216,7 +216,7 @@ public class RequestService : IRequestService
                 .Select(gm => gm.Group)
                 .FirstOrDefaultAsync();
             if (group == null || !GroupCanApprove(group, orgRequest.Type))
-                return ServiceResult.Forbidden<OrgRequestResponse>();
+                return ServiceResult.Forbidden<OrgRequestResponse>(code: "request.cannotRespond");
         }
 
         if (orgRequest.Status != RequestStatus.Pending)

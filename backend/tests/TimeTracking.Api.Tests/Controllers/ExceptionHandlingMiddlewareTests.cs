@@ -37,6 +37,7 @@ public class ExceptionHandlingMiddlewareTests
         contentType.Should().Be("application/problem+json");
         problem.GetProperty("status").GetInt32().Should().Be(expected);
         problem.GetProperty("instance").GetString().Should().Be("/api/v1/something");
+        problem.GetProperty("code").GetString().Should().StartWith("common.");
     }
 
     [Fact]

@@ -30,7 +30,7 @@ public class WorkScheduleService : IWorkScheduleService
         if (membership == null)
             return ServiceResult.NotFound<WorkScheduleResponse>("You are not a member of this organization.");
 
-        var schedule = await GetCurrentScheduleAsync(userId, org.Id);
+        var schedule = await GetCurrentScheduleAsync(userId, org);
         return ServiceResult.Ok(MapToResponse(schedule, userId, org, membership));
     }
 
@@ -175,7 +175,7 @@ public class WorkScheduleService : IWorkScheduleService
         if (membership == null)
             return ServiceResult.NotFound<WorkScheduleResponse>("Member not found in this organization.");
 
-        var schedule = await GetCurrentScheduleAsync(memberId, org.Id);
+        var schedule = await GetCurrentScheduleAsync(memberId, org);
         return ServiceResult.Ok(MapToResponse(schedule, memberId, org, membership));
     }
 
@@ -363,7 +363,7 @@ public class WorkScheduleService : IWorkScheduleService
                 Id = 0,
                 UserId = userId,
                 OrganizationId = org.Id,
-                ValidFrom = DateOnly.FromDateTime(DateTime.UtcNow),
+                ValidFrom = OrgClock.For(org).Today(),
                 ValidTo = null,
                 WeeklyWorkHours = 0,
                 TargetMon = 0, TargetTue = 0, TargetWed = 0, TargetThu = 0, TargetFri = 0,
@@ -394,12 +394,12 @@ public class WorkScheduleService : IWorkScheduleService
         };
     }
 
-    private async Task<WorkSchedule?> GetCurrentScheduleAsync(int userId, int orgId)
+    private async Task<WorkSchedule?> GetCurrentScheduleAsync(int userId, Organization org)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = OrgClock.For(org).Today();
         return await _context.WorkSchedules
             .AsNoTracking()
-            .Where(s => s.UserId == userId && s.OrganizationId == orgId
+            .Where(s => s.UserId == userId && s.OrganizationId == org.Id
                 && s.ValidFrom <= today
                 && (s.ValidTo == null || s.ValidTo >= today))
             .OrderByDescending(s => s.ValidFrom)

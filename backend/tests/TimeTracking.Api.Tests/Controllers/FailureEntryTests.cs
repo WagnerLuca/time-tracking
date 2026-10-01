@@ -100,7 +100,7 @@ public class FailureEntryTests : IClassFixture<TimeTrackingApiFactory>
 
         // Reports flag it and count nothing for it
         var entriesCsv = await (await client.PostAsJsonAsync("/api/v1/ExportImport/export",
-            new { type = "entries", organizationSlug = slug, from = "2026-03-01", to = "2026-03-04" })).Content.ReadAsStringAsync();
+            new { lang = "en", type = "entries", organizationSlug = slug, from = "2026-03-01", to = "2026-03-04" })).Content.ReadAsStringAsync();
         entriesCsv.Should().Contain("Needs Correction");
 
         // Correcting the end time clears the flag and makes it count
@@ -134,7 +134,7 @@ public class FailureEntryTests : IClassFixture<TimeTrackingApiFactory>
         await CloseOverdueAsync(new DateTime(2026, 3, 5, 12, 0, 0, DateTimeKind.Utc));
 
         var csv = await (await client.PostAsJsonAsync("/api/v1/ExportImport/export",
-            new { type = "daily", organizationSlug = slug, from = "2026-03-04", to = "2026-03-04" })).Content.ReadAsStringAsync();
+            new { lang = "en", type = "daily", organizationSlug = slug, from = "2026-03-04", to = "2026-03-04" })).Content.ReadAsStringAsync();
 
         var day = csv.Split('\n').Single(l => l.StartsWith("2026-03-04"));
         day.Should().Contain("Needs Correction");

@@ -12,14 +12,14 @@ public interface IPdfReportService
     /// Allowed for the member themselves, org Admins/Owners, or Group Admins with export capability.
     /// </summary>
     Task<ServiceResult<byte[]>> GenerateMonthlyReportAsync(
-        string slug, int callerUserId, int targetUserId, int year, int month);
+        string slug, int callerUserId, int targetUserId, int year, int month, string? lang = null);
 
     /// <summary>
     /// Generates a month-by-month PDF summary report for one calendar year.
     /// Allowed for the member themselves, org Admins/Owners, or Group Admins with export capability.
     /// </summary>
     Task<ServiceResult<byte[]>> GenerateYearlyReportAsync(
-        string slug, int callerUserId, int targetUserId, int year);
+        string slug, int callerUserId, int targetUserId, int year, string? lang = null);
 
     /// <summary>
     /// Current balance (cumulative overtime, today / this week / this month) using the report

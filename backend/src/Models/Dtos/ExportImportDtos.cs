@@ -28,6 +28,10 @@ public record ExportRequest
 
     /// <summary>Columns to include in the export. If empty/null, all columns are included.</summary>
     public List<string>? Columns { get; init; }
+
+    /// <summary>Language of headers, weekdays and status texts: "de" (default) or "en". Numbers stay invariant.</summary>
+    [MaxLength(10)]
+    public string? Lang { get; init; }
 }
 
 /// <summary>Preview of parsed CSV rows before confirming import.</summary>

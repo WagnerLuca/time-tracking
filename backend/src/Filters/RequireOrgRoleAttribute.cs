@@ -55,7 +55,7 @@ public class OrgRoleAuthorizationFilter : IAsyncActionFilter
         var slug = context.RouteData.Values["slug"]?.ToString();
         if (string.IsNullOrEmpty(slug))
         {
-            context.Result = Problem(StatusCodes.Status400BadRequest, "Bad Request", "Organization slug is required.");
+            context.Result = Problem(StatusCodes.Status400BadRequest, "Bad Request", "Organization slug is required.", "org.slugRequired");
             return;
         }
 
@@ -73,27 +73,32 @@ public class OrgRoleAuthorizationFilter : IAsyncActionFilter
 
         if (membership == null)
         {
-            context.Result = Problem(StatusCodes.Status403Forbidden, "Forbidden", "You are not a member of this organization.");
+            context.Result = Problem(StatusCodes.Status403Forbidden, "Forbidden", "You are not a member of this organization.", "org.notMember");
             return;
         }
 
         if (membership.Role < _minimumRole)
         {
-            context.Result = Problem(StatusCodes.Status403Forbidden, "Forbidden", $"This action requires {_minimumRole} role or higher.");
+            context.Result = Problem(StatusCodes.Status403Forbidden, "Forbidden", $"This action requires {_minimumRole} role or higher.",
+                _minimumRole == OrganizationRole.Owner ? "org.ownerRequired" : "org.adminRequired");
             return;
         }
 
         if (membership.Require2fa && !membership.TwoFactorEnabled)
         {
             context.Result = Problem(StatusCodes.Status403Forbidden, "TwoFactorRequired",
-                "This organization requires two-factor authentication. Enable it in your account settings to continue.");
+                "This organization requires two-factor authentication. Enable it in your account settings to continue.", "org.twoFactorRequired");
             return;
         }
 
         await next();
     }
 
-    private static ObjectResult Problem(int status, string title, string detail) =>
-        new(new ProblemDetails { Type = $"https://httpstatuses.io/{status}", Title = title, Status = status, Detail = detail })
+    private static ObjectResult Problem(int status, string title, string detail, string code) =>
+        new(new ProblemDetails
+        {
+            Type = $"https://httpstatuses.io/{status}", Title = title, Status = status, Detail = detail,
+            Extensions = { ["code"] = code }
+        })
         { StatusCode = status };
 }

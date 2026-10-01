@@ -57,6 +57,7 @@ public class HalfDayEdgeCaseTests : IClassFixture<TimeTrackingApiFactory>
         // Export daily report
         var exportResp = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "daily",
             organizationSlug = slug,
             from = $"{dateFrom}T00:00:00Z",

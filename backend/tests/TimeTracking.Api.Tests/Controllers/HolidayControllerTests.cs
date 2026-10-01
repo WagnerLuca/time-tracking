@@ -171,6 +171,27 @@ public class HolidayControllerTests : IClassFixture<TimeTrackingApiFactory>
         holidays.Should().Contain(h => h.Name.Contains("Neujahr") || h.Name.Contains("Tag"));
     }
 
+    [Fact]
+    public async Task ImportPresetHolidays_Again_DoesNotDuplicateRecurringOrExistingHolidays()
+    {
+        var (client, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "preset-again@holiday.test");
+        await TestHelpers.CreateOrganizationAsync(client, "Preset Again", "preset-again-org");
+
+        var first = await (await client.PostAsync("/api/v1/organizations/preset-again-org/holidays/import-preset?preset=de&year=2026", null))
+            .Content.ReadFromJsonAsync<List<HolidayResponseDto>>(TestHelpers.JsonOptions);
+        // Same year again: nothing new
+        var again = await (await client.PostAsync("/api/v1/organizations/preset-again-org/holidays/import-preset?preset=de&year=2026", null))
+            .Content.ReadFromJsonAsync<List<HolidayResponseDto>>(TestHelpers.JsonOptions);
+        again.Should().BeEmpty();
+        // Next year: only the movable (Easter-based) holidays are new, the recurring ones already cover 2027
+        var nextYear = await (await client.PostAsync("/api/v1/organizations/preset-again-org/holidays/import-preset?preset=de&year=2027", null))
+            .Content.ReadFromJsonAsync<List<HolidayResponseDto>>(TestHelpers.JsonOptions);
+        nextYear.Should().OnlyContain(h => !h.IsRecurring).And.HaveCount(first!.Count(h => !h.IsRecurring));
+
+        var all = await client.GetFromJsonAsync<List<HolidayResponseDto>>("/api/v1/organizations/preset-again-org/holidays", TestHelpers.JsonOptions);
+        all!.Count(h => h.Name == "Neujahr").Should().Be(1);
+    }
+
     // ── Auth required ────────────────────────────────────────────────────
 
     [Fact]
