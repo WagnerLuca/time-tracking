@@ -7,7 +7,8 @@ export const de = {
 		SetInitialOvertime: 'Überstunden',
 		WorkScheduleChange: 'Arbeitszeit',
 		CsvImport: 'CSV-Import',
-		RequestAbsence: 'Abwesenheit'
+		RequestAbsence: 'Abwesenheit',
+		AddManualEntry: 'Eintrag nachtragen'
 	},
 	requestTypeFull: {
 		JoinOrganization: 'Organisation beitreten',
@@ -16,7 +17,8 @@ export const de = {
 		SetInitialOvertime: 'Anfangsüberstunden festlegen',
 		WorkScheduleChange: 'Arbeitszeitmodell ändern',
 		CsvImport: 'Zeiteinträge per CSV importieren',
-		RequestAbsence: 'Abwesenheit / Urlaub beantragen'
+		RequestAbsence: 'Abwesenheit / Urlaub beantragen',
+		AddManualEntry: 'Vergessenen Zeiteintrag nachtragen'
 	},
 	requestStatus: {
 		Accepted: 'Angenommen',
@@ -151,7 +153,8 @@ export const en: typeof de = {
 		SetInitialOvertime: 'Overtime',
 		WorkScheduleChange: 'Schedule',
 		CsvImport: 'CSV import',
-		RequestAbsence: 'Absence'
+		RequestAbsence: 'Absence',
+		AddManualEntry: 'Add entry'
 	},
 	requestTypeFull: {
 		JoinOrganization: 'Join organization',
@@ -160,7 +163,8 @@ export const en: typeof de = {
 		SetInitialOvertime: 'Set initial overtime',
 		WorkScheduleChange: 'Change work schedule',
 		CsvImport: 'Import time entries from CSV',
-		RequestAbsence: 'Absence / vacation request'
+		RequestAbsence: 'Absence / vacation request',
+		AddManualEntry: 'Add a forgotten time entry'
 	},
 	requestStatus: {
 		Accepted: 'Accepted',

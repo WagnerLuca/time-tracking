@@ -12,7 +12,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { authApi, requestsApi, timeTrackingApi, notificationsApi } from '$lib/apiClient';
 	import type { NotificationResponse, OrgRequestResponse, TimeEntryResponse } from '$lib/api';
-	import { failureNotificationTarget } from '$lib/utils/notifications';
+	import { bellNotifications, decisionNotificationIds, notificationTarget } from '$lib/utils/notifications';
 	import { invalidateOrgDetail } from '$lib/stores/orgDetail';
 	import { parseRequestData, formatRequestTypeFull, formatRequestType, formatRequestStatus, formatTimeAgo, formatDate, formatDateTime, formatClock, statusBadgeClass, roleLabel } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
@@ -20,6 +20,7 @@
 	import Modal from '$lib/components/Modal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import Toaster from '$lib/components/Toaster.svelte';
+	import DeclineForm from '$lib/components/DeclineForm.svelte';
 
 	let { children } = $props();
 
@@ -35,11 +36,24 @@
 	// Notification state
 	let pendingRequests = $state<OrgRequestResponse[]>([]);
 	let userNotifRequests = $state<OrgRequestResponse[]>([]);
-	/** Unread "timer stopped automatically" notifications (the Notification table, not requests). */
-	let failureNotifs = $state<NotificationResponse[]>([]);
-	let totalNotifCount = $derived(pendingRequests.length + userNotifRequests.length + failureNotifs.length);
+	/** Unread notifications (the Notification table), incl. request decisions, which the bell shows as requests. */
+	let notifications = $state<NotificationResponse[]>([]);
+	let bellNotifs = $derived(bellNotifications(notifications));
+	let totalNotifCount = $derived(pendingRequests.length + userNotifRequests.length + bellNotifs.length);
 	let detailReq = $state<OrgRequestResponse | null>(null);
 	let responding = $state(false);
+	/** The decline step (optional reason) of the request in the detail modal. */
+	let declining = $state(false);
+
+	/** Title of a notification in the UI language; unknown types keep the server's (English) title. */
+	function notifTitle(n: NotificationResponse): string {
+		switch (n.type) {
+			case 'FailureEntry': return t('nav.notifications.failureTitle');
+			case 'TimerReminder': return t('nav.notifications.reminderTitle');
+			case 'SettingsChanged': return t('nav.notifications.settingsTitle');
+			default: return n.title ?? '';
+		}
+	}
 
 	// Failure entries: timers auto-stopped at the business day end that still need a real end time
 	let failures = $state<TimeEntryResponse[]>([]);
@@ -147,29 +161,37 @@
 		]);
 		pendingRequests = adminRes.status === 'fulfilled' ? (adminRes.value.data.requests ?? []) : [];
 		userNotifRequests = userRes.status === 'fulfilled' ? (userRes.value.data.requests ?? []) : [];
-		failureNotifs = notifRes.status === 'fulfilled' ? (notifRes.value.data.items ?? []).filter((n) => n.type === 'FailureEntry' && !n.isRead) : [];
+		notifications = notifRes.status === 'fulfilled' ? (notifRes.value.data.items ?? []).filter((n) => !n.isRead) : [];
 	}
 
-	/** Opens History at the stopped entry and marks the notification read. */
-	async function openFailureNotif(n: NotificationResponse) {
-		openMenu = null;
-		failureNotifs = failureNotifs.filter((x) => x.id !== n.id);
-		goto(failureNotificationTarget(n.message, n.organizationId, failures).href);
+	async function markNotificationsRead(ids: number[]) {
+		notifications = notifications.filter((x) => x.id == null || !ids.includes(x.id));
+		await Promise.all(ids.map((id) => notificationsApi.apiV1NotificationsIdReadPut(id)));
+	}
+
+	/** Opens where the notification leads (e.g. History at the stopped entry) and marks it read. */
+	async function openNotif(n: NotificationResponse) {
+		const { href } = notificationTarget(n, failures);
+		if (href) {
+			openMenu = null;
+			goto(href);
+		}
 		try {
-			if (n.id != null) await notificationsApi.apiV1NotificationsIdReadPut(n.id);
+			if (n.id != null) await markNotificationsRead([n.id]);
 		} catch (err) {
 			toast.error(err, t('nav.notifications.dismissFailed'));
 		}
 	}
 
-	async function respondToRequest(request: OrgRequestResponse, accept: boolean) {
+	async function respondToRequest(request: OrgRequestResponse, accept: boolean, reason?: string) {
 		if (!request.organizationSlug || !request.id) return;
 		responding = true;
 		try {
-			await requestsApi.apiV1OrganizationsSlugRequestsIdPut(request.organizationSlug, request.id, { accept });
+			await requestsApi.apiV1OrganizationsSlugRequestsIdPut(request.organizationSlug, request.id, { accept, reason });
 			invalidateOrgDetail(request.organizationSlug); // e.g. vacation counts, new members
 			toast.success(accept ? t('nav.notifications.accepted') : t('nav.notifications.declined'));
 			detailReq = null;
+			declining = false;
 			await loadNotifications();
 			if (accept && request.type === 'JoinOrganization' && auth.user?.id) {
 				orgContext.loadOrganizations(auth.user.id);
@@ -186,6 +208,9 @@
 			await requestsApi.apiV1OrganizationsUserNotificationsMarkSeenPost(ids);
 			userNotifRequests = userNotifRequests.filter((r) => !ids.includes(r.id!));
 			detailReq = null;
+			// The matching "request accepted/declined" notifications are the same news: read them too
+			const decisionIds = decisionNotificationIds(notifications, ids);
+			if (decisionIds.length > 0) await markNotificationsRead(decisionIds);
 		} catch (err) {
 			toast.error(err, t('nav.notifications.dismissFailed'));
 		}
@@ -193,6 +218,7 @@
 
 	function openNotifDetail(req: OrgRequestResponse) {
 		openMenu = null;
+		declining = false;
 		detailReq = req;
 	}
 
@@ -354,21 +380,29 @@
 							</div>
 
 							<div class="overflow-y-auto">
-								<!-- Timers stopped at the business day end -->
-								{#if failureNotifs.length > 0}
+								<!-- Notifications: timers stopped at the business day end, reminders, settings changes -->
+								{#if bellNotifs.length > 0}
 									<div class="py-1">
 										<div class="px-3 py-2">
-											<span class="text-xs font-bold uppercase tracking-wider text-base-content/40">{t('nav.notifications.failures')}</span>
+											<span class="text-xs font-bold uppercase tracking-wider text-base-content/40">{t('nav.notifications.alerts')}</span>
 										</div>
-										{#each failureNotifs as n (n.id)}
-											{@const target = failureNotificationTarget(n.message, n.organizationId, failures)}
-											<button type="button" class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors border-l-4 border-l-error" onclick={() => openFailureNotif(n)}>
+										{#each bellNotifs as n (n.id)}
+											{@const target = notificationTarget(n, failures)}
+											<button type="button" class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors border-l-4 {n.type === 'FailureEntry' ? 'border-l-error' : n.type === 'TimerReminder' ? 'border-l-warning' : 'border-l-info'}" onclick={() => openNotif(n)}>
 												<div class="flex flex-col gap-0.5 flex-1 min-w-0">
-													<span class="font-semibold text-xs text-error">{t('nav.notifications.failureTitle')}</span>
-													<span class="text-xs text-base-content/60">{target.date ? t('nav.notifications.failureStarted', { date: formatDate(target.date) }) : t('nav.notifications.failureCorrect')}</span>
+													<span class="font-semibold text-xs {n.type === 'FailureEntry' ? 'text-error' : 'text-base-content'}">{notifTitle(n)}</span>
+													<span class="text-xs text-base-content/60 break-words">
+														{#if n.type === 'FailureEntry'}
+															{target.date ? t('nav.notifications.failureStarted', { date: formatDate(target.date) }) : t('nav.notifications.failureCorrect')}
+														{:else if n.type === 'TimerReminder'}
+															{t('nav.notifications.reminderText')}
+														{:else}
+															{n.message}
+														{/if}
+													</span>
 													<span class="text-[0.7rem] text-base-content/40">{formatTimeAgo(n.createdAt)}</span>
 												</div>
-												<span class="text-base-content/40 text-lg flex-shrink-0" aria-hidden="true">›</span>
+												<span class="text-base-content/40 text-lg flex-shrink-0" aria-hidden="true">{target.href ? '›' : '✓'}</span>
 											</button>
 										{/each}
 									</div>
@@ -389,6 +423,9 @@
 													<span class="text-xs text-base-content/50">{req.organizationName}</span>
 													{#if req.respondedByName}
 														<span class="text-xs text-base-content/40 italic truncate">{t('nav.notifications.by', { name: req.respondedByName })}</span>
+													{/if}
+													{#if req.responseReason}
+														<span class="text-xs text-base-content/60 truncate">{t('common.reason', { reason: req.responseReason })}</span>
 													{/if}
 													<span class="text-[0.7rem] text-base-content/40">{formatTimeAgo(req.respondedAt)}</span>
 												</div>
@@ -465,7 +502,7 @@
 	</nav>
 
 	<!-- Notification detail -->
-	<Modal open={!!detailReq} title={detailReq ? formatRequestTypeFull(detailReq.type) : ''} onclose={() => (detailReq = null)}>
+	<Modal open={!!detailReq} title={detailReq ? formatRequestTypeFull(detailReq.type) : ''} onclose={() => { detailReq = null; declining = false; }}>
 		{#if detailReq}
 			{#snippet row(label: string, value: string, italic = false)}
 				<div class="flex justify-between items-baseline gap-3 py-1.5 border-b border-base-200/50 last:border-b-0">
@@ -489,6 +526,7 @@
 				{#if detailReq.respondedAt}{@render row(t('nav.notifications.responded'), formatDateTime(detailReq.respondedAt))}{/if}
 				{#if detailReq.respondedByName}{@render row(t('nav.notifications.respondedBy'), detailReq.respondedByName)}{/if}
 				{#if detailReq.message}{@render row(t('nav.notifications.message'), `"${detailReq.message}"`, true)}{/if}
+				{#if detailReq.responseReason}{@render row(t('common.declineReason'), detailReq.responseReason)}{/if}
 			</dl>
 
 			{@const dataLines = parseRequestData(detailReq.type, detailReq.requestData)}
@@ -503,8 +541,10 @@
 		{/if}
 
 		{#snippet actions()}
-			{#if detailReq?.status === 'Pending' && pendingRequests.some((r) => r.id === detailReq?.id)}
-				<button type="button" class="btn btn-error btn-outline" disabled={responding} onclick={() => respondToRequest(detailReq!, false)}>{t('nav.notifications.decline')}</button>
+			{#if detailReq?.status === 'Pending' && pendingRequests.some((r) => r.id === detailReq?.id) && declining}
+				<DeclineForm busy={responding} onconfirm={(reason) => respondToRequest(detailReq!, false, reason)} oncancel={() => (declining = false)} />
+			{:else if detailReq?.status === 'Pending' && pendingRequests.some((r) => r.id === detailReq?.id)}
+				<button type="button" class="btn btn-error btn-outline" disabled={responding} onclick={() => (declining = true)}>{t('nav.notifications.decline')}</button>
 				<button type="button" class="btn btn-success" disabled={responding} onclick={() => respondToRequest(detailReq!, true)}>{t('nav.notifications.accept')}</button>
 			{:else if detailReq && userNotifRequests.some((r) => r.id === detailReq?.id)}
 				<button type="button" class="btn btn-ghost" onclick={() => dismissUserNotifs([detailReq!.id!])}>{t('nav.notifications.dismiss')}</button>

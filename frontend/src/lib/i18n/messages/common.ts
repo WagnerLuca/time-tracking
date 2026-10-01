@@ -52,7 +52,12 @@ export const de = {
 	actionFailed: 'Die Aktion ist fehlgeschlagen.',
 	httpStatus: '{message} (HTTP {status})',
 	hoursShort: '{value} h',
-	perWeek: '{value} h/Woche'
+	perWeek: '{value} h/Woche',
+	declineReason: 'Begründung',
+	declineReasonPlaceholder: 'Warum wird der Antrag abgelehnt?',
+	declineReasonHint: 'Die Begründung sieht die antragstellende Person.',
+	declineConfirm: 'Ablehnen',
+	reason: 'Begründung: {reason}'
 };
 
 export const en: typeof de = {
@@ -107,5 +112,10 @@ export const en: typeof de = {
 	actionFailed: 'The action failed.',
 	httpStatus: '{message} (HTTP {status})',
 	hoursShort: '{value} h',
-	perWeek: '{value} h/week'
+	perWeek: '{value} h/week',
+	declineReason: 'Reason',
+	declineReasonPlaceholder: 'Why is the request declined?',
+	declineReasonHint: 'The person who made the request sees the reason.',
+	declineConfirm: 'Decline',
+	reason: 'Reason: {reason}'
 };

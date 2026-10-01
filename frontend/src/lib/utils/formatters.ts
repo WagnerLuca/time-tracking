@@ -156,7 +156,7 @@ export function getMonthName(date: Date = new Date()): string {
 
 // ── Domain labels ──
 
-const REQUEST_TYPES = ['JoinOrganization', 'EditPastEntry', 'EditPause', 'SetInitialOvertime', 'WorkScheduleChange', 'CsvImport', 'RequestAbsence'] as const;
+const REQUEST_TYPES = ['JoinOrganization', 'EditPastEntry', 'EditPause', 'SetInitialOvertime', 'WorkScheduleChange', 'CsvImport', 'RequestAbsence', 'AddManualEntry'] as const;
 
 function isRequestType(type: string | null | undefined): type is (typeof REQUEST_TYPES)[number] {
 	return (REQUEST_TYPES as readonly string[]).includes(type ?? '');
@@ -216,12 +216,15 @@ export function statusBadgeClass(status: string | null | undefined): string {
 export function parseRequestData(type: string | null | undefined, data: string | null | undefined): string[] {
 	if (!data) return [];
 	try {
-		if (type === 'EditPastEntry') {
-			const obj = JSON.parse(data);
+		if (type === 'EditPastEntry' || type === 'AddManualEntry') {
+			// camelCase from the frontend (edit requests), PascalCase from the backend (manual entries)
+			const raw = JSON.parse(data) as Record<string, unknown>;
+			const obj = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k.charAt(0).toLowerCase() + k.slice(1), v]));
 			const parts: string[] = [];
-			if (obj.startTime) parts.push(t('format.requestData.start', { value: formatDateTime(obj.startTime) }));
-			if (obj.endTime) parts.push(t('format.requestData.end', { value: formatDateTime(obj.endTime) }));
-			if (obj.description !== undefined) parts.push(t('format.requestData.note', { value: obj.description }));
+			if (obj.startTime) parts.push(t('format.requestData.start', { value: formatDateTime(String(obj.startTime)) }));
+			if (obj.endTime) parts.push(t('format.requestData.end', { value: formatDateTime(String(obj.endTime)) }));
+			if (obj.pauseDurationMinutes != null) parts.push(t('format.requestData.pause', { value: String(obj.pauseDurationMinutes) }));
+			if (obj.description != null) parts.push(t('format.requestData.note', { value: String(obj.description) }));
 			return parts;
 		} else if (type === 'EditPause') {
 			return [t('format.requestData.pause', { value: data })];

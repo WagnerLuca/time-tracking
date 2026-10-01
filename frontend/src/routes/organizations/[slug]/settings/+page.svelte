@@ -1,4 +1,5 @@
 <script lang="ts">
+	import DeclineForm from '$lib/components/DeclineForm.svelte';
 	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
@@ -113,11 +114,15 @@
 		}
 	}
 
-	async function respondToRequest(req: OrgRequestResponse, accept: boolean) {
+	/** The request whose decline form (optional reason) is open. */
+	let decliningId = $state<number | null>(null);
+
+	async function respondToRequest(req: OrgRequestResponse, accept: boolean, reason?: string) {
 		if (!req.id) return;
 		respondingId = req.id;
 		try {
-			await requestsApi.apiV1OrganizationsSlugRequestsIdPut(orgSlug, req.id, { accept });
+			await requestsApi.apiV1OrganizationsSlugRequestsIdPut(orgSlug, req.id, { accept, reason });
+			decliningId = null;
 			toast.success(accept ? t('orgSettings.requests.accepted') : t('orgSettings.requests.declined'));
 			await loadRequestHistory();
 		} catch (err) {
@@ -945,11 +950,18 @@
 												<span>&middot; {t('orgSettings.requests.entry', { id: req.relatedEntityId })}</span>
 											{/if}
 										</div>
+										{#if req.responseReason}
+											<div class="text-base-content/70 text-sm mt-1 break-words">{t('common.reason', { reason: req.responseReason })}</div>
+										{/if}
 									</div>
 									{#if req.status === 'Pending'}
 										<div class="flex gap-1.5 mt-3 pt-3 border-t border-base-300">
-											<button class="btn btn-success btn-sm" disabled={respondingId === req.id} onclick={() => respondToRequest(req, true)}>{t('orgSettings.requests.accept')}</button>
-											<button class="btn btn-outline btn-error btn-sm" disabled={respondingId === req.id} onclick={() => respondToRequest(req, false)}>{t('orgSettings.requests.decline')}</button>
+											{#if decliningId === req.id}
+												<DeclineForm busy={respondingId === req.id} onconfirm={(reason) => respondToRequest(req, false, reason)} oncancel={() => (decliningId = null)} />
+											{:else}
+												<button class="btn btn-success btn-sm" disabled={respondingId === req.id} onclick={() => respondToRequest(req, true)}>{t('orgSettings.requests.accept')}</button>
+												<button class="btn btn-outline btn-error btn-sm" disabled={respondingId === req.id} onclick={() => (decliningId = req.id ?? null)}>{t('orgSettings.requests.decline')}</button>
+											{/if}
 										</div>
 									{/if}
 								</li>

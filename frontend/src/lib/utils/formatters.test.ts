@@ -74,5 +74,9 @@ describe('formatters', () => {
 		expect(lines).toEqual(['2 Tage: 02.03.2026 → 03.03.2026', 'Art: Urlaub (½ Tag)', 'Notiz: Urlaub']);
 		expect(parseRequestData('EditPause', '15')).toEqual(['Pause: 15 Min.']);
 		expect(parseRequestData('Unknown', 'raw')).toEqual(['raw']);
+		const manual = JSON.stringify({ StartTime: '2026-09-28T06:00:00Z', EndTime: '2026-09-28T14:30:00Z', PauseDurationMinutes: 30, Description: 'Vergessen' });
+		expect(parseRequestData('AddManualEntry', manual)).toEqual(['Beginn: 28.09.2026, 08:00', 'Ende: 28.09.2026, 16:30', 'Pause: 30 Min.', 'Notiz: Vergessen']);
+		expect(parseRequestData('AddManualEntry', JSON.stringify({ StartTime: '2026-09-28T06:00:00Z', EndTime: '2026-09-28T07:00:00Z', PauseDurationMinutes: null, Description: null }))).toHaveLength(2);
+		expect(formatRequestType('AddManualEntry')).toBe('Eintrag nachtragen');
 	});
 });
