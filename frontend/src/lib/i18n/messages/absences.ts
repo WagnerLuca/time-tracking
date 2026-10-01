@@ -68,17 +68,16 @@ export const de = {
 		from: 'Von',
 		to: 'Bis (optional)',
 		toBeforeFrom: 'Das Enddatum darf nicht vor dem Startdatum liegen.',
-		noWorkdays: 'Im gewählten Zeitraum liegen keine Arbeitstage (Mo–Fr).',
 		type: 'Art',
 		note: 'Notiz (optional)',
 		notePlaceholder: 'z. B. Arzttermin',
 		halfDay: 'Halber Tag',
-		workdaysHint: 'Nur Arbeitstage (Mo–Fr) im Zeitraum werden gezählt.',
+		workdaysHint: 'Gezählt werden nur Arbeitstage laut Arbeitszeitplan (ohne Plan Mo–Fr), Feiertage nicht.',
 		sendRequest: 'Antrag senden',
 		add: 'Abwesenheit eintragen',
 		requestSent: {
 			one: 'Abwesenheitsantrag für 1 Tag zur Genehmigung gesendet.',
-			other: 'Abwesenheitsantrag für {count} Tage zur Genehmigung gesendet.'
+			other: 'Abwesenheitsantrag für {count} Kalendertage zur Genehmigung gesendet; es zählen nur deine Arbeitstage.'
 		},
 		requestFailed: 'Antrag konnte nicht gesendet werden.',
 		addFailed: 'Abwesenheit konnte nicht eingetragen werden.',
@@ -159,17 +158,16 @@ export const en: typeof de = {
 		from: 'From',
 		to: 'To (optional)',
 		toBeforeFrom: 'The end date must not be before the start date.',
-		noWorkdays: 'No workdays (Mon–Fri) in the selected range.',
 		type: 'Type',
 		note: 'Note (optional)',
 		notePlaceholder: "e.g. Doctor's appointment",
 		halfDay: 'Half day',
-		workdaysHint: 'Only workdays (Mon–Fri) in the range are counted.',
+		workdaysHint: 'Only working days of the work schedule count (Mon–Fri without one), holidays do not.',
 		sendRequest: 'Send request',
 		add: 'Add absence',
 		requestSent: {
 			one: 'Absence request for 1 day sent for approval.',
-			other: 'Absence request for {count} days sent for approval.'
+			other: 'Absence request for {count} calendar days sent for approval; only your working days count.'
 		},
 		requestFailed: 'Could not send the request.',
 		addFailed: 'Could not add the absence.',

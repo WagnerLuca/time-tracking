@@ -566,7 +566,10 @@ public class RequestService : IRequestService
             type = AbsenceType.Other;
         }
 
+        // A range keeps only the member's working days (schedule, holidays); one picked day stays as asked
         var requestedDates = data.Dates.Distinct().ToList();
+        if (requestedDates.Count > 1)
+            requestedDates = await WorkingDays.FilterAsync(_context, orgRequest.UserId, org.Id, requestedDates);
         var existingDates = (await _context.AbsenceDays
             .Where(a => a.OrganizationId == org.Id
                      && a.UserId == orgRequest.UserId

@@ -85,9 +85,9 @@
 
 	let toBeforeFrom = $derived(!!fromDate && !!toDate && toDate < fromDate);
 	let memberMissing = $derived(!!members && selectedUserId == null);
-	let workdays = $derived(fromDate && !toBeforeFrom ? workdaysInRange(fromDate, toDate) : []);
-	let noWorkdays = $derived(!!fromDate && !toBeforeFrom && workdays.length === 0);
-	let invalid = $derived(!fromDate || toBeforeFrom || memberMissing || noWorkdays);
+	// The server keeps only the member's working days of the range (schedule incl. weekends, holidays)
+	let workdays = $derived(fromDate && !toBeforeFrom ? daysInRange(fromDate, toDate) : []);
+	let invalid = $derived(!fromDate || toBeforeFrom || memberMissing);
 
 	let selectedCustomType = $derived(typeValue.startsWith('c') ? absenceTypes.find((at) => 'c' + at.id === typeValue) : undefined);
 
@@ -96,14 +96,13 @@
 		return { type: parseInt(value, 10) as AbsenceType };
 	}
 
-	/** Mon–Fri dates (yyyy-MM-dd) between from and to (inclusive; to defaults to from). */
-	function workdaysInRange(from: string, to: string): string[] {
+	/** All dates (yyyy-MM-dd) between from and to (inclusive; to defaults to from). */
+	function daysInRange(from: string, to: string): string[] {
 		const cursor = new Date(from + 'T00:00:00');
 		const end = to ? new Date(to + 'T00:00:00') : new Date(cursor);
 		const days: string[] = [];
 		while (cursor <= end) {
-			const dow = cursor.getDay();
-			if (dow >= 1 && dow <= 5) days.push(dateKey(cursor));
+			days.push(dateKey(cursor));
 			cursor.setDate(cursor.getDate() + 1);
 		}
 		return days;
@@ -197,9 +196,6 @@
 				{#if toBeforeFrom}<span class="text-xs text-error">{t('absences.dialog.toBeforeFrom')}</span>{/if}
 			</div>
 		</div>
-		{#if noWorkdays}
-			<p class="text-xs text-warning m-0" role="status">{t('absences.dialog.noWorkdays')}</p>
-		{/if}
 		<div class="flex flex-col gap-1">
 			<label for="{fieldId}-type" class="text-sm font-medium text-base-content/70">{t('absences.dialog.type')}</label>
 			<select id="{fieldId}-type" bind:value={typeValue} class="select select-bordered select-sm w-full" disabled={saving}>

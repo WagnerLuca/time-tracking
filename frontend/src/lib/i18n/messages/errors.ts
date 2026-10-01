@@ -70,7 +70,10 @@ export const de = {
 		notFound: 'Eintrag nicht gefunden.',
 		running: 'Ein laufender Eintrag kann nicht bearbeitet werden. Stoppe ihn zuerst.',
 		editDisabled: 'Das Bearbeiten vergangener Einträge ist in dieser Organisation deaktiviert.',
-		editRequiresApproval: 'Das Bearbeiten vergangener Einträge muss genehmigt werden. Bitte stelle eine Anfrage.'
+		editRequiresApproval: 'Das Bearbeiten vergangener Einträge muss genehmigt werden. Bitte stelle eine Anfrage.',
+		overlap: 'Der Eintrag überschneidet sich mit einem bestehenden Eintrag.',
+		manualInFuture: 'Ein nachgetragener Eintrag muss in der Vergangenheit liegen.',
+		addDisabled: 'Das Nachtragen von Einträgen ist in dieser Organisation deaktiviert.'
 	},
 	timer: {
 		alreadyRunning: 'Es läuft bereits ein Timer.',
@@ -86,7 +89,8 @@ export const de = {
 	},
 	export: {
 		forbidden: 'Du darfst die Daten dieses Mitglieds nicht exportieren.',
-		orgRequired: 'Für diesen Export muss eine Organisation gewählt sein.'
+		orgRequired: 'Für diesen Export muss eine Organisation gewählt sein.',
+		payrollAdminOnly: 'Nur Admins können die Lohnabrechnung exportieren.'
 	},
 	import: {
 		disabled: 'Der CSV-Import ist in dieser Organisation deaktiviert.',
@@ -218,7 +222,10 @@ export const en: typeof de = {
 		notFound: 'Entry not found.',
 		running: 'A running entry cannot be edited. Stop it first.',
 		editDisabled: 'Editing past entries is disabled in this organization.',
-		editRequiresApproval: 'Editing past entries needs approval. Please submit a request.'
+		editRequiresApproval: 'Editing past entries needs approval. Please submit a request.',
+		overlap: 'The entry overlaps an existing entry.',
+		manualInFuture: 'An added entry must lie in the past.',
+		addDisabled: 'Adding past entries is disabled in this organization.'
 	},
 	timer: {
 		alreadyRunning: 'A timer is already running.',
@@ -234,7 +241,8 @@ export const en: typeof de = {
 	},
 	export: {
 		forbidden: "You may not export this member's data.",
-		orgRequired: 'Select an organization for this export.'
+		orgRequired: 'Select an organization for this export.',
+		payrollAdminOnly: 'Only admins can export payroll data.'
 	},
 	import: {
 		disabled: 'CSV import is disabled in this organization.',
