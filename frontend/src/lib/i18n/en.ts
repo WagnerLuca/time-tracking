@@ -18,6 +18,7 @@ import * as holidays from './messages/holidays';
 import * as orgSettings from './messages/orgSettings';
 import * as settings from './messages/settings';
 import * as exportPage from './messages/export';
+import * as errors from './messages/errors';
 import type { Dictionary } from './de';
 
 export const en: Dictionary = {
@@ -40,5 +41,6 @@ export const en: Dictionary = {
 	holidays: holidays.en,
 	orgSettings: orgSettings.en,
 	settings: settings.en,
-	export: exportPage.en
+	export: exportPage.en,
+	errors: errors.en
 };

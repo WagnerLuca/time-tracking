@@ -4,12 +4,28 @@
  * Replaces all `catch (err: any) { error = err.response?.data?.message || '...'; }` patterns
  * with a type-safe `catch (err) { error = extractErrorMessage(err, 'Failed to ...'); }`.
  */
-import { t } from '$lib/i18n';
+import { t, type MessageKey } from '$lib/i18n';
+import { de } from '$lib/i18n/de';
+import { lookup } from '$lib/i18n/translate';
+
+/** The stable `code` of a backend ProblemDetails (e.g. "auth.sessionEnded"), or null. */
+export function getErrorCode(err: unknown): string | null {
+	const code = (err as { response?: { data?: { code?: unknown } } } | null)?.response?.data?.code;
+	return typeof code === 'string' && code ? code : null;
+}
+
+/** The translated text for a backend error code, or null when the code is unknown. */
+export function translateErrorCode(code: string | null | undefined): string | null {
+	if (!code) return null;
+	const key = `errors.${code}`;
+	return typeof lookup(de, key) === 'string' ? t(key as MessageKey) : null;
+}
 
 /**
  * Extract a human-readable error message from an unknown error object.
  *
  * Checks (in order):
+ * 0. A known backend error `code` (ProblemDetails extension), translated via `messages/errors.ts`
  * 1. Axios-style `err.response.data.message` (string from backend ProblemDetails/JSON)
  * 2. Axios-style `err.response.data` if it's a plain string (some endpoints return raw text)
  * 3. Native `Error.message`
@@ -25,6 +41,8 @@ export function extractErrorMessage(err: unknown, fallback: string = t('common.u
 			if (typeof res.data === 'object') {
 				// Org requires 2FA the caller has not set up (RequireOrgRole filter)
 				if (isTwoFactorRequired(err)) return t('common.twoFactorRequired');
+				const translated = translateErrorCode(getErrorCode(err));
+				if (translated) return translated;
 				// Backend ServiceResult / custom JSON: { message: "..." }
 				if ('message' in res.data && typeof res.data.message === 'string') {
 					return res.data.message;

@@ -18,6 +18,7 @@ import * as holidays from './messages/holidays';
 import * as orgSettings from './messages/orgSettings';
 import * as settings from './messages/settings';
 import * as exportPage from './messages/export';
+import * as errors from './messages/errors';
 
 /** German is the default and the fallback for any missing English string. */
 export const de = {
@@ -40,7 +41,8 @@ export const de = {
 	holidays: holidays.de,
 	orgSettings: orgSettings.de,
 	settings: settings.de,
-	export: exportPage.de
+	export: exportPage.de,
+	errors: errors.de
 };
 
 export type Dictionary = typeof de;

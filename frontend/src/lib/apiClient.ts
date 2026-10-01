@@ -3,7 +3,7 @@ import { env } from '$env/dynamic/public';
 import { goto } from '$app/navigation';
 import { isTwoFactorRequired } from '$lib/utils/errorHandler';
 import { installRefreshInterceptor, type RefreshedTokens } from '$lib/authRefresh';
-import { Configuration, AbsenceDayApi, ApiKeysApi, AuthApi, ExportImportApi, GroupApi, HolidayApi, NotificationsApi, OrganizationsApi, PauseRulesApi, ReportsApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
+import { Configuration, AbsenceDayApi, ApiKeysApi, AuthApi, ExportImportApi, GroupApi, HolidayApi, InvitationsApi, MemberEntriesApi, NotificationsApi, OrganizationsApi, PauseRulesApi, ReportsApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
 
 // Detect base URL: browser uses current hostname, SSR uses Docker service name
 const getApiBaseUrl = (): string => {
@@ -37,6 +37,20 @@ axiosInstance.interceptors.request.use(
     },
     (error) => Promise.reject(error)
 );
+
+// A failed `responseType: 'blob'` download (CSV/PDF/JSON export) carries its ProblemDetails as a
+// Blob: parse it back to JSON so extractErrorMessage can read `code`/`detail` like everywhere else.
+axiosInstance.interceptors.response.use(undefined, async (error) => {
+    const data = error?.response?.data;
+    if (typeof Blob !== 'undefined' && data instanceof Blob && data.type.includes('json')) {
+        try {
+            error.response.data = JSON.parse(await data.text());
+        } catch {
+            // leave the blob; the caller falls back to its own message
+        }
+    }
+    return Promise.reject(error);
+});
 
 // Response interceptor: on 401 refresh the access token once (shared by concurrent
 // requests) and retry; only a failed refresh ends the session. See authRefresh.ts.
@@ -108,6 +122,8 @@ export const workScheduleApi = new WorkScheduleApi(config, undefined, axiosInsta
 export const groupApi = new GroupApi(config, undefined, axiosInstance);
 export const reportsApi = new ReportsApi(config, undefined, axiosInstance);
 export const apiKeysApi = new ApiKeysApi(config, undefined, axiosInstance);
+export const invitationsApi = new InvitationsApi(config, undefined, axiosInstance);
+export const memberEntriesApi = new MemberEntriesApi(config, undefined, axiosInstance);
 
 // Type for the polymorphic 2FA-required login response (not in generated types
 // because the login endpoint declares LoginResponse as its return type).

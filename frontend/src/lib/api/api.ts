@@ -106,19 +106,25 @@ export interface AbsenceTypeDefinitionResponse {
     'isActive'?: boolean;
     'createdAt'?: string;
 }
+/**
+ * Accept an invitation with the token from the mail.
+ */
+export interface AcceptInvitationRequest {
+    'token': string;
+}
+/**
+ * The organization the caller just joined.
+ */
+export interface AcceptedInvitationResponse {
+    'organizationId'?: number;
+    'organizationSlug': string | null;
+    'organizationName': string | null;
+    'role': string | null;
+}
 export interface AddGroupMemberRequest {
     'userId'?: number;
     'role'?: string | null;
 }
-/**
- * Request payload for adding a user to an organization.
- */
-export interface AddMemberRequest {
-    'userId'?: number;
-    'role'?: OrganizationRole;
-}
-
-
 export interface AdminCreateAbsenceDayRequest {
     'userId'?: number;
     'date'?: string;
@@ -169,6 +175,14 @@ export interface BalanceResponse {
     'week': PeriodBalance;
     'month': PeriodBalance;
     /**
+     * The current week Monday–Sunday, one entry per day. Target is the planned target of every day  (upcoming ones too); overtime only counts days that are in the balance (see TimeTracking.Api.Models.Dtos.DayBalance.IsCounted).
+     */
+    'weekDays'?: Array<DayBalance> | null;
+    /**
+     * The current month split into Monday-based weeks (clipped to the month), with the same  rules as TimeTracking.Api.Models.Dtos.BalanceResponse.WeekDays: planned target of the whole segment, overtime of its counted days.
+     */
+    'monthWeeks'?: Array<PeriodBalance> | null;
+    /**
      * Uncorrected failure entries (not counted in any figure above).
      */
     'failureEntryCount'?: number;
@@ -185,6 +199,25 @@ export interface ChangePasswordRequest {
      * New password (min 8 characters).
      */
     'newPassword': string;
+}
+/**
+ * A day that breaks the Working Time Act (see WorkingTimeAct).
+ */
+export interface ComplianceDayResponse {
+    'date'?: string;
+    'netHours'?: number;
+    /**
+     * Hours between the previous day\'s last entry and this day\'s first; null without entries the day before.
+     */
+    'restHoursBefore'?: number | null;
+    /**
+     * More than 10 h net work.
+     */
+    'dailyMax'?: boolean;
+    /**
+     * Less than 11 h rest before this day.
+     */
+    'restPeriod'?: boolean;
 }
 /**
  * Request payload for creating a personal absence day.
@@ -234,6 +267,46 @@ export interface CreateHolidayRequest {
     'name': string;
     'isRecurring'?: boolean;
     'isHalfDay'?: boolean;
+}
+/**
+ * Invite an email address into the organization.
+ */
+export interface CreateInvitationRequest {
+    'email': string;
+    'role'?: OrganizationRole;
+}
+
+
+/**
+ * A finished time entry added by hand (e.g. a forgotten day).
+ */
+export interface CreateManualEntryRequest {
+    /**
+     * Start (UTC).
+     */
+    'startTime'?: string;
+    /**
+     * End (UTC), not in the future.
+     */
+    'endTime'?: string;
+    /**
+     * Pause in minutes; without it the organization\'s pause rules apply.
+     */
+    'pauseDurationMinutes'?: number | null;
+    'description'?: string | null;
+    /**
+     * Organization to book on; null = personal entry.
+     */
+    'organizationId'?: number | null;
+}
+/**
+ * An admin creates a finished entry for a member.
+ */
+export interface CreateMemberEntryRequest {
+    'startTime'?: string;
+    'endTime'?: string;
+    'pauseDurationMinutes'?: number | null;
+    'description'?: string | null;
 }
 /**
  * Request payload for creating a new organization request.
@@ -291,6 +364,8 @@ export interface CreateWorkScheduleRequest {
     'targetWed'?: number | null;
     'targetThu'?: number | null;
     'targetFri'?: number | null;
+    'targetSat'?: number | null;
+    'targetSun'?: number | null;
 }
 /**
  * Returned once when a key is created — the only time the plaintext key is visible.
@@ -304,10 +379,39 @@ export interface CreatedApiKeyResponse {
     'key': string | null;
 }
 /**
+ * One day of the balance breakdown (organization-local date).
+ */
+export interface DayBalance {
+    'date'?: string;
+    /**
+     * Planned target (holidays and absences credited), also for days still to come.
+     */
+    'targetHours'?: number;
+    /**
+     * Net worked hours (failure entries excluded).
+     */
+    'workedHours'?: number;
+    /**
+     * The day\'s overtime; 0 for days not counted.
+     */
+    'overtimeHours'?: number;
+    /**
+     * The day is in the balance: not in the future and not before the first tracked entry.
+     */
+    'isCounted'?: boolean;
+}
+/**
  * Request payload for deleting (anonymizing) the current account.
  */
 export interface DeleteAccountRequest {
     'password': string;
+}
+/**
+ * Turning 2FA off needs the password and a current code (or a backup code).
+ */
+export interface DisableTwoFactorRequest {
+    'currentPassword': string;
+    'code': string;
 }
 export interface EffectivePermissionsResponse {
     'editPastEntriesMode'?: string | null;
@@ -354,6 +458,10 @@ export interface ExportRequest {
      * Columns to include in the export. If empty/null, all columns are included.
      */
     'columns'?: Array<string> | null;
+    /**
+     * Language of headers, weekdays and status texts: \"de\" (default) or \"en\". Numbers stay invariant.
+     */
+    'lang'?: string | null;
 }
 /**
  * Request a password reset link for an email address.
@@ -468,6 +576,16 @@ export interface ImportResultResponse {
     'errors'?: Array<string> | null;
 }
 /**
+ * A pending invitation as admins see it (never contains the token).
+ */
+export interface InvitationResponse {
+    'id'?: number;
+    'email': string | null;
+    'role': string | null;
+    'createdAt'?: string;
+    'expiresAt'?: string;
+}
+/**
  * Request payload for logging in with email and password.
  */
 export interface LoginRequest {
@@ -497,6 +615,13 @@ export interface LoginResponse {
      */
     'expiresAt': string;
     'user': UserInfo;
+}
+/**
+ * Result of a manual entry: TimeTracking.Api.Models.Dtos.ManualEntryResponse.Entry when it was created directly, TimeTracking.Api.Models.Dtos.ManualEntryResponse.Request  when the organization requires approval (the entry is created once it is accepted).
+ */
+export interface ManualEntryResponse {
+    'entry'?: TimeEntryResponse;
+    'request'?: OrgRequestResponse;
 }
 /**
  * Number of request notifications marked as seen.
@@ -556,6 +681,10 @@ export interface NotificationResponse {
     'isRead'?: boolean;
     'createdAt'?: string;
     'organizationId'?: number | null;
+    /**
+     * Time entry id (FailureEntry, TimerReminder) or request id (RequestAccepted, RequestDeclined) for deep links.
+     */
+    'relatedEntityId'?: number | null;
 }
 /**
  * Standard paginated response wrapper for list endpoints.
@@ -602,6 +731,10 @@ export interface OrgRequestResponse {
     'createdAt'?: string;
     'respondedAt'?: string | null;
     'respondedByName'?: string | null;
+    /**
+     * Reason the approver gave with the decision, if any.
+     */
+    'responseReason'?: string | null;
     'groupId'?: number | null;
     'groupName'?: string | null;
 }
@@ -775,6 +908,24 @@ export interface PauseRuleResponse {
     'pauseMinutes'?: number;
 }
 /**
+ * Request payload for the payroll export.
+ */
+export interface PayrollExportRequest {
+    'orgSlug': string;
+    /**
+     * First local day (inclusive).
+     */
+    'from'?: string;
+    /**
+     * Last local day (inclusive); days after today are not counted yet.
+     */
+    'to'?: string;
+    /**
+     * Header language: \"de\" (default) or \"en\". The format stays German either way.
+     */
+    'lang'?: string | null;
+}
+/**
  * Worked vs. target hours for a period (holidays and absences already credited).
  */
 export interface PeriodBalance {
@@ -783,6 +934,59 @@ export interface PeriodBalance {
     'targetHours'?: number;
     'workedHours'?: number;
     'overtimeHours'?: number;
+}
+export interface PersonalAbsence {
+    'organization'?: string | null;
+    'date'?: string;
+    'type'?: string | null;
+    'isHalfDay'?: boolean;
+    'note'?: string | null;
+}
+/**
+ * Everything the application stores about one person (GDPR Art. 15/20).
+ */
+export interface PersonalDataExport {
+    'exportedAt'?: string;
+    'profile': UserInfo;
+    'createdAt'?: string;
+    'lastLoginAt'?: string | null;
+    'memberships': Array<PersonalMembership> | null;
+    'timeEntries': Array<PersonalTimeEntry> | null;
+    'absences': Array<PersonalAbsence> | null;
+    'requests': Array<PersonalRequest> | null;
+    'notifications': Array<PersonalNotification> | null;
+}
+export interface PersonalMembership {
+    'organization'?: string | null;
+    'role'?: string | null;
+    'joinedAt'?: string;
+    'active'?: boolean;
+    'vacationDaysPerYear'?: number;
+    'initialOvertimeHours'?: number;
+    'badgeId'?: string | null;
+}
+export interface PersonalNotification {
+    'title'?: string | null;
+    'message'?: string | null;
+    'createdAt'?: string;
+    'isRead'?: boolean;
+}
+export interface PersonalRequest {
+    'organization'?: string | null;
+    'type'?: string | null;
+    'status'?: string | null;
+    'message'?: string | null;
+    'requestData'?: string | null;
+    'createdAt'?: string;
+    'respondedAt'?: string | null;
+}
+export interface PersonalTimeEntry {
+    'organization'?: string | null;
+    'startTime'?: string;
+    'endTime'?: string | null;
+    'pauseMinutes'?: number;
+    'description'?: string | null;
+    'isFailure'?: boolean;
 }
 export interface ProblemDetails {
     [key: string]: any;
@@ -873,7 +1077,8 @@ export const RequestType = {
     NUMBER_3: 3,
     NUMBER_4: 4,
     NUMBER_5: 5,
-    NUMBER_6: 6
+    NUMBER_6: 6,
+    NUMBER_7: 7
 } as const;
 
 export type RequestType = typeof RequestType[keyof typeof RequestType];
@@ -891,6 +1096,10 @@ export interface RespondToOrgRequestRequest {
      * true = Accept, false = Decline
      */
     'accept'?: boolean;
+    /**
+     * Optional reason shown to the member (e.g. why the request was declined).
+     */
+    'reason'?: string | null;
 }
 /**
  * Tri-state rule mode for organization settings.  Disabled = feature off entirely.  RequiresApproval = user must request, admin approves.  Allowed = user can do it themselves.
@@ -950,6 +1159,33 @@ export interface StopTimeEntryRequest {
     'description'?: string | null;
 }
 /**
+ * One recorded change of a time entry.
+ */
+export interface TimeEntryChangeResponse {
+    'id'?: number;
+    'timeEntryId'?: number;
+    'organizationId'?: number | null;
+    'changedByUserId'?: number | null;
+    'changedByName'?: string | null;
+    'changedAt'?: string;
+    /**
+     * Created, Updated, Deleted or ApprovedRequest.
+     */
+    'kind': string | null;
+    'changes': Array<TimeEntryFieldChangeResponse> | null;
+}
+/**
+ * A field before/after a change. Times are ISO 8601 UTC, numbers invariant, null = not set.
+ */
+export interface TimeEntryFieldChangeResponse {
+    /**
+     * StartTime, EndTime, PauseDurationMinutes, Description, OrganizationId or IsFailure.
+     */
+    'field': string | null;
+    'oldValue'?: string | null;
+    'newValue'?: string | null;
+}
+/**
  * Response representing a single time entry.
  */
 export interface TimeEntryResponse {
@@ -987,6 +1223,10 @@ export interface TimeEntryResponse {
      */
     'isFailure'?: boolean;
     'createdAt'?: string;
+    /**
+     * Working Time Act warnings, filled on stop, edit and manual/admin create:  \"dailyMax\" (more than 10 h net that day), \"restPeriod\" (less than 11 h rest before  this day or before the next). Null where not computed (lists).
+     */
+    'warnings'?: Array<string> | null;
 }
 /**
  * Standard paginated response wrapper for list endpoints.
@@ -1101,6 +1341,15 @@ export interface UpdateHolidayRequest {
     'isHalfDay'?: boolean | null;
 }
 /**
+ * An admin corrects a member\'s entry; unset fields stay. Setting the end time resolves a failure entry.
+ */
+export interface UpdateMemberEntryRequest {
+    'startTime'?: string | null;
+    'endTime'?: string | null;
+    'pauseDurationMinutes'?: number | null;
+    'description'?: string | null;
+}
+/**
  * Request payload for changing a member\'s role.
  */
 export interface UpdateMemberRoleRequest {
@@ -1212,6 +1461,8 @@ export interface UpdateWorkScheduleRequest {
     'targetWed'?: number | null;
     'targetThu'?: number | null;
     'targetFri'?: number | null;
+    'targetSat'?: number | null;
+    'targetSun'?: number | null;
 }
 /**
  * Request payload for creating/updating a custom absence type.
@@ -1294,6 +1545,8 @@ export interface WorkScheduleResponse {
     'targetWed'?: number;
     'targetThu'?: number;
     'targetFri'?: number;
+    'targetSat'?: number;
+    'targetSun'?: number;
     'initialOvertimeHours'?: number;
     'initialOvertimeMode': string | null;
     'workScheduleChangeMode': string | null;
@@ -2633,11 +2886,11 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
         /**
          * 
          * @summary Disable 2FA for the authenticated user (requires current password)
-         * @param {ChangePasswordRequest} [changePasswordRequest] 
+         * @param {DisableTwoFactorRequest} [disableTwoFactorRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1Auth2faDisablePost: async (changePasswordRequest?: ChangePasswordRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        apiV1Auth2faDisablePost: async (disableTwoFactorRequest?: DisableTwoFactorRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/api/v1/Auth/2fa/disable`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -2661,7 +2914,7 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(changePasswordRequest, localVarRequestOptions, configuration)
+            localVarRequestOptions.data = serializeDataIfNeeded(disableTwoFactorRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -2924,6 +3177,40 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
             localVarRequestOptions.data = serializeDataIfNeeded(refreshTokenRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Download everything stored about you (GDPR Art. 15/20) as JSON.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1AuthMeExportGet: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Auth/me/export`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -3213,12 +3500,12 @@ export const AuthApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary Disable 2FA for the authenticated user (requires current password)
-         * @param {ChangePasswordRequest} [changePasswordRequest] 
+         * @param {DisableTwoFactorRequest} [disableTwoFactorRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1Auth2faDisablePost(changePasswordRequest?: ChangePasswordRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AuthResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1Auth2faDisablePost(changePasswordRequest, options);
+        async apiV1Auth2faDisablePost(disableTwoFactorRequest?: DisableTwoFactorRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AuthResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1Auth2faDisablePost(disableTwoFactorRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1Auth2faDisablePost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -3311,6 +3598,18 @@ export const AuthApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1AuthLogoutPost(refreshTokenRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1AuthLogoutPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Download everything stored about you (GDPR Art. 15/20) as JSON.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1AuthMeExportGet(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PersonalDataExport>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1AuthMeExportGet(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1AuthMeExportGet']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -3424,12 +3723,12 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
         /**
          * 
          * @summary Disable 2FA for the authenticated user (requires current password)
-         * @param {ChangePasswordRequest} [changePasswordRequest] 
+         * @param {DisableTwoFactorRequest} [disableTwoFactorRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1Auth2faDisablePost(changePasswordRequest?: ChangePasswordRequest, options?: RawAxiosRequestConfig): AxiosPromise<AuthResponse> {
-            return localVarFp.apiV1Auth2faDisablePost(changePasswordRequest, options).then((request) => request(axios, basePath));
+        apiV1Auth2faDisablePost(disableTwoFactorRequest?: DisableTwoFactorRequest, options?: RawAxiosRequestConfig): AxiosPromise<AuthResponse> {
+            return localVarFp.apiV1Auth2faDisablePost(disableTwoFactorRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -3499,6 +3798,15 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
          */
         apiV1AuthLogoutPost(refreshTokenRequest?: RefreshTokenRequest, options?: RawAxiosRequestConfig): AxiosPromise<AuthResponse> {
             return localVarFp.apiV1AuthLogoutPost(refreshTokenRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Download everything stored about you (GDPR Art. 15/20) as JSON.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1AuthMeExportGet(options?: RawAxiosRequestConfig): AxiosPromise<PersonalDataExport> {
+            return localVarFp.apiV1AuthMeExportGet(options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -3589,12 +3897,12 @@ export class AuthApi extends BaseAPI {
     /**
      * 
      * @summary Disable 2FA for the authenticated user (requires current password)
-     * @param {ChangePasswordRequest} [changePasswordRequest] 
+     * @param {DisableTwoFactorRequest} [disableTwoFactorRequest] 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public apiV1Auth2faDisablePost(changePasswordRequest?: ChangePasswordRequest, options?: RawAxiosRequestConfig) {
-        return AuthApiFp(this.configuration).apiV1Auth2faDisablePost(changePasswordRequest, options).then((request) => request(this.axios, this.basePath));
+    public apiV1Auth2faDisablePost(disableTwoFactorRequest?: DisableTwoFactorRequest, options?: RawAxiosRequestConfig) {
+        return AuthApiFp(this.configuration).apiV1Auth2faDisablePost(disableTwoFactorRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -3671,6 +3979,16 @@ export class AuthApi extends BaseAPI {
      */
     public apiV1AuthLogoutPost(refreshTokenRequest?: RefreshTokenRequest, options?: RawAxiosRequestConfig) {
         return AuthApiFp(this.configuration).apiV1AuthLogoutPost(refreshTokenRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Download everything stored about you (GDPR Art. 15/20) as JSON.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1AuthMeExportGet(options?: RawAxiosRequestConfig) {
+        return AuthApiFp(this.configuration).apiV1AuthMeExportGet(options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -3885,6 +4203,44 @@ export const ExportImportApiAxiosParamCreator = function (configuration?: Config
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @summary Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):  target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing  correction. German format (`;`, decimal comma, UTF-8 BOM); `lang` = \"de\" (default) or \"en\" for the headers.  Org admins only, while the organization lets admins see members\' hours.
+         * @param {PayrollExportRequest} [payrollExportRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1ExportImportPayrollPost: async (payrollExportRequest?: PayrollExportRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/ExportImport/payroll`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(payrollExportRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -3935,6 +4291,19 @@ export const ExportImportApiFp = function(configuration?: Configuration) {
             const localVarOperationServerBasePath = operationServerMap['ExportImportApi.apiV1ExportImportImportPreviewPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * 
+         * @summary Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):  target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing  correction. German format (`;`, decimal comma, UTF-8 BOM); `lang` = \"de\" (default) or \"en\" for the headers.  Org admins only, while the organization lets admins see members\' hours.
+         * @param {PayrollExportRequest} [payrollExportRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1ExportImportPayrollPost(payrollExportRequest?: PayrollExportRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1ExportImportPayrollPost(payrollExportRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ExportImportApi.apiV1ExportImportPayrollPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -3976,6 +4345,16 @@ export const ExportImportApiFactory = function (configuration?: Configuration, b
         apiV1ExportImportImportPreviewPost(orgSlug?: string, file?: File, options?: RawAxiosRequestConfig): AxiosPromise<ImportPreviewResponse> {
             return localVarFp.apiV1ExportImportImportPreviewPost(orgSlug, file, options).then((request) => request(axios, basePath));
         },
+        /**
+         * 
+         * @summary Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):  target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing  correction. German format (`;`, decimal comma, UTF-8 BOM); `lang` = \"de\" (default) or \"en\" for the headers.  Org admins only, while the organization lets admins see members\' hours.
+         * @param {PayrollExportRequest} [payrollExportRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1ExportImportPayrollPost(payrollExportRequest?: PayrollExportRequest, options?: RawAxiosRequestConfig): AxiosPromise<File> {
+            return localVarFp.apiV1ExportImportPayrollPost(payrollExportRequest, options).then((request) => request(axios, basePath));
+        },
     };
 };
 
@@ -4016,6 +4395,17 @@ export class ExportImportApi extends BaseAPI {
      */
     public apiV1ExportImportImportPreviewPost(orgSlug?: string, file?: File, options?: RawAxiosRequestConfig) {
         return ExportImportApiFp(this.configuration).apiV1ExportImportImportPreviewPost(orgSlug, file, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):  target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing  correction. German format (`;`, decimal comma, UTF-8 BOM); `lang` = \"de\" (default) or \"en\" for the headers.  Org admins only, while the organization lets admins see members\' hours.
+     * @param {PayrollExportRequest} [payrollExportRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1ExportImportPayrollPost(payrollExportRequest?: PayrollExportRequest, options?: RawAxiosRequestConfig) {
+        return ExportImportApiFp(this.configuration).apiV1ExportImportPayrollPost(payrollExportRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -4464,6 +4854,44 @@ export const GroupApiAxiosParamCreator = function (configuration?: Configuration
         },
         /**
          * 
+         * @summary Permission overrides of all groups of the organization (one request instead of one per group).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsPermissionsGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugGroupsPermissionsGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/groups/permissions`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Create a new group (admin only).
          * @param {string} slug 
          * @param {CreateGroupRequest} [createGroupRequest] 
@@ -4701,6 +5129,19 @@ export const GroupApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Permission overrides of all groups of the organization (one request instead of one per group).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugGroupsPermissionsGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<GroupPermissionsResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsPermissionsGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsPermissionsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Create a new group (admin only).
          * @param {string} slug 
          * @param {CreateGroupRequest} [createGroupRequest] 
@@ -4849,6 +5290,16 @@ export const GroupApiFactory = function (configuration?: Configuration, basePath
          */
         apiV1OrganizationsSlugGroupsGroupIdPut(slug: string, groupId: number, updateGroupRequest?: UpdateGroupRequest, options?: RawAxiosRequestConfig): AxiosPromise<GroupDetailResponse> {
             return localVarFp.apiV1OrganizationsSlugGroupsGroupIdPut(slug, groupId, updateGroupRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Permission overrides of all groups of the organization (one request instead of one per group).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugGroupsPermissionsGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<Array<GroupPermissionsResponse>> {
+            return localVarFp.apiV1OrganizationsSlugGroupsPermissionsGet(slug, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -5001,6 +5452,17 @@ export class GroupApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugGroupsGroupIdPut(slug: string, groupId: number, updateGroupRequest?: UpdateGroupRequest, options?: RawAxiosRequestConfig) {
         return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGroupIdPut(slug, groupId, updateGroupRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Permission overrides of all groups of the organization (one request instead of one per group).
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugGroupsPermissionsGet(slug: string, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsPermissionsGet(slug, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -5199,12 +5661,13 @@ export const HolidayApiAxiosParamCreator = function (configuration?: Configurati
          * 
          * @summary Import preset holidays (e.g. German public holidays) for a given year (admin only).
          * @param {string} slug Organization URL slug.
-         * @param {string} [preset] Preset code, e.g. \&quot;de\&quot; (default).
+         * @param {string} [preset] Preset code: \&quot;DE\&quot; (nationwide, default), a state like \&quot;DE-BY\&quot;, \&quot;AT\&quot; or \&quot;CH\&quot;.
          * @param {number} [year] Year to import for. Defaults to current year.
+         * @param {number} [toYear] Last year of a range starting at year (at most 10 years); movable holidays are created for every year.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugHolidaysImportPresetPost: async (slug: string, preset?: string, year?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        apiV1OrganizationsSlugHolidaysImportPresetPost: async (slug: string, preset?: string, year?: number, toYear?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'slug' is not null or undefined
             assertParamExists('apiV1OrganizationsSlugHolidaysImportPresetPost', 'slug', slug)
             const localVarPath = `/api/v1/organizations/{slug}/holidays/import-preset`
@@ -5230,6 +5693,10 @@ export const HolidayApiAxiosParamCreator = function (configuration?: Configurati
 
             if (year !== undefined) {
                 localVarQueryParameter['year'] = year;
+            }
+
+            if (toYear !== undefined) {
+                localVarQueryParameter['toYear'] = toYear;
             }
 
 
@@ -5352,13 +5819,14 @@ export const HolidayApiFp = function(configuration?: Configuration) {
          * 
          * @summary Import preset holidays (e.g. German public holidays) for a given year (admin only).
          * @param {string} slug Organization URL slug.
-         * @param {string} [preset] Preset code, e.g. \&quot;de\&quot; (default).
+         * @param {string} [preset] Preset code: \&quot;DE\&quot; (nationwide, default), a state like \&quot;DE-BY\&quot;, \&quot;AT\&quot; or \&quot;CH\&quot;.
          * @param {number} [year] Year to import for. Defaults to current year.
+         * @param {number} [toYear] Last year of a range starting at year (at most 10 years); movable holidays are created for every year.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1OrganizationsSlugHolidaysImportPresetPost(slug: string, preset?: string, year?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<HolidayResponse>>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugHolidaysImportPresetPost(slug, preset, year, options);
+        async apiV1OrganizationsSlugHolidaysImportPresetPost(slug: string, preset?: string, year?: number, toYear?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<HolidayResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugHolidaysImportPresetPost(slug, preset, year, toYear, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiV1OrganizationsSlugHolidaysImportPresetPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -5432,13 +5900,14 @@ export const HolidayApiFactory = function (configuration?: Configuration, basePa
          * 
          * @summary Import preset holidays (e.g. German public holidays) for a given year (admin only).
          * @param {string} slug Organization URL slug.
-         * @param {string} [preset] Preset code, e.g. \&quot;de\&quot; (default).
+         * @param {string} [preset] Preset code: \&quot;DE\&quot; (nationwide, default), a state like \&quot;DE-BY\&quot;, \&quot;AT\&quot; or \&quot;CH\&quot;.
          * @param {number} [year] Year to import for. Defaults to current year.
+         * @param {number} [toYear] Last year of a range starting at year (at most 10 years); movable holidays are created for every year.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugHolidaysImportPresetPost(slug: string, preset?: string, year?: number, options?: RawAxiosRequestConfig): AxiosPromise<Array<HolidayResponse>> {
-            return localVarFp.apiV1OrganizationsSlugHolidaysImportPresetPost(slug, preset, year, options).then((request) => request(axios, basePath));
+        apiV1OrganizationsSlugHolidaysImportPresetPost(slug: string, preset?: string, year?: number, toYear?: number, options?: RawAxiosRequestConfig): AxiosPromise<Array<HolidayResponse>> {
+            return localVarFp.apiV1OrganizationsSlugHolidaysImportPresetPost(slug, preset, year, toYear, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -5508,13 +5977,14 @@ export class HolidayApi extends BaseAPI {
      * 
      * @summary Import preset holidays (e.g. German public holidays) for a given year (admin only).
      * @param {string} slug Organization URL slug.
-     * @param {string} [preset] Preset code, e.g. \&quot;de\&quot; (default).
+     * @param {string} [preset] Preset code: \&quot;DE\&quot; (nationwide, default), a state like \&quot;DE-BY\&quot;, \&quot;AT\&quot; or \&quot;CH\&quot;.
      * @param {number} [year] Year to import for. Defaults to current year.
+     * @param {number} [toYear] Last year of a range starting at year (at most 10 years); movable holidays are created for every year.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public apiV1OrganizationsSlugHolidaysImportPresetPost(slug: string, preset?: string, year?: number, options?: RawAxiosRequestConfig) {
-        return HolidayApiFp(this.configuration).apiV1OrganizationsSlugHolidaysImportPresetPost(slug, preset, year, options).then((request) => request(this.axios, this.basePath));
+    public apiV1OrganizationsSlugHolidaysImportPresetPost(slug: string, preset?: string, year?: number, toYear?: number, options?: RawAxiosRequestConfig) {
+        return HolidayApiFp(this.configuration).apiV1OrganizationsSlugHolidaysImportPresetPost(slug, preset, year, toYear, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -5527,6 +5997,738 @@ export class HolidayApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugHolidaysPost(slug: string, createHolidayRequest?: CreateHolidayRequest, options?: RawAxiosRequestConfig) {
         return HolidayApiFp(this.configuration).apiV1OrganizationsSlugHolidaysPost(slug, createHolidayRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * InvitationsApi - axios parameter creator
+ */
+export const InvitationsApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary Accept an invitation with the token from the mail; the signed-in account must have the invited address.
+         * @param {AcceptInvitationRequest} [acceptInvitationRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1InvitationsAcceptPost: async (acceptInvitationRequest?: AcceptInvitationRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/invitations/accept`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(acceptInvitationRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Pending invitations (admins).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugInvitationsGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugInvitationsGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/invitations`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Revoke a pending invitation (admins).
+         * @param {string} slug 
+         * @param {number} invitationId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugInvitationsInvitationIdDelete: async (slug: string, invitationId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugInvitationsInvitationIdDelete', 'slug', slug)
+            // verify required parameter 'invitationId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugInvitationsInvitationIdDelete', 'invitationId', invitationId)
+            const localVarPath = `/api/v1/organizations/{slug}/invitations/{invitationId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"invitationId"}}`, encodeURIComponent(String(invitationId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Invite an email address (admins; inviting admins needs the owner). Mails a link valid for 7 days.
+         * @param {string} slug 
+         * @param {CreateInvitationRequest} [createInvitationRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugInvitationsPost: async (slug: string, createInvitationRequest?: CreateInvitationRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugInvitationsPost', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/invitations`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createInvitationRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * InvitationsApi - functional programming interface
+ */
+export const InvitationsApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = InvitationsApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Accept an invitation with the token from the mail; the signed-in account must have the invited address.
+         * @param {AcceptInvitationRequest} [acceptInvitationRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1InvitationsAcceptPost(acceptInvitationRequest?: AcceptInvitationRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AcceptedInvitationResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1InvitationsAcceptPost(acceptInvitationRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InvitationsApi.apiV1InvitationsAcceptPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Pending invitations (admins).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugInvitationsGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<InvitationResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugInvitationsGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InvitationsApi.apiV1OrganizationsSlugInvitationsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Revoke a pending invitation (admins).
+         * @param {string} slug 
+         * @param {number} invitationId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugInvitationsInvitationIdDelete(slug: string, invitationId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugInvitationsInvitationIdDelete(slug, invitationId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InvitationsApi.apiV1OrganizationsSlugInvitationsInvitationIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Invite an email address (admins; inviting admins needs the owner). Mails a link valid for 7 days.
+         * @param {string} slug 
+         * @param {CreateInvitationRequest} [createInvitationRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugInvitationsPost(slug: string, createInvitationRequest?: CreateInvitationRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<InvitationResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugInvitationsPost(slug, createInvitationRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['InvitationsApi.apiV1OrganizationsSlugInvitationsPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * InvitationsApi - factory interface
+ */
+export const InvitationsApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = InvitationsApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Accept an invitation with the token from the mail; the signed-in account must have the invited address.
+         * @param {AcceptInvitationRequest} [acceptInvitationRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1InvitationsAcceptPost(acceptInvitationRequest?: AcceptInvitationRequest, options?: RawAxiosRequestConfig): AxiosPromise<AcceptedInvitationResponse> {
+            return localVarFp.apiV1InvitationsAcceptPost(acceptInvitationRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Pending invitations (admins).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugInvitationsGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<Array<InvitationResponse>> {
+            return localVarFp.apiV1OrganizationsSlugInvitationsGet(slug, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Revoke a pending invitation (admins).
+         * @param {string} slug 
+         * @param {number} invitationId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugInvitationsInvitationIdDelete(slug: string, invitationId: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugInvitationsInvitationIdDelete(slug, invitationId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Invite an email address (admins; inviting admins needs the owner). Mails a link valid for 7 days.
+         * @param {string} slug 
+         * @param {CreateInvitationRequest} [createInvitationRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugInvitationsPost(slug: string, createInvitationRequest?: CreateInvitationRequest, options?: RawAxiosRequestConfig): AxiosPromise<InvitationResponse> {
+            return localVarFp.apiV1OrganizationsSlugInvitationsPost(slug, createInvitationRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * InvitationsApi - object-oriented interface
+ */
+export class InvitationsApi extends BaseAPI {
+    /**
+     * 
+     * @summary Accept an invitation with the token from the mail; the signed-in account must have the invited address.
+     * @param {AcceptInvitationRequest} [acceptInvitationRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1InvitationsAcceptPost(acceptInvitationRequest?: AcceptInvitationRequest, options?: RawAxiosRequestConfig) {
+        return InvitationsApiFp(this.configuration).apiV1InvitationsAcceptPost(acceptInvitationRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Pending invitations (admins).
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugInvitationsGet(slug: string, options?: RawAxiosRequestConfig) {
+        return InvitationsApiFp(this.configuration).apiV1OrganizationsSlugInvitationsGet(slug, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Revoke a pending invitation (admins).
+     * @param {string} slug 
+     * @param {number} invitationId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugInvitationsInvitationIdDelete(slug: string, invitationId: number, options?: RawAxiosRequestConfig) {
+        return InvitationsApiFp(this.configuration).apiV1OrganizationsSlugInvitationsInvitationIdDelete(slug, invitationId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Invite an email address (admins; inviting admins needs the owner). Mails a link valid for 7 days.
+     * @param {string} slug 
+     * @param {CreateInvitationRequest} [createInvitationRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugInvitationsPost(slug: string, createInvitationRequest?: CreateInvitationRequest, options?: RawAxiosRequestConfig) {
+        return InvitationsApiFp(this.configuration).apiV1OrganizationsSlugInvitationsPost(slug, createInvitationRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * MemberEntriesApi - axios parameter creator
+ */
+export const MemberEntriesApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary Days breaking the Working Time Act (> 10 h net, < 11 h rest) in [from, to] (default: current month).  Same access as the member\'s reports (self, admins while member hours are visible, group admins with export rights).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdComplianceGet: async (slug: string, memberId: number, from?: string, to?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdComplianceGet', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdComplianceGet', 'memberId', memberId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/compliance`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (from !== undefined) {
+                localVarQueryParameter['from'] = (from as any instanceof Date) ?
+                    (from as any).toISOString().substring(0,10) :
+                    from;
+            }
+
+            if (to !== undefined) {
+                localVarQueryParameter['to'] = (to as any instanceof Date) ?
+                    (to as any).toISOString().substring(0,10) :
+                    to;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Delete a member\'s entry.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} entryId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdDelete: async (slug: string, memberId: number, entryId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdDelete', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdDelete', 'memberId', memberId)
+            // verify required parameter 'entryId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdDelete', 'entryId', entryId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/entries/{entryId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)))
+                .replace(`{${"entryId"}}`, encodeURIComponent(String(entryId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Correct a member\'s entry regardless of the member\'s own edit rule; setting the end time resolves a failure entry.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} entryId 
+         * @param {UpdateMemberEntryRequest} [updateMemberEntryRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdPut: async (slug: string, memberId: number, entryId: number, updateMemberEntryRequest?: UpdateMemberEntryRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdPut', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdPut', 'memberId', memberId)
+            // verify required parameter 'entryId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdPut', 'entryId', entryId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/entries/{entryId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)))
+                .replace(`{${"entryId"}}`, encodeURIComponent(String(entryId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updateMemberEntryRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Create a finished entry for a member (org admin, or group admin with time-edit approval).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {CreateMemberEntryRequest} [createMemberEntryRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdEntriesPost: async (slug: string, memberId: number, createMemberEntryRequest?: CreateMemberEntryRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdEntriesPost', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdEntriesPost', 'memberId', memberId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/entries`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createMemberEntryRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * MemberEntriesApi - functional programming interface
+ */
+export const MemberEntriesApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = MemberEntriesApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Days breaking the Working Time Act (> 10 h net, < 11 h rest) in [from, to] (default: current month).  Same access as the member\'s reports (self, admins while member hours are visible, group admins with export rights).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdComplianceGet(slug: string, memberId: number, from?: string, to?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<ComplianceDayResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdComplianceGet(slug, memberId, from, to, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MemberEntriesApi.apiV1OrganizationsSlugMembersMemberIdComplianceGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Delete a member\'s entry.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} entryId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdDelete(slug: string, memberId: number, entryId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdDelete(slug, memberId, entryId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MemberEntriesApi.apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Correct a member\'s entry regardless of the member\'s own edit rule; setting the end time resolves a failure entry.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} entryId 
+         * @param {UpdateMemberEntryRequest} [updateMemberEntryRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdPut(slug: string, memberId: number, entryId: number, updateMemberEntryRequest?: UpdateMemberEntryRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<TimeEntryResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdPut(slug, memberId, entryId, updateMemberEntryRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MemberEntriesApi.apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Create a finished entry for a member (org admin, or group admin with time-edit approval).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {CreateMemberEntryRequest} [createMemberEntryRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdEntriesPost(slug: string, memberId: number, createMemberEntryRequest?: CreateMemberEntryRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<TimeEntryResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdEntriesPost(slug, memberId, createMemberEntryRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MemberEntriesApi.apiV1OrganizationsSlugMembersMemberIdEntriesPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * MemberEntriesApi - factory interface
+ */
+export const MemberEntriesApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = MemberEntriesApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Days breaking the Working Time Act (> 10 h net, < 11 h rest) in [from, to] (default: current month).  Same access as the member\'s reports (self, admins while member hours are visible, group admins with export rights).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdComplianceGet(slug: string, memberId: number, from?: string, to?: string, options?: RawAxiosRequestConfig): AxiosPromise<Array<ComplianceDayResponse>> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdComplianceGet(slug, memberId, from, to, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Delete a member\'s entry.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} entryId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdDelete(slug: string, memberId: number, entryId: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdDelete(slug, memberId, entryId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Correct a member\'s entry regardless of the member\'s own edit rule; setting the end time resolves a failure entry.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} entryId 
+         * @param {UpdateMemberEntryRequest} [updateMemberEntryRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdPut(slug: string, memberId: number, entryId: number, updateMemberEntryRequest?: UpdateMemberEntryRequest, options?: RawAxiosRequestConfig): AxiosPromise<TimeEntryResponse> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdPut(slug, memberId, entryId, updateMemberEntryRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Create a finished entry for a member (org admin, or group admin with time-edit approval).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {CreateMemberEntryRequest} [createMemberEntryRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdEntriesPost(slug: string, memberId: number, createMemberEntryRequest?: CreateMemberEntryRequest, options?: RawAxiosRequestConfig): AxiosPromise<TimeEntryResponse> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdEntriesPost(slug, memberId, createMemberEntryRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * MemberEntriesApi - object-oriented interface
+ */
+export class MemberEntriesApi extends BaseAPI {
+    /**
+     * 
+     * @summary Days breaking the Working Time Act (> 10 h net, < 11 h rest) in [from, to] (default: current month).  Same access as the member\'s reports (self, admins while member hours are visible, group admins with export rights).
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {string} [from] 
+     * @param {string} [to] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdComplianceGet(slug: string, memberId: number, from?: string, to?: string, options?: RawAxiosRequestConfig) {
+        return MemberEntriesApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdComplianceGet(slug, memberId, from, to, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Delete a member\'s entry.
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {number} entryId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdDelete(slug: string, memberId: number, entryId: number, options?: RawAxiosRequestConfig) {
+        return MemberEntriesApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdDelete(slug, memberId, entryId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Correct a member\'s entry regardless of the member\'s own edit rule; setting the end time resolves a failure entry.
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {number} entryId 
+     * @param {UpdateMemberEntryRequest} [updateMemberEntryRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdPut(slug: string, memberId: number, entryId: number, updateMemberEntryRequest?: UpdateMemberEntryRequest, options?: RawAxiosRequestConfig) {
+        return MemberEntriesApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdEntriesEntryIdPut(slug, memberId, entryId, updateMemberEntryRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Create a finished entry for a member (org admin, or group admin with time-edit approval).
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {CreateMemberEntryRequest} [createMemberEntryRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdEntriesPost(slug: string, memberId: number, createMemberEntryRequest?: CreateMemberEntryRequest, options?: RawAxiosRequestConfig) {
+        return MemberEntriesApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdEntriesPost(slug, memberId, createMemberEntryRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -6301,48 +7503,6 @@ export const OrganizationsApiAxiosParamCreator = function (configuration?: Confi
         },
         /**
          * 
-         * @summary Add a member to the organization (admin only).
-         * @param {string} slug Organization URL slug.
-         * @param {AddMemberRequest} [addMemberRequest] 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        apiV1OrganizationsSlugMembersPost: async (slug: string, addMemberRequest?: AddMemberRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'slug' is not null or undefined
-            assertParamExists('apiV1OrganizationsSlugMembersPost', 'slug', slug)
-            const localVarPath = `/api/v1/Organizations/{slug}/members`
-                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            // authentication Bearer required
-            // http bearer authentication required
-            await setBearerAuthToObject(localVarHeaderParameter, configuration)
-
-
-    
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(addMemberRequest, localVarRequestOptions, configuration)
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
          * @summary Update an existing organization (admin only).
          * @param {string} slug Organization URL slug.
          * @param {UpdateOrganizationRequest} [updateOrganizationRequest] 
@@ -6630,20 +7790,6 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Add a member to the organization (admin only).
-         * @param {string} slug Organization URL slug.
-         * @param {AddMemberRequest} [addMemberRequest] 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async apiV1OrganizationsSlugMembersPost(slug: string, addMemberRequest?: AddMemberRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OrganizationMemberResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersPost(slug, addMemberRequest, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['OrganizationsApi.apiV1OrganizationsSlugMembersPost']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 
          * @summary Update an existing organization (admin only).
          * @param {string} slug Organization URL slug.
          * @param {UpdateOrganizationRequest} [updateOrganizationRequest] 
@@ -6808,17 +7954,6 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
         },
         /**
          * 
-         * @summary Add a member to the organization (admin only).
-         * @param {string} slug Organization URL slug.
-         * @param {AddMemberRequest} [addMemberRequest] 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        apiV1OrganizationsSlugMembersPost(slug: string, addMemberRequest?: AddMemberRequest, options?: RawAxiosRequestConfig): AxiosPromise<OrganizationMemberResponse> {
-            return localVarFp.apiV1OrganizationsSlugMembersPost(slug, addMemberRequest, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @summary Update an existing organization (admin only).
          * @param {string} slug Organization URL slug.
          * @param {UpdateOrganizationRequest} [updateOrganizationRequest] 
@@ -6978,18 +8113,6 @@ export class OrganizationsApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug: string, memberId: number, setVacationDaysRequest?: SetVacationDaysRequest, options?: RawAxiosRequestConfig) {
         return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug, memberId, setVacationDaysRequest, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Add a member to the organization (admin only).
-     * @param {string} slug Organization URL slug.
-     * @param {AddMemberRequest} [addMemberRequest] 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public apiV1OrganizationsSlugMembersPost(slug: string, addMemberRequest?: AddMemberRequest, options?: RawAxiosRequestConfig) {
-        return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersPost(slug, addMemberRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -7435,10 +8558,11 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
          * @param {number} memberId 
          * @param {number} [year] 
          * @param {number} [month] 
+         * @param {string} [lang] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet: async (slug: string, memberId: number, year?: number, month?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet: async (slug: string, memberId: number, year?: number, month?: number, lang?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'slug' is not null or undefined
             assertParamExists('apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet', 'slug', slug)
             // verify required parameter 'memberId' is not null or undefined
@@ -7469,6 +8593,10 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
                 localVarQueryParameter['month'] = month;
             }
 
+            if (lang !== undefined) {
+                localVarQueryParameter['lang'] = lang;
+            }
+
 
     
             setSearchParams(localVarUrlObj, localVarQueryParameter);
@@ -7486,10 +8614,11 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Target member user ID.
          * @param {number} [year] Report year.
+         * @param {string} [lang] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet: async (slug: string, memberId: number, year?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet: async (slug: string, memberId: number, year?: number, lang?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'slug' is not null or undefined
             assertParamExists('apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet', 'slug', slug)
             // verify required parameter 'memberId' is not null or undefined
@@ -7514,6 +8643,10 @@ export const ReportsApiAxiosParamCreator = function (configuration?: Configurati
 
             if (year !== undefined) {
                 localVarQueryParameter['year'] = year;
+            }
+
+            if (lang !== undefined) {
+                localVarQueryParameter['lang'] = lang;
             }
 
 
@@ -7557,11 +8690,12 @@ export const ReportsApiFp = function(configuration?: Configuration) {
          * @param {number} memberId 
          * @param {number} [year] 
          * @param {number} [month] 
+         * @param {string} [lang] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug: string, memberId: number, year?: number, month?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug, memberId, year, month, options);
+        async apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug: string, memberId: number, year?: number, month?: number, lang?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug, memberId, year, month, lang, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['ReportsApi.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -7572,11 +8706,12 @@ export const ReportsApiFp = function(configuration?: Configuration) {
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Target member user ID.
          * @param {number} [year] Report year.
+         * @param {string} [lang] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug: string, memberId: number, year?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug, memberId, year, options);
+        async apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug: string, memberId: number, year?: number, lang?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug, memberId, year, lang, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['ReportsApi.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -7608,11 +8743,12 @@ export const ReportsApiFactory = function (configuration?: Configuration, basePa
          * @param {number} memberId 
          * @param {number} [year] 
          * @param {number} [month] 
+         * @param {string} [lang] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug: string, memberId: number, year?: number, month?: number, options?: RawAxiosRequestConfig): AxiosPromise<File> {
-            return localVarFp.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug, memberId, year, month, options).then((request) => request(axios, basePath));
+        apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug: string, memberId: number, year?: number, month?: number, lang?: string, options?: RawAxiosRequestConfig): AxiosPromise<File> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug, memberId, year, month, lang, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -7620,11 +8756,12 @@ export const ReportsApiFactory = function (configuration?: Configuration, basePa
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Target member user ID.
          * @param {number} [year] Report year.
+         * @param {string} [lang] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug: string, memberId: number, year?: number, options?: RawAxiosRequestConfig): AxiosPromise<File> {
-            return localVarFp.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug, memberId, year, options).then((request) => request(axios, basePath));
+        apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug: string, memberId: number, year?: number, lang?: string, options?: RawAxiosRequestConfig): AxiosPromise<File> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug, memberId, year, lang, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -7652,11 +8789,12 @@ export class ReportsApi extends BaseAPI {
      * @param {number} memberId 
      * @param {number} [year] 
      * @param {number} [month] 
+     * @param {string} [lang] 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug: string, memberId: number, year?: number, month?: number, options?: RawAxiosRequestConfig) {
-        return ReportsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug, memberId, year, month, options).then((request) => request(this.axios, this.basePath));
+    public apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug: string, memberId: number, year?: number, month?: number, lang?: string, options?: RawAxiosRequestConfig) {
+        return ReportsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdReportsMonthlyGet(slug, memberId, year, month, lang, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -7665,11 +8803,12 @@ export class ReportsApi extends BaseAPI {
      * @param {string} slug Organization URL slug.
      * @param {number} memberId Target member user ID.
      * @param {number} [year] Report year.
+     * @param {string} [lang] 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug: string, memberId: number, year?: number, options?: RawAxiosRequestConfig) {
-        return ReportsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug, memberId, year, options).then((request) => request(this.axios, this.basePath));
+    public apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug: string, memberId: number, year?: number, lang?: string, options?: RawAxiosRequestConfig) {
+        return ReportsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdReportsYearlyGet(slug, memberId, year, lang, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -8444,6 +9583,44 @@ export const TimeTrackingApiAxiosParamCreator = function (configuration?: Config
         },
         /**
          * 
+         * @summary Edit history of a time entry (owner, or admins who may see the owner\'s entries).
+         * @param {number} id Time entry ID (also works for deleted entries).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1TimeTrackingIdHistoryGet: async (id: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiV1TimeTrackingIdHistoryGet', 'id', id)
+            const localVarPath = `/api/v1/TimeTracking/{id}/history`
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Update an existing time entry.
          * @param {number} id Time entry ID.
          * @param {UpdateTimeEntryRequest} [updateTimeEntryRequest] 
@@ -8478,6 +9655,44 @@ export const TimeTrackingApiAxiosParamCreator = function (configuration?: Config
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
             localVarRequestOptions.data = serializeDataIfNeeded(updateTimeEntryRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Add a finished entry by hand (e.g. a forgotten day). Follows the organization\'s \"edit past  entries\" rule: Allowed creates it (`entry`), RequiresApproval creates an AddManualEntry  request (`request`) that creates it on approval, Disabled is 403. Personal entries are always allowed.
+         * @param {CreateManualEntryRequest} [createManualEntryRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1TimeTrackingManualPost: async (createManualEntryRequest?: CreateManualEntryRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/TimeTracking/manual`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createManualEntryRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -8625,6 +9840,19 @@ export const TimeTrackingApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Edit history of a time entry (owner, or admins who may see the owner\'s entries).
+         * @param {number} id Time entry ID (also works for deleted entries).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1TimeTrackingIdHistoryGet(id: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<TimeEntryChangeResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1TimeTrackingIdHistoryGet(id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['TimeTrackingApi.apiV1TimeTrackingIdHistoryGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Update an existing time entry.
          * @param {number} id Time entry ID.
          * @param {UpdateTimeEntryRequest} [updateTimeEntryRequest] 
@@ -8635,6 +9863,19 @@ export const TimeTrackingApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1TimeTrackingIdPut(id, updateTimeEntryRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['TimeTrackingApi.apiV1TimeTrackingIdPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Add a finished entry by hand (e.g. a forgotten day). Follows the organization\'s \"edit past  entries\" rule: Allowed creates it (`entry`), RequiresApproval creates an AddManualEntry  request (`request`) that creates it on approval, Disabled is 403. Personal entries are always allowed.
+         * @param {CreateManualEntryRequest} [createManualEntryRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1TimeTrackingManualPost(createManualEntryRequest?: CreateManualEntryRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ManualEntryResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1TimeTrackingManualPost(createManualEntryRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['TimeTrackingApi.apiV1TimeTrackingManualPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -8716,6 +9957,16 @@ export const TimeTrackingApiFactory = function (configuration?: Configuration, b
         },
         /**
          * 
+         * @summary Edit history of a time entry (owner, or admins who may see the owner\'s entries).
+         * @param {number} id Time entry ID (also works for deleted entries).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1TimeTrackingIdHistoryGet(id: number, options?: RawAxiosRequestConfig): AxiosPromise<Array<TimeEntryChangeResponse>> {
+            return localVarFp.apiV1TimeTrackingIdHistoryGet(id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Update an existing time entry.
          * @param {number} id Time entry ID.
          * @param {UpdateTimeEntryRequest} [updateTimeEntryRequest] 
@@ -8724,6 +9975,16 @@ export const TimeTrackingApiFactory = function (configuration?: Configuration, b
          */
         apiV1TimeTrackingIdPut(id: number, updateTimeEntryRequest?: UpdateTimeEntryRequest, options?: RawAxiosRequestConfig): AxiosPromise<TimeEntryResponse> {
             return localVarFp.apiV1TimeTrackingIdPut(id, updateTimeEntryRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Add a finished entry by hand (e.g. a forgotten day). Follows the organization\'s \"edit past  entries\" rule: Allowed creates it (`entry`), RequiresApproval creates an AddManualEntry  request (`request`) that creates it on approval, Disabled is 403. Personal entries are always allowed.
+         * @param {CreateManualEntryRequest} [createManualEntryRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1TimeTrackingManualPost(createManualEntryRequest?: CreateManualEntryRequest, options?: RawAxiosRequestConfig): AxiosPromise<ManualEntryResponse> {
+            return localVarFp.apiV1TimeTrackingManualPost(createManualEntryRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -8800,6 +10061,17 @@ export class TimeTrackingApi extends BaseAPI {
 
     /**
      * 
+     * @summary Edit history of a time entry (owner, or admins who may see the owner\'s entries).
+     * @param {number} id Time entry ID (also works for deleted entries).
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1TimeTrackingIdHistoryGet(id: number, options?: RawAxiosRequestConfig) {
+        return TimeTrackingApiFp(this.configuration).apiV1TimeTrackingIdHistoryGet(id, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
      * @summary Update an existing time entry.
      * @param {number} id Time entry ID.
      * @param {UpdateTimeEntryRequest} [updateTimeEntryRequest] 
@@ -8808,6 +10080,17 @@ export class TimeTrackingApi extends BaseAPI {
      */
     public apiV1TimeTrackingIdPut(id: number, updateTimeEntryRequest?: UpdateTimeEntryRequest, options?: RawAxiosRequestConfig) {
         return TimeTrackingApiFp(this.configuration).apiV1TimeTrackingIdPut(id, updateTimeEntryRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Add a finished entry by hand (e.g. a forgotten day). Follows the organization\'s \"edit past  entries\" rule: Allowed creates it (`entry`), RequiresApproval creates an AddManualEntry  request (`request`) that creates it on approval, Disabled is 403. Personal entries are always allowed.
+     * @param {CreateManualEntryRequest} [createManualEntryRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1TimeTrackingManualPost(createManualEntryRequest?: CreateManualEntryRequest, options?: RawAxiosRequestConfig) {
+        return TimeTrackingApiFp(this.configuration).apiV1TimeTrackingManualPost(createManualEntryRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
