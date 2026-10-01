@@ -114,6 +114,17 @@ public class GroupController : OrganizationBaseController
         return ToResponse(await _service.RemoveMemberAsync(slug, groupId, targetUserId, userId.Value));
     }
 
+    /// <summary>Permission overrides of all groups of the organization (one request instead of one per group).</summary>
+    [HttpGet("{slug}/groups/permissions")]
+    [RequireOrgRole]
+    [ProducesResponseType(typeof(List<GroupPermissionsResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllPermissions(string slug)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.GetAllPermissionsAsync(slug, userId.Value));
+    }
+
     /// <summary>Get group permission overrides.</summary>
     [HttpGet("{slug}/groups/{groupId}/permissions")]
     [RequireOrgRole]

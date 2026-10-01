@@ -315,6 +315,19 @@ public class GroupService : IGroupService
         return ServiceResult.Ok(ToPermissionsResponse(group));
     }
 
+    public async Task<ServiceResult<List<GroupPermissionsResponse>>> GetAllPermissionsAsync(string slug, int callerUserId)
+    {
+        var (org, membership) = await ResolveOrgMemberAsync(slug, callerUserId);
+        if (org is null) return ServiceResult.NotFound<List<GroupPermissionsResponse>>("Organization not found.");
+        if (membership is null) return ServiceResult.Forbidden<List<GroupPermissionsResponse>>("You are not a member of this organization.");
+
+        var groups = await _context.Groups.AsNoTracking()
+            .Where(g => g.OrganizationId == org.Id)
+            .OrderBy(g => g.Name)
+            .ToListAsync();
+        return ServiceResult.Ok(groups.Select(ToPermissionsResponse).ToList());
+    }
+
     public async Task<ServiceResult<GroupPermissionsResponse>> UpdatePermissionsAsync(string slug, int groupId, int callerUserId, UpdateGroupPermissionsRequest request)
     {
         var (org, membership) = await ResolveOrgMemberAsync(slug, callerUserId);
@@ -377,8 +390,9 @@ public class GroupService : IGroupService
             .Where(g => g.OrganizationId == org.Id && g.Members.Any(m => m.UserId == userId))
             .ToListAsync();
 
-        var isGroupAdmin = userGroups.Any(g =>
-            _context.GroupMembers.Any(gm => gm.GroupId == g.Id && gm.UserId == userId && gm.Role == GroupRole.Admin));
+        var userGroupIds = userGroups.Select(g => g.Id).ToList();
+        var isGroupAdmin = await _context.GroupMembers
+            .AnyAsync(gm => userGroupIds.Contains(gm.GroupId) && gm.UserId == userId && gm.Role == GroupRole.Admin);
 
         // Resolve permissions: most permissive group override wins
         var editPastEntries = ResolveRuleMode(org.EditPastEntriesMode, userGroups, g => g.EditPastEntriesMode);
