@@ -49,6 +49,26 @@ public class BalanceTests : IClassFixture<TimeTrackingApiFactory>
 
         balance.GetProperty("month").GetProperty("overtimeHours").GetDouble().Should().BeApproximately(reportOvertime, 0.01);
         balance.GetProperty("cumulativeOvertimeHours").GetDouble().Should().BeApproximately(reportCumulative, 0.01);
+
+        // Week/month breakdowns add up to the period figures
+        var weekDays = balance.GetProperty("weekDays").EnumerateArray().ToList();
+        weekDays.Should().HaveCount(7);
+        DateOnly.Parse(weekDays[0].GetProperty("date").GetString()!).DayOfWeek.Should().Be(DayOfWeek.Monday);
+        weekDays.Sum(d => d.GetProperty("overtimeHours").GetDouble())
+            .Should().BeApproximately(balance.GetProperty("week").GetProperty("overtimeHours").GetDouble(), 0.01);
+        var todayRow = weekDays.Single(d => d.GetProperty("date").GetString() == today.ToString("yyyy-MM-dd"));
+        todayRow.GetProperty("workedHours").GetDouble().Should().Be(4);
+        todayRow.GetProperty("isCounted").GetBoolean().Should().BeTrue();
+        weekDays.Where(d => DateOnly.Parse(d.GetProperty("date").GetString()!) > today)
+            .Should().OnlyContain(d => !d.GetProperty("isCounted").GetBoolean() && d.GetProperty("overtimeHours").GetDouble() == 0);
+
+        var monthWeeks = balance.GetProperty("monthWeeks").EnumerateArray().ToList();
+        monthWeeks.First().GetProperty("from").GetString().Should().Be(monthStart.ToString("yyyy-MM-dd"));
+        monthWeeks.Last().GetProperty("to").GetString().Should().Be(monthStart.AddMonths(1).AddDays(-1).ToString("yyyy-MM-dd"));
+        monthWeeks.Sum(w => w.GetProperty("overtimeHours").GetDouble())
+            .Should().BeApproximately(balance.GetProperty("month").GetProperty("overtimeHours").GetDouble(), 0.01);
+        monthWeeks.Sum(w => w.GetProperty("workedHours").GetDouble())
+            .Should().BeApproximately(balance.GetProperty("month").GetProperty("workedHours").GetDouble(), 0.01);
     }
 
     [Fact]

@@ -117,6 +117,41 @@ public class PdfReportService : IPdfReportService
             };
         }
 
+        // Day/week breakdowns for the dashboard charts: planned targets for the whole week/month
+        // (incl. upcoming days), overtime only for counted days (from the first entry up to today)
+        var weekEnd = weekStart.AddDays(6);
+        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+        var planned = (await DailyReportAggregator.BuildAsync(_context, targetUserId, context.Org.Id,
+                periodStart, weekEnd > monthEnd ? weekEnd : monthEnd, 0, includeFuture: true))
+            .ToDictionary(r => r.Date);
+        var counted = rows.ToDictionary(r => r.Date);
+
+        DayBalance Day(DateOnly date) => new()
+        {
+            Date = date,
+            TargetHours = Math.Round(planned.GetValueOrDefault(date)?.TargetHours ?? 0, 2),
+            WorkedHours = Math.Round(planned.GetValueOrDefault(date)?.NetWorkedHours ?? 0, 2),
+            OvertimeHours = Math.Round(counted.GetValueOrDefault(date)?.Overtime ?? 0, 2),
+            IsCounted = counted.ContainsKey(date)
+        };
+
+        var monthWeeks = new List<PeriodBalance>();
+        for (var from = monthStart; from <= monthEnd; )
+        {
+            var to = from.AddDays(6 - (((int)from.DayOfWeek + 6) % 7));
+            if (to > monthEnd) to = monthEnd;
+            var days = Enumerable.Range(0, to.DayNumber - from.DayNumber + 1).Select(i => Day(from.AddDays(i))).ToList();
+            monthWeeks.Add(new PeriodBalance
+            {
+                From = from,
+                To = to,
+                TargetHours = Math.Round(days.Sum(d => d.TargetHours), 2),
+                WorkedHours = Math.Round(days.Sum(d => d.WorkedHours), 2),
+                OvertimeHours = Math.Round(days.Sum(d => d.OvertimeHours), 2)
+            });
+            from = to.AddDays(1);
+        }
+
         var failures = await _context.TimeEntries.AsNoTracking()
             .CountAsync(e => e.UserId == targetUserId && e.OrganizationId == context.Org.Id && e.IsFailure);
 
@@ -127,6 +162,8 @@ public class PdfReportService : IPdfReportService
             Today = Period(today),
             Week = Period(weekStart),
             Month = Period(monthStart),
+            WeekDays = Enumerable.Range(0, 7).Select(i => Day(weekStart.AddDays(i))).ToList(),
+            MonthWeeks = monthWeeks,
             FailureEntryCount = failures
         });
     }

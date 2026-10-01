@@ -38,7 +38,7 @@ public static class DailyReportAggregator
 
     public static async Task<List<DailyReportRow>> BuildAsync(
         TimeTrackingDbContext context, int userId, int orgId,
-        DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours)
+        DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours, bool includeFuture = false)
     {
         // Days are the organization's local days (an entry at 00:30 Berlin belongs to that
         // day, not to the previous UTC day)
@@ -48,8 +48,9 @@ public static class DailyReportAggregator
 
         // Only count days up to today — future days haven't happened yet and
         // would otherwise show as artificial "Missing" time with a misleading target.
+        // (includeFuture: only for planned targets; such rows must not feed a balance.)
         var today = clock.Today();
-        if (dateTo > today) dateTo = today;
+        if (dateTo > today && !includeFuture) dateTo = today;
         if (dateFrom > dateTo) return [];
 
         var rangeFromUtc = clock.StartOfDayUtc(dateFrom);
