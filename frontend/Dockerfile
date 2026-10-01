@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Multi-stage build for SvelteKit with SSR support
 # Use BUILDPLATFORM for build stage to avoid QEMU issues with npm
-FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 
 # Set the working directory
 WORKDIR /app
@@ -24,32 +24,23 @@ RUN npm run check
 RUN npm run build
 
 # Production runtime stage - uses target platform
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
 
-# Create app directory
 WORKDIR /app
 
-# Create a non-root user for security
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S sveltekit -u 1001
-
-# Copy the built SvelteKit server from builder stage
+# The server bundle in build/ still imports the runtime dependencies (axios, ...),
+# so install those; @wagnerluca/ui and the rest of the toolchain are devDependencies.
+# Files stay root-owned: the app user can read but not modify its own code.
+COPY --from=builder /app/package.json /app/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY --from=builder /app/build ./build
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/package-lock.json ./package-lock.json
 
-# Install only production dependencies
-RUN npm ci --omit=dev && npm cache clean --force
+# Run as the image's built-in non-root user
+USER node
 
-# Change ownership to non-root user
-RUN chown -R sveltekit:nodejs /app
-USER sveltekit
-
-# Expose the port
 EXPOSE 3000
 
-# Start the SvelteKit server
 CMD ["dumb-init", "node", "build"]
