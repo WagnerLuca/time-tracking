@@ -12,10 +12,13 @@ public record PersonalDataExport
     public required List<PersonalAbsence> Absences { get; init; }
     public required List<PersonalRequest> Requests { get; init; }
     public required List<PersonalNotification> Notifications { get; init; }
+    public required List<PersonalEntryChange> EntryChanges { get; init; }
 }
 
 public record PersonalMembership(string Organization, string Role, DateTime JoinedAt, bool Active, double VacationDaysPerYear, double InitialOvertimeHours, string? BadgeId);
 public record PersonalTimeEntry(string? Organization, DateTime StartTime, DateTime? EndTime, int PauseMinutes, string? Description, bool IsFailure);
 public record PersonalAbsence(string Organization, DateOnly Date, string Type, bool IsHalfDay, string? Note);
 public record PersonalRequest(string Organization, string Type, string Status, string? Message, string? RequestData, DateTime CreatedAt, DateTime? RespondedAt);
+/// <summary>Changes is the stored JSON array of {field, oldValue, newValue}.</summary>
+public record PersonalEntryChange(int TimeEntryId, DateTime ChangedAt, string Kind, bool ChangedByYou, string Changes);
 public record PersonalNotification(string Title, string Message, DateTime CreatedAt, bool IsRead);

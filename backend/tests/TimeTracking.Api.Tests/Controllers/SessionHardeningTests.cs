@@ -113,6 +113,7 @@ public class SessionHardeningTests : IClassFixture<TimeTrackingApiFactory>
         var json = await export.Content.ReadFromJsonAsync<JsonElement>();
         json.GetProperty("profile").GetProperty("email").GetString().Should().Be("gdpr@harden.test");
         json.GetProperty("timeEntries").EnumerateArray().Should().Contain(e => e.GetProperty("description").GetString() == "my work");
+        json.GetProperty("entryChanges").ValueKind.Should().Be(JsonValueKind.Array);
     }
 
     [Fact]

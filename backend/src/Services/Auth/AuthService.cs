@@ -337,6 +337,11 @@ public class AuthService : IAuthService
                 .Where(n => n.UserId == userId)
                 .OrderBy(n => n.CreatedAt)
                 .Select(n => new PersonalNotification(n.Title, n.Message, n.CreatedAt, n.IsRead))
+                .ToListAsync(),
+            EntryChanges = await _context.TimeEntryChanges.IgnoreQueryFilters().AsNoTracking()
+                .Where(c => c.UserId == userId)
+                .OrderBy(c => c.ChangedAt)
+                .Select(c => new PersonalEntryChange(c.TimeEntryId, c.ChangedAt, c.Kind.ToString(), c.ChangedByUserId == userId, c.Changes))
                 .ToListAsync()
         });
     }
