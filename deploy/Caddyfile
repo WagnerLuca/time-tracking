@@ -1,0 +1,27 @@
+# Reverse proxy for docker-compose.production.yml: automatic HTTPS (Let's Encrypt)
+# for $DOMAIN, the API under the same origin, everything else to the SvelteKit server.
+# DOMAIN and ACME_EMAIL come from .env via the caddy service's environment.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		# HTTPS only from now on; add "; preload" once you are sure about every subdomain
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# Caddy replaces any client-sent X-Forwarded-For/-Proto, so the backend can trust
+	# them from this hop only (ReverseProxy__KnownNetworks = the compose subnet).
+	@api path /api/* /health
+	handle @api {
+		reverse_proxy backend:7000
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

@@ -1,10 +1,17 @@
 # Time Tracking — deployment using the pre-built images from ghcr.io.
 # Nothing is built here; see docker-compose.yml for the local build setup.
 #
-# Usage:
-#   cp .env.example .env      # then edit JWT_SECRET and POSTGRES_PASSWORD
+# Usage (on a host whose DNS name $DOMAIN points at it, ports 80 + 443 open):
+#   copy this file, deploy/Caddyfile and .env.example (as .env) to the host
+#   edit .env: DOMAIN, ACME_EMAIL, JWT_SECRET, POSTGRES_PASSWORD, APP_DB_PASSWORD, SMTP_*
 #   docker compose -f docker-compose.production.yml up -d
-#   open http://localhost:3000
+#   open https://$DOMAIN
+#
+# Caddy (deploy/Caddyfile) is the only service with public ports: it gets a Let's
+# Encrypt certificate for $DOMAIN, sends HSTS and routes /api/* + /health to the
+# backend and everything else to the frontend — one origin, so the browser calls
+# the API same-origin and CORS never comes into play. Backend (7000) and frontend
+# (3000) are reachable only inside the compose network; Seq only on 127.0.0.1.
 #
 # Images come from .github/workflows/{backend,frontend}.yml:
 #   ghcr.io/wagnerluca/time-tracking-backend
@@ -13,18 +20,54 @@
 # refused, either make the packages public or log in once per host:
 #   echo $GHP_READ_TOKEN | docker login ghcr.io -u WagnerLuca --password-stdin
 #
-# Required env: JWT_SECRET, POSTGRES_PASSWORD  (see .env.example)
-# Optional env: IMAGE_TAG, *_PORT, PUBLIC_API_BASE_URL, ALLOWED_ORIGINS
+# Required env: DOMAIN, ACME_EMAIL, JWT_SECRET, POSTGRES_PASSWORD, APP_DB_PASSWORD, SMTP_HOST
+# Optional env: IMAGE_TAG, COMPOSE_SUBNET, SEQ_PORT, ACCESS_TOKEN_EXPIRY_MINUTES, SMTP_*, EMAIL_FROM  (see .env.example)
 #
 # EF Core migrations run automatically on backend startup
 # (Program.cs: context.Database.Migrate()), so there is no manual migrate step.
+
+# Applied to every service: no privilege escalation via setuid binaries
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
 services:
+  caddy:
+    <<: *hardening
+    image: caddy:${CADDY_VERSION:-2-alpine}
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required (the public host name, e.g. zeit.example.com)}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required (Let's Encrypt account / expiry notices)}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and ACME account — keep this volume, or Let's Encrypt rate limits bite
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
   db:
+    <<: *hardening
     image: postgres:${POSTGRES_VERSION:-18-alpine}
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-timetracking}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:-timetracking}
+      # Read by the init script below (as psql variables, never pasted into SQL)
+      APP_DB_USER: ${APP_DB_USER:-timetracking_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}
     volumes:
       # NOTE: correct mount point for the postgres:18 image, which keeps PGDATA
       # under a versioned subdirectory and declares the volume at the parent.
@@ -41,9 +84,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
+    shm_size: 128m
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   seq:
+    <<: *hardening
     # Structured log sink; the backend's Serilog config writes to it.
     image: datalust/seq:${SEQ_VERSION:-latest}
     environment:
@@ -55,65 +103,110 @@ services:
       - "127.0.0.1:${SEQ_PORT:-5341}:80"
     volumes:
       - seq_data:/data
-    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   backend:
+    <<: *hardening
     image: ghcr.io/wagnerluca/time-tracking-backend:${IMAGE_TAG:-latest}
     environment:
       UseInMemoryDatabase: ${USE_INMEMORY_DB:-false}
       # The app connects as a normal role (never the superuser), so Postgres row-level
-      # security actually applies — superusers bypass it.
+      # security actually applies — superusers bypass it. The password is part of a URL
+      # here: keep it to [A-Za-z0-9._~-] (openssl rand -hex 24 is fine).
       DATABASE_URL: postgres://${APP_DB_USER:-timetracking_app}:${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}@db:5432/${POSTGRES_DB:-timetracking}
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ASPNETCORE_URLS: http://+:${BACKEND_PORT:-7000}
+      ASPNETCORE_URLS: http://+:7000
       Serilog__WriteTo__1__Args__serverUrl: http://seq:80
       JwtSettings__Secret: ${JWT_SECRET:?JWT_SECRET is required — generate one with `openssl rand -base64 48`}
-      JwtSettings__AccessTokenExpiryMinutes: ${ACCESS_TOKEN_EXPIRY_MINUTES:-60}
-      Cors__AllowedOrigins__0: ${ALLOWED_ORIGINS:-http://localhost:3000}
-    ports:
-      # Must stay published: the browser talks to the API directly (the frontend
-      # falls back to <current-host>:7000 when PUBLIC_API_BASE_URL is unset).
-      - "${BACKEND_PORT:-7000}:${BACKEND_PORT:-7000}"
+      JwtSettings__AccessTokenExpiryMinutes: ${ACCESS_TOKEN_EXPIRY_MINUTES:-15}
+      # Same origin through Caddy, so CORS is only a fallback
+      Cors__AllowedOrigins__0: https://${DOMAIN}
+      # Client IPs (rate limits) come from Caddy's X-Forwarded-For — trusted only from
+      # this network, which nothing outside the compose project can join
+      ReverseProxy__TrustForwardedHeaders: "true"
+      ReverseProxy__KnownNetworks__0: ${COMPOSE_SUBNET:-172.30.80.0/24}
+      # Password-reset / verification mails. Required outside Development: without an SMTP
+      # host the backend refuses to start rather than writing reset links to the log.
+      Email__Smtp__Host: ${SMTP_HOST:?SMTP_HOST is required (password reset / email verification mails)}
+      Email__Smtp__Port: ${SMTP_PORT:-587}
+      Email__Smtp__EnableSsl: ${SMTP_ENABLE_SSL:-true}
+      Email__Smtp__Username: ${SMTP_USERNAME:-}
+      Email__Smtp__Password: ${SMTP_PASSWORD:-}
+      Email__From: ${EMAIL_FROM:-Zeiterfassung <no-reply@${DOMAIN}>}
+      Email__FrontendBaseUrl: https://${DOMAIN}
+    expose:
+      - "7000"
+    healthcheck:
+      # The aspnet image has no curl/wget; bash's /dev/tcp is enough for GET /health (503 if the DB is down)
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/7000 && printf 'GET /health HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *' 200 '* ]]"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
       seq:
         condition: service_started
-    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   frontend:
+    <<: *hardening
     image: ghcr.io/wagnerluca/time-tracking-frontend:${IMAGE_TAG:-latest}
     environment:
-      PORT: ${FRONTEND_PORT:-3000}
-      HOST: ${FRONTEND_HOST:-0.0.0.0}
-      NODE_ENV: ${NODE_ENV:-production}
-      # Read at RUNTIME ($env/dynamic/public), so changing it only needs a
-      # restart — no image rebuild. Point it at the public API URL when the
-      # backend is not reachable at <frontend-host>:7000.
-      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-}
-    ports:
-      - "${FRONTEND_PORT:-3000}:${FRONTEND_PORT:-3000}"
+      PORT: 3000
+      HOST: 0.0.0.0
+      NODE_ENV: production
+      # Read at RUNTIME ($env/dynamic/public), so changing it only needs a restart.
+      # Same origin as the page: Caddy routes /api/* to the backend.
+      PUBLIC_API_BASE_URL: https://${DOMAIN}
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
       - backend
-    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
 volumes:
   db_data:
   seq_data:
+  caddy_data:
+  caddy_config:
 
 configs:
   # Creates the app role that owns the database (so migrations can run as it) but is
   # neither superuser nor BYPASSRLS. Needs Docker Compose v2.23+ for inline config content.
+  # Names and password reach SQL only as psql variables (:"ident" / :'literal' quoting),
+  # so quotes or other special characters cannot break or inject into the statements.
   app_db_role:
     content: |
       #!/bin/sh
       set -e
-      psql -v ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" <<'SQL'
-      CREATE ROLE ${APP_DB_USER:-timetracking_app} LOGIN PASSWORD '${APP_DB_PASSWORD}' NOSUPERUSER NOBYPASSRLS;
-      ALTER DATABASE ${POSTGRES_DB:-timetracking} OWNER TO ${APP_DB_USER:-timetracking_app};
-      ALTER SCHEMA public OWNER TO ${APP_DB_USER:-timetracking_app};
+      psql -v ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" \
+        -v app_user="$$APP_DB_USER" -v app_pw="$$APP_DB_PASSWORD" -v db="$$POSTGRES_DB" <<'SQL'
+      CREATE ROLE :"app_user" LOGIN PASSWORD :'app_pw' NOSUPERUSER NOBYPASSRLS;
+      ALTER DATABASE :"db" OWNER TO :"app_user";
+      ALTER SCHEMA public OWNER TO :"app_user";
       SQL
 
 networks:
   default:
     name: time-tracking-network
+    # Fixed subnet so the backend can trust forwarded headers from exactly this network
+    ipam:
+      config:
+        - subnet: ${COMPOSE_SUBNET:-172.30.80.0/24}
