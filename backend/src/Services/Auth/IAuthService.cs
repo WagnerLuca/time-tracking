@@ -24,5 +24,6 @@ public interface IAuthService
     Task<ServiceResult<LoginResponse>> VerifyTwoFactorAsync(TwoFactorVerifyRequest request);
     Task<ServiceResult<TwoFactorSetupResponse>> SetupTwoFactorAsync(int userId);
     Task<ServiceResult<TwoFactorConfirmResponse>> ConfirmTwoFactorAsync(int userId, TwoFactorConfirmRequest request);
-    Task<ServiceResult<AuthResponse>> DisableTwoFactorAsync(int userId, string currentPassword);
+    Task<ServiceResult<AuthResponse>> DisableTwoFactorAsync(int userId, string currentPassword, string code);
+    Task<ServiceResult<PersonalDataExport>> ExportPersonalDataAsync(int userId);
 }

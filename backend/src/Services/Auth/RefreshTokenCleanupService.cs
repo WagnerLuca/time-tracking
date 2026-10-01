@@ -58,5 +58,21 @@ public class RefreshTokenCleanupService : BackgroundService
             await context.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Cleaned up {Count} expired/revoked refresh tokens.", expiredTokens.Count);
         }
+
+        // Data minimisation: spent links and old read notifications have no further use
+        var linkCutoff = cutoff.AddDays(-30);
+        context.UserTokens.RemoveRange(await context.UserTokens
+            .Where(t => t.ExpiresAt < linkCutoff || t.UsedAt < linkCutoff)
+            .ToListAsync(cancellationToken));
+        context.OrgInvitations.RemoveRange(await context.OrgInvitations.IgnoreQueryFilters()
+            .Where(i => i.ExpiresAt < linkCutoff || i.AcceptedAt < linkCutoff || i.RevokedAt < linkCutoff)
+            .ToListAsync(cancellationToken));
+        var notificationCutoff = cutoff.AddDays(-180);
+        context.Notifications.RemoveRange(await context.Notifications
+            .Where(n => n.IsRead && n.CreatedAt < notificationCutoff)
+            .ToListAsync(cancellationToken));
+        var removed = await context.SaveChangesAsync(cancellationToken);
+        if (removed > 0)
+            _logger.LogInformation("Retention cleanup removed {Count} old links and notifications.", removed);
     }
 }

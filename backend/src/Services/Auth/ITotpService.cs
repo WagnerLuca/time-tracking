@@ -19,5 +19,5 @@ public interface ITotpService
     string GenerateTwoFactorToken(int userId);
 
     /// <summary>Validate and extract user ID from a 2FA token.</summary>
-    int? ValidateTwoFactorToken(string token);
+    (int UserId, DateTime IssuedAt)? ValidateTwoFactorToken(string token);
 }

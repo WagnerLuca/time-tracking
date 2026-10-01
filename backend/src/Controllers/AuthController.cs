@@ -15,6 +15,7 @@ namespace TimeTracking.Api.Controllers;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
 [Authorize]
+[EnableRateLimiting("General")]   // per-user baseline; sensitive actions below are stricter
 public class AuthController : OrganizationBaseController
 {
     private readonly IAuthService _authService;
@@ -145,11 +146,26 @@ public class AuthController : OrganizationBaseController
 
     /// <summary>Update the current user's profile (name, email).</summary>
     [HttpPut("profile")]
+    [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(UserInfo), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest request)
     {
         if (GetCurrentUserId() is not int userId) return Unauthorized();
         return ToResponse(await _authService.UpdateProfileAsync(userId, request));
+    }
+
+    /// <summary>Download everything stored about you (GDPR Art. 15/20) as JSON.</summary>
+    [HttpGet("me/export")]
+    [EnableRateLimiting("AuthModerate")]
+    [ProducesResponseType(typeof(PersonalDataExport), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportPersonalData()
+    {
+        if (GetCurrentUserId() is not int userId) return Unauthorized();
+        var result = await _authService.ExportPersonalDataAsync(userId);
+        if (!result.IsSuccess) return ToResponse(result);
+        var json = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(result.Data,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { WriteIndented = true });
+        return File(json, "application/json", $"time-tracking-data-{DateTime.UtcNow:yyyy-MM-dd}.json");
     }
 
     // ── Two-Factor Authentication Endpoints ──
@@ -169,6 +185,7 @@ public class AuthController : OrganizationBaseController
     /// Begin 2FA setup — generates a TOTP secret and returns the authenticator URI
     /// </summary>
     [HttpPost("2fa/setup")]
+    [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(TwoFactorSetupResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SetupTwoFactor()
@@ -181,6 +198,7 @@ public class AuthController : OrganizationBaseController
     /// Confirm 2FA setup by providing a valid TOTP code from the authenticator app
     /// </summary>
     [HttpPost("2fa/confirm")]
+    [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(TwoFactorConfirmResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConfirmTwoFactor([FromBody] TwoFactorConfirmRequest request)
@@ -193,11 +211,12 @@ public class AuthController : OrganizationBaseController
     /// Disable 2FA for the authenticated user (requires current password)
     /// </summary>
     [HttpPost("2fa/disable")]
+    [EnableRateLimiting("AuthStrict")]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> DisableTwoFactor([FromBody] ChangePasswordRequest request)
+    public async Task<IActionResult> DisableTwoFactor([FromBody] DisableTwoFactorRequest request)
     {
         if (GetCurrentUserId() is not int userId) return Unauthorized();
-        return ToResponse(await _authService.DisableTwoFactorAsync(userId, request.CurrentPassword));
+        return ToResponse(await _authService.DisableTwoFactorAsync(userId, request.CurrentPassword, request.Code));
     }
 }

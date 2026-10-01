@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using TimeTracking.Api.Data;
 using TimeTracking.Api.Models;
 using TimeTracking.Api.Models.Dtos;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using System.Text.RegularExpressions;
 
@@ -12,6 +13,10 @@ public class AuthService : IAuthService
 {
     private static readonly TimeSpan EmailTokenLifetime = TimeSpan.FromHours(24);
     private static readonly TimeSpan ResetTokenLifetime = TimeSpan.FromHours(1);
+    // One mail per purpose and user in this window, so the endpoints cannot be used to spam a mailbox
+    private static readonly TimeSpan MailCooldown = TimeSpan.FromMinutes(2);
+    private const int MaxTwoFactorAttempts = 5;
+    private static readonly TimeSpan TwoFactorLockout = TimeSpan.FromMinutes(15);
 
     // Verified against when the email is unknown, so response time does not reveal which accounts exist
     private static readonly string DummyPasswordHash = BCrypt.Net.BCrypt.HashPassword("timing-equalizer");
@@ -23,6 +28,7 @@ public class AuthService : IAuthService
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<AuthService> _logger;
     private readonly JwtSettings _jwtSettings;
+    private readonly IMemoryCache _cache;
 
     public AuthService(
         TimeTrackingDbContext context,
@@ -31,8 +37,10 @@ public class AuthService : IAuthService
         IEmailSender email,
         EmailSettings emailSettings,
         ILogger<AuthService> logger,
-        IOptions<JwtSettings> jwtSettings)
+        IOptions<JwtSettings> jwtSettings,
+        IMemoryCache cache)
     {
+        _cache = cache;
         _context = context;
         _tokenService = tokenService;
         _totpService = totpService;
@@ -177,8 +185,9 @@ public class AuthService : IAuthService
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
         user.UpdatedAt = DateTime.UtcNow;
-        await RevokeAllSessionsAsync(userId);
+        await RevokeAllSessionsAsync(user);
         await _context.SaveChangesAsync();
+        _cache.Remove(Filters.ActiveUserFilter.CacheKey(userId));
 
         _logger.LogInformation("Password changed for user {UserId}", userId);
 
@@ -220,14 +229,23 @@ public class AuthService : IAuthService
         user.TwoFactorEnabledAt = null;
         user.TotpLastStep = null;
         user.IsActive = false;
+        user.LastLoginAt = null;
         user.UpdatedAt = DateTime.UtcNow;
 
         foreach (var membership in await _context.UserOrganizations.Where(uo => uo.UserId == userId).ToListAsync())
+        {
             membership.IsActive = false;
+            membership.BadgeId = null;
+        }
+        // Free-text the person wrote may name them; the request itself stays for the audit trail
+        foreach (var request in await _context.OrgRequests.Where(r => r.UserId == userId).ToListAsync())
+            request.Message = null;
+        _context.Notifications.RemoveRange(_context.Notifications.Where(n => n.UserId == userId));
         _context.GroupMembers.RemoveRange(_context.GroupMembers.Where(gm => gm.UserId == userId));
         _context.UserTokens.RemoveRange(_context.UserTokens.Where(t => t.UserId == userId));
-        await RevokeAllSessionsAsync(userId);
+        await RevokeAllSessionsAsync(user);
         await _context.SaveChangesAsync();
+        _cache.Remove(Filters.ActiveUserFilter.CacheKey(userId));
 
         _logger.LogInformation("User {UserId} deleted (anonymized) their account", userId);
         return ServiceResult.Ok(new AuthResponse { Success = true, Message = "Account deleted successfully" });
@@ -262,6 +280,8 @@ public class AuthService : IAuthService
                 .AnyAsync(u => u.Email.ToLower() == newEmail.ToLower() && u.Id != userId);
             if (emailTaken)
                 return ServiceResult.BadRequest<UserInfo>("Email is already in use by another account.");
+            if (await RecentlyMailedAsync(user.Id, UserTokenPurpose.EmailChange))
+                return ServiceResult.TooManyRequests<UserInfo>("A confirmation email was just sent. Please wait a few minutes before changing the address again.");
 
             await SendEmailChangeConfirmationAsync(user, newEmail);
         }
@@ -278,6 +298,47 @@ public class AuthService : IAuthService
         _logger.LogInformation("User {UserId} updated their profile", userId);
 
         return ServiceResult.Ok(await ToUserInfoAsync(user));
+    }
+
+    public async Task<ServiceResult<PersonalDataExport>> ExportPersonalDataAsync(int userId)
+    {
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null)
+            return ServiceResult.NotFound<PersonalDataExport>("User not found");
+
+        return ServiceResult.Ok(new PersonalDataExport
+        {
+            Profile = await ToUserInfoAsync(user),
+            CreatedAt = user.CreatedAt,
+            LastLoginAt = user.LastLoginAt,
+            Memberships = await _context.UserOrganizations.IgnoreQueryFilters().AsNoTracking()
+                .Where(uo => uo.UserId == userId)
+                .Select(uo => new PersonalMembership(uo.Organization.Name, uo.Role.ToString(), uo.JoinedAt, uo.IsActive,
+                    uo.VacationDaysPerYear, uo.InitialOvertimeHours, uo.BadgeId))
+                .ToListAsync(),
+            TimeEntries = await _context.TimeEntries.IgnoreQueryFilters().AsNoTracking()
+                .Where(t => t.UserId == userId)
+                .OrderBy(t => t.StartTime)
+                .Select(t => new PersonalTimeEntry(t.Organization != null ? t.Organization.Name : null,
+                    t.StartTime, t.EndTime, t.PauseDurationMinutes, t.Description, t.IsFailure))
+                .ToListAsync(),
+            Absences = await _context.AbsenceDays.IgnoreQueryFilters().AsNoTracking()
+                .Where(a => a.UserId == userId)
+                .OrderBy(a => a.Date)
+                .Select(a => new PersonalAbsence(a.Organization.Name, a.Date, a.Type.ToString(), a.IsHalfDay, a.Note))
+                .ToListAsync(),
+            Requests = await _context.OrgRequests.IgnoreQueryFilters().AsNoTracking()
+                .Where(r => r.UserId == userId)
+                .OrderBy(r => r.CreatedAt)
+                .Select(r => new PersonalRequest(r.Organization.Name, r.Type.ToString(), r.Status.ToString(),
+                    r.Message, r.RequestData, r.CreatedAt, r.RespondedAt))
+                .ToListAsync(),
+            Notifications = await _context.Notifications.AsNoTracking()
+                .Where(n => n.UserId == userId)
+                .OrderBy(n => n.CreatedAt)
+                .Select(n => new PersonalNotification(n.Title, n.Message, n.CreatedAt, n.IsRead))
+                .ToListAsync()
+        });
     }
 
     // ── Email verification, email change, password reset ──
@@ -313,6 +374,8 @@ public class AuthService : IAuthService
             return ServiceResult.NotFound<AuthResponse>("User not found");
         if (user.EmailConfirmed)
             return ServiceResult.BadRequest<AuthResponse>("Your email address is already confirmed.");
+        if (await RecentlyMailedAsync(user.Id, UserTokenPurpose.EmailVerification))
+            return ServiceResult.TooManyRequests<AuthResponse>("A confirmation email was just sent. Please wait a few minutes before asking again.");
 
         await SendEmailVerificationAsync(user);
         await _context.SaveChangesAsync();
@@ -322,7 +385,7 @@ public class AuthService : IAuthService
     public async Task<ServiceResult<AuthResponse>> ForgotPasswordAsync(string email)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email.Trim().ToLower() && u.IsActive);
-        if (user != null)
+        if (user != null && !await RecentlyMailedAsync(user.Id, UserTokenPurpose.PasswordReset))
         {
             var token = CreateUserToken(user, UserTokenPurpose.PasswordReset, ResetTokenLifetime);
             await _context.SaveChangesAsync();
@@ -351,8 +414,9 @@ public class AuthService : IAuthService
         user.EmailConfirmed = true;   // they proved control of the mailbox
         user.UpdatedAt = DateTime.UtcNow;
         userToken.UsedAt = DateTime.UtcNow;
-        await RevokeAllSessionsAsync(user.Id);
+        await RevokeAllSessionsAsync(user);
         await _context.SaveChangesAsync();
+        _cache.Remove(Filters.ActiveUserFilter.CacheKey(user.Id));
 
         _logger.LogInformation("Password reset for user {UserId}", user.Id);
         return ServiceResult.Ok(new AuthResponse { Success = true, Message = "Your password has been changed. You can sign in now." });
@@ -362,23 +426,36 @@ public class AuthService : IAuthService
 
     public async Task<ServiceResult<LoginResponse>> VerifyTwoFactorAsync(TwoFactorVerifyRequest request)
     {
-        var userId = _totpService.ValidateTwoFactorToken(request.TwoFactorToken);
-        if (userId == null)
+        var token = _totpService.ValidateTwoFactorToken(request.TwoFactorToken);
+        if (token == null)
             return ServiceResult.Unauthorized<LoginResponse>("Invalid or expired two-factor token");
 
-        var user = await _context.Users.FindAsync(userId.Value);
+        var user = await _context.Users.FindAsync(token.Value.UserId);
         if (user == null || !user.IsActive || !user.TwoFactorEnabled)
             return ServiceResult.Unauthorized<LoginResponse>("Invalid two-factor request");
 
-        // TOTP first (each time step only once), then the one-time backup codes
-        var codeValid = _totpService.VerifyCode(user.TotpSecretKey!, request.Code, user.TotpLastStep, out var step);
-        if (codeValid)
-            user.TotpLastStep = step;
-        else
-            codeValid = ConsumeBackupCode(user, request.Code);
+        // A login token works once: after a successful 2FA login, older tokens are spent
+        if (user.LastTwoFactorLoginAt is { } last && token.Value.IssuedAt <= last)
+            return ServiceResult.Unauthorized<LoginResponse>("Invalid or expired two-factor token");
 
-        if (!codeValid)
+        if (user.TwoFactorLockedUntil > DateTime.UtcNow)
+            return ServiceResult.TooManyRequests<LoginResponse>("Too many wrong codes. Try again in 15 minutes.");
+
+        if (!CheckSecondFactor(user, request.Code))
+        {
+            if (++user.TwoFactorFailedAttempts >= MaxTwoFactorAttempts)
+            {
+                user.TwoFactorLockedUntil = DateTime.UtcNow + TwoFactorLockout;
+                user.TwoFactorFailedAttempts = 0;
+                _logger.LogWarning("2FA locked for user {UserId} after repeated wrong codes", user.Id);
+            }
+            await _context.SaveChangesAsync();
             return ServiceResult.Unauthorized<LoginResponse>("Invalid verification code");
+        }
+
+        user.TwoFactorFailedAttempts = 0;
+        user.TwoFactorLockedUntil = null;
+        user.LastTwoFactorLoginAt = DateTime.UtcNow;
 
         _logger.LogInformation("2FA verification successful for user {UserId}", user.Id);
 
@@ -444,7 +521,7 @@ public class AuthService : IAuthService
         });
     }
 
-    public async Task<ServiceResult<AuthResponse>> DisableTwoFactorAsync(int userId, string currentPassword)
+    public async Task<ServiceResult<AuthResponse>> DisableTwoFactorAsync(int userId, string currentPassword, string code)
     {
         var user = await _context.Users.FindAsync(userId);
         if (user == null)
@@ -455,6 +532,10 @@ public class AuthService : IAuthService
 
         if (!VerifyPassword(user, currentPassword))
             return ServiceResult.BadRequest<AuthResponse>("Current password is incorrect");
+
+        // A stolen session plus password is not enough: the second factor itself must agree
+        if (user.TwoFactorLockedUntil > DateTime.UtcNow || !CheckSecondFactor(user, code))
+            return ServiceResult.BadRequest<AuthResponse>("Invalid verification code");
 
         // Turning 2FA off would lock the user out of organizations that require it
         var requiringOrgs = await _context.UserOrganizations
@@ -498,14 +579,27 @@ public class AuthService : IAuthService
         };
     }
 
-    private async Task RevokeAllSessionsAsync(int userId)
+    /// <summary>Ends every session: refresh tokens revoked, access tokens invalid via the security stamp.</summary>
+    private async Task RevokeAllSessionsAsync(User user)
     {
-        var tokens = await _context.RefreshTokens.Where(rt => rt.UserId == userId && !rt.IsRevoked).ToListAsync();
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
+        var tokens = await _context.RefreshTokens.Where(rt => rt.UserId == user.Id && !rt.IsRevoked).ToListAsync();
         foreach (var token in tokens)
         {
             token.IsRevoked = true;
             token.RevokedAt = DateTime.UtcNow;
         }
+    }
+
+    /// <summary>TOTP first (each time step only once), then the one-time backup codes.</summary>
+    private bool CheckSecondFactor(User user, string code)
+    {
+        if (_totpService.VerifyCode(user.TotpSecretKey!, code, user.TotpLastStep, out var step))
+        {
+            user.TotpLastStep = step;
+            return true;
+        }
+        return ConsumeBackupCode(user, code);
     }
 
     /// <summary>One-time backup code check against the BCrypt hashes (legacy plaintext codes still work once).</summary>
@@ -541,6 +635,12 @@ public class AuthService : IAuthService
             ExpiresAt = DateTime.UtcNow.Add(lifetime)
         });
         return token;
+    }
+
+    private Task<bool> RecentlyMailedAsync(int userId, UserTokenPurpose purpose)
+    {
+        var since = DateTime.UtcNow - MailCooldown;
+        return _context.UserTokens.AnyAsync(t => t.UserId == userId && t.Purpose == purpose && t.CreatedAt > since);
     }
 
     private async Task<UserToken?> FindUsableTokenAsync(string token, params UserTokenPurpose[] purposes)

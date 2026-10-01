@@ -73,6 +73,10 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
         });
         pwResp.EnsureSuccessStatusCode();
 
+        // The change ends every session, this one included
+        (await client.GetAsync("/api/v1/Auth/me")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        await TestHelpers.AuthenticateAsync(client, "lifecycle@test.com", "NewPassword2!");
+
         // 7. Owners must delete (or hand over) their organization before deleting the account
         var blocked = await client.PostAsJsonAsync("/api/v1/Auth/account/delete", new { password = "NewPassword2!" });
         blocked.StatusCode.Should().Be(HttpStatusCode.BadRequest);

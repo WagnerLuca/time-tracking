@@ -58,7 +58,7 @@ public class TotpService : ITotpService
         return Convert.ToBase64String(Encoding.UTF8.GetBytes($"{payload}|{sig}"));
     }
 
-    public int? ValidateTwoFactorToken(string token)
+    public (int UserId, DateTime IssuedAt)? ValidateTwoFactorToken(string token)
     {
         try
         {
@@ -87,7 +87,7 @@ public class TotpService : ITotpService
                 return null;
             }
 
-            return userId;
+            return (userId, DateTimeOffset.FromUnixTimeSeconds(timestamp).UtcDateTime);
         }
         catch
         {

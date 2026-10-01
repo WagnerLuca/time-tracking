@@ -120,6 +120,16 @@ public record UpdateProfileRequest
     public string? CurrentPassword { get; init; }
 }
 
+/// <summary>Turning 2FA off needs the password and a current code (or a backup code).</summary>
+public record DisableTwoFactorRequest
+{
+    [Required]
+    public required string CurrentPassword { get; init; }
+
+    [Required, MaxLength(20)]
+    public required string Code { get; init; }
+}
+
 /// <summary>Request payload for deleting (anonymizing) the current account.</summary>
 public record DeleteAccountRequest
 {

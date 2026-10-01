@@ -9,7 +9,8 @@ public enum ServiceErrorType
     BadRequest,
     Forbidden,
     Unauthorized,
-    Conflict
+    Conflict,
+    TooManyRequests
 }
 
 /// <summary>
@@ -48,6 +49,7 @@ public class ServiceResult
     public static ServiceResult<T> Forbidden<T>(string message = "Forbidden") => Fail<T>(ServiceErrorType.Forbidden, message);
     public static ServiceResult<T> Conflict<T>(string message) => Fail<T>(ServiceErrorType.Conflict, message);
     public static ServiceResult<T> Unauthorized<T>(string message = "Unauthorized") => Fail<T>(ServiceErrorType.Unauthorized, message);
+    public static ServiceResult<T> TooManyRequests<T>(string message) => Fail<T>(ServiceErrorType.TooManyRequests, message);
 }
 
 /// <summary>

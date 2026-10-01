@@ -444,8 +444,8 @@ public class RequestService : IRequestService
                         if (data.StartTime.HasValue) entry.StartTime = data.StartTime.Value;
                         if (data.EndTime.HasValue)   { entry.EndTime = data.EndTime.Value; entry.IsFailure = false; }
                         if (data.Description != null) entry.Description = data.Description;
-                        if (entry.EndTime.HasValue && entry.EndTime.Value <= entry.StartTime)
-                            return "The end time would be before the start time.";
+                        if (EntryTimes.Validate(entry.StartTime, entry.EndTime) is { } timesError)
+                            return timesError;
                         if (timesChanged) await PauseRules.ApplyAsync(_context, entry);
                         entry.UpdatedAt = DateTime.UtcNow;
                     }
@@ -592,30 +592,22 @@ public class RequestService : IRequestService
     private async Task ApplyCsvImportAsync(int userId, Organization org, List<CsvImportEntry> entries)
     {
         var imported = 0;
-        foreach (var entry in entries)
+        var clock = OrgClock.For(org);
+        // Same row checks as a direct import; the request data was only stored, never validated
+        foreach (var entry in entries.Take(EntryTimes.MaxImportRows))
         {
-            if (string.IsNullOrEmpty(entry.Date) || string.IsNullOrEmpty(entry.StartTime)
-                || string.IsNullOrEmpty(entry.EndTime))
-                continue;
-
-            if (!DateTime.TryParse($"{entry.Date} {entry.StartTime}", CultureInfo.InvariantCulture,
-                    DateTimeStyles.None, out var startTime))
-                continue;
-            if (!DateTime.TryParse($"{entry.Date} {entry.EndTime}", CultureInfo.InvariantCulture,
-                    DateTimeStyles.None, out var endTime))
-                continue;
-            if (endTime <= startTime)
+            if (TimeEntryExportService.ParseImportRow(clock, entry.Date, entry.StartTime, entry.EndTime, entry.PauseMinutes,
+                    entry.Description, out var startUtc, out var endUtc) != null)
                 continue;
 
             _context.TimeEntries.Add(new TimeEntry
             {
                 UserId = userId,
                 OrganizationId = org.Id,
-                // CSV times are the organization's local wall-clock times
-                StartTime = OrgClock.For(org).ToUtc(startTime),
-                EndTime = OrgClock.For(org).ToUtc(endTime),
+                StartTime = startUtc,
+                EndTime = endUtc,
                 IsRunning = false,
-                PauseDurationMinutes = Math.Max(0, entry.PauseMinutes),
+                PauseDurationMinutes = entry.PauseMinutes,
                 Description = entry.Description,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow

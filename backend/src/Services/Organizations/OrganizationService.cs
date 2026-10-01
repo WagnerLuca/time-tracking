@@ -116,8 +116,11 @@ public class OrganizationService : IOrganizationService
         if (organization == null)
             return ServiceResult.NotFound<OrganizationDetailResponse>("Organization not found");
 
-        // Strip member PII for non-members: only members can see the full member list
+        // Strip member PII for non-members: only members can see the full member list.
+        // An org that requires 2FA shows it only to members who have 2FA, like every other org endpoint.
         var isMember = callerUserId.HasValue && organization.Members.Any(m => m.Id == callerUserId.Value);
+        if (isMember && organization.Require2fa)
+            isMember = await _context.Users.AnyAsync(u => u.Id == callerUserId!.Value && u.TwoFactorEnabled);
         if (!isMember)
         {
             return ServiceResult.Ok(organization with { Members = new List<OrganizationMemberResponse>() });
@@ -197,6 +200,8 @@ public class OrganizationService : IOrganizationService
                 VacationDaysPlanned = visible ? planned : 0,
                 VacationDaysRemaining = visible ? Math.Max(0, m.VacationDaysPerYear - used) : 0,
                 BadgeId = callerIsAdmin ? m.BadgeId : null,
+                // Starting overtime balance is payroll data: the person and admins only
+                InitialOvertimeHours = callerIsAdmin || m.Id == callerUserId.Value ? m.InitialOvertimeHours : 0,
                 Groups = groupsByUser.GetValueOrDefault(m.Id) ?? new List<MemberGroupResponse>()
             };
         }).ToList();

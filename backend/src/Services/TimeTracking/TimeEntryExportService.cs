@@ -56,8 +56,15 @@ public class TimeEntryExportService : ITimeEntryExportService
                 .FirstOrDefaultAsync(o => o.Slug == request.OrganizationSlug);
             if (filterOrg == null)
                 return ServiceResult.NotFound<byte[]>("Organization not found.");
+            var denied = await MemberGateAsync(filterOrg, callerUserId);
+            if (denied != null) return ServiceResult.Fail<byte[]>(denied.Value.Type, denied.Value.Message);
             query = query.Where(e => e.OrganizationId == filterOrg.Id);
         }
+
+        var rangeError = EntryTimes.ValidateRange(
+            request.From.HasValue ? DateOnly.FromDateTime(request.From.Value) : null,
+            request.To.HasValue ? DateOnly.FromDateTime(request.To.Value) : null);
+        if (rangeError != null) return ServiceResult.BadRequest<byte[]>(rangeError);
 
         // From/To are local calendar days of the organization (inclusive)
         var rangeClock = OrgClock.For(filterOrg);
@@ -131,6 +138,8 @@ public class TimeEntryExportService : ITimeEntryExportService
             .FirstOrDefaultAsync(o => o.Slug == request.OrganizationSlug);
         if (org == null)
             return ServiceResult.NotFound<byte[]>("Organization not found.");
+        var denied = await MemberGateAsync(org, callerUserId);
+        if (denied != null) return ServiceResult.Fail<byte[]>(denied.Value.Type, denied.Value.Message);
 
         var membership = await _context.UserOrganizations.AsNoTracking()
             .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
@@ -140,6 +149,8 @@ public class TimeEntryExportService : ITimeEntryExportService
         var localToday = OrgClock.For(org).Today();
         var dateFrom = request.From.HasValue ? DateOnly.FromDateTime(request.From.Value) : new DateOnly(localToday.Year, localToday.Month, 1);
         var dateTo = request.To.HasValue ? DateOnly.FromDateTime(request.To.Value) : dateFrom.AddMonths(1).AddDays(-1);
+        var rangeError = EntryTimes.ValidateRange(dateFrom, dateTo);
+        if (rangeError != null) return ServiceResult.BadRequest<byte[]>(rangeError);
 
         var rows = await DailyReportAggregator.BuildAsync(
             _context, userId, org.Id, dateFrom, dateTo, membership.InitialOvertimeHours);
@@ -189,11 +200,8 @@ public class TimeEntryExportService : ITimeEntryExportService
             .FirstOrDefaultAsync(o => o.Slug == orgSlug);
         if (org == null)
             return ServiceResult.NotFound<ImportPreviewResponse>("Organization not found.");
-
-        var membership = await _context.UserOrganizations.AsNoTracking()
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
-        if (membership == null)
-            return ServiceResult.Forbidden<ImportPreviewResponse>("You are not a member of this organization.");
+        var denied = await MemberGateAsync(org, userId);
+        if (denied != null) return ServiceResult.Fail<ImportPreviewResponse>(denied.Value.Type, denied.Value.Message);
 
         if (await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.CsvImport) == RuleMode.Disabled)
             return ServiceResult.Forbidden<ImportPreviewResponse>("CSV import is disabled in this organization.");
@@ -204,6 +212,8 @@ public class TimeEntryExportService : ITimeEntryExportService
 
         if (lines.Count < 2)
             return ServiceResult.BadRequest<ImportPreviewResponse>("CSV file must have a header row and at least one data row.");
+        if (lines.Count - 1 > EntryTimes.MaxImportRows)
+            return ServiceResult.BadRequest<ImportPreviewResponse>($"A CSV file can hold at most {EntryTimes.MaxImportRows} entries. Split it into several files.");
 
         var headers = ParseCsvLine(lines[0]).Select(h => h.Trim().ToLowerInvariant()).ToList();
 
@@ -252,11 +262,7 @@ public class TimeEntryExportService : ITimeEntryExportService
             var isDuplicate = existingSet.Contains($"{date}|{start}");
             if (isDuplicate) duplicateCount++;
 
-            string? warning = null;
-            if (!DateTime.TryParse($"{date} {start}", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
-                warning = "Invalid date/start time format";
-            else if (!DateTime.TryParse($"{date} {end}", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
-                warning = "Invalid end time format";
+            var warning = ParseImportRow(importClock, date, start, end, pauseMins, desc, out _, out _);
 
             rows.Add(new ImportPreviewRow
             {
@@ -287,11 +293,10 @@ public class TimeEntryExportService : ITimeEntryExportService
             .FirstOrDefaultAsync(o => o.Slug == orgSlug);
         if (org == null)
             return ServiceResult.NotFound<ImportResultResponse>("Organization not found.");
-
-        var membership = await _context.UserOrganizations.AsNoTracking()
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
-        if (membership == null)
-            return ServiceResult.Forbidden<ImportResultResponse>("You are not a member of this organization.");
+        var denied = await MemberGateAsync(org, userId);
+        if (denied != null) return ServiceResult.Fail<ImportResultResponse>(denied.Value.Type, denied.Value.Message);
+        if (entries.Count > EntryTimes.MaxImportRows)
+            return ServiceResult.BadRequest<ImportResultResponse>($"An import can hold at most {EntryTimes.MaxImportRows} entries.");
 
         var csvImportMode = await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.CsvImport);
         if (csvImportMode == RuleMode.Disabled)
@@ -304,26 +309,14 @@ public class TimeEntryExportService : ITimeEntryExportService
         var skipped = 0;
         var errors = new List<string>();
 
+        var clock = OrgClock.For(org);
         foreach (var entry in entries)
         {
-            if (!DateTime.TryParse($"{entry.Date} {entry.StartTime}", CultureInfo.InvariantCulture,
-                    DateTimeStyles.None, out var startTime))
+            var problem = ParseImportRow(clock, entry.Date, entry.StartTime, entry.EndTime, entry.PauseMinutes, entry.Description,
+                out var startUtc, out var endUtc);
+            if (problem != null)
             {
-                errors.Add($"Invalid start: {entry.Date} {entry.StartTime}");
-                skipped++;
-                continue;
-            }
-            if (!DateTime.TryParse($"{entry.Date} {entry.EndTime}", CultureInfo.InvariantCulture,
-                    DateTimeStyles.None, out var endTime))
-            {
-                errors.Add($"Invalid end: {entry.Date} {entry.EndTime}");
-                skipped++;
-                continue;
-            }
-
-            if (endTime <= startTime)
-            {
-                errors.Add($"End time must be after start time: {entry.Date}");
+                errors.Add($"{entry.Date} {entry.StartTime}: {problem}");
                 skipped++;
                 continue;
             }
@@ -332,11 +325,10 @@ public class TimeEntryExportService : ITimeEntryExportService
             {
                 UserId = userId,
                 OrganizationId = org.Id,
-                // CSV times are the organization's local wall-clock times
-                StartTime = OrgClock.For(org).ToUtc(startTime),
-                EndTime = OrgClock.For(org).ToUtc(endTime),
+                StartTime = startUtc,
+                EndTime = endUtc,
                 IsRunning = false,
-                PauseDurationMinutes = Math.Max(0, entry.PauseMinutes),
+                PauseDurationMinutes = entry.PauseMinutes,
                 Description = entry.Description,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -360,9 +352,9 @@ public class TimeEntryExportService : ITimeEntryExportService
         });
     }
 
-    // â”€â”€ Private helpers â”€â”€
+    // ── Private helpers ──
 
-        /// <summary>
+    /// <summary>
     /// Resolves which user's data to export: the caller themselves by default, or
     /// <see cref="ExportRequest.TargetUserId"/> when set and the caller has export
     /// permission for that member (self, org Admin/Owner, or a Group Admin of a
@@ -393,6 +385,39 @@ public class TimeEntryExportService : ITimeEntryExportService
             return (callerUserId, (ServiceErrorType.Forbidden, "You do not have permission to export this member's data."));
 
         return (request.TargetUserId.Value, null);
+    }
+
+    /// <summary>Active member who meets the organization's 2FA requirement, or the reason why not.</summary>
+    private async Task<(ServiceErrorType Type, string Message)?> MemberGateAsync(Organization org, int userId)
+    {
+        var member = await _context.UserOrganizations.AsNoTracking()
+            .Where(uo => uo.OrganizationId == org.Id && uo.UserId == userId)
+            .Select(uo => new { uo.User.TwoFactorEnabled })
+            .FirstOrDefaultAsync();
+        if (member == null) return (ServiceErrorType.Forbidden, "You are not a member of this organization.");
+        if (org.Require2fa && !member.TwoFactorEnabled)
+            return (ServiceErrorType.Forbidden, "This organization requires two-factor authentication. Enable it in your account settings to continue.");
+        return null;
+    }
+
+    /// <summary>
+    /// Parses one CSV row (organization-local wall-clock times) and checks it like a normal entry.
+    /// Returns the problem, or null with the UTC times set.
+    /// </summary>
+    internal static string? ParseImportRow(OrgClock clock, string? date, string? start, string? end, int pauseMinutes, string? description,
+        out DateTime startUtc, out DateTime endUtc)
+    {
+        startUtc = endUtc = default;
+        if (!DateTime.TryParse($"{date} {start}", CultureInfo.InvariantCulture, DateTimeStyles.None, out var localStart))
+            return "Invalid date/start time format";
+        if (!DateTime.TryParse($"{date} {end}", CultureInfo.InvariantCulture, DateTimeStyles.None, out var localEnd))
+            return "Invalid end time format";
+        if (pauseMinutes is < 0 or > 1440) return "Pause must be between 0 and 1440 minutes.";
+        if (description?.Length > 500) return "Description is longer than 500 characters.";
+
+        startUtc = clock.ToUtc(localStart);
+        endUtc = clock.ToUtc(localEnd);
+        return EntryTimes.Validate(startUtc, endUtc);
     }
 
     private static List<string> ResolveColumns(List<string>? requested, string[] available)

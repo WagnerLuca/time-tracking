@@ -53,6 +53,7 @@ public abstract class OrganizationBaseController : ControllerBase
             ServiceErrorType.Forbidden    => StatusCodes.Status403Forbidden,
             ServiceErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
             ServiceErrorType.Conflict     => StatusCodes.Status409Conflict,
+            ServiceErrorType.TooManyRequests => StatusCodes.Status429TooManyRequests,
             _ => StatusCodes.Status500InternalServerError
         };
 

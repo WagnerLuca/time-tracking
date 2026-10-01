@@ -26,6 +26,9 @@ public class TokenService : ITokenService
         _logger = logger;
     }
 
+    /// <summary>Claim carrying <see cref="User.SecurityStamp"/>; checked by ActiveUserFilter.</summary>
+    public const string SecurityStampClaim = "sst";
+
     public string GenerateAccessToken(User user)
     {
         var claims = new List<Claim>
@@ -35,7 +38,8 @@ public class TokenService : ITokenService
             new(ClaimTypes.Email, user.Email),
             new(ClaimTypes.Name, $"{user.FirstName} {user.LastName}"),
             new("firstName", user.FirstName),
-            new("lastName", user.LastName)
+            new("lastName", user.LastName),
+            new(SecurityStampClaim, user.SecurityStamp)
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));

@@ -147,6 +147,10 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Email: SMTP when Email:Smtp:Host is set, otherwise mails (with their links) go to the log
 var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>() ?? new EmailSettings();
+// The log fallback writes whole mails — reset and invitation links included — so it is
+// development-only; a real deployment must configure SMTP
+if (string.IsNullOrWhiteSpace(emailSettings.Smtp.Host) && !isDevOrTest)
+    throw new InvalidOperationException("Email:Smtp:Host is not configured. Set Email__Smtp__Host (and credentials) so password reset and invitation mails can be sent.");
 builder.Services.AddSingleton(emailSettings);
 if (string.IsNullOrWhiteSpace(emailSettings.Smtp.Host))
     builder.Services.AddSingleton<IEmailSender, LogEmailSender>();
@@ -224,7 +228,16 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    static string ClientIp(HttpContext ctx) => ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    // IPv6 clients usually control a whole /64, so they count as one client per /64
+    static string ClientIp(HttpContext ctx)
+    {
+        var ip = ctx.Connection.RemoteIpAddress;
+        if (ip == null) return "unknown";
+        if (ip.IsIPv4MappedToIPv6) ip = ip.MapToIPv4();
+        return ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6
+            ? Convert.ToHexString(ip.GetAddressBytes(), 0, 8) + "::/64"
+            : ip.ToString();
+    }
     static string UserOrIp(HttpContext ctx) =>
         ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value is { } id ? $"user:{id}" : $"ip:{ClientIp(ctx)}";
     static FixedWindowRateLimiterOptions Window(int permits) => new()
@@ -252,8 +265,14 @@ if (trustForwardedHeaders)
     builder.Services.Configure<ForwardedHeadersOptions>(o =>
     {
         o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        // Only the configured proxy network may set X-Forwarded-For; anything else would let
+        // clients pick their own IP and dodge the rate limits
         o.KnownIPNetworks.Clear();
         o.KnownProxies.Clear();
+        foreach (var cidr in builder.Configuration.GetSection("ReverseProxy:KnownNetworks").Get<string[]>() ?? [])
+            o.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(cidr));
+        if (o.KnownIPNetworks.Count == 0)
+            o.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("127.0.0.0/8"));
     });
 }
 

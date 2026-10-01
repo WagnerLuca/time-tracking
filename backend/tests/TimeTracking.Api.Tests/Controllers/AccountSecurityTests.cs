@@ -140,7 +140,8 @@ public class AccountSecurityTests : IClassFixture<TimeTrackingApiFactory>
 
         var setup = await (await owner.PostAsync("/api/v1/Auth/2fa/setup", null)).Content.ReadFromJsonAsync<JsonElement>();
         var totp = new OtpNet.Totp(OtpNet.Base32Encoding.ToBytes(setup.GetProperty("sharedKey").GetString()!));
-        (await owner.PostAsJsonAsync("/api/v1/Auth/2fa/confirm", new { code = totp.ComputeTotp() })).EnsureSuccessStatusCode();
+        var backupCode = (await (await owner.PostAsJsonAsync("/api/v1/Auth/2fa/confirm", new { code = totp.ComputeTotp() }))
+            .Content.ReadFromJsonAsync<JsonElement>()).GetProperty("backupCodes")[0].GetString();
         (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/settings", new { require2fa = true })).EnsureSuccessStatusCode();
 
         var (member, m) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "req2fa-m@sec.test");
@@ -153,8 +154,9 @@ public class AccountSecurityTests : IClassFixture<TimeTrackingApiFactory>
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         // Owner cannot switch their own 2FA off while the org requires it
-        (await owner.PostAsJsonAsync("/api/v1/Auth/2fa/disable", new { currentPassword = "Password123!", newPassword = "x" }))
-            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var disable = await owner.PostAsJsonAsync("/api/v1/Auth/2fa/disable", new { currentPassword = "Password123!", code = backupCode });
+        disable.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await disable.Content.ReadAsStringAsync()).Should().Contain("Strict Org");
     }
 
     [Fact]

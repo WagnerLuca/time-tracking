@@ -759,10 +759,17 @@ namespace TimeTracking.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<DateTime?>("LastTwoFactorLoginAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");
 
                     b.Property<string>("ProfileImageUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<long?>("TotpLastStep")
@@ -778,6 +785,12 @@ namespace TimeTracking.Api.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<DateTime?>("TwoFactorEnabledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TwoFactorFailedAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("TwoFactorLockedUntil")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("UpdatedAt")

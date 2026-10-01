@@ -35,6 +35,8 @@ public record CreateOrgRequestRequest
 
     public RequestType Type { get; init; } = RequestType.JoinOrganization;
     public int? RelatedEntityId { get; init; }
+
+    [MaxLength(200_000)]   // a CSV import of 1000 rows fits comfortably
     public string? RequestData { get; init; }
 }
 

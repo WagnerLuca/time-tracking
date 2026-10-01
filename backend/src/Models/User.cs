@@ -34,6 +34,24 @@ public class User
     [JsonIgnore]
     public string? TwoFactorBackupCodes { get; set; }
 
+    /// <summary>
+    /// Changes whenever credentials or 2FA change; access tokens carry it ("sst") and stop
+    /// working once it no longer matches, so old sessions end immediately.
+    /// </summary>
+    [JsonIgnore]
+    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
+
+    /// <summary>Failed 2FA codes in a row; five lock 2FA verification for 15 minutes.</summary>
+    [JsonIgnore]
+    public int TwoFactorFailedAttempts { get; set; }
+
+    [JsonIgnore]
+    public DateTime? TwoFactorLockedUntil { get; set; }
+
+    /// <summary>A 2FA login token issued before this instant has been used (tokens are single-use).</summary>
+    [JsonIgnore]
+    public DateTime? LastTwoFactorLoginAt { get; set; }
+
     /// <summary>TOTP time step of the last accepted code; a code can never be used twice.</summary>
     [JsonIgnore]
     public long? TotpLastStep { get; set; }

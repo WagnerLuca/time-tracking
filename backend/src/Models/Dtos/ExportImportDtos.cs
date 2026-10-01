@@ -64,7 +64,10 @@ public record ImportEntryRequest
     [Required]
     public required string EndTime { get; init; }
 
+    [Range(0, 1440)]
     public int PauseMinutes { get; init; }
+
+    [MaxLength(500)]
     public string? Description { get; init; }
 }
 
