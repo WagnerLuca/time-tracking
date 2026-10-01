@@ -5,6 +5,11 @@
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { t } from '$lib/i18n';
 	import AuthLanguageToggle from '$lib/components/AuthLanguageToggle.svelte';
+	import { page } from '$app/state';
+	import { safeNext, withNext } from '$lib/utils/redirect';
+
+	/** Where to continue after registering (e.g. back to an invitation link). */
+	const next = $derived(safeNext(page.url.searchParams.get('next')));
 
 	let email = $state('');
 	let password = $state('');
@@ -34,7 +39,7 @@
 		try {
 			await auth.register({ email: email.trim(), password, firstName: firstName.trim(), lastName: lastName.trim() });
 			toast.success(t('auth.register.verifySent'));
-			goto('/organizations');
+			goto(next ?? '/organizations');
 		} catch (err) {
 			error = extractErrorMessage(err, t('auth.register.failed'));
 		} finally {
@@ -53,6 +58,9 @@
 		<div class="card-body p-6 sm:p-10">
 			<h1 class="text-2xl font-bold mb-1">{t('auth.register.title')}</h1>
 			<p class="text-base-content/60 mb-6">{t('auth.register.subtitle')}</p>
+			{#if next?.startsWith('/invite')}
+				<div class="alert alert-info text-sm mb-4" role="status">{t('auth.inviteHint')}</div>
+			{/if}
 
 			{#if error}
 				<div class="alert alert-error text-sm mb-4" role="alert">{error}</div>
@@ -152,7 +160,7 @@
 			</form>
 
 			<p class="text-center mt-6 text-sm text-base-content/60">
-				{t('auth.register.haveAccount')} <a href="/login" class="link link-primary">{t('auth.register.login')}</a>
+				{t('auth.register.haveAccount')} <a href={withNext('/login', next)} class="link link-primary">{t('auth.register.login')}</a>
 			</p>
 		</div>
 	</div>

@@ -19,6 +19,7 @@ import * as orgSettings from './messages/orgSettings';
 import * as settings from './messages/settings';
 import * as exportPage from './messages/export';
 import * as errors from './messages/errors';
+import * as invitations from './messages/invitations';
 import type { Dictionary } from './de';
 
 export const en: Dictionary = {
@@ -42,5 +43,6 @@ export const en: Dictionary = {
 	orgSettings: orgSettings.en,
 	settings: settings.en,
 	export: exportPage.en,
-	errors: errors.en
+	errors: errors.en,
+	invitations: invitations.en
 };

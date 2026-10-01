@@ -6,6 +6,7 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { t, tp } from '$lib/i18n';
 	import GroupTags from '$lib/components/GroupTags.svelte';
+	import InvitationsPanel from '$lib/components/InvitationsPanel.svelte';
 	import { organizationsApi } from '$lib/apiClient';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import { getWeekRange } from '$lib/utils/dateHelpers';
@@ -19,7 +20,8 @@
 	let loading = $state(true);
 	let error = $state('');
 
-	let isAdmin = $derived(isOrgAdmin(org?.members?.find((m) => m.id === auth.user?.id)?.role));
+	let myRole = $derived(org?.members?.find((m) => m.id === auth.user?.id)?.role);
+	let isAdmin = $derived(isOrgAdmin(myRole));
 
 	// This week's tracked time per member (only returned where the caller may see it)
 	let overviewByUser = $state(new Map<number, MemberTimeOverviewResponse>());
@@ -94,6 +96,10 @@
 		<p class="text-base-content/60 text-sm mt-2 mb-5">
 			{isAdmin ? t('memberList.introAdmin') : t('memberList.introMember')}
 		</p>
+
+		{#if isAdmin}
+			<InvitationsPanel {orgSlug} isOwner={myRole === 'Owner'} />
+		{/if}
 
 		<section>
 			<div class="flex items-center justify-between mb-4 flex-wrap gap-2">

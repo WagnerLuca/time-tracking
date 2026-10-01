@@ -6,6 +6,7 @@
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { t } from '$lib/i18n';
 	import AuthLanguageToggle from '$lib/components/AuthLanguageToggle.svelte';
+	import { safeNext, withNext } from '$lib/utils/redirect';
 
 	let email = $state('');
 	let password = $state('');
@@ -22,10 +23,7 @@
 	});
 
 	/** Where to go after login: a same-origin path from ?next= (set by the 401 handler), else the default flow. */
-	const next = $derived.by(() => {
-		const value = page.url.searchParams.get('next');
-		return value && value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\') && !value.startsWith('/login') ? value : null;
-	});
+	const next = $derived(safeNext(page.url.searchParams.get('next')));
 
 	async function navigateAfterLogin() {
 		if (auth.user?.id) {
@@ -126,6 +124,9 @@
 			{:else}
 				<h1 class="text-2xl font-bold mb-1">{t('auth.login.title')}</h1>
 				<p class="text-base-content/60 mb-6">{t('auth.login.subtitle')}</p>
+				{#if next?.startsWith('/invite')}
+					<div class="alert alert-info text-sm mb-4" role="status">{t('auth.inviteHint')}</div>
+				{/if}
 
 				{#if error}
 					<div id="loginError" class="alert alert-error text-sm mb-4" role="alert">{error}</div>
@@ -169,7 +170,7 @@
 				</form>
 
 				<p class="text-center mt-6 text-sm text-base-content/60">
-					{t('auth.login.noAccount')} <a href="/register" class="link link-primary">{t('auth.login.register')}</a>
+					{t('auth.login.noAccount')} <a href={withNext('/register', next)} class="link link-primary">{t('auth.login.register')}</a>
 				</p>
 			{/if}
 		</div>

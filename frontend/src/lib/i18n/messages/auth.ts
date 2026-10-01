@@ -3,6 +3,7 @@ export const de = {
 	email: 'E-Mail',
 	emailPlaceholder: 'du@beispiel.de',
 	password: 'Passwort',
+	inviteHint: 'Du wurdest in eine Organisation eingeladen. Melde dich mit der eingeladenen E-Mail-Adresse an oder erstelle damit ein Konto – danach wird die Einladung angenommen.',
 	login: {
 		pageTitle: 'Anmelden',
 		title: 'Anmelden',
@@ -80,6 +81,7 @@ export const en: typeof de = {
 	email: 'Email',
 	emailPlaceholder: 'you@example.com',
 	password: 'Password',
+	inviteHint: 'You were invited to an organization. Sign in with the invited email address or create an account with it – the invitation is accepted afterwards.',
 	login: {
 		pageTitle: 'Sign in',
 		title: 'Sign in',
