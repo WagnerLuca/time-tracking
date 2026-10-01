@@ -256,13 +256,12 @@
 		permGroupsLoading = true;
 		permGroupsError = '';
 		try {
-			const { data: groups } = await groupApi.apiV1OrganizationsSlugGroupsGet(orgSlug);
-			const columns = await Promise.all(
-				groups.map(async (group) => {
-					const { data: perms } = await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(orgSlug, group.id!);
-					return { group, perms };
-				})
-			);
+			const [{ data: groups }, { data: allPerms }] = await Promise.all([
+				groupApi.apiV1OrganizationsSlugGroupsGet(orgSlug),
+				groupApi.apiV1OrganizationsSlugGroupsPermissionsGet(orgSlug)
+			]);
+			const permsById = new Map(allPerms.map((p) => [p.groupId, p]));
+			const columns = groups.map((group) => ({ group, perms: permsById.get(group.id) ?? { groupId: group.id } }));
 			permGroups = columns.sort((a, b) => (a.group.name ?? '').localeCompare(b.group.name ?? ''));
 		} catch (err) {
 			permGroupsError = extractErrorMessage(err, t('orgSettings.matrix.loadFailed'));

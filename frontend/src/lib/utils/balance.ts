@@ -1,4 +1,5 @@
 import type { BalanceResponse, PeriodBalance } from '$lib/api';
+import { parseDateKey } from './dateHelpers';
 
 /** A period of the balance endpoint in minutes (the unit every formatter here takes). */
 export interface PeriodMinutes {
@@ -15,6 +16,10 @@ export interface BalanceMinutes {
 	today: PeriodMinutes;
 	week: PeriodMinutes;
 	month: PeriodMinutes;
+	/** Mon–Sun of the current week; `counted` is false for days still to come. */
+	weekDays: (PeriodMinutes & { date: Date; counted: boolean })[];
+	/** The current month in Monday-based weeks, clipped to the month. */
+	monthWeeks: (PeriodMinutes & { from: Date; to: Date })[];
 	failureEntryCount: number;
 }
 
@@ -32,6 +37,8 @@ export function balanceToMinutes(b: BalanceResponse): BalanceMinutes {
 		today: period(b.today),
 		week: period(b.week),
 		month: period(b.month),
+		weekDays: (b.weekDays ?? []).map((d) => ({ ...period(d), date: parseDateKey(d.date!), counted: d.isCounted ?? false })),
+		monthWeeks: (b.monthWeeks ?? []).map((w) => ({ ...period(w), from: parseDateKey(w.from!), to: parseDateKey(w.to!) })),
 		failureEntryCount: b.failureEntryCount ?? 0
 	};
 }

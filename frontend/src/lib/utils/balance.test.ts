@@ -24,5 +24,19 @@ describe('balanceToMinutes', () => {
 		expect(b.cumulative).toBe(0);
 		expect(b.week).toEqual({ worked: 0, target: 0, delta: 0 });
 		expect(b.failureEntryCount).toBe(0);
+		expect(b.weekDays).toEqual([]);
+		expect(b.monthWeeks).toEqual([]);
+	});
+
+	it('maps the week days and month weeks with local dates', () => {
+		const b = balanceToMinutes({
+			today: {},
+			week: {},
+			month: {},
+			weekDays: [{ date: '2026-09-28', targetHours: 8, workedHours: 8.5, overtimeHours: 0.5, isCounted: true }],
+			monthWeeks: [{ from: '2026-09-01', to: '2026-09-06', targetHours: 40, workedHours: 38, overtimeHours: -2 }]
+		});
+		expect(b.weekDays).toEqual([{ date: new Date(2026, 8, 28), worked: 510, target: 480, delta: 30, counted: true }]);
+		expect(b.monthWeeks[0]).toEqual({ from: new Date(2026, 8, 1), to: new Date(2026, 8, 6), worked: 2280, target: 2400, delta: -120 });
 	});
 });

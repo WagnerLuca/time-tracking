@@ -8,7 +8,7 @@
 	import type { WorkScheduleResponse } from '$lib/api';
 	import { formatHours, formatDelta, formatClock, barWidth, getMonthName, dayNamesShort } from '$lib/utils/formatters';
 	import { isToday, isFuture, sumMinutes, dateKey } from '$lib/utils/dateHelpers';
-	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, getTargetForRange } from '$lib/utils/scheduleHelpers';
+	import { getDayType, getDayTypeLabel } from '$lib/utils/scheduleHelpers';
 	import { WEEKLY_ENTRY_LIMIT } from '$lib/utils/constants';
 	import { fetchAllPages } from '$lib/utils/pagination';
 	import { balanceToMinutes } from '$lib/utils/balance';
@@ -84,40 +84,52 @@
 			const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 			const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-			const orgId = orgContext.selectedOrgId ?? undefined;
 			const userId = auth.user?.id;
-			const [schedule, off, weekRes, monthEntries, balanceRes] = await Promise.all([
-				slug ? workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(slug).then((r) => r.data) : Promise.resolve(null),
-				loadDaysOff(slug, auth.user?.id, weekStart < monthStart ? weekStart : monthStart, weekEnd > monthEnd ? weekEnd : monthEnd),
-				timeTrackingApi.apiV1TimeTrackingGet(orgId, weekStart.toISOString(), weekEnd.toISOString(), WEEKLY_ENTRY_LIMIT),
-				fetchAllPages((limit, offset) => timeTrackingApi.apiV1TimeTrackingGet(orgId, monthStart.toISOString(), monthEnd.toISOString(), limit, offset).then((r) => r.data)),
-				slug && userId ? reportsApi.apiV1OrganizationsSlugMembersMemberIdBalanceGet(slug, userId).then((r) => balanceToMinutes(r.data)) : Promise.resolve(null)
+			const dayNames = dayNamesShort();
+			const weekRange = (from: Date, to: Date) => t('dashboard.weekRange', { from: from.getDate(), to: to.getDate() });
+
+			if (slug && userId) {
+				// Everything from the balance endpoint (report rules: absences credited, failure entries excluded)
+				const [schedule, off, b] = await Promise.all([
+					workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(slug).then((r) => r.data),
+					loadDaysOff(slug, userId, weekStart < monthStart ? weekStart : monthStart, weekEnd > monthEnd ? weekEnd : monthEnd),
+					reportsApi.apiV1OrganizationsSlugMembersMemberIdBalanceGet(slug, userId).then((r) => balanceToMinutes(r.data))
+				]);
+				workSchedule = schedule;
+				daysOff = off;
+				stats = {
+					todayMinutes: b.today.worked,
+					weekMinutes: b.week.worked,
+					monthMinutes: b.month.worked,
+					todayTarget: b.today.target,
+					weekTarget: b.week.target,
+					monthTarget: b.month.target,
+					cumulative: schedule?.weeklyWorkHours ? b.cumulative : null,
+					weekDays: b.weekDays.map((d) => ({ label: dayNames[(d.date.getDay() + 6) % 7], date: d.date, worked: d.worked, target: d.target })),
+					monthWeeks: b.monthWeeks.map((w) => ({ label: weekRange(w.from, w.to), worked: w.worked, target: w.target }))
+				};
+				return;
+			}
+
+			// Without an org there is no schedule and no balance: just the tracked time
+			workSchedule = null;
+			daysOff = emptyDaysOff();
+			const [weekRes, monthEntries] = await Promise.all([
+				timeTrackingApi.apiV1TimeTrackingGet(undefined, weekStart.toISOString(), weekEnd.toISOString(), WEEKLY_ENTRY_LIMIT),
+				fetchAllPages((limit, offset) => timeTrackingApi.apiV1TimeTrackingGet(undefined, monthStart.toISOString(), monthEnd.toISOString(), limit, offset).then((r) => r.data))
 			]);
-			workSchedule = schedule;
-			daysOff = off;
-			const { holidayDates, halfDayHolidays, sickDayDates, vacationDates, otherAbsenceDates, halfDayAbsences } = off;
-			const credit = (d: Date) => getAbsenceCredit(d, schedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, [], halfDayAbsences, halfDayHolidays);
 			const inRange = (from: Date, to: Date) => (e: { startTime?: string }) => {
 				const ts = new Date(e.startTime!);
 				return ts >= from && ts <= to;
 			};
-
 			const weekEntries = weekRes.data.items ?? [];
-
-			const dayNames = dayNamesShort();
 			const weekDays: Stats['weekDays'] = dayNames.map((label, i) => {
 				const d = new Date(weekStart);
 				d.setDate(weekStart.getDate() + i);
 				const dEnd = new Date(d);
 				dEnd.setHours(23, 59, 59, 999);
-				return {
-					label,
-					date: d,
-					worked: sumMinutes(weekEntries.filter(inRange(d, dEnd))) + credit(d),
-					target: getDayTarget(d, schedule, holidayDates, [], halfDayHolidays)
-				};
+				return { label, date: d, worked: sumMinutes(weekEntries.filter(inRange(d, dEnd))), target: 0 };
 			});
-
 			// Month split into Mon–Sun weeks (clipped to the month)
 			const monthWeeks: Stats['monthWeeks'] = [];
 			let wkStart = new Date(monthStart);
@@ -126,26 +138,19 @@
 				wkEnd.setDate(wkStart.getDate() + (7 - (wkStart.getDay() || 7)));
 				wkEnd.setHours(23, 59, 59, 999);
 				if (wkEnd > monthEnd) wkEnd = new Date(monthEnd);
-				monthWeeks.push({
-					label: t('dashboard.weekRange', { from: wkStart.getDate(), to: wkEnd.getDate() }),
-					worked: sumMinutes(monthEntries.filter(inRange(wkStart, wkEnd))),
-					target: getTargetForRange(wkStart, wkEnd, schedule, holidayDates, [], null, halfDayHolidays)
-				});
+				monthWeeks.push({ label: weekRange(wkStart, wkEnd), worked: sumMinutes(monthEntries.filter(inRange(wkStart, wkEnd))), target: 0 });
 				wkStart = new Date(wkEnd);
 				wkStart.setDate(wkStart.getDate() + 1);
 				wkStart.setHours(0, 0, 0, 0);
 			}
-
-			// Totals come from the balance endpoint (report rules); without an org only the tracked time is shown
-			const b = balanceRes;
 			stats = {
-				todayMinutes: b ? b.today.worked : sumMinutes(weekEntries.filter(inRange(todayStart, todayEnd))),
-				weekMinutes: b ? b.week.worked : sumMinutes(weekEntries),
-				monthMinutes: b ? b.month.worked : sumMinutes(monthEntries),
-				todayTarget: b?.today.target ?? 0,
-				weekTarget: b?.week.target ?? 0,
-				monthTarget: b?.month.target ?? 0,
-				cumulative: b && schedule?.weeklyWorkHours ? b.cumulative : null,
+				todayMinutes: sumMinutes(weekEntries.filter(inRange(todayStart, todayEnd))),
+				weekMinutes: sumMinutes(weekEntries),
+				monthMinutes: sumMinutes(monthEntries),
+				todayTarget: 0,
+				weekTarget: 0,
+				monthTarget: 0,
+				cumulative: null,
 				weekDays,
 				monthWeeks
 			};

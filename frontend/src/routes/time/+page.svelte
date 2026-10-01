@@ -69,10 +69,17 @@
 	// Week navigation
 	let weekOffset = $state(0);
 	const weekRange = $derived(getWeekRange(weekOffset));
-	const dailyTotals = $derived(computeDailyTotals(weekEntries, weekRange, workSchedule));
+	// The current week comes from the balance endpoint (absences credited, report rules); other weeks are computed here
+	const dailyTotals = $derived(
+		weekOffset === 0 && balance?.weekDays.length === 7
+			? balance.weekDays.map((d, i) => ({ name: dayNamesShort()[i], date: d.date, minutes: d.worked, targetMinutes: d.target, isPastOrToday: d.counted }))
+			: computeDailyTotals(weekEntries, weekRange, workSchedule)
+	);
 	const weekTotal = $derived(dailyTotals.reduce((s, d) => s + d.minutes, 0));
 	const weekTargetSoFar = $derived(dailyTotals.filter((d) => d.isPastOrToday).reduce((s, d) => s + d.targetMinutes, 0));
-	const weekTargetFull = $derived(workSchedule?.weeklyWorkHours ? workSchedule.weeklyWorkHours * 60 : dailyTotals.reduce((s, d) => s + d.targetMinutes, 0));
+	const weekTargetFull = $derived(
+		workSchedule?.weeklyWorkHours && !(weekOffset === 0 && balance) ? workSchedule.weeklyWorkHours * 60 : dailyTotals.reduce((s, d) => s + d.targetMinutes, 0)
+	);
 	const maxDayMinutes = $derived(Math.max(...dailyTotals.map((d) => Math.max(d.minutes, d.targetMinutes)), 480));
 
 	// (Re)load everything once the org list is known and whenever the selected org changes
