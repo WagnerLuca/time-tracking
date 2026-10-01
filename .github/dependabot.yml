@@ -1,0 +1,29 @@
+# Weekly dependency PRs. npm installs of @wagnerluca/ui need GitHub Packages auth:
+# add a "GHP_READ_TOKEN" Dependabot secret (Settings > Secrets > Dependabot).
+version: 2
+registries:
+  github-npm:
+    type: npm-registry
+    url: https://npm.pkg.github.com
+    token: ${{secrets.GHP_READ_TOKEN}}
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    registries: [github-npm]
+    schedule: { interval: weekly }
+    groups:
+      npm-minor-patch: { update-types: [minor, patch] }
+  - package-ecosystem: nuget
+    directory: /backend
+    schedule: { interval: weekly }
+    groups:
+      nuget-minor-patch: { update-types: [minor, patch] }
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /backend
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }

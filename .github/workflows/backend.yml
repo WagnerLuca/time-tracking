@@ -13,6 +13,10 @@ on:
       - 'backend/**'
       - '.github/workflows/backend.yml'
 
+# Least privilege by default; only the publish job may write packages
+permissions:
+  contents: read
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}-backend
@@ -38,7 +42,7 @@ jobs:
 
       - name: Check migrations match the model
         run: |
-          dotnet tool install --global dotnet-ef
+          dotnet tool install --global dotnet-ef --version 10.0.3 # keep in step with Microsoft.EntityFrameworkCore.Design
           dotnet ef migrations has-pending-model-changes
         working-directory: backend
 
