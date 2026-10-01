@@ -34,7 +34,7 @@ public class AbsenceCreditTests : IClassFixture<TimeTrackingApiFactory>
     private static async Task<string> DayAsync(HttpClient owner, string slug, string date)
     {
         var csv = await (await owner.PostAsJsonAsync("/api/v1/ExportImport/export",
-            new { type = "daily", organizationSlug = slug, from = date, to = date })).Content.ReadAsStringAsync();
+            new { lang = "en", type = "daily", organizationSlug = slug, from = date, to = date })).Content.ReadAsStringAsync();
         return csv.Split('\n').Single(l => l.StartsWith(date));
     }
 

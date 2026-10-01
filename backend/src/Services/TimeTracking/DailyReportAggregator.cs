@@ -33,6 +33,9 @@ public record DailyReportRow(
 /// </summary>
 public static class DailyReportAggregator
 {
+    /// <summary>Appended to a failure entry in <see cref="DailyReportRow.EntrySummary"/>; <see cref="ReportText.EntrySummary"/> translates it.</summary>
+    public const string FailureMarker = " [not stopped, needs correction]";
+
     public static async Task<List<DailyReportRow>> BuildAsync(
         TimeTrackingDbContext context, int userId, int orgId,
         DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours)
@@ -132,7 +135,7 @@ public static class DailyReportAggregator
             var entrySummary = allDayEntries.Count > 0
                 ? string.Join(" | ", allDayEntries.Select(e =>
                     $"{clock.ToLocal(e.StartTime):HH:mm}-{(e.EndTime.HasValue ? clock.ToLocal(e.EndTime.Value).ToString("HH:mm") : "?")}" +
-                    (e.IsFailure ? " [not stopped, needs correction]" : "") +
+                    (e.IsFailure ? FailureMarker : "") +
                     (string.IsNullOrEmpty(e.Description) ? "" : $" ({e.Description})")))
                 : "";
 

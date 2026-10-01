@@ -65,10 +65,32 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
         var again = await PreviewAsync(member, slug, "Date,Start Time,End Time\n2026-03-02,08:00,16:30\n");
         (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("duplicateCount").GetInt32().Should().Be(1);
 
-        var export = await member.PostAsJsonAsync("/api/v1/ExportImport/export", new { type = "entries", organizationSlug = slug });
+        var export = await member.PostAsJsonAsync("/api/v1/ExportImport/export", new { lang = "en", type = "entries", organizationSlug = slug });
         export.EnsureSuccessStatusCode();
         var csv = await export.Content.ReadAsStringAsync();
         csv.Should().Contain("2026-03-02").And.Contain("Imported");
+    }
+
+    [Fact]
+    public async Task Export_IsGermanByDefault_AndAGermanExportImportsAgain()
+    {
+        var (_, member, slug, _) = await SetupAsync("csv-de", Allowed);
+        (await PreviewAsync(member, slug, "Date,Start Time,End Time,Pause,Description\n2026-03-02,08:00,16:30,30,Imported\n")).EnsureSuccessStatusCode();
+        (await ConfirmAsync(member, slug)).EnsureSuccessStatusCode();
+
+        var csv = await (await member.PostAsJsonAsync("/api/v1/ExportImport/export", new { type = "entries", organizationSlug = slug })).Content.ReadAsStringAsync();
+        csv.Should().StartWith("Datum,Tag,Beginn,Ende,Dauer (h),Pause (min),Netto (h),Beschreibung,Organisation,Status").And.Contain("2026-03-02,Mo,08:00,16:30");
+
+        var daily = await (await member.PostAsJsonAsync("/api/v1/ExportImport/export", new
+        {
+            type = "daily", organizationSlug = slug, from = "2026-03-01", to = "2026-03-02", columns = new[] { "Date", "DayOfWeek", "Status" }
+        })).Content.ReadAsStringAsync();
+        daily.Should().Contain("Datum,Tag,Status").And.Contain("2026-03-01,So,Wochenende").And.Contain("2026-03-02,Mo,Frei");   // no work schedule → day off
+
+        // The German headers are understood by the import (same row → duplicate)
+        var again = await PreviewAsync(member, slug, csv);
+        again.EnsureSuccessStatusCode();
+        (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("duplicateCount").GetInt32().Should().Be(1);
     }
 
     [Fact]
@@ -109,7 +131,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
         var (_, stranger) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "csv-other-x@test.com");
 
         var export = await member.PostAsJsonAsync("/api/v1/ExportImport/export",
-            new { type = "entries", organizationSlug = slug, targetUserId = stranger.User.Id });
+            new { lang = "en", type = "entries", organizationSlug = slug, targetUserId = stranger.User.Id });
         export.IsSuccessStatusCode.Should().BeFalse();
     }
 
@@ -125,6 +147,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "entries"
         });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -148,6 +171,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
         // Far future date — should return only header
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "entries",
             from = "2099-01-01T00:00:00Z",
             to = "2099-12-31T00:00:00Z"
@@ -168,6 +192,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
         // Non-existent org slug — should return only header (no entries match)
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "entries",
             organizationSlug = "non-existent-slug-999"
         });
@@ -185,6 +210,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "entries"
         });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -206,6 +232,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "entries"
         });
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -221,6 +248,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "daily",
             organizationSlug = TestHelpers.SeedOrgSlug
         });
@@ -244,6 +272,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
         // Request exactly 7 days
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "daily",
             organizationSlug = TestHelpers.SeedOrgSlug,
             from = "2026-01-05T00:00:00Z",
@@ -267,6 +296,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "daily",
             organizationSlug = TestHelpers.SeedOrgSlug
         });
@@ -281,6 +311,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "daily",
             organizationSlug = "does-not-exist-org"
         });
@@ -296,6 +327,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
         // 2026-01-10 is a Saturday, 2026-01-11 is a Sunday
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "daily",
             organizationSlug = TestHelpers.SeedOrgSlug,
             from = "2026-01-10T00:00:00Z",
@@ -316,6 +348,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "daily",
             organizationSlug = TestHelpers.SeedOrgSlug
         });
@@ -334,6 +367,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "daily",
             organizationSlug = TestHelpers.SeedOrgSlug,
             from = $"{rangeFrom:yyyy-MM-dd}T00:00:00Z",
@@ -367,6 +401,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "daily",
             organizationSlug = TestHelpers.SeedOrgSlug,
             from = $"{rangeFrom:yyyy-MM-dd}T00:00:00Z",
@@ -393,6 +428,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "entries",
             organizationSlug = TestHelpers.SeedOrgSlug,
             targetUserId = tom.Id
@@ -413,6 +449,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "entries",
             targetUserId = tom.Id
             // organizationSlug intentionally omitted — permission can't be resolved without an org
@@ -434,6 +471,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await memberClient.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "entries",
             organizationSlug = TestHelpers.SeedOrgSlug,
             targetUserId = owner.Id
@@ -453,6 +491,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "daily",
             organizationSlug = TestHelpers.SeedOrgSlug,
             targetUserId = tom.Id
@@ -475,6 +514,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await memberClient.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "daily",
             organizationSlug = TestHelpers.SeedOrgSlug,
             targetUserId = owner.Id
@@ -491,6 +531,7 @@ public class ExportImportControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var response = await client.PostAsJsonAsync("/api/v1/ExportImport/export", new
         {
+            lang = "en",
             type = "entries",
             targetUserId = ownId
             // no organizationSlug — allowed because target == caller, no permission check needed

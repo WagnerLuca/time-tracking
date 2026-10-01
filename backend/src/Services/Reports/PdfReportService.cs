@@ -14,12 +14,6 @@ public class PdfReportService : IPdfReportService
     private readonly TimeTrackingDbContext _context;
     private readonly ILogger<PdfReportService> _logger;
 
-    private static readonly string[] MonthNames =
-    [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ];
-
     public PdfReportService(TimeTrackingDbContext context, ILogger<PdfReportService> logger)
     {
         _context = context;
@@ -27,7 +21,7 @@ public class PdfReportService : IPdfReportService
     }
 
     public async Task<ServiceResult<byte[]>> GenerateMonthlyReportAsync(
-        string slug, int callerUserId, int targetUserId, int year, int month)
+        string slug, int callerUserId, int targetUserId, int year, int month, string? lang = null)
     {
         if (month is < 1 or > 12)
             return ServiceResult.BadRequest<byte[]>("Month must be between 1 and 12.");
@@ -41,8 +35,9 @@ public class PdfReportService : IPdfReportService
         var (rows, overallCumulative) = await DailyReportAggregator.BuildWithRunningTotalAsync(
             _context, targetUserId, context.Org!.Id, dateFrom, dateTo, context.Membership!.InitialOvertimeHours);
 
-        var period = $"{MonthNames[month - 1]} {year}";
-        var bytes = RenderMonthlyPdf(context.Org.Name, context.TargetUser!, period, rows, overallCumulative);
+        var t = ReportText.For(lang);
+        var period = $"{t.Month(month)} {year}";
+        var bytes = RenderMonthlyPdf(t, context.Org.Name, context.TargetUser!, period, rows, overallCumulative);
 
         _logger.LogInformation(
             "Monthly PDF report generated for user {TargetUserId} in org {OrgSlug} ({Year}-{Month}) by user {CallerId}",
@@ -52,7 +47,7 @@ public class PdfReportService : IPdfReportService
     }
 
     public async Task<ServiceResult<byte[]>> GenerateYearlyReportAsync(
-        string slug, int callerUserId, int targetUserId, int year)
+        string slug, int callerUserId, int targetUserId, int year, string? lang = null)
     {
         var context = await ResolveReportContextAsync(slug, callerUserId, targetUserId);
         if (context.Error != null) return ServiceResult.Fail<byte[]>(context.Error.Value, context.ErrorMessage!);
@@ -81,7 +76,7 @@ public class PdfReportService : IPdfReportService
             ))
             .ToList();
 
-        var bytes = RenderYearlyPdf(context.Org.Name, context.TargetUser!, year, monthSummaries, overallCumulative);
+        var bytes = RenderYearlyPdf(ReportText.For(lang), context.Org.Name, context.TargetUser!, year, monthSummaries, overallCumulative);
 
         _logger.LogInformation(
             "Yearly PDF report generated for user {TargetUserId} in org {OrgSlug} ({Year}) by user {CallerId}",
@@ -164,7 +159,7 @@ public class PdfReportService : IPdfReportService
     //  PDF rendering
     // ────────────────────────────────────────────────────
 
-    private static byte[] RenderMonthlyPdf(string orgName, User member, string period, List<DailyReportRow> rows, double overallCumulative)
+    private static byte[] RenderMonthlyPdf(ReportText t, string orgName, User member, string period, List<DailyReportRow> rows, double overallCumulative)
     {
         var totalTarget = rows.Sum(r => r.TargetHours);
         var totalNet = rows.Sum(r => r.NetWorkedHours);
@@ -181,33 +176,33 @@ public class PdfReportService : IPdfReportService
                 page.Margin(1.5f, Unit.Centimetre);
                 page.DefaultTextStyle(x => x.FontSize(9));
 
-                page.Header().Element(c => ComposeHeader(c, orgName, member, "Monthly Time Report", period));
+                page.Header().Element(c => ComposeHeader(c, t, orgName, member, t["pdf.monthlyTitle"], period));
 
                 page.Content().PaddingTop(10).Column(column =>
                 {
                     column.Spacing(12);
 
                     column.Item().Element(c => ComposeSummaryCards(c, [
-                        ("Target", FormatHours(totalTarget)),
-                        ("Worked (net)", FormatHours(totalNet)),
-                        ("Balance", FormatSigned(totalOvertime)),
-                        ("Overall Cumulative", FormatSigned(overallCumulative))
+                        (t["pdf.target"], FormatHours(t, totalTarget)),
+                        (t["pdf.workedNet"], FormatHours(t, totalNet)),
+                        (t["pdf.balance"], FormatSigned(t, totalOvertime)),
+                        (t["pdf.overallCumulative"], FormatSigned(t, overallCumulative))
                     ]));
                     column.Item().Element(c => ComposeSummaryCards(c, [
-                        ("Vacation", $"{vacationDays}d"),
-                        ("Sick", $"{sickDays}d"),
-                        ("Holidays", $"{holidayDays}d")
+                        (t["pdf.vacation"], $"{vacationDays}{t["pdf.daysSuffix"]}"),
+                        (t["pdf.sick"], $"{sickDays}{t["pdf.daysSuffix"]}"),
+                        (t["pdf.holidays"], $"{holidayDays}{t["pdf.daysSuffix"]}")
                     ]));
 
-                    column.Item().Element(c => ComposeDailyTable(c, rows));
+                    column.Item().Element(c => ComposeDailyTable(c, t, rows));
                 });
 
-                page.Footer().Element(ComposeFooter);
+                page.Footer().Element(c => ComposeFooter(c, t));
             });
         }).GeneratePdf();
     }
 
-    private static byte[] RenderYearlyPdf(string orgName, User member, int year, List<MonthSummary> months, double overallCumulative)
+    private static byte[] RenderYearlyPdf(ReportText t, string orgName, User member, int year, List<MonthSummary> months, double overallCumulative)
     {
         var totalTarget = months.Sum(m => m.TargetHours);
         var totalNet = months.Sum(m => m.NetWorkedHours);
@@ -224,33 +219,33 @@ public class PdfReportService : IPdfReportService
                 page.Margin(1.5f, Unit.Centimetre);
                 page.DefaultTextStyle(x => x.FontSize(9));
 
-                page.Header().Element(c => ComposeHeader(c, orgName, member, "Yearly Time Report", year.ToString()));
+                page.Header().Element(c => ComposeHeader(c, t, orgName, member, t["pdf.yearlyTitle"], year.ToString()));
 
                 page.Content().PaddingTop(10).Column(column =>
                 {
                     column.Spacing(12);
 
                     column.Item().Element(c => ComposeSummaryCards(c, [
-                        ("Target", FormatHours(totalTarget)),
-                        ("Worked (net)", FormatHours(totalNet)),
-                        ("Year Balance", FormatSigned(totalOvertime)),
-                        ("Overall Cumulative", FormatSigned(overallCumulative))
+                        (t["pdf.target"], FormatHours(t, totalTarget)),
+                        (t["pdf.workedNet"], FormatHours(t, totalNet)),
+                        (t["pdf.yearBalance"], FormatSigned(t, totalOvertime)),
+                        (t["pdf.overallCumulative"], FormatSigned(t, overallCumulative))
                     ]));
                     column.Item().Element(c => ComposeSummaryCards(c, [
-                        ("Vacation", $"{vacationDays}d"),
-                        ("Sick", $"{sickDays}d"),
-                        ("Holidays", $"{holidayDays}d")
+                        (t["pdf.vacation"], $"{vacationDays}{t["pdf.daysSuffix"]}"),
+                        (t["pdf.sick"], $"{sickDays}{t["pdf.daysSuffix"]}"),
+                        (t["pdf.holidays"], $"{holidayDays}{t["pdf.daysSuffix"]}")
                     ]));
 
-                    column.Item().Element(c => ComposeMonthlyTable(c, months));
+                    column.Item().Element(c => ComposeMonthlyTable(c, t, months));
                 });
 
-                page.Footer().Element(ComposeFooter);
+                page.Footer().Element(c => ComposeFooter(c, t));
             });
         }).GeneratePdf();
     }
 
-    private static void ComposeHeader(QuestPDF.Infrastructure.IContainer container, string orgName, User member, string title, string period)
+    private static void ComposeHeader(QuestPDF.Infrastructure.IContainer container, ReportText t, string orgName, User member, string title, string period)
     {
         container.Column(column =>
         {
@@ -266,7 +261,7 @@ public class PdfReportService : IPdfReportService
                 {
                     inner.Item().AlignRight().Text(orgName).FontSize(10).SemiBold();
                     inner.Item().AlignRight().Text(period).FontSize(10).FontColor(Colors.Grey.Darken1);
-                    inner.Item().AlignRight().Text($"Generated {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC").FontSize(7).FontColor(Colors.Grey.Medium);
+                    inner.Item().AlignRight().Text(string.Format(t["pdf.generated"], DateTime.UtcNow.ToString($"{t.DateFormat} HH:mm", CultureInfo.InvariantCulture))).FontSize(7).FontColor(Colors.Grey.Medium);
                 });
             });
             column.Item().PaddingTop(8).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
@@ -288,7 +283,7 @@ public class PdfReportService : IPdfReportService
         });
     }
 
-    private static void ComposeDailyTable(QuestPDF.Infrastructure.IContainer container, List<DailyReportRow> rows)
+    private static void ComposeDailyTable(QuestPDF.Infrastructure.IContainer container, ReportText t, List<DailyReportRow> rows)
     {
         container.Table(table =>
         {
@@ -307,7 +302,7 @@ public class PdfReportService : IPdfReportService
 
             table.Header(header =>
             {
-                foreach (var text in new[] { "Date", "Day", "Target", "Worked", "Net", "Overtime", "Cumul.", "Status", "Note" })
+                foreach (var text in new[] { "date", "day", "target", "worked", "net", "overtime", "cumul", "status", "note" }.Select(k => t["pdf." + k]))
                     header.Cell().Element(HeaderCell).Text(text);
             });
 
@@ -318,24 +313,24 @@ public class PdfReportService : IPdfReportService
                 var background = rowIndex % 2 == 1 ? Colors.Grey.Lighten4 : Colors.White;
                 rowIndex++;
 
-                table.Cell().Element(c => BodyCell(c, background)).Text(row.Date.ToString("yyyy-MM-dd"));
-                table.Cell().Element(c => BodyCell(c, background)).Text(row.DayOfWeek.ToString()[..3]);
-                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(isWeekendOrOff ? "-" : FormatHours(row.TargetHours));
-                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(row.WorkedHours > 0 ? FormatHours(row.WorkedHours) : "-");
-                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(row.WorkedHours > 0 ? FormatHours(row.NetWorkedHours) : "-");
-                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(t =>
+                table.Cell().Element(c => BodyCell(c, background)).Text(row.Date.ToString(t.DateFormat, CultureInfo.InvariantCulture));
+                table.Cell().Element(c => BodyCell(c, background)).Text(t.Day(row.DayOfWeek));
+                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(isWeekendOrOff ? "-" : FormatHours(t, row.TargetHours));
+                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(row.WorkedHours > 0 ? FormatHours(t, row.WorkedHours) : "-");
+                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(row.WorkedHours > 0 ? FormatHours(t, row.NetWorkedHours) : "-");
+                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(span =>
                 {
-                    if (isWeekendOrOff && row.WorkedHours == 0) { t.Span("-"); return; }
-                    t.Span(FormatSigned(row.Overtime)).FontColor(row.Overtime < 0 ? Colors.Red.Darken1 : Colors.Green.Darken1);
+                    if (isWeekendOrOff && row.WorkedHours == 0) { span.Span("-"); return; }
+                    span.Span(FormatSigned(t, row.Overtime)).FontColor(row.Overtime < 0 ? Colors.Red.Darken1 : Colors.Green.Darken1);
                 });
-                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(FormatSigned(row.CumulativeOvertime));
-                table.Cell().Element(c => BodyCell(c, background)).Text(row.Status).FontColor(row.Status == "Needs Correction" ? Colors.Red.Darken1 : Colors.Black);
-                table.Cell().Element(c => BodyCell(c, background)).Text(BuildNote(row)).FontSize(7.5f);
+                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(FormatSigned(t, row.CumulativeOvertime));
+                table.Cell().Element(c => BodyCell(c, background)).Text(t.Status(row.Status)).FontColor(row.Status == "Needs Correction" ? Colors.Red.Darken1 : Colors.Black);
+                table.Cell().Element(c => BodyCell(c, background)).Text(BuildNote(t, row)).FontSize(7.5f);
             }
         });
     }
 
-    private static void ComposeMonthlyTable(QuestPDF.Infrastructure.IContainer container, List<MonthSummary> months)
+    private static void ComposeMonthlyTable(QuestPDF.Infrastructure.IContainer container, ReportText t, List<MonthSummary> months)
     {
         container.Table(table =>
         {
@@ -355,7 +350,7 @@ public class PdfReportService : IPdfReportService
 
             table.Header(header =>
             {
-                foreach (var text in new[] { "Month", "Target", "Worked (net)", "Balance", "Cumul.", "Worked", "Missing", "Vac.", "Sick", "Holiday" })
+                foreach (var text in new[] { "month", "target", "workedNet", "balance", "cumul", "worked", "missing", "vac", "sick", "holiday" }.Select(k => t["pdf." + k]))
                     header.Cell().Element(HeaderCell).Text(text);
             });
 
@@ -365,14 +360,14 @@ public class PdfReportService : IPdfReportService
                 var background = rowIndex % 2 == 1 ? Colors.Grey.Lighten4 : Colors.White;
                 rowIndex++;
 
-                table.Cell().Element(c => BodyCell(c, background)).Text(MonthNames[m.Month - 1]);
-                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(FormatHours(m.TargetHours));
-                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(FormatHours(m.NetWorkedHours));
-                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(t =>
+                table.Cell().Element(c => BodyCell(c, background)).Text(t.Month(m.Month));
+                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(FormatHours(t, m.TargetHours));
+                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(FormatHours(t, m.NetWorkedHours));
+                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(span =>
                 {
-                    t.Span(FormatSigned(m.Overtime)).FontColor(m.Overtime < 0 ? Colors.Red.Darken1 : Colors.Green.Darken1);
+                    span.Span(FormatSigned(t, m.Overtime)).FontColor(m.Overtime < 0 ? Colors.Red.Darken1 : Colors.Green.Darken1);
                 });
-                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(FormatSigned(m.CumulativeOvertimeAtEnd));
+                table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(FormatSigned(t, m.CumulativeOvertimeAtEnd));
                 table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(m.WorkedDays.ToString());
                 table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(m.MissingDays.ToString());
                 table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(m.VacationDays.ToString());
@@ -382,12 +377,12 @@ public class PdfReportService : IPdfReportService
         });
     }
 
-    private static void ComposeFooter(QuestPDF.Infrastructure.IContainer container)
+    private static void ComposeFooter(QuestPDF.Infrastructure.IContainer container, ReportText t)
     {
         container.AlignCenter().Text(text =>
         {
             text.DefaultTextStyle(x => x.FontSize(8).FontColor(Colors.Grey.Medium));
-            text.Span("Page ");
+            text.Span(t["pdf.page"]);
             text.CurrentPageNumber();
             text.Span(" / ");
             text.TotalPages();
@@ -400,16 +395,16 @@ public class PdfReportService : IPdfReportService
     private static QuestPDF.Infrastructure.IContainer BodyCell(QuestPDF.Infrastructure.IContainer container, string background) =>
         container.Background(background).Padding(4).BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten3);
 
-    private static string BuildNote(DailyReportRow row)
+    private static string BuildNote(ReportText t, DailyReportRow row)
     {
         if (row.HolidayName != null) return row.HolidayName;
-        if (row.AbsenceType != null) return row.AbsenceNote ?? row.AbsenceType.Value.ToString();
-        return row.EntrySummary;
+        if (row.AbsenceType != null) return row.AbsenceNote ?? t.Absence(row.AbsenceType.Value);
+        return t.EntrySummary(row.EntrySummary);
     }
 
-    private static string FormatHours(double hours) => $"{hours.ToString("F2", CultureInfo.InvariantCulture)}h";
+    private static string FormatHours(ReportText t, double hours) => $"{hours.ToString("F2", t.Numbers)} h";
 
-    private static string FormatSigned(double hours) => $"{hours.ToString("+0.00;-0.00;0.00", CultureInfo.InvariantCulture)}h";
+    private static string FormatSigned(ReportText t, double hours) => $"{hours.ToString("+0.00;-0.00;0.00", t.Numbers)} h";
 
     private record MonthSummary(
         int Month, double TargetHours, double WorkedHours, double NetWorkedHours,

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using TimeTracking.Api.Services;
 using TimeTracking.Api.Tests.Infrastructure;
 
 namespace TimeTracking.Api.Tests.Controllers;
@@ -32,6 +33,33 @@ public class ReportsControllerTests : IClassFixture<TimeTrackingApiFactory>
         var bytes = await response.Content.ReadAsByteArrayAsync();
         bytes.Length.Should().BeGreaterThan(0);
         bytes.Take(4).Should().Equal((byte)'%', (byte)'P', (byte)'D', (byte)'F');
+    }
+
+    [Theory]
+    [InlineData("monthly?year=2026&month=3&lang=en")]
+    [InlineData("monthly?year=2026&month=3&lang=de")]
+    [InlineData("yearly?year=2026&lang=en")]
+    [InlineData("yearly?year=2026")]
+    public async Task Reports_RenderInEitherLanguage(string query)
+    {
+        var client = _factory.CreateClient();
+        await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedMemberEmail, TestHelpers.SeedPassword);
+        var ownId = await GetOwnUserIdAsync(client);
+
+        var response = await client.GetAsync($"/api/v1/organizations/{TestHelpers.SeedOrgSlug}/members/{ownId}/reports/{query}");
+        response.EnsureSuccessStatusCode();
+        (await response.Content.ReadAsByteArrayAsync()).Take(4).Should().Equal((byte)'%', (byte)'P', (byte)'D', (byte)'F');
+    }
+
+    [Fact]
+    public void ReportText_IsGermanByDefault_AndKeepsCustomAbsenceNames()
+    {
+        ReportText.For(null).Status("Needs Correction").Should().Be("Korrektur nötig");
+        ReportText.For("en-GB").Status("Needs Correction").Should().Be("Needs Correction");
+        ReportText.For("de").Status("Business Trip").Should().Be("Business Trip");
+        ReportText.For("de").Day(DayOfWeek.Monday).Should().Be("Mo");
+        ReportText.For("de").Month(3).Should().Be("März");
+        ReportText.For("de").EntrySummary("08:00-? [not stopped, needs correction]").Should().Be("08:00-? [nicht gestoppt, Korrektur nötig]");
     }
 
     [Fact]

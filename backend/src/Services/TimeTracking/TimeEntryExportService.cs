@@ -82,10 +82,11 @@ public class TimeEntryExportService : ITimeEntryExportService
         var entries = await query.OrderBy(e => e.StartTime).ToListAsync();
 
         var columns = ResolveColumns(request.Columns, AllEntryColumns);
+        var text = ReportText.For(request.Lang);
         var sb = new StringBuilder();
 
         // Header
-        sb.AppendLine(string.Join(",", columns.Select(FormatColumnHeader)));
+        sb.AppendLine(string.Join(",", columns.Select(c => text["col." + c])));
 
         foreach (var entry in entries)
         {
@@ -104,7 +105,7 @@ public class TimeEntryExportService : ITimeEntryExportService
                 values.Add(col switch
                 {
                     "Date" => localStart.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    "DayOfWeek" => localStart.DayOfWeek.ToString()[..3],
+                    "DayOfWeek" => text.Day(localStart.DayOfWeek),
                     "StartTime" => localStart.ToString("HH:mm", CultureInfo.InvariantCulture),
                     "EndTime" => localEnd?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "",
                     "Duration" => (durationMinutes / 60.0).ToString("F2", CultureInfo.InvariantCulture),
@@ -112,7 +113,7 @@ public class TimeEntryExportService : ITimeEntryExportService
                     "NetDuration" => (netMinutes / 60.0).ToString("F2", CultureInfo.InvariantCulture),
                     "Description" => EscapeCsv(entry.Description ?? ""),
                     "Organization" => EscapeCsv(entry.Organization?.Name ?? ""),
-                    "Status" => entry.IsFailure ? "Needs Correction" : "",
+                    "Status" => entry.IsFailure ? text.Status("Needs Correction") : "",
                     _ => ""
                 });
             }
@@ -166,8 +167,9 @@ public class TimeEntryExportService : ITimeEntryExportService
         }).ToList();
 
         var columns = ResolveColumns(request.Columns, AllDailyColumns);
+        var text = ReportText.For(request.Lang);
         var sb = new StringBuilder();
-        sb.AppendLine(string.Join(",", columns.Select(FormatColumnHeader)));
+        sb.AppendLine(string.Join(",", columns.Select(c => text["col." + c])));
 
         foreach (var row in rows)
         {
@@ -177,18 +179,18 @@ public class TimeEntryExportService : ITimeEntryExportService
                 values.Add(col switch
                 {
                     "Date" => row.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    "DayOfWeek" => row.DayOfWeek.ToString()[..3],
+                    "DayOfWeek" => text.Day(row.DayOfWeek),
                     "TargetHours" => row.TargetHours.ToString("F2", CultureInfo.InvariantCulture),
                     "WorkedHours" => row.WorkedHours.ToString("F2", CultureInfo.InvariantCulture),
                     "Pause" => row.PauseMinutes.ToString(CultureInfo.InvariantCulture),
                     "NetWorkedHours" => row.NetWorkedHours.ToString("F2", CultureInfo.InvariantCulture),
                     "Overtime" => row.Overtime.ToString("+0.00;-0.00;0.00", CultureInfo.InvariantCulture),
                     "CumulativeOvertime" => row.CumulativeOvertime.ToString("+0.00;-0.00;0.00", CultureInfo.InvariantCulture),
-                    "Status" => row.Status,
+                    "Status" => EscapeCsv(text.Status(row.Status)),
                     "HolidayName" => EscapeCsv(row.HolidayName ?? ""),
-                    "AbsenceType" => row.AbsenceType?.ToString() ?? "",
+                    "AbsenceType" => row.AbsenceType is { } absenceType ? text.Absence(absenceType) : "",
                     "AbsenceNote" => EscapeCsv(row.AbsenceNote ?? ""),
-                    "Description" => EscapeCsv(row.EntrySummary),
+                    "Description" => EscapeCsv(text.EntrySummary(row.EntrySummary)),
                     "Organization" => EscapeCsv(org.Name),
                     _ => ""
                 });
@@ -227,11 +229,12 @@ public class TimeEntryExportService : ITimeEntryExportService
 
         var headers = ParseCsvLine(lines[0]).Select(h => h.Trim().ToLowerInvariant()).ToList();
 
-        var dateIdx = FindColumnIndex(headers, "date");
-        var startIdx = FindColumnIndex(headers, "start time", "starttime", "start");
-        var endIdx = FindColumnIndex(headers, "end time", "endtime", "end");
+        // English and German headers, so both export languages import again
+        var dateIdx = FindColumnIndex(headers, "date", "datum");
+        var startIdx = FindColumnIndex(headers, "start time", "starttime", "start", "beginn");
+        var endIdx = FindColumnIndex(headers, "end time", "endtime", "end", "ende");
         var pauseIdx = FindColumnIndex(headers, "pause", "pause (min)", "pause minutes");
-        var descIdx = FindColumnIndex(headers, "description", "notes", "desc");
+        var descIdx = FindColumnIndex(headers, "description", "notes", "desc", "beschreibung");
 
         if (dateIdx < 0 || startIdx < 0 || endIdx < 0)
             return ServiceResult.BadRequest<ImportPreviewResponse>(
@@ -436,25 +439,6 @@ public class TimeEntryExportService : ITimeEntryExportService
             return [.. available];
         return requested.Where(c => available.Contains(c, StringComparer.OrdinalIgnoreCase)).ToList();
     }
-
-    private static string FormatColumnHeader(string col) => col switch
-    {
-        "DayOfWeek" => "Day",
-        "StartTime" => "Start Time",
-        "EndTime" => "End Time",
-        "Duration" => "Duration (h)",
-        "Pause" => "Pause (min)",
-        "NetDuration" => "Net Duration (h)",
-        "TargetHours" => "Target (h)",
-        "WorkedHours" => "Worked (h)",
-        "NetWorkedHours" => "Net Worked (h)",
-        "Overtime" => "Overtime (h)",
-        "CumulativeOvertime" => "Cumulative Overtime (h)",
-        "HolidayName" => "Holiday",
-        "AbsenceType" => "Absence Type",
-        "AbsenceNote" => "Absence Note",
-        _ => col
-    };
 
     private static double GetTargetHours(List<WorkSchedule> schedules, DateOnly date)
     {
