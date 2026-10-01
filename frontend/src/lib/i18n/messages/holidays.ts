@@ -22,7 +22,21 @@ export const de = {
 	deleted: 'Feiertag gelöscht.',
 	deleteFailed: 'Feiertag konnte nicht gelöscht werden.',
 	empty: 'Keine Feiertage in {year}.',
-	managedByAdmins: 'Feiertage werden von den Admins der Organisation verwaltet.'
+	managedByAdmins: 'Feiertage werden von den Admins der Organisation verwaltet.',
+	import: {
+		open: 'Gesetzliche Feiertage importieren',
+		intro: 'Übernimmt die gesetzlichen Feiertage einer Region für einen oder mehrere Jahre (höchstens 10). Bereits vorhandene Tage bleiben unverändert.',
+		region: 'Region',
+		fromYear: 'Von Jahr',
+		toYear: 'Bis Jahr',
+		submit: 'Importieren',
+		importing: 'Wird importiert…',
+		done: { one: '{count} Feiertag importiert.', other: '{count} Feiertage importiert.' },
+		failed: 'Die Feiertage konnten nicht importiert werden.',
+		presetsFailed: 'Die Regionen konnten nicht geladen werden.',
+		rangeInvalid: 'Bitte Jahre zwischen 2000 und 2100 wählen, das Bis-Jahr nicht vor dem Von-Jahr.',
+		rangeTooLong: 'Höchstens {max} Jahre auf einmal.'
+	}
 };
 
 export const en: typeof de = {
@@ -48,5 +62,19 @@ export const en: typeof de = {
 	deleted: 'Holiday deleted.',
 	deleteFailed: 'Could not delete the holiday.',
 	empty: 'No holidays for {year}.',
-	managedByAdmins: 'Holidays are managed by organization admins.'
+	managedByAdmins: 'Holidays are managed by organization admins.',
+	import: {
+		open: 'Import public holidays',
+		intro: 'Adds the public holidays of a region for one or more years (at most 10). Days that already exist stay as they are.',
+		region: 'Region',
+		fromYear: 'From year',
+		toYear: 'To year',
+		submit: 'Import',
+		importing: 'Importing…',
+		done: { one: '{count} holiday imported.', other: '{count} holidays imported.' },
+		failed: 'The holidays could not be imported.',
+		presetsFailed: 'Could not load the regions.',
+		rangeInvalid: 'Choose years between 2000 and 2100, the end year not before the start year.',
+		rangeTooLong: 'At most {max} years at once.'
+	}
 };

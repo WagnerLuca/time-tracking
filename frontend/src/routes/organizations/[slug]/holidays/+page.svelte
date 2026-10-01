@@ -6,11 +6,11 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { holidayApi } from '$lib/apiClient';
-	import { t } from '$lib/i18n';
+	import { t, tp } from '$lib/i18n';
 	import { formatDate } from '$lib/utils/formatters';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
-	import type { OrganizationDetailResponse, HolidayResponse } from '$lib/api';
+	import type { OrganizationDetailResponse, HolidayResponse, HolidayPresetResponse } from '$lib/api';
 
 	let org = $state<OrganizationDetailResponse | null>(null);
 	let loading = $state(true);
@@ -44,6 +44,55 @@
 	let editError = $state('');
 
 	let deletingId = $state<number | null>(null);
+
+	// Import public holidays from a preset (Germany nationwide or a state, Austria, Switzerland)
+	const MAX_IMPORT_YEARS = 10;
+	let showImport = $state(false);
+	let presets = $state<HolidayPresetResponse[]>([]);
+	let importPreset = $state('DE');
+	let importFromYear = $state(new Date().getFullYear());
+	let importToYear = $state(new Date().getFullYear());
+	let importing = $state(false);
+	let importError = $state('');
+	let importRangeError = $derived(
+		!Number.isInteger(importFromYear) || !Number.isInteger(importToYear) || importFromYear < 2000 || importToYear > 2100 || importToYear < importFromYear
+			? t('holidays.import.rangeInvalid')
+			: importToYear - importFromYear >= MAX_IMPORT_YEARS
+				? t('holidays.import.rangeTooLong', { max: MAX_IMPORT_YEARS })
+				: ''
+	);
+
+	async function toggleImport() {
+		showImport = !showImport;
+		importError = '';
+		if (showImport && presets.length === 0) {
+			try {
+				const { data } = await holidayApi.apiV1OrganizationsHolidayPresetsGet();
+				presets = data;
+			} catch (err) {
+				importError = extractErrorMessage(err, t('holidays.import.presetsFailed'));
+			}
+		}
+	}
+
+	async function importHolidays(e: Event) {
+		e.preventDefault();
+		if (importRangeError || !importPreset) return;
+		importing = true;
+		importError = '';
+		try {
+			const { data } = await holidayApi.apiV1OrganizationsSlugHolidaysImportPresetPost(orgSlug, importPreset, importFromYear, importToYear);
+			invalidateOrgDetail(orgSlug);
+			toast.success(tp('holidays.import.done', data.length));
+			showImport = false;
+			selectedYear = importFromYear;
+			await loadHolidays();
+		} catch (err) {
+			importError = extractErrorMessage(err, t('holidays.import.failed'));
+		} finally {
+			importing = false;
+		}
+	}
 
 	const orgSlug = $derived(page.params.slug ?? '');
 	let selectedYear = $state(new Date().getFullYear());
@@ -213,9 +262,14 @@
 						</select>
 					</div>
 					{#if canEdit}
-						<button class="btn btn-primary btn-sm" onclick={toggleAddForm} aria-expanded={showAddHoliday}>
-							{showAddHoliday ? t('common.cancel') : t('holidays.add')}
-						</button>
+						<div class="flex gap-2 flex-wrap">
+							<button class="btn btn-outline btn-sm" onclick={toggleImport} aria-expanded={showImport}>
+								{showImport ? t('common.cancel') : t('holidays.import.open')}
+							</button>
+							<button class="btn btn-primary btn-sm" onclick={toggleAddForm} aria-expanded={showAddHoliday}>
+								{showAddHoliday ? t('common.cancel') : t('holidays.add')}
+							</button>
+						</div>
 					{/if}
 				</div>
 
@@ -223,6 +277,37 @@
 					<div class="alert alert-error mb-4 text-sm" role="alert">
 						<span>{holidaysError}</span>
 						<button class="btn btn-sm" onclick={loadHolidays}>{t('common.retry')}</button>
+					</div>
+				{/if}
+
+				{#if showImport && canEdit}
+					<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
+						<p class="text-sm text-base-content/60 mb-3">{t('holidays.import.intro')}</p>
+						{#if importError}
+							<div class="alert alert-error mb-3 text-sm" role="alert">{importError}</div>
+						{/if}
+						<form onsubmit={importHolidays} class="flex gap-3 items-end flex-wrap" novalidate>
+							<div class="form-control w-full sm:w-auto">
+								<label for="holidayPreset" class="label text-xs">{t('holidays.import.region')}</label>
+								<select id="holidayPreset" class="select select-bordered select-sm w-full sm:w-64" bind:value={importPreset} disabled={importing || presets.length === 0}>
+									{#each presets as p (p.key)}
+										<option value={p.key}>{p.name}</option>
+									{/each}
+								</select>
+							</div>
+							<div class="form-control">
+								<label for="importFrom" class="label text-xs">{t('holidays.import.fromYear')}</label>
+								<input id="importFrom" type="number" min="2000" max="2100" class="input input-bordered input-sm w-24" class:input-error={importRangeError} bind:value={importFromYear} disabled={importing} aria-describedby={importRangeError ? 'importRangeError' : undefined} />
+							</div>
+							<div class="form-control">
+								<label for="importTo" class="label text-xs">{t('holidays.import.toYear')}</label>
+								<input id="importTo" type="number" min="2000" max="2100" class="input input-bordered input-sm w-24" class:input-error={importRangeError} bind:value={importToYear} disabled={importing} aria-describedby={importRangeError ? 'importRangeError' : undefined} />
+							</div>
+							<button type="submit" class="btn btn-primary btn-sm" disabled={importing || !!importRangeError || presets.length === 0}>
+								{importing ? t('holidays.import.importing') : t('holidays.import.submit')}
+							</button>
+						</form>
+						{#if importRangeError}<p id="importRangeError" class="text-xs text-error mt-2 m-0">{importRangeError}</p>{/if}
 					</div>
 				{/if}
 
