@@ -4,27 +4,58 @@ export const API = process.env.E2E_API_URL ?? 'http://localhost:7000/api/v1';
 export const PASSWORD = 'Password123';
 
 /** Fill and submit the login form (the page must already show it). */
-export async function submitLogin(page: Page, email: string) {
+export async function submitLogin(page: Page, email: string, password = PASSWORD) {
 	// client-only app: wait until Svelte has mounted before typing
 	await page.waitForLoadState('networkidle');
 	await page.locator('input[type="email"]').fill(email);
-	await page.locator('input[type="password"]').fill(PASSWORD);
+	await page.locator('input[type="password"]').fill(password);
 	await page.locator('form button[type="submit"]').click();
 	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
 }
 
-/** Log in through the UI; a user with several orgs and none selected picks the first. */
+interface Session {
+	accessToken: string;
+	refreshToken: string;
+	user: unknown;
+}
+
+// One API login per user and test run: the backend allows 10 logins per minute and IP
+// (AuthStrict), which a UI login in every test would exceed.
+const sessions = new Map<string, Session>();
+
+async function session(request: APIRequestContext, email: string): Promise<Session> {
+	const cached = sessions.get(email);
+	if (cached) return cached;
+	for (let attempt = 0; ; attempt++) {
+		const res = await request.post(`${API}/Auth/login`, { data: { email, password: PASSWORD } });
+		if (res.status() === 429 && attempt < 2) {
+			await new Promise((r) => setTimeout(r, 61_000)); // next rate-limit window
+			continue;
+		}
+		expect(res.ok(), await res.text()).toBeTruthy();
+		const data = (await res.json()) as Session;
+		sessions.set(email, data);
+		return data;
+	}
+}
+
+/** Signed in as `email` without the login form (the session is put into localStorage like a real login). */
 export async function login(page: Page, email: string) {
+	const s = await session(page.request, email);
 	await page.goto('/login');
-	await submitLogin(page, email);
+	await page.evaluate((s) => {
+		localStorage.setItem('authToken', s.accessToken);
+		localStorage.setItem('refreshToken', s.refreshToken);
+		localStorage.setItem('authUser', JSON.stringify(s.user));
+	}, s);
+	await page.goto('/');
+	await expect(page).not.toHaveURL(/\/login/);
 	if (page.url().includes('/select-org')) await page.locator('main button').first().click();
 }
 
 /** A bearer token straight from the API, for test setup. */
 export async function apiToken(request: APIRequestContext, email: string): Promise<string> {
-	const res = await request.post(`${API}/Auth/login`, { data: { email, password: PASSWORD } });
-	expect(res.ok()).toBeTruthy();
-	return (await res.json()).accessToken;
+	return (await session(request, email)).accessToken;
 }
 
 /** The organizations the user belongs to (slug, id, role). */

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { login } from './helpers';
 
 /**
  * History calendar: left click selects a day and lists its entries below the
@@ -7,12 +8,7 @@ import { expect, test } from '@playwright/test';
 test('history: left click shows the day entries, right click opens the dialog', async ({ page }) => {
 	const note = `E2E Kalender ${Date.now()}`;
 
-	await page.goto('/login');
-	await page.waitForLoadState('networkidle');
-	await page.locator('input[type="email"]').fill('tom.weber@example.com');
-	await page.locator('input[type="password"]').fill('Password123');
-	await page.locator('form button[type="submit"]').click();
-	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
+	await login(page, 'tom.weber@example.com');
 
 	// An entry for today
 	await page.goto('/time');
