@@ -919,6 +919,12 @@ namespace TimeTracking.Api.Migrations
                     b.Property<double>("TargetMon")
                         .HasColumnType("double precision");
 
+                    b.Property<double>("TargetSat")
+                        .HasColumnType("double precision");
+
+                    b.Property<double>("TargetSun")
+                        .HasColumnType("double precision");
+
                     b.Property<double>("TargetThu")
                         .HasColumnType("double precision");
 

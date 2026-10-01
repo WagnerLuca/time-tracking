@@ -49,16 +49,17 @@ public class PauseRulesControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "Pause Rule Test", "pause-rule-test");
 
+        // New organizations already have the 6 h / 9 h defaults
         var response = await client.PostAsJsonAsync("/api/v1/organizations/pause-rule-test/pause-rules", new
         {
-            minHours = 6.0,
-            pauseMinutes = 30
+            minHours = 10.0,
+            pauseMinutes = 60
         });
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var rule = await response.Content.ReadFromJsonAsync<PauseRuleResponseDto>(TestHelpers.JsonOptions);
-        rule!.MinHours.Should().Be(6.0);
-        rule.PauseMinutes.Should().Be(30);
+        rule!.MinHours.Should().Be(10.0);
+        rule.PauseMinutes.Should().Be(60);
     }
 
     [Fact]

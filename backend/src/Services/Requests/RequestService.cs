@@ -574,6 +574,8 @@ public class RequestService : IRequestService
             schedule.TargetWed = data.TargetWed ?? 0;
             schedule.TargetThu = data.TargetThu ?? 0;
             schedule.TargetFri = data.TargetFri ?? 0;
+            schedule.TargetSat = data.TargetSat ?? 0;
+            schedule.TargetSun = data.TargetSun ?? 0;
         }
 
         // Close any open-ended predecessor schedule

@@ -123,7 +123,7 @@ public class HolidayService : IHolidayService
     }
 
     public async Task<ServiceResult<List<HolidayResponse>>> ImportPresetHolidaysAsync(
-        string slug, int callerUserId, string preset, int? year)
+        string slug, int callerUserId, string preset, int? year, int? toYear = null)
     {
         var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
@@ -134,10 +134,13 @@ public class HolidayService : IHolidayService
             return ServiceResult.Forbidden<List<HolidayResponse>>();
 
         var targetYear = year ?? DateTime.UtcNow.Year;
-        var presetHolidays = GetPresetHolidays(preset, targetYear);
+        var lastYear = toYear ?? targetYear;
+        if (targetYear < 2000 || lastYear > 2100 || lastYear < targetYear || lastYear - targetYear > 10)
+            return ServiceResult.BadRequest<List<HolidayResponse>>("Choose years between 2000 and 2100, at most 10 years apart.");
+        var presetHolidays = HolidayPresets.Get(preset, targetYear, lastYear);
         if (presetHolidays == null)
             return ServiceResult.BadRequest<List<HolidayResponse>>(
-                $"Unknown preset: {preset}. Available: de, at, ch");
+                $"Unknown preset: {preset}. Available: {string.Join(", ", HolidayPresets.All().Select(p => p.Key))}");
 
         var existingDates = await _context.Holidays
             .Where(h => h.OrganizationId == org.Id)
@@ -173,15 +176,7 @@ public class HolidayService : IHolidayService
         return ServiceResult.Ok(added);
     }
 
-    public List<HolidayPresetResponse> GetAvailablePresets()
-    {
-        return
-        [
-            new() { Key = "de", Name = "Germany" },
-            new() { Key = "at", Name = "Austria" },
-            new() { Key = "ch", Name = "Switzerland" }
-        ];
-    }
+    public List<HolidayPresetResponse> GetAvailablePresets() => HolidayPresets.All();
 
     // ────────────────────────────────────────────────────
     //  Private helpers
@@ -196,94 +191,4 @@ public class HolidayService : IHolidayService
         IsRecurring = h.IsRecurring,
         IsHalfDay = h.IsHalfDay
     };
-
-    // ────────────────────────────────────────────────────
-    //  Preset holiday data
-    // ────────────────────────────────────────────────────
-
-    private static List<(DateOnly Date, string Name, bool IsRecurring)>? GetPresetHolidays(string preset, int year)
-    {
-        return preset.ToLowerInvariant() switch
-        {
-            "de" => GetGermanHolidays(year),
-            "at" => GetAustrianHolidays(year),
-            "ch" => GetSwissHolidays(year),
-            _ => null
-        };
-    }
-
-    private static DateOnly Easter(int year)
-    {
-        int a = year % 19;
-        int b = year / 100;
-        int c = year % 100;
-        int d = b / 4;
-        int e = b % 4;
-        int f = (b + 8) / 25;
-        int g = (b - f + 1) / 3;
-        int h = (19 * a + b - d - g + 15) % 30;
-        int i = c / 4;
-        int k = c % 4;
-        int l = (32 + 2 * e + 2 * i - h - k) % 7;
-        int m = (a + 11 * h + 22 * l) / 451;
-        int month = (h + l - 7 * m + 114) / 31;
-        int day = ((h + l - 7 * m + 114) % 31) + 1;
-        return new DateOnly(year, month, day);
-    }
-
-    private static List<(DateOnly, string, bool)> GetGermanHolidays(int year)
-    {
-        var easter = Easter(year);
-        return new List<(DateOnly, string, bool)>
-        {
-            (new DateOnly(year, 1, 1),  "Neujahr", true),
-            (easter.AddDays(-2),        "Karfreitag", false),
-            (easter.AddDays(1),         "Ostermontag", false),
-            (new DateOnly(year, 5, 1),  "Tag der Arbeit", true),
-            (easter.AddDays(39),        "Christi Himmelfahrt", false),
-            (easter.AddDays(50),        "Pfingstmontag", false),
-            (new DateOnly(year, 10, 3), "Tag der Deutschen Einheit", true),
-            (new DateOnly(year, 12, 25),"1. Weihnachtstag", true),
-            (new DateOnly(year, 12, 26),"2. Weihnachtstag", true)
-        };
-    }
-
-    private static List<(DateOnly, string, bool)> GetAustrianHolidays(int year)
-    {
-        var easter = Easter(year);
-        return new List<(DateOnly, string, bool)>
-        {
-            (new DateOnly(year, 1, 1),  "Neujahr", true),
-            (new DateOnly(year, 1, 6),  "Heilige Drei Könige", true),
-            (easter.AddDays(1),         "Ostermontag", false),
-            (new DateOnly(year, 5, 1),  "Staatsfeiertag", true),
-            (easter.AddDays(39),        "Christi Himmelfahrt", false),
-            (easter.AddDays(50),        "Pfingstmontag", false),
-            (easter.AddDays(60),        "Fronleichnam", false),
-            (new DateOnly(year, 8, 15), "Mariä Himmelfahrt", true),
-            (new DateOnly(year, 10, 26),"Nationalfeiertag", true),
-            (new DateOnly(year, 11, 1), "Allerheiligen", true),
-            (new DateOnly(year, 12, 8), "Mariä Empfängnis", true),
-            (new DateOnly(year, 12, 25),"Christtag", true),
-            (new DateOnly(year, 12, 26),"Stefanitag", true)
-        };
-    }
-
-    private static List<(DateOnly, string, bool)> GetSwissHolidays(int year)
-    {
-        var easter = Easter(year);
-        return new List<(DateOnly, string, bool)>
-        {
-            (new DateOnly(year, 1, 1),  "Neujahr", true),
-            (new DateOnly(year, 1, 2),  "Berchtoldstag", true),
-            (easter.AddDays(-2),        "Karfreitag", false),
-            (easter.AddDays(1),         "Ostermontag", false),
-            (new DateOnly(year, 5, 1),  "Tag der Arbeit", true),
-            (easter.AddDays(39),        "Auffahrt", false),
-            (easter.AddDays(50),        "Pfingstmontag", false),
-            (new DateOnly(year, 8, 1),  "Bundesfeier", true),
-            (new DateOnly(year, 12, 25),"Weihnachten", true),
-            (new DateOnly(year, 12, 26),"Stephanstag", true)
-        };
-    }
 }

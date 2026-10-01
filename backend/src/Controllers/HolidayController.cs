@@ -80,17 +80,18 @@ public class HolidayController : OrganizationBaseController
 
     /// <summary>Import preset holidays (e.g. German public holidays) for a given year (admin only).</summary>
     /// <param name="slug">Organization URL slug.</param>
-    /// <param name="preset">Preset code, e.g. "de" (default).</param>
+    /// <param name="preset">Preset code: "DE" (nationwide, default), a state like "DE-BY", "AT" or "CH".</param>
     /// <param name="year">Year to import for. Defaults to current year.</param>
+    /// <param name="toYear">Last year of a range starting at <paramref name="year"/> (at most 10 years); movable holidays are created for every year.</param>
     [HttpPost("{slug}/holidays/import-preset")]
     [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(typeof(List<HolidayResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ImportPresetHolidays(
-        string slug, [FromQuery] string preset = "de", [FromQuery] int? year = null)
+        string slug, [FromQuery] string preset = "de", [FromQuery] int? year = null, [FromQuery] int? toYear = null)
     {
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
-        return ToResponse(await _service.ImportPresetHolidaysAsync(slug, userId.Value, preset, year));
+        return ToResponse(await _service.ImportPresetHolidaysAsync(slug, userId.Value, preset, year, toYear));
     }
 
     /// <summary>List available holiday preset codes.</summary>

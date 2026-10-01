@@ -115,9 +115,9 @@ public class AbsenceDayService : IAbsenceDayService
     public async Task<ServiceResult<List<AbsenceDayResponse>>> CreateAbsenceRangeAsync(
         string slug, int userId, CreateAbsenceRangeRequest request)
     {
-        var dates = WeekdaysBetween(request.From, request.To);
+        var dates = await WorkingDaysBetweenAsync(slug, userId, request.From, request.To);
         if (dates == null)
-            return ServiceResult.BadRequest<List<AbsenceDayResponse>>("Choose a range of at most one year with at least one weekday.");
+            return ServiceResult.BadRequest<List<AbsenceDayResponse>>("Choose a range of at most one year with at least one working day.");
         return await CreateOwnAsync(slug, userId, dates, request.Type, request.CustomTypeId, request.IsHalfDay, request.Note);
     }
 
@@ -130,9 +130,9 @@ public class AbsenceDayService : IAbsenceDayService
     {
         if (request.UserId is not int targetUserId)
             return ServiceResult.BadRequest<List<AbsenceDayResponse>>("UserId is required.");
-        var dates = WeekdaysBetween(request.From, request.To);
+        var dates = await WorkingDaysBetweenAsync(slug, targetUserId, request.From, request.To);
         if (dates == null)
-            return ServiceResult.BadRequest<List<AbsenceDayResponse>>("Choose a range of at most one year with at least one weekday.");
+            return ServiceResult.BadRequest<List<AbsenceDayResponse>>("Choose a range of at most one year with at least one working day.");
         return await CreateForMemberAsync(slug, callerUserId, targetUserId, dates, request.Type, request.CustomTypeId, request.IsHalfDay, request.Note);
     }
 
@@ -224,14 +224,16 @@ public class AbsenceDayService : IAbsenceDayService
         return ServiceResult.Ok(absences.Select(a => MapToResponse(a, user, customTypeResult.type)).ToList());
     }
 
-    /// <summary>Mon–Fri between from and to (inclusive); null for an empty, reversed or &gt; 1 year range.</summary>
-    private static List<DateOnly>? WeekdaysBetween(DateOnly from, DateOnly to)
+    /// <summary>
+    /// The member's working days between from and to (inclusive), holidays skipped (see
+    /// <see cref="WorkingDays"/>); null for an empty, reversed or &gt; 1 year range.
+    /// </summary>
+    private async Task<List<DateOnly>?> WorkingDaysBetweenAsync(string slug, int userId, DateOnly from, DateOnly to)
     {
         if (to < from || to.DayNumber - from.DayNumber > 366) return null;
-        var days = Enumerable.Range(0, to.DayNumber - from.DayNumber + 1)
-            .Select(from.AddDays)
-            .Where(d => d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
-            .ToList();
+        var org = await _context.FindOrgBySlugAsync(slug);
+        var all = Enumerable.Range(0, to.DayNumber - from.DayNumber + 1).Select(from.AddDays).ToList();
+        var days = await WorkingDays.FilterAsync(_context, userId, org?.Id, all);
         return days.Count == 0 ? null : days;
     }
 

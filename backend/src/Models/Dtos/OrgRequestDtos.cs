@@ -132,4 +132,6 @@ public record WorkScheduleChangeRequestData
     public double? TargetWed { get; init; }
     public double? TargetThu { get; init; }
     public double? TargetFri { get; init; }
+    public double? TargetSat { get; init; }
+    public double? TargetSun { get; init; }
 }

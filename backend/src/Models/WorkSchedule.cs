@@ -26,6 +26,20 @@ public class WorkSchedule
     public double TargetWed { get; set; }
     public double TargetThu { get; set; }
     public double TargetFri { get; set; }
+    public double TargetSat { get; set; }
+    public double TargetSun { get; set; }
+
+    /// <summary>Target hours for that weekday.</summary>
+    public double TargetFor(DayOfWeek day) => day switch
+    {
+        DayOfWeek.Monday => TargetMon,
+        DayOfWeek.Tuesday => TargetTue,
+        DayOfWeek.Wednesday => TargetWed,
+        DayOfWeek.Thursday => TargetThu,
+        DayOfWeek.Friday => TargetFri,
+        DayOfWeek.Saturday => TargetSat,
+        _ => TargetSun
+    };
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

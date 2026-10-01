@@ -15,6 +15,8 @@ public record WorkScheduleResponse
     public double TargetWed { get; init; }
     public double TargetThu { get; init; }
     public double TargetFri { get; init; }
+    public double TargetSat { get; init; }
+    public double TargetSun { get; init; }
     public double InitialOvertimeHours { get; init; }
     public required string InitialOvertimeMode { get; init; }
     public required string WorkScheduleChangeMode { get; init; }
@@ -32,6 +34,8 @@ public record CreateWorkScheduleRequest
     public double? TargetWed { get; init; }
     public double? TargetThu { get; init; }
     public double? TargetFri { get; init; }
+    public double? TargetSat { get; init; }
+    public double? TargetSun { get; init; }
 }
 
 /// <summary>Request payload for updating a work schedule.</summary>
@@ -46,4 +50,6 @@ public record UpdateWorkScheduleRequest
     public double? TargetWed { get; init; }
     public double? TargetThu { get; init; }
     public double? TargetFri { get; init; }
+    public double? TargetSat { get; init; }
+    public double? TargetSun { get; init; }
 }

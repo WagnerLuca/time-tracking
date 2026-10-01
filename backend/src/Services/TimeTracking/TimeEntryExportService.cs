@@ -460,6 +460,8 @@ public class TimeEntryExportService : ITimeEntryExportService
             DayOfWeek.Wednesday => schedule.TargetWed,
             DayOfWeek.Thursday => schedule.TargetThu,
             DayOfWeek.Friday => schedule.TargetFri,
+            DayOfWeek.Saturday => schedule.TargetSat,
+            DayOfWeek.Sunday => schedule.TargetSun,
             _ => 0
         };
     }

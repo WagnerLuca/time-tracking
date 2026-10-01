@@ -313,6 +313,8 @@ public class WorkScheduleService : IWorkScheduleService
             schedule.TargetWed = request.TargetWed ?? 0;
             schedule.TargetThu = request.TargetThu ?? 0;
             schedule.TargetFri = request.TargetFri ?? 0;
+            schedule.TargetSat = request.TargetSat ?? 0;
+            schedule.TargetSun = request.TargetSun ?? 0;
         }
 
         return schedule;
@@ -335,6 +337,8 @@ public class WorkScheduleService : IWorkScheduleService
                 schedule.TargetWed = daily;
                 schedule.TargetThu = daily;
                 schedule.TargetFri = daily;
+                schedule.TargetSat = 0;
+                schedule.TargetSun = 0;
             }
             else
             {
@@ -343,6 +347,8 @@ public class WorkScheduleService : IWorkScheduleService
                 schedule.TargetWed = request.TargetWed ?? schedule.TargetWed;
                 schedule.TargetThu = request.TargetThu ?? schedule.TargetThu;
                 schedule.TargetFri = request.TargetFri ?? schedule.TargetFri;
+                schedule.TargetSat = request.TargetSat ?? schedule.TargetSat;
+                schedule.TargetSun = request.TargetSun ?? schedule.TargetSun;
             }
         }
     }
@@ -380,6 +386,8 @@ public class WorkScheduleService : IWorkScheduleService
             TargetWed = schedule.TargetWed,
             TargetThu = schedule.TargetThu,
             TargetFri = schedule.TargetFri,
+            TargetSat = schedule.TargetSat,
+            TargetSun = schedule.TargetSun,
             InitialOvertimeHours = membership?.InitialOvertimeHours ?? 0,
             InitialOvertimeMode = org.InitialOvertimeMode.ToString(),
             WorkScheduleChangeMode = org.WorkScheduleChangeMode.ToString()

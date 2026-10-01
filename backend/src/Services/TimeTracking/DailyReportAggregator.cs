@@ -121,7 +121,7 @@ public static class DailyReportAggregator
             if (hasFailures) { status = "Needs Correction"; }
             else if (isAbsence) { status = AbsenceStatus(absence!); }
             else if (isHoliday) { status = holiday!.IsHalfDay ? "Half Holiday" : "Holiday"; }
-            else if (dayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) { status = "Weekend"; }
+            else if (dayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday && targetHours == 0) { status = "Weekend"; }
             else if (targetHours == 0) { status = "Day Off"; }
             else if (dayEntries.Count > 0) { status = "Worked"; }
             else { status = "Missing"; }
@@ -190,6 +190,8 @@ public static class DailyReportAggregator
             DayOfWeek.Wednesday => schedule.TargetWed,
             DayOfWeek.Thursday => schedule.TargetThu,
             DayOfWeek.Friday => schedule.TargetFri,
+            DayOfWeek.Saturday => schedule.TargetSat,
+            DayOfWeek.Sunday => schedule.TargetSun,
             _ => 0
         };
     }

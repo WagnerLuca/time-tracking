@@ -149,9 +149,15 @@ public class OrganizationService : IOrganizationService
                      && a.Date >= yearStart && a.Date <= yearEnd)
             .ToListAsync();
 
+        // Only the member's working days count (a vacation day on a day off costs nothing)
+        var schedulesByUser = (await _context.WorkSchedules.AsNoTracking()
+                .Where(ws => ws.OrganizationId == organization.Id && memberIds.Contains(ws.UserId))
+                .ToListAsync())
+            .ToLookup(ws => ws.UserId);
+
         // Split usage into taken (up to today) and planned (after today, rest of year)
         var usageByUser = vacationUsage
-            .Where(a => !holidayDates.Contains(a.Date))
+            .Where(a => !holidayDates.Contains(a.Date) && WorkingDays.IsWorkingDay(schedulesByUser[a.UserId], a.Date))
             .GroupBy(a => a.UserId)
             .ToDictionary(
                 g => g.Key,
@@ -251,7 +257,13 @@ public class OrganizationService : IOrganizationService
             LogoUrl = request.LogoUrl,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
-            IsActive = true
+            IsActive = true,
+            // Statutory minimum breaks (§ 4 ArbZG) as a sensible default; admins can change them
+            PauseRules =
+            {
+                new PauseRule { MinHours = 6, PauseMinutes = 30, CreatedAt = DateTime.UtcNow },
+                new PauseRule { MinHours = 9, PauseMinutes = 45, CreatedAt = DateTime.UtcNow }
+            }
         };
 
         _context.Organizations.Add(organization);

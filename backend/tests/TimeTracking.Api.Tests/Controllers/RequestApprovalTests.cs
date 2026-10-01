@@ -60,7 +60,7 @@ public class RequestApprovalTests : IClassFixture<TimeTrackingApiFactory>
     public async Task ApprovedEdit_AppliesPauseRules_LikeADirectEdit()
     {
         var (owner, member, slug, orgId) = await SetupAsync("req-pause", new { editPastEntriesMode = RequiresApproval, autoPauseEnabled = true });
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/pause-rules", new { minHours = 6, pauseMinutes = 30 })).EnsureSuccessStatusCode();
+        // The default 6 h → 30 min rule of a new organization applies
         (await member.PostAsJsonAsync("/api/v1/TimeTracking/start", new { organizationId = orgId })).EnsureSuccessStatusCode();
         var entry = await (await member.PostAsJsonAsync("/api/v1/TimeTracking/stop", (object?)null)).Content.ReadFromJsonAsync<JsonElement>();
         var start = entry.GetProperty("startTime").GetDateTime().ToUniversalTime();
