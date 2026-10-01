@@ -49,14 +49,14 @@ public class ActiveUserFilter : IAsyncActionFilter
 
                 if (current is not { IsActive: true })
                 {
-                    context.Result = Unauthorized("Your account has been deactivated.");
+                    context.Result = Unauthorized("Your account has been deactivated.", "auth.accountDeactivated");
                     return;
                 }
 
                 // Password changed/reset or account deleted since this token was issued → session over
                 if (user.FindFirst(TimeTracking.Api.Services.TokenService.SecurityStampClaim)?.Value != current.SecurityStamp)
                 {
-                    context.Result = Unauthorized("Your session has ended. Please sign in again.");
+                    context.Result = Unauthorized("Your session has ended. Please sign in again.", "auth.sessionEnded");
                     return;
                 }
             }
@@ -69,11 +69,12 @@ public class ActiveUserFilter : IAsyncActionFilter
 
     private sealed record SessionState(bool IsActive, string SecurityStamp);
 
-    private static UnauthorizedObjectResult Unauthorized(string detail) => new(new ProblemDetails
+    private static UnauthorizedObjectResult Unauthorized(string detail, string code) => new(new ProblemDetails
     {
         Type = "https://httpstatuses.io/401",
         Title = "Unauthorized",
         Status = StatusCodes.Status401Unauthorized,
-        Detail = detail
+        Detail = detail,
+        Extensions = { ["code"] = code }
     });
 }

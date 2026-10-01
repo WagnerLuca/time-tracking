@@ -149,9 +149,10 @@ public class AccountSecurityTests : IClassFixture<TimeTrackingApiFactory>
 
         var blocked = await member.GetAsync($"/api/v1/organizations/{org.Slug}/holidays");
         blocked.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await blocked.Content.ReadAsStringAsync()).Should().Contain("TwoFactorRequired");
-        (await member.PostAsJsonAsync("/api/v1/TimeTracking/start", new { organizationId = org.Id }))
-            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await blocked.Content.ReadAsStringAsync()).Should().Contain("TwoFactorRequired").And.Contain("\"code\":\"org.twoFactorRequired\"");
+        var startBlocked = await member.PostAsJsonAsync("/api/v1/TimeTracking/start", new { organizationId = org.Id });
+        startBlocked.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await startBlocked.Content.ReadAsStringAsync()).Should().Contain("\"code\":\"org.twoFactorRequired\"");
 
         // Owner cannot switch their own 2FA off while the org requires it
         var disable = await owner.PostAsJsonAsync("/api/v1/Auth/2fa/disable", new { currentPassword = "Password123!", code = backupCode });
