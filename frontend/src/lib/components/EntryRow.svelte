@@ -4,6 +4,7 @@
 	import { timer } from '$lib/stores/timer.svelte';
 	import { formatTime, formatDateShort, formatDuration, formatClock } from '$lib/utils/formatters';
 	import EntryEditForm from './EntryEditForm.svelte';
+	import EntryHistory from './EntryHistory.svelte';
 	import { t } from '$lib/i18n';
 
 	/**
@@ -55,6 +56,7 @@
 		onsave={() => editor.saveEditEntry(entry.id!)}
 		oncancel={editor.cancelEditEntry}
 	/>
+	<EntryHistory entryId={entry.id!} />
 {:else}
 	<div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 {compact ? 'px-3 py-2' : 'px-4 py-3'} {entry.isRunning ? 'bg-success/5' : ''}">
 		<div class="min-w-0 flex-1 basis-48">

@@ -1,6 +1,7 @@
 import { timeTrackingApi } from '$lib/apiClient';
 import { getErrorStatus } from '$lib/utils/errorHandler';
 import { t } from '$lib/i18n';
+import { toastEntryWarnings } from '$lib/utils/entryEditor.svelte';
 import type { StartTimeEntryRequest, StopTimeEntryRequest, TimeEntryResponse } from '$lib/api';
 
 /**
@@ -56,8 +57,10 @@ function createTimerStore() {
 	}
 
 	async function stop(request: StopTimeEntryRequest = {}): Promise<void> {
-		await timeTrackingApi.apiV1TimeTrackingStopPost(request);
+		const { data } = await timeTrackingApi.apiV1TimeTrackingStopPost(request);
 		setCurrent(null);
+		// Working Time Act (more than 10 h that day, under 11 h rest): tell the user right away
+		toastEntryWarnings(data);
 	}
 
 	function reset() {

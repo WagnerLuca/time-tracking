@@ -1,5 +1,9 @@
 /** Strings for the history page and the member calendar. `en` is typed against `de`. */
 export const de = {
+	compliance: {
+		dailyMax: 'Arbeitszeitgesetz: {hours} h an diesem Tag (mehr als 10 h).',
+		restPeriod: 'Arbeitszeitgesetz: nur {hours} h Ruhezeit davor (weniger als 11 h).'
+	},
 	pageTitle: 'Verlauf',
 	noOrgTitle: 'Keine Organisation ausgewählt',
 	selectOrg: 'Oben im Menü eine Organisation auswählen, um den Verlauf zu sehen.',
@@ -51,6 +55,10 @@ export const de = {
 };
 
 export const en: typeof de = {
+	compliance: {
+		dailyMax: 'Working Time Act: {hours} h on this day (more than 10 h).',
+		restPeriod: 'Working Time Act: only {hours} h of rest before (less than 11 h).'
+	},
 	pageTitle: 'History',
 	noOrgTitle: 'No organization selected',
 	selectOrg: 'Select an organization in the menu above to see your history.',

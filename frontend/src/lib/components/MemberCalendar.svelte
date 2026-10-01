@@ -3,9 +3,9 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { organizationsApi, timeTrackingApi, workScheduleApi, absenceDayApi, groupApi, reportsApi } from '$lib/apiClient';
-	import type { TimeEntryResponse, WorkScheduleResponse, OrganizationDetailResponse, AbsenceTypeDefinitionResponse, EffectivePermissionsResponse } from '$lib/api';
-	import { formatHours, formatDelta, formatDate, formatDateFull, getMonthName, dayNamesShort, barWidth } from '$lib/utils/formatters';
+	import { organizationsApi, timeTrackingApi, workScheduleApi, absenceDayApi, groupApi, reportsApi, memberEntriesApi } from '$lib/apiClient';
+	import type { TimeEntryResponse, WorkScheduleResponse, OrganizationDetailResponse, AbsenceTypeDefinitionResponse, EffectivePermissionsResponse, ComplianceDayResponse } from '$lib/api';
+	import { formatHours, formatDelta, formatDate, formatDateFull, formatNumber, getMonthName, dayNamesShort, barWidth } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, type CustomCreditSets } from '$lib/utils/scheduleHelpers';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
@@ -18,6 +18,7 @@
 	import { dayPress } from '$lib/utils/dayPress';
 	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
 	import EntryRow from '$lib/components/EntryRow.svelte';
+	import EntryEditForm from '$lib/components/EntryEditForm.svelte';
 	import RequestModal from '$lib/components/RequestModal.svelte';
 	import AbsenceDialog from '$lib/components/AbsenceDialog.svelte';
 	import { t, tp } from '$lib/i18n';
@@ -40,8 +41,12 @@
 		focusEntryId?: number | null;
 		/** Called whenever the balance was (re)loaded, e.g. after an entry edit. */
 		onbalance?: (balance: BalanceMinutes | null) => void;
+		/** Admin corrections: the caller may add, edit and delete this member's entries (not with isSelf). */
+		canCorrect?: boolean;
 	}
-	let { orgSlug, orgId = null, userId, isSelf = false, orgDetail: orgDetailProp = null, focusDate = null, focusEntryId = null, onbalance }: Props = $props();
+	let { orgSlug, orgId = null, userId, isSelf = false, orgDetail: orgDetailProp = null, focusDate = null, focusEntryId = null, onbalance, canCorrect = false }: Props = $props();
+	/** Correcting someone else's entries through the admin endpoints. */
+	const correcting = $derived(!isSelf && canCorrect);
 
 	// View mode
 	let viewMode = $state<'month' | 'year'>('month');
@@ -92,23 +97,42 @@
 	let canAddAbsence = $derived(isAdmin || (isSelf && selfAbsenceMode !== 'Disabled'));
 	let mustRequest = $derived(!isAdmin && isSelf && selfAbsenceMode === 'RequiresApproval');
 
-	/** Entry permissions; only own entries are editable here (isSelf). */
-	const entryPerms = $derived({
-		canEdit: isSelf && canEditEntries(effectivePerms, orgDetail),
-		canRequestEdit: isSelf && canRequestEditEntries(effectivePerms, orgDetail),
-		canEditPause: isSelf && canEditPause(effectivePerms, orgDetail),
-		canRequestEditPause: isSelf && canRequestEditPause(effectivePerms, orgDetail)
-	});
+	/** Entry permissions: own entries by the org rules (isSelf), someone else's only as an admin correction. */
+	const entryPerms = $derived(
+		correcting
+			? { canEdit: true, canRequestEdit: false, canEditPause: true, canRequestEditPause: false }
+			: {
+				canEdit: isSelf && canEditEntries(effectivePerms, orgDetail),
+				canRequestEdit: isSelf && canRequestEditEntries(effectivePerms, orgDetail),
+				canEditPause: isSelf && canEditPause(effectivePerms, orgDetail),
+				canRequestEditPause: isSelf && canRequestEditPause(effectivePerms, orgDetail)
+			}
+	);
+	/** Adding a finished entry by hand: own entries follow the "edit past entries" rule (approval → request). */
+	const canAddEntry = $derived(correcting || entryPerms.canEdit || entryPerms.canRequestEdit);
+	const addEntryNeedsApproval = $derived(!correcting && !entryPerms.canEdit && entryPerms.canRequestEdit);
 
-	// Shared entry editing + request logic (only exposed in the UI when isSelf)
+	// Shared entry editing + request logic (exposed in the UI for own entries and admin corrections)
 	const editor = createEntryEditor({
 		getOrgDetail: () => orgDetail,
 		getPermissions: () => effectivePerms,
 		getOrgSlug: () => orgSlug,
-		onSaved: async () => { await loadEntries(); await loadCumulativeBalance(); },
-		onDeleted: async () => { await loadEntries(); await loadCumulativeBalance(); },
+		getOrgId: () => orgId ?? orgDetail?.id ?? null,
+		getMemberId: () => (correcting ? userId : null),
+		onSaved: async () => { await Promise.all([loadEntries(), loadCumulativeBalance()]); },
+		onDeleted: async () => { await Promise.all([loadEntries(), loadCumulativeBalance()]); },
 		findEntry: (id) => entries.find((e) => e.id === id)
 	});
+
+	/** Working Time Act violations of the shown month, by day ('YYYY-MM-DD'). */
+	let compliance = $state(new Map<string, ComplianceDayResponse>());
+
+	function complianceText(day: ComplianceDayResponse): string {
+		const parts: string[] = [];
+		if (day.dailyMax) parts.push(t('calendar.compliance.dailyMax', { hours: formatNumber(day.netHours ?? 0, { maximumFractionDigits: 1 }) }));
+		if (day.restPeriod) parts.push(t('calendar.compliance.restPeriod', { hours: formatNumber(day.restHoursBefore ?? 0, { maximumFractionDigits: 1 }) }));
+		return parts.join(' ');
+	}
 
 	// Computed
 	const weekdayNames = $derived(dayNamesShort());
@@ -209,8 +233,19 @@
 		const from = new Date(currentYear, currentMonth, 1);
 		const to = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
 		if (daysOffYear !== currentYear) loadDaysOff();
+		loadCompliance(from, to);
 		entries = await fetchEntriesRange(from, to);
 		ensureSelectedDayForCurrentMonth();
+	}
+
+	async function loadCompliance(from: Date, to: Date) {
+		const month = dateKey(from);
+		try {
+			const { data } = await memberEntriesApi.apiV1OrganizationsSlugMembersMemberIdComplianceGet(orgSlug, userId, dateKey(from), dateKey(to));
+			if (month === dateKey(new Date(currentYear, currentMonth, 1))) compliance = new Map(data.map((d) => [d.date ?? '', d]));
+		} catch {
+			compliance = new Map(); // 403: not visible to the caller; the calendar works without markers
+		}
 	}
 
 	async function loadYearEntries() {
@@ -340,7 +375,10 @@
 	/** Left click: select the day and bring its details into view (`block`). */
 	async function selectDay(day: CalendarDay, block: ScrollLogicalPosition) {
 		if (!day.isCurrentMonth) return;
-		if (selectedDayKey !== day.key) editor.cancelEditEntry();
+		if (selectedDayKey !== day.key) {
+			editor.cancelEditEntry();
+			editor.cancelCreate();
+		}
 		selectedDayKey = day.key;
 		await tick();
 		dayDetailsEl?.scrollIntoView({ behavior: 'smooth', block });
@@ -611,6 +649,9 @@
 							{#if day.hasFailure}
 								<span class="absolute top-1 right-1 h-2 w-2 rounded-full bg-error" title={t('calendar.needsCorrection')}></span>
 							{/if}
+							{#if compliance.has(day.key)}
+								<span class="absolute top-0.5 right-4 text-[0.7rem] leading-none text-warning" title={complianceText(compliance.get(day.key)!)} data-testid="compliance-marker">⚠<span class="sr-only">{complianceText(compliance.get(day.key)!)}</span></span>
+							{/if}
 							{#if day.isCurrentMonth}
 								{#if day.workedMinutes > 0}
 									<span class="text-xs font-semibold text-base-content">{formatHours(day.workedMinutes)}</span>
@@ -649,6 +690,9 @@
 							{#if day.hasFailure}
 								<span class="badge badge-error badge-xs" title={t('calendar.needsCorrection')}>!</span>
 							{/if}
+							{#if compliance.has(day.key)}
+								<span class="text-warning text-xs" title={complianceText(compliance.get(day.key)!)}>⚠<span class="sr-only">{complianceText(compliance.get(day.key)!)}</span></span>
+							{/if}
 							<span class="text-sm tabular-nums whitespace-nowrap">
 								{#if day.workedMinutes > 0}
 									<span class="inline-block w-2 h-2 rounded-full align-middle mr-1" style="background: {heatColor(day.workedMinutes, day.targetMinutes)}" aria-hidden="true"></span>{formatHours(day.workedMinutes)}
@@ -675,9 +719,14 @@
 							<h3 class="text-[0.9375rem] font-bold m-0">{t('calendar.dayDetails')}</h3>
 							<span class="text-sm text-base-content/70">{formatDateFull(dayDetails.date)}</span>
 						</div>
-						{#if canAddAbsence}
-							<button type="button" class="btn btn-outline btn-sm" onclick={() => openAbsenceDialog(dayDetails.key)}>{mustRequest ? t('calendar.requestAbsence') : t('calendar.addAbsence')}</button>
-						{/if}
+						<div class="flex flex-wrap gap-2">
+							{#if canAddEntry && isPastOrToday(dayDetails.date) && editor.creatingDay !== dayDetails.key}
+								<button type="button" class="btn btn-outline btn-sm" onclick={() => editor.startCreate(dayDetails.key)}>{correcting ? t('entries.manual.addAdmin') : t('entries.manual.add')}</button>
+							{/if}
+							{#if canAddAbsence}
+								<button type="button" class="btn btn-outline btn-sm" onclick={() => openAbsenceDialog(dayDetails.key)}>{mustRequest ? t('calendar.requestAbsence') : t('calendar.addAbsence')}</button>
+							{/if}
+						</div>
 					</div>
 
 					<div class="flex flex-wrap gap-2 mb-4">
@@ -694,12 +743,34 @@
 							<span class="badge {dayTypeClasses(dayDetails.dayType).badge}">{dayDetails.dayTypeLabel}</span>
 						{/if}
 					</div>
+					{#if compliance.has(dayDetails.key)}
+						<div role="status" class="alert alert-warning text-sm mb-3 py-2">{complianceText(compliance.get(dayDetails.key)!)}</div>
+					{/if}
+
+					{#if editor.creatingDay === dayDetails.key}
+						<div class="rounded-lg border border-primary/40 overflow-hidden mb-3">
+							<EntryEditForm
+								bind:startTime={editor.createStart}
+								bind:endTime={editor.createEnd}
+								bind:description={editor.createDescription}
+								bind:pause={editor.createPause}
+								error={editor.createError}
+								saving={editor.createSaving}
+								canEditPause={editor.pauseEditable}
+								requireEnd
+								title={correcting ? t('entries.manual.titleAdmin', { date: formatDate(dayDetails.date) }) : t('entries.manual.title', { date: formatDate(dayDetails.date) })}
+								hint={addEntryNeedsApproval ? t('entries.manual.needsApprovalHint') : ''}
+								onsave={editor.saveCreate}
+								oncancel={editor.cancelCreate}
+							/>
+						</div>
+					{/if}
 
 					{#if selectedDayEntries.length > 0}
 						<ul class="flex flex-col gap-2">
 							{#each selectedDayEntries as entry (entry.id)}
 								<li class="rounded-lg border border-base-300 bg-base-200/40 overflow-hidden">
-									<EntryRow {entry} editor={isSelf ? editor : undefined} {...entryPerms} compact />
+									<EntryRow {entry} editor={isSelf || correcting ? editor : undefined} {...entryPerms} compact />
 								</li>
 							{/each}
 						</ul>

@@ -24,6 +24,49 @@ export const de = {
 	deleted: 'Zeiteintrag gelöscht.',
 	saveFailed: 'Zeiteintrag konnte nicht gespeichert werden.',
 	deleteFailed: 'Zeiteintrag konnte nicht gelöscht werden.',
+	pauseAuto: 'automatisch',
+	pauseAutoHint: 'Leer lassen: die Pausenregeln der Organisation gelten.',
+	manual: {
+		add: 'Eintrag nachtragen',
+		addAdmin: 'Eintrag hinzufügen',
+		title: 'Vergessenen Eintrag für {date} nachtragen',
+		titleAdmin: 'Eintrag für {date} hinzufügen',
+		needsApprovalHint: 'In dieser Organisation muss ein nachgetragener Eintrag genehmigt werden. Er wird als Antrag gesendet.',
+		created: 'Zeiteintrag nachgetragen.',
+		requested: 'Antrag gesendet. Der Eintrag erscheint, sobald ein Admin ihn genehmigt.',
+		failed: 'Der Eintrag konnte nicht nachgetragen werden.',
+		endRequired: 'Bitte ein Ende angeben.',
+		disabled: 'Nachtragen ist in dieser Organisation deaktiviert.',
+		overlap: 'Der Eintrag überschneidet sich mit einem vorhandenen Eintrag.'
+	},
+	warnings: {
+		dailyMax: 'Arbeitszeitgesetz: An diesem Tag wurde mehr als 10 Stunden gearbeitet.',
+		restPeriod: 'Arbeitszeitgesetz: Vor diesem Eintrag lagen weniger als 11 Stunden Ruhezeit.'
+	},
+	history: {
+		title: 'Verlauf',
+		loading: 'Verlauf wird geladen…',
+		empty: 'Noch keine Änderungen aufgezeichnet.',
+		failed: 'Der Verlauf konnte nicht geladen werden.',
+		by: '{name}',
+		system: 'System',
+		kind: {
+			Created: 'Erstellt',
+			Updated: 'Geändert',
+			Deleted: 'Gelöscht',
+			ApprovedRequest: 'Per Antrag übernommen'
+		},
+		field: {
+			StartTime: 'Beginn',
+			EndTime: 'Ende',
+			PauseDurationMinutes: 'Pause',
+			Description: 'Notiz',
+			OrganizationId: 'Organisation',
+			IsFailure: 'Korrektur nötig'
+		},
+		empty_value: 'leer',
+		minutes: '{value} min'
+	},
 	request: {
 		titleEdit: 'Änderung des Zeiteintrags beantragen',
 		titlePause: 'Pausenänderung beantragen',
@@ -63,6 +106,49 @@ export const en: typeof de = {
 	deleted: 'Time entry deleted.',
 	saveFailed: 'Could not save the time entry.',
 	deleteFailed: 'Could not delete the time entry.',
+	pauseAuto: 'automatic',
+	pauseAutoHint: "Leave empty: the organization's pause rules apply.",
+	manual: {
+		add: 'Add missed entry',
+		addAdmin: 'Add entry',
+		title: 'Add a forgotten entry for {date}',
+		titleAdmin: 'Add an entry for {date}',
+		needsApprovalHint: 'In this organization an added entry needs approval. It is sent as a request.',
+		created: 'Time entry added.',
+		requested: 'Request sent. The entry appears once an admin approves it.',
+		failed: 'The entry could not be added.',
+		endRequired: 'Please enter an end time.',
+		disabled: 'Adding past entries is disabled in this organization.',
+		overlap: 'The entry overlaps an existing entry.'
+	},
+	warnings: {
+		dailyMax: 'Working Time Act: more than 10 hours were worked on this day.',
+		restPeriod: 'Working Time Act: less than 11 hours of rest before this entry.'
+	},
+	history: {
+		title: 'History',
+		loading: 'Loading history…',
+		empty: 'No changes recorded yet.',
+		failed: 'Could not load the history.',
+		by: '{name}',
+		system: 'System',
+		kind: {
+			Created: 'Created',
+			Updated: 'Changed',
+			Deleted: 'Deleted',
+			ApprovedRequest: 'Applied from a request'
+		},
+		field: {
+			StartTime: 'Start',
+			EndTime: 'End',
+			PauseDurationMinutes: 'Pause',
+			Description: 'Note',
+			OrganizationId: 'Organization',
+			IsFailure: 'Needs correction'
+		},
+		empty_value: 'empty',
+		minutes: '{value} min'
+	},
 	request: {
 		titleEdit: 'Request time entry change',
 		titlePause: 'Request pause change',

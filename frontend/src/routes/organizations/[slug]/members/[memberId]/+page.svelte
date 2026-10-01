@@ -58,6 +58,9 @@
 	// Group admins sharing a group with the member may export too (backend is the source of truth)
 	let callerAdminGroupIds = $derived(new Set((org?.members?.find((m) => m.id === auth.user?.id)?.groups ?? []).filter((g) => g.isGroupAdmin).map((g) => g.groupId)));
 	let canGenerateReport = $derived(isSelf || isAdmin || (member?.groups ?? []).some((g) => callerAdminGroupIds.has(g.groupId)));
+	// Admin corrections of the member's entries: org admins, or group admins of a shared group for plain members.
+	// ponytail: the group's "may approve time edits" flag is not checked here; the backend answers 403 without it.
+	let canCorrect = $derived(!isSelf && (isAdmin || (member?.role === 'Member' && (member?.groups ?? []).some((g) => callerAdminGroupIds.has(g.groupId)))));
 
 	$effect(() => {
 		if (!orgSlug || !memberId) return;
@@ -174,7 +177,7 @@
 			<section class="card bg-base-100 border border-base-300 p-5 mb-5">
 				<h2 class="text-base font-bold text-base-content m-0 mb-4">{t('memberDetail.calendar')}</h2>
 				{#key `${orgSlug}-${memberId}`}
-					<MemberCalendar bind:this={calendar} {orgSlug} orgId={org?.id} userId={memberId} {isSelf} orgDetail={org} onbalance={(b) => (balance = b)} />
+					<MemberCalendar bind:this={calendar} {orgSlug} orgId={org?.id} userId={memberId} {isSelf} {canCorrect} orgDetail={org} onbalance={(b) => (balance = b)} />
 				{/key}
 			</section>
 
