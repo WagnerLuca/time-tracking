@@ -30,7 +30,13 @@ public class FailureEntryService : BackgroundService
             {
                 using var scope = _scopeFactory.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<TimeTrackingDbContext>();
-                var closed = await CloseOverdueEntriesAsync(context, DateTime.UtcNow, stoppingToken);
+                var email = scope.ServiceProvider.GetRequiredService<IEmailSender>();
+                var frontend = scope.ServiceProvider.GetRequiredService<EmailSettings>().FrontendBaseUrl;
+                var now = DateTime.UtcNow;
+                var reminded = await SendDayEndRemindersAsync(context, now, email, frontend, stoppingToken);
+                if (reminded > 0)
+                    _logger.LogInformation("Reminded {Count} member(s) of a timer still running before business day end.", reminded);
+                var closed = await CloseOverdueEntriesAsync(context, now, stoppingToken, email, frontend);
                 if (closed > 0)
                     _logger.LogInformation("Auto-stopped {Count} timer(s) at business day end.", closed);
             }
@@ -43,17 +49,71 @@ public class FailureEntryService : BackgroundService
         }
     }
 
+    /// <summary>How long before the business day end a still running timer triggers a reminder.</summary>
+    public static readonly TimeSpan ReminderLead = TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// Reminds (in-app + mail) the owner of every timer still running within <see cref="ReminderLead"/>
+    /// of its business day end, once per entry. Returns the count.
+    /// </summary>
+    public static async Task<int> SendDayEndRemindersAsync(TimeTrackingDbContext context, DateTime nowUtc,
+        IEmailSender? email = null, string? frontendBaseUrl = null, CancellationToken ct = default)
+    {
+        var running = await context.TimeEntries
+            .Include(e => e.Organization)
+            .Include(e => e.User)
+            .Where(e => e.IsRunning && e.DayEndReminderSentAt == null)
+            .ToListAsync(ct);
+
+        var due = new List<(TimeEntry Entry, DateTime CutoffLocal)>();
+        foreach (var entry in running)
+        {
+            var tz = ResolveTimeZone(entry.Organization?.TimeZone);
+            var cutoff = BusinessDayEndUtc(entry.StartTime, entry.Organization?.BusinessDayEnd ?? TimeOnly.MinValue, tz);
+            if (nowUtc < cutoff - ReminderLead || nowUtc >= cutoff) continue;
+
+            entry.DayEndReminderSentAt = nowUtc;
+            var cutoffLocal = TimeZoneInfo.ConvertTimeFromUtc(cutoff, tz);
+            context.Notifications.Add(new Notification
+            {
+                UserId = entry.UserId,
+                OrganizationId = entry.OrganizationId,
+                Title = "Timer still running",
+                Message = $"Your timer is still running. It will be stopped automatically at {cutoffLocal:HH:mm} (end of the business day) and then needs a correction.",
+                Type = "TimerReminder",
+                RelatedEntityId = entry.Id
+            });
+            due.Add((entry, cutoffLocal));
+        }
+
+        if (due.Count == 0) return 0;
+        await context.SaveChangesAsync(ct);   // marked before mailing: a crash may skip a mail, never repeat one
+
+        if (email != null)
+            foreach (var (entry, cutoffLocal) in due.Where(d => d.Entry.User.IsActive))
+                await NotificationMails.TrySendAsync(email, entry.User.Email,
+                    "Dein Timer läuft noch / Your timer is still running",
+                    $"Dein Timer läuft noch und wird um {cutoffLocal:HH:mm} automatisch gestoppt (Ende des Geschäftstags). / " +
+                    $"Your timer is still running and will be stopped automatically at {cutoffLocal:HH:mm} (end of the business day).\n\n" +
+                    $"{frontendBaseUrl}/time", ct: ct);
+        return due.Count;
+    }
+
     /// <summary>
     /// Stops every running entry whose business day has ended by <paramref name="nowUtc"/>,
-    /// at that day end, flags it as a failure and notifies its owner. Returns the count.
+    /// at that day end, flags it as a failure and notifies its owner (in-app, plus a mail when
+    /// <paramref name="email"/> is given). Returns the count.
     /// </summary>
-    public static async Task<int> CloseOverdueEntriesAsync(TimeTrackingDbContext context, DateTime nowUtc, CancellationToken ct = default)
+    public static async Task<int> CloseOverdueEntriesAsync(TimeTrackingDbContext context, DateTime nowUtc, CancellationToken ct = default,
+        IEmailSender? email = null, string? frontendBaseUrl = null)
     {
         // ponytail: loads all running entries each minute; fine while running timers number in the hundreds
         var running = await context.TimeEntries
             .Include(e => e.Organization)
+            .Include(e => e.User)
             .Where(e => e.IsRunning)
             .ToListAsync(ct);
+        var failed = new List<TimeEntry>();
 
         var closed = 0;
         foreach (var entry in running)
@@ -75,12 +135,28 @@ public class FailureEntryService : BackgroundService
                 Title = "Timer stopped automatically",
                 Message = $"Your timer started {TimeZoneInfo.ConvertTimeFromUtc(entry.StartTime, tz):dd.MM.yyyy HH:mm} ran past the end of the business day " +
                           "and was stopped. It does not count until you correct its end time.",
-                Type = "FailureEntry"
+                Type = "FailureEntry",
+                RelatedEntityId = entry.Id
             });
+            failed.Add(entry);
             closed++;
         }
 
         if (closed > 0) await context.SaveChangesAsync(ct);
+
+        if (email != null)
+            foreach (var entry in failed.Where(e => e.User.IsActive))
+            {
+                var tz = ResolveTimeZone(entry.Organization?.TimeZone);
+                var startLocal = TimeZoneInfo.ConvertTimeFromUtc(entry.StartTime, tz);
+                await NotificationMails.TrySendAsync(email, entry.User.Email,
+                    "Timer automatisch gestoppt / Timer stopped automatically",
+                    $"Dein Timer vom {startLocal:dd.MM.yyyy HH:mm} lief über das Ende des Geschäftstags und wurde gestoppt. " +
+                    "Er zählt erst, wenn du die Endzeit korrigierst. / " +
+                    $"Your timer started {startLocal:dd.MM.yyyy HH:mm} ran past the end of the business day and was stopped. " +
+                    "It does not count until you correct its end time.\n\n" +
+                    $"{frontendBaseUrl}/history?date={startLocal:yyyy-MM-dd}&entry={entry.Id}", ct: ct);
+            }
         return closed;
     }
 

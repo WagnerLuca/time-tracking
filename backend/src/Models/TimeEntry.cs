@@ -31,6 +31,9 @@ public class TimeEntry
     /// the member corrects the end time, which clears the flag.
     /// </summary>
     public bool IsFailure { get; set; }
+
+    /// <summary>When the "timer still running shortly before business day end" reminder went out (once per entry).</summary>
+    public DateTime? DayEndReminderSentAt { get; set; }
     
     public DateTime CreatedAt { get; set; }
     

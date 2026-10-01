@@ -213,6 +213,7 @@ public class TimeTrackingDbContext : DbContext
             entity.Property(e => e.Status).IsRequired().IsConcurrencyToken();
             entity.Property(e => e.Type).IsRequired();
             entity.Property(e => e.RequestData).HasMaxLength(50000);
+            entity.Property(e => e.ResponseReason).HasMaxLength(1000);
 
             if (isInMemory)
                 entity.Property(e => e.CreatedAt).IsRequired();

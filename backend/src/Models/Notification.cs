@@ -33,6 +33,12 @@ public class Notification
     /// Whether the user has read/dismissed this notification.
     /// </summary>
     public bool IsRead { get; set; } = false;
+
+    /// <summary>
+    /// The entity the notification is about, for deep links: the time entry id for
+    /// "FailureEntry"/"TimerReminder", the request id for "RequestAccepted"/"RequestDeclined".
+    /// </summary>
+    public int? RelatedEntityId { get; set; }
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     

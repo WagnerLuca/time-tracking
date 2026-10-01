@@ -40,7 +40,8 @@ public class NotificationService : INotificationService
                 Type = n.Type,
                 IsRead = n.IsRead,
                 CreatedAt = n.CreatedAt,
-                OrganizationId = n.OrganizationId
+                OrganizationId = n.OrganizationId,
+                RelatedEntityId = n.RelatedEntityId
             })
             .ToListAsync();
 

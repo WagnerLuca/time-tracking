@@ -353,6 +353,9 @@ namespace TimeTracking.Api.Migrations
                     b.Property<int?>("OrganizationId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("RelatedEntityId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -461,6 +464,10 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<int?>("RespondedByUserId")
                         .HasColumnType("integer");
+
+                    b.Property<string>("ResponseReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<int>("Status")
                         .IsConcurrencyToken()
@@ -676,6 +683,9 @@ namespace TimeTracking.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTime?>("DayEndReminderSentAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)

@@ -23,6 +23,8 @@ public record OrgRequestResponse
     public DateTime CreatedAt { get; init; }
     public DateTime? RespondedAt { get; init; }
     public string? RespondedByName { get; init; }
+    /// <summary>Reason the approver gave with the decision, if any.</summary>
+    public string? ResponseReason { get; init; }
     public int? GroupId { get; init; }
     public string? GroupName { get; init; }
 }
@@ -46,6 +48,10 @@ public record RespondToOrgRequestRequest
     /// true = Accept, false = Decline
     /// </summary>
     public bool Accept { get; init; }
+
+    /// <summary>Optional reason shown to the member (e.g. why the request was declined).</summary>
+    [MaxLength(1000)]
+    public string? Reason { get; init; }
 }
 
 /// <summary>

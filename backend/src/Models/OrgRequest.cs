@@ -18,7 +18,9 @@ public enum RequestType
     WorkScheduleChange = 4,
     CsvImport = 5,
     /// <summary>Request one or more absence days (e.g. vacation) that need approval.</summary>
-    RequestAbsence = 6
+    RequestAbsence = 6,
+    /// <summary>Add a finished time entry by hand (a forgotten day); gated by the "edit past entries" rule.</summary>
+    AddManualEntry = 7
 }
 
 public class OrgRequest
@@ -46,6 +48,9 @@ public class OrgRequest
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? RespondedAt { get; set; }
     public int? RespondedByUserId { get; set; }
+
+    /// <summary>Optional reason the approver gave with the decision (e.g. why it was declined).</summary>
+    public string? ResponseReason { get; set; }
     
     /// <summary>
     /// Tracks when the user was notified of the response. Null = not yet seen.

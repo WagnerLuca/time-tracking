@@ -10,6 +10,8 @@ public record NotificationResponse
     public bool IsRead { get; init; }
     public DateTime CreatedAt { get; init; }
     public int? OrganizationId { get; init; }
+    /// <summary>Time entry id (FailureEntry, TimerReminder) or request id (RequestAccepted, RequestDeclined) for deep links.</summary>
+    public int? RelatedEntityId { get; init; }
 }
 
 /// <summary>Number of unread notifications.</summary>

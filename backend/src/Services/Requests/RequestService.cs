@@ -10,11 +10,15 @@ namespace TimeTracking.Api.Services;
 public class RequestService : IRequestService
 {
     private readonly TimeTrackingDbContext _context;
+    private readonly IEmailSender _email;
+    private readonly EmailSettings _emailSettings;
     private readonly ILogger<RequestService> _logger;
 
-    public RequestService(TimeTrackingDbContext context, ILogger<RequestService> logger)
+    public RequestService(TimeTrackingDbContext context, IEmailSender email, EmailSettings emailSettings, ILogger<RequestService> logger)
     {
         _context = context;
+        _email = email;
+        _emailSettings = emailSettings;
         _logger = logger;
     }
 
@@ -104,14 +108,10 @@ public class RequestService : IRequestService
             }
         }
 
-        // Check for existing pending request of same type
-        var pendingExists = await _context.OrgRequests
-            .AnyAsync(r => r.OrganizationId == org.Id
-                        && r.UserId == userId
-                        && r.Type == request.Type
-                        && r.Status == RequestStatus.Pending);
-        if (pendingExists)
-            return ServiceResult.Conflict<OrgRequestResponse>("You already have a pending request of this type for this organization.");
+        // Several open requests of one type are fine (two failure entries, two vacations), the same one twice is not
+        var duplicate = await FindDuplicateAsync(org.Id, userId, request);
+        if (duplicate != null)
+            return ServiceResult.Conflict<OrgRequestResponse>(duplicate);
 
         var orgRequest = new OrgRequest
         {
@@ -132,6 +132,7 @@ public class RequestService : IRequestService
         orgRequest.User = user;
         if (orgRequest.GroupId.HasValue)
             orgRequest.Group = await _context.Groups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == orgRequest.GroupId.Value);
+        await MailApproversAsync(orgRequest, org, user);
         return ServiceResult.Ok(MapToResponse(orgRequest, org.Name, org.Slug));
     }
 
@@ -224,6 +225,7 @@ public class RequestService : IRequestService
         orgRequest.Status = request.Accept ? RequestStatus.Accepted : RequestStatus.Declined;
         orgRequest.RespondedAt = DateTime.UtcNow;
         orgRequest.RespondedByUserId = callerUserId;
+        orgRequest.ResponseReason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
 
         // Apply side effects on acceptance. They are only staged here and saved together with
         // the status below, so an approval applies completely or not at all.
@@ -234,6 +236,19 @@ public class RequestService : IRequestService
                 return ServiceResult.BadRequest<OrgRequestResponse>(
                     $"The request cannot be applied: {error} Decline it and ask for a new one.");
         }
+
+        // The in-app notification is saved together with the decision
+        var (_, labelEn) = NotificationMails.Label(orgRequest.Type);
+        _context.Notifications.Add(new Notification
+        {
+            UserId = orgRequest.UserId,
+            OrganizationId = org.Id,
+            Title = request.Accept ? "Request accepted" : "Request declined",
+            Message = $"Your {labelEn} request in {org.Name} was {(request.Accept ? "accepted" : "declined")}."
+                      + (orgRequest.ResponseReason != null ? $" Reason: {orgRequest.ResponseReason}" : ""),
+            Type = request.Accept ? "RequestAccepted" : "RequestDeclined",
+            RelatedEntityId = orgRequest.Id
+        });
 
         try
         {
@@ -247,6 +262,7 @@ public class RequestService : IRequestService
 
         _logger.LogInformation("Request {RequestId} {Action} by user {UserId}", requestId, request.Accept ? "accepted" : "declined", callerUserId);
 
+        await NotifyRequesterAsync(orgRequest, org);
         var responder = await _context.Users.FindAsync(callerUserId);
         return ServiceResult.Ok(MapToResponse(orgRequest, org.Name, org.Slug,
             responder != null ? $"{responder.FirstName} {responder.LastName}" : null));
@@ -643,9 +659,82 @@ public class RequestService : IRequestService
             RespondedAt = r.RespondedAt,
             RespondedByName = responderName
                 ?? (r.RespondedByUser != null ? $"{r.RespondedByUser.FirstName} {r.RespondedByUser.LastName}" : null),
+            ResponseReason = r.ResponseReason,
             GroupId = r.GroupId,
             GroupName = r.Group?.Name
         };
+    }
+
+    /// <summary>
+    /// Why this request would duplicate one that is still open, or null. Joining and the initial
+    /// overtime are single values (one open request); a request about an entity (a time entry)
+    /// conflicts with an open one about the same entity; absence requests with open ones sharing a
+    /// date; anything else only with an identical open request.
+    /// </summary>
+    private async Task<string?> FindDuplicateAsync(int orgId, int userId, CreateOrgRequestRequest request)
+    {
+        var open = await _context.OrgRequests.AsNoTracking()
+            .Where(r => r.OrganizationId == orgId && r.UserId == userId
+                     && r.Type == request.Type && r.Status == RequestStatus.Pending)
+            .ToListAsync();
+        if (open.Count == 0) return null;
+
+        const string same = "You already have a pending request for this.";
+        if (request.Type is RequestType.JoinOrganization or RequestType.SetInitialOvertime)
+            return "You already have a pending request of this type for this organization.";
+        if (request.RelatedEntityId.HasValue)
+            return open.Any(r => r.RelatedEntityId == request.RelatedEntityId) ? same : null;
+        if (request.Type == RequestType.RequestAbsence)
+        {
+            var dates = AbsenceDates(request.RequestData);
+            var overlap = open.SelectMany(r => AbsenceDates(r.RequestData)).Where(dates.Contains).Distinct().Order().ToList();
+            return overlap.Count > 0
+                ? $"You already have a pending absence request for {string.Join(", ", overlap.Select(d => d.ToString("yyyy-MM-dd")))}."
+                : null;
+        }
+        return open.Any(r => r.RequestData == request.RequestData) ? same : null;
+    }
+
+    private static HashSet<DateOnly> AbsenceDates(string? requestData)
+    {
+        if (requestData == null) return [];
+        try { return JsonSerializer.Deserialize<AbsenceRequestData>(requestData, RequestDataJson)?.Dates.ToHashSet() ?? []; }
+        catch (JsonException) { return []; }
+    }
+
+    /// <summary>Mails everyone who may decide the new request: org admins/owners and, for a group-routed one, that group's admins.</summary>
+    private async Task MailApproversAsync(OrgRequest orgRequest, Organization org, User requester)
+    {
+        var approvers = await _context.UserOrganizations.AsNoTracking()
+            .Where(uo => uo.OrganizationId == org.Id && uo.UserId != requester.Id && uo.User.IsActive
+                      && (uo.Role >= OrganizationRole.Admin
+                          || (orgRequest.GroupId != null && _context.GroupMembers.Any(gm =>
+                                 gm.GroupId == orgRequest.GroupId && gm.UserId == uo.UserId && gm.Role == GroupRole.Admin))))
+            .Select(uo => uo.User.Email)
+            .ToListAsync();
+
+        var (de, en) = NotificationMails.Label(orgRequest.Type);
+        var name = $"{requester.FirstName} {requester.LastName}";
+        foreach (var to in approvers)
+            await NotificationMails.TrySendAsync(_email, to,
+                $"Neue Anfrage in {org.Name} / New request in {org.Name}",
+                $"{name} hat eine Anfrage gestellt: {de}. / {name} submitted a request: {en}.\n\n" +
+                $"{_emailSettings.FrontendBaseUrl}/organizations/{org.Slug}",
+                _logger);
+    }
+
+    /// <summary>Mails the requester the decision (with the reason, if one was given).</summary>
+    private async Task NotifyRequesterAsync(OrgRequest orgRequest, Organization org)
+    {
+        if (!orgRequest.User.IsActive) return;
+        var accepted = orgRequest.Status == RequestStatus.Accepted;
+        var (de, en) = NotificationMails.Label(orgRequest.Type);
+        var reason = orgRequest.ResponseReason != null ? $"\n\nBegründung / Reason: {orgRequest.ResponseReason}" : "";
+        await NotificationMails.TrySendAsync(_email, orgRequest.User.Email,
+            accepted ? $"Anfrage angenommen / Request accepted ({org.Name})" : $"Anfrage abgelehnt / Request declined ({org.Name})",
+            $"Deine Anfrage ({de}) in {org.Name} wurde {(accepted ? "angenommen" : "abgelehnt")}. / " +
+            $"Your {en} request in {org.Name} was {(accepted ? "accepted" : "declined")}.{reason}\n\n{_emailSettings.FrontendBaseUrl}/",
+            _logger);
     }
 
     /// <summary>
@@ -688,6 +777,7 @@ public class RequestService : IRequestService
     private static bool GroupCanApprove(Group group, RequestType type) => type switch
     {
         RequestType.EditPastEntry or RequestType.EditPause or RequestType.CsvImport or RequestType.SetInitialOvertime
+            or RequestType.AddManualEntry
             => group.GroupAdminCanApproveTimeEdits == true,
         RequestType.WorkScheduleChange => group.GroupAdminCanApproveScheduleChanges == true,
         RequestType.RequestAbsence => group.GroupAdminCanApproveAbsences == true,

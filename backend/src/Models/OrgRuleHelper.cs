@@ -13,7 +13,7 @@ public static class OrgRuleHelper
     /// </summary>
     public static RuleMode GetRuleMode(Organization org, RequestType action) => action switch
     {
-        RequestType.EditPastEntry      => org.EditPastEntriesMode,
+        RequestType.EditPastEntry or RequestType.AddManualEntry => org.EditPastEntriesMode,
         RequestType.EditPause          => org.EditPauseMode,
         RequestType.SetInitialOvertime => org.InitialOvertimeMode,
         RequestType.WorkScheduleChange => org.WorkScheduleChangeMode,
@@ -28,7 +28,7 @@ public static class OrgRuleHelper
     /// </summary>
     public static RuleMode? GetGroupRuleMode(Group group, RequestType action) => action switch
     {
-        RequestType.EditPastEntry      => group.EditPastEntriesMode,
+        RequestType.EditPastEntry or RequestType.AddManualEntry => group.EditPastEntriesMode,
         RequestType.EditPause          => group.EditPauseMode,
         RequestType.SetInitialOvertime => group.InitialOvertimeMode,
         RequestType.WorkScheduleChange => group.WorkScheduleChangeMode,
