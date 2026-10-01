@@ -42,7 +42,8 @@
 	let to = $state('');
 	let weekly = $state<number | null>(null);
 	let distribute = $state(true);
-	let days = $state<(number | null)[]>([0, 0, 0, 0, 0]);
+	/** Mon … Sun target hours (used when not distributing evenly over Mon–Fri). */
+	let days = $state<(number | null)[]>([0, 0, 0, 0, 0, 0, 0]);
 	let submitted = $state(false);
 	let saving = $state(false);
 	let saveError = $state('');
@@ -90,7 +91,7 @@
 		to = '';
 		weekly = null;
 		distribute = true;
-		days = [0, 0, 0, 0, 0];
+		days = [0, 0, 0, 0, 0, 0, 0];
 		submitted = false;
 		saveError = '';
 	}
@@ -106,7 +107,7 @@
 		if (fromError || toError || weeklyError || daysError) return;
 		saving = true;
 		saveError = '';
-		const [mon, tue, wed, thu, fri] = days.map((d) => d ?? 0);
+		const [mon, tue, wed, thu, fri, sat, sun] = days.map((d) => d ?? 0);
 		const payload: CreateWorkScheduleRequest = {
 			validFrom: from,
 			validTo: to || undefined,
@@ -116,7 +117,9 @@
 			targetTue: distribute ? undefined : tue,
 			targetWed: distribute ? undefined : wed,
 			targetThu: distribute ? undefined : thu,
-			targetFri: distribute ? undefined : fri
+			targetFri: distribute ? undefined : fri,
+			targetSat: distribute ? undefined : sat,
+			targetSun: distribute ? undefined : sun
 		};
 		const existingId = replacing?.id;
 		try {
@@ -208,8 +211,8 @@
 			{#if !distribute}
 				<fieldset>
 					<legend class="text-sm font-medium text-base-content/80 mb-1">{t('schedule.periods.dailyTargets')}</legend>
-					<div class="grid grid-cols-5 gap-2 max-w-sm">
-						{#each dayNamesShort().slice(0, 5) as dayName, i}
+					<div class="grid grid-cols-4 sm:grid-cols-7 gap-2 max-w-md">
+						{#each dayNamesShort() as dayName, i}
 							<div class="flex flex-col items-center gap-1">
 								<label for="sp-day{i}-{memberId ?? 'self'}" class="text-xs font-semibold text-base-content/60">{dayName}</label>
 								<input id="sp-day{i}-{memberId ?? 'self'}" type="number" step="0.5" min="0" max={MAX_DAILY} class="input input-bordered input-xs w-full text-center" bind:value={days[i]} disabled={saving} />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getAbsenceCredit, getDayTarget, getDayType, getTargetForRange, type ScheduleLike } from './scheduleHelpers';
+import { getAbsenceCredit, getDayTarget, getDayType, type ScheduleLike } from './scheduleHelpers';
 
 // 40h week, 8h Mon–Fri (targets are hours in the API, the helpers return minutes)
 const schedule: ScheduleLike = { targetMon: 8, targetTue: 8, targetWed: 8, targetThu: 8, targetFri: 8, weeklyWorkHours: 40 };
@@ -17,6 +17,13 @@ describe('getDayTarget', () => {
 		expect(getDayTarget(mon, schedule, new Map())).toBe(480);
 		expect(getDayTarget(sat, schedule, new Map())).toBe(0);
 		expect(getDayTarget(sun, schedule, new Map())).toBe(0);
+	});
+
+	it('uses Saturday/Sunday targets when the schedule has them', () => {
+		const weekend = { ...schedule, targetSat: 4, targetSun: 2 };
+		expect(getDayTarget(sat, weekend, new Map())).toBe(240);
+		expect(getDayTarget(sun, weekend, new Map())).toBe(120);
+		expect(getDayTarget(sat, weekend, new Map([['2026-03-07', 'Feiertag']]))).toBe(0);
 	});
 
 	it('returns 0 without any schedule', () => {
@@ -86,32 +93,6 @@ describe('getAbsenceCredit', () => {
 		expect(getAbsenceCredit(mon, schedule, new Map(), none, none, other, [], undefined, undefined, { noCredit: new Set(), topUp: new Set([key]) }, 300)).toBe(180);
 		// worked more than the target → no negative credit
 		expect(getAbsenceCredit(mon, schedule, new Map(), none, none, other, [], undefined, undefined, { noCredit: new Set(), topUp: new Set([key]) }, 600)).toBe(0);
-	});
-});
-
-describe('getTargetForRange', () => {
-	it('sums weekday targets, including both ends', () => {
-		expect(getTargetForRange(mon, sun, schedule, new Map(), [])).toBe(2400);
-		expect(getTargetForRange(mon, mon, schedule, new Map(), [])).toBe(480);
-	});
-
-	it('skips holidays and halves half-day holidays', () => {
-		const holidays = new Map([['2026-03-04', 'Feiertag'], ['2026-03-06', 'Halber Feiertag']]);
-		expect(getTargetForRange(mon, sun, schedule, holidays, [], null, new Set(['2026-03-06']))).toBe(480 * 3 + 240);
-	});
-
-	it('clips the range to the first tracked entry', () => {
-		expect(getTargetForRange(mon, sun, schedule, new Map(), [], wed)).toBe(480 * 3);
-		expect(getTargetForRange(mon, wed, schedule, new Map(), [], new Date(2026, 2, 10))).toBe(0);
-	});
-
-	it('crosses the DST switch without losing a day', () => {
-		// Mon 2026-03-23 … Fri 2026-03-27, clocks change on Sun 2026-03-29; range to Tue 2026-03-31
-		expect(getTargetForRange(new Date(2026, 2, 23), new Date(2026, 2, 31), schedule, new Map(), [])).toBe(480 * 7);
-	});
-
-	it('returns 0 without a schedule', () => {
-		expect(getTargetForRange(mon, sun, null, new Map(), [])).toBe(0);
 	});
 });
 

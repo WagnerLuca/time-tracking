@@ -12,7 +12,7 @@
 	}
 	let { schedule, loading = false, error = '', class: className = '' }: Props = $props();
 
-	let targets = $derived(schedule ? [schedule.targetMon, schedule.targetTue, schedule.targetWed, schedule.targetThu, schedule.targetFri] : []);
+	let targets = $derived(schedule ? [schedule.targetMon, schedule.targetTue, schedule.targetWed, schedule.targetThu, schedule.targetFri, schedule.targetSat, schedule.targetSun] : []);
 
 	function hours(v: number | null | undefined): string {
 		return v != null ? t('common.hoursShort', { value: formatNumber(v) }) : '—';
@@ -26,12 +26,12 @@
 	{:else if error}
 		<div class="alert alert-error text-sm py-2">{error}</div>
 	{:else if schedule}
-		<div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+		<div class="grid grid-cols-4 sm:grid-cols-8 gap-2">
 			<div class="flex flex-col items-center bg-base-200/40 p-2 rounded-lg border border-base-300">
 				<span class="text-xs text-base-content/60 font-medium">{t('schedule.active.weeklyHours')}</span>
 				<span class="text-lg font-bold text-base-content">{hours(schedule.weeklyWorkHours)}</span>
 			</div>
-			{#each dayNamesShort().slice(0, 5) as day, i}
+			{#each dayNamesShort() as day, i}
 				<div class="flex flex-col items-center bg-base-200/40 p-2 rounded-lg border border-base-300">
 					<span class="text-xs text-base-content/60 font-medium">{day}</span>
 					<span class="text-lg font-bold text-base-content">{hours(targets[i] ?? 0)}</span>

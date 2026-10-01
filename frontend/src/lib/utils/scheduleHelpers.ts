@@ -17,6 +17,8 @@ export interface ScheduleLike {
 	targetWed?: number | null;
 	targetThu?: number | null;
 	targetFri?: number | null;
+	targetSat?: number | null;
+	targetSun?: number | null;
 	weeklyWorkHours?: number | null;
 	initialOvertimeHours?: number | null;
 	initialOvertimeMode?: string | null;
@@ -32,6 +34,8 @@ export interface SchedulePeriodLike extends ScheduleLike {
  * Get the target minutes for a specific day, considering holidays and schedule periods.
  *
  * Priority order:
+ * Weekends have the schedule's Saturday/Sunday targets (0 unless set).
+ *
  * 1. Full-day holidays → 0 (no target)
  * 2. Half-day holidays → 50% of normal target
  * 3. Matching schedule period (by date range) → use that period's targets
@@ -59,9 +63,7 @@ export function getDayTarget(
 		return 0;
 	}
 
-	// Weekend → 0
 	const dow = date.getDay();
-	if (dow === 0 || dow === 6) return 0;
 
 	// Check schedule periods first (most specific wins)
 	for (const p of periods) {
@@ -80,7 +82,6 @@ export function getDayTarget(
  */
 function getFullDayTarget(date: Date, schedule: ScheduleLike | null | undefined, periods: SchedulePeriodLike[]): number {
 	const dow = date.getDay();
-	if (dow === 0 || dow === 6) return 0;
 	const key = dateKey(date);
 	for (const p of periods) {
 		if (p.validFrom && p.validFrom <= key && (!p.validTo || p.validTo >= key)) {
@@ -96,11 +97,13 @@ function getFullDayTarget(date: Date, schedule: ScheduleLike | null | undefined,
  */
 function getTargetForDow(dow: number, schedule: ScheduleLike): number {
 	const targets: Record<number, number> = {
+		0: (schedule.targetSun ?? 0) * 60,
 		1: (schedule.targetMon ?? 0) * 60,
 		2: (schedule.targetTue ?? 0) * 60,
 		3: (schedule.targetWed ?? 0) * 60,
 		4: (schedule.targetThu ?? 0) * 60,
 		5: (schedule.targetFri ?? 0) * 60,
+		6: (schedule.targetSat ?? 0) * 60
 	};
 	return targets[dow] ?? 0;
 }
@@ -212,34 +215,5 @@ export function getDayTypeLabel(
 	if (vacationDates.has(key)) return t('format.dayType.vacation') + halfSuffix;
 	if (otherAbsenceDates.has(key)) return otherLabel + halfSuffix;
 	return '';
-}
-
-/**
- * Sum the target minutes over a date range, optionally clipping to the first entry date.
- * Used by the dashboard for computing week/month targets since first tracked entry.
- */
-export function getTargetForRange(
-	rangeStart: Date,
-	rangeEnd: Date,
-	schedule: ScheduleLike | null | undefined,
-	holidayDates: Map<string, string> | Set<string>,
-	periods: SchedulePeriodLike[],
-	firstEntryDate: Date | null = null,
-	halfDayHolidays?: Set<string>
-): number {
-	if (!schedule && periods.length === 0) return 0;
-	const effectiveStart = firstEntryDate && firstEntryDate > rangeStart ? firstEntryDate : rangeStart;
-	if (effectiveStart > rangeEnd) return 0;
-
-	let total = 0;
-	const cursor = new Date(effectiveStart);
-	cursor.setHours(0, 0, 0, 0);
-	const end = new Date(rangeEnd);
-	end.setHours(23, 59, 59, 999);
-	while (cursor <= end) {
-		total += getDayTarget(cursor, schedule, holidayDates, periods, halfDayHolidays);
-		cursor.setDate(cursor.getDate() + 1);
-	}
-	return total;
 }
 
