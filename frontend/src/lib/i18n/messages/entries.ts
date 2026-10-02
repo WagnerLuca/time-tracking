@@ -9,6 +9,14 @@ export const de = {
 	running: 'Läuft',
 	needsCorrection: 'Korrektur nötig',
 	needsCorrectionHint: 'Der Timer lief über das Ende des Arbeitstags und wurde automatisch gestoppt. Er zählt als 0, bis die Endzeit korrigiert ist.',
+	source: {
+		terminal: 'Terminal',
+		terminalNamed: 'Terminal {name}',
+		terminalRoute: 'Gestartet an {start}, gestoppt an {stop}',
+		manual: 'Nachgetragen',
+		import: 'Importiert',
+		admin: 'Vom Admin erfasst'
+	},
 	pauseBadge: '−{minutes} min Pause',
 	addPauseBadge: '+ Pause',
 	editPause: 'Pause bearbeiten',
@@ -91,6 +99,14 @@ export const en: typeof de = {
 	running: 'Running',
 	needsCorrection: 'Needs correction',
 	needsCorrectionHint: 'The timer ran past the business day end and was stopped automatically. It counts as 0 until the end time is corrected.',
+	source: {
+		terminal: 'Terminal',
+		terminalNamed: 'Terminal {name}',
+		terminalRoute: 'Started at {start}, stopped at {stop}',
+		manual: 'Added by hand',
+		import: 'Imported',
+		admin: 'Entered by an admin'
+	},
 	pauseBadge: '−{minutes} min pause',
 	addPauseBadge: '+ Pause',
 	editPause: 'Edit pause',

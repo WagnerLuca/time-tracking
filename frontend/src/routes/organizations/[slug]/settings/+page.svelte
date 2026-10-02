@@ -892,7 +892,7 @@
 				{/if}
 			</section>
 
-			<ApiKeysPanel {orgSlug} />
+			<ApiKeysPanel {orgSlug} members={org.members ?? []} />
 
 			<!-- Request History -->
 			<section class="mt-8">

@@ -130,7 +130,7 @@ export const de = {
 	},
 	apiKeys: {
 		title: 'Terminal-API-Schlüssel',
-		intro: 'Für Geräte wie einen RFID-Scanner: Ein Terminal startet oder stoppt damit den Timer eines Mitglieds anhand seiner Ausweis-ID. Ausweis-IDs werden auf der Seite des jeweiligen Mitglieds vergeben. Mehr kann ein Schlüssel nicht.',
+		intro: 'Für Geräte wie einen RFID-Scanner: Ein Terminal startet oder stoppt damit den Timer eines Mitglieds anhand seiner Karte. Karten werden auf der Seite des Mitglieds oder unten unter „Unbekannte Karten“ zugeordnet. Mehr kann ein Schlüssel nicht. Der Name des Schlüssels ist der Terminal-Name im Protokoll und an den Einträgen.',
 		header: 'Header',
 		endpoint: 'Endpunkt',
 		field: 'Feld',
@@ -151,7 +151,45 @@ export const de = {
 		revokeTitle: '„{name}“ widerrufen?',
 		revokeMessage: 'Terminals mit diesem Schlüssel funktionieren sofort nicht mehr.',
 		revoked: 'API-Schlüssel widerrufen.',
-		revokeFailed: 'API-Schlüssel konnte nicht widerrufen werden.'
+		revokeFailed: 'API-Schlüssel konnte nicht widerrufen werden.',
+		rename: 'Umbenennen',
+		renamed: 'Terminal umbenannt.',
+		renameFailed: 'Das Terminal konnte nicht umbenannt werden.'
+	},
+	terminal: {
+		unknownTitle: 'Unbekannte Karten',
+		unknownIntro: 'Karten, die in den letzten 7 Tagen an einem Terminal gescannt wurden, aber niemandem gehören. Nach dem Zuordnen funktioniert die Karte sofort.',
+		unknownEmpty: 'Keine unbekannten Karten.',
+		scans: { one: '{count} Scan', other: '{count} Scans' },
+		lastSeen: 'zuletzt {time}',
+		atTerminal: 'an {terminal}',
+		assign: 'Mitglied zuordnen',
+		member: 'Mitglied',
+		chooseMember: 'Mitglied wählen…',
+		cardLabel: 'Bezeichnung (optional)',
+		assigned: 'Karte zugeordnet.',
+		assignFailed: 'Die Karte konnte nicht zugeordnet werden.',
+		loadFailed: 'Die Terminal-Daten konnten nicht geladen werden.',
+		punchesTitle: 'Stempelprotokoll',
+		punchesIntro: 'Die letzten Scans aller Terminals, neueste zuerst. Einträge werden 400 Tage aufbewahrt.',
+		punchesEmpty: 'Noch keine Scans.',
+		refresh: 'Aktualisieren',
+		colTime: 'Zeit',
+		colTerminal: 'Terminal',
+		colCard: 'Karte',
+		colMember: 'Mitglied',
+		colResult: 'Ergebnis',
+		queued: 'nachgereicht {time}',
+		deletedTerminal: 'gelöschtes Terminal',
+		results: {
+			Started: 'Gestartet',
+			Stopped: 'Gestoppt',
+			ClosedFailure: 'Fehleintrag geschlossen',
+			Repeated: 'Doppelt gescannt',
+			UnknownCard: 'Unbekannte Karte',
+			Blocked: 'Gesperrt',
+			Rejected: 'Abgelehnt'
+		}
 	}
 };
 
@@ -286,7 +324,7 @@ export const en: typeof de = {
 	},
 	apiKeys: {
 		title: 'Terminal API keys',
-		intro: "For devices such as an RFID scanner: a terminal uses the key to start or stop a member's timer by their badge ID. Assign badge IDs on each member's page. A key can do nothing else.",
+		intro: "For devices such as an RFID scanner: a terminal uses the key to start or stop a member's timer by their card. Assign cards on the member's page or below under “Unknown cards”. A key can do nothing else. The key's name is the terminal name in the protocol and on entries.",
 		header: 'Header',
 		endpoint: 'Endpoint',
 		field: 'Field',
@@ -307,6 +345,44 @@ export const en: typeof de = {
 		revokeTitle: 'Revoke "{name}"?',
 		revokeMessage: 'Terminals using it stop working immediately.',
 		revoked: 'API key revoked.',
-		revokeFailed: 'Could not revoke the API key.'
+		revokeFailed: 'Could not revoke the API key.',
+		rename: 'Rename',
+		renamed: 'Terminal renamed.',
+		renameFailed: 'Could not rename the terminal.'
+	},
+	terminal: {
+		unknownTitle: 'Unknown cards',
+		unknownIntro: 'Cards scanned at a terminal in the last 7 days that belong to nobody. Once assigned, the card works right away.',
+		unknownEmpty: 'No unknown cards.',
+		scans: { one: '{count} scan', other: '{count} scans' },
+		lastSeen: 'last {time}',
+		atTerminal: 'at {terminal}',
+		assign: 'Assign to member',
+		member: 'Member',
+		chooseMember: 'Choose a member…',
+		cardLabel: 'Label (optional)',
+		assigned: 'Card assigned.',
+		assignFailed: 'Could not assign the card.',
+		loadFailed: 'Could not load the terminal data.',
+		punchesTitle: 'Punch protocol',
+		punchesIntro: 'The latest scans of all terminals, newest first. Rows are kept for 400 days.',
+		punchesEmpty: 'No scans yet.',
+		refresh: 'Refresh',
+		colTime: 'Time',
+		colTerminal: 'Terminal',
+		colCard: 'Card',
+		colMember: 'Member',
+		colResult: 'Result',
+		queued: 'sent later {time}',
+		deletedTerminal: 'deleted terminal',
+		results: {
+			Started: 'Started',
+			Stopped: 'Stopped',
+			ClosedFailure: 'Failure entry closed',
+			Repeated: 'Scanned twice',
+			UnknownCard: 'Unknown card',
+			Blocked: 'Blocked',
+			Rejected: 'Rejected'
+		}
 	}
 };

@@ -121,6 +121,14 @@ export interface AcceptedInvitationResponse {
     'organizationName': string | null;
     'role': string | null;
 }
+/**
+ * Add a card to a member: typed in (TimeTracking.Api.Models.Dtos.AddBadgeCardRequest.CardId) or adopted from an unknown scan (TimeTracking.Api.Models.Dtos.AddBadgeCardRequest.FromPunchId).
+ */
+export interface AddBadgeCardRequest {
+    'cardId'?: string | null;
+    'fromPunchId'?: number | null;
+    'label'?: string | null;
+}
 export interface AddGroupMemberRequest {
     'userId'?: number;
     'role'?: string | null;
@@ -161,6 +169,18 @@ export interface ApiKeyResponse {
 export interface AuthResponse {
     'success': boolean;
     'message': string | null;
+}
+/**
+ * A member\'s terminal card. The card value itself is never returned, only its last characters.
+ */
+export interface BadgeCardResponse {
+    'id'?: number;
+    'userId'?: number;
+    'cardHint': string | null;
+    'label'?: string | null;
+    'isBlocked'?: boolean;
+    'createdAt'?: string;
+    'lastUsedAt'?: string | null;
 }
 /**
  * A member\'s working-time balance, computed by the same day-by-day rules as the reports.  Days are the organization\'s local days; periods end today.
@@ -828,9 +848,9 @@ export interface OrganizationMemberResponse {
      */
     'vacationVisible'?: boolean;
     /**
-     * Terminal badge ID; only filled in for org admins.
+     * Number of terminal cards; only filled in for org admins.
      */
-    'badgeId'?: string | null;
+    'cardCount'?: number;
 }
 /**
  * Summary view of an organization.
@@ -942,6 +962,14 @@ export interface PersonalAbsence {
     'isHalfDay'?: boolean;
     'note'?: string | null;
 }
+export interface PersonalCard {
+    'organization'?: string | null;
+    'cardHint'?: string | null;
+    'label'?: string | null;
+    'isBlocked'?: boolean;
+    'createdAt'?: string;
+    'lastUsedAt'?: string | null;
+}
 /**
  * Everything the application stores about one person (GDPR Art. 15/20).
  */
@@ -951,10 +979,25 @@ export interface PersonalDataExport {
     'createdAt'?: string;
     'lastLoginAt'?: string | null;
     'memberships': Array<PersonalMembership> | null;
+    /**
+     * Terminal cards, by hint and label (the card value itself is not stored).
+     */
+    'cards': Array<PersonalCard> | null;
     'timeEntries': Array<PersonalTimeEntry> | null;
     'absences': Array<PersonalAbsence> | null;
     'requests': Array<PersonalRequest> | null;
     'notifications': Array<PersonalNotification> | null;
+    'entryChanges': Array<PersonalEntryChange> | null;
+}
+/**
+ * Changes is the stored JSON array of {field, oldValue, newValue}.
+ */
+export interface PersonalEntryChange {
+    'timeEntryId'?: number;
+    'changedAt'?: string;
+    'kind'?: string | null;
+    'changedByYou'?: boolean;
+    'changes'?: string | null;
 }
 export interface PersonalMembership {
     'organization'?: string | null;
@@ -963,7 +1006,6 @@ export interface PersonalMembership {
     'active'?: boolean;
     'vacationDaysPerYear'?: number;
     'initialOvertimeHours'?: number;
-    'badgeId'?: string | null;
 }
 export interface PersonalNotification {
     'title'?: string | null;
@@ -998,19 +1040,34 @@ export interface ProblemDetails {
     'instance'?: string | null;
 }
 /**
- * A badge scan from a terminal.
+ * A card scan from a terminal.
  */
 export interface PunchRequest {
+    /**
+     * The card value (UID or a value derived from the card\'s secret); treated as opaque.
+     */
     'badgeId': string;
+    /**
+     * When the card was scanned (UTC), for scans a terminal queued while offline. Accepted from  72 hours ago to 2 minutes ahead; must not be before the member\'s last accepted punch.  Without it the arrival time counts.
+     */
+    'scannedAt'?: string | null;
+    /**
+     * The terminal\'s id for this scan, unique per key: a replay returns the stored result.
+     */
+    'clientPunchId'?: string | null;
 }
 /**
- * Outcome of a badge scan: the member\'s timer was started or stopped.
+ * Outcome of a card scan.
  */
 export interface PunchResponse {
     /**
-     * \"Started\" or \"Stopped\".
+     * \"Started\", \"Stopped\" or \"ClosedFailure\" (a queued scan closed an auto-stopped entry).
      */
     'action': string | null;
+    /**
+     * True when this was a second scan within a minute: nothing changed, this is the previous result.
+     */
+    'repeated'?: boolean;
     'firstName': string | null;
     'lastName': string | null;
     'entry': TimeEntryResponse;
@@ -1115,12 +1172,6 @@ export type RuleMode = typeof RuleMode[keyof typeof RuleMode];
 
 
 /**
- * Request payload for assigning (or clearing, with null) a member\'s badge ID.
- */
-export interface SetBadgeRequest {
-    'badgeId'?: string | null;
-}
-/**
  * Request payload for setting a member\'s initial overtime hours.
  */
 export interface SetInitialOvertimeRequest {
@@ -1157,6 +1208,24 @@ export interface StopTimeEntryRequest {
      * Optional description to set/update on the entry being stopped.
      */
     'description'?: string | null;
+}
+/**
+ * One row of the punch protocol.
+ */
+export interface TerminalPunchResponse {
+    'id'?: number;
+    'scannedAt'?: string;
+    'receivedAt'?: string;
+    /**
+     * Started, Stopped, ClosedFailure, Repeated, UnknownCard, Blocked or Rejected.
+     */
+    'result': string | null;
+    'terminalName'?: string | null;
+    'cardHint': string | null;
+    'cardLabel'?: string | null;
+    'userId'?: number | null;
+    'memberName'?: string | null;
+    'timeEntryId'?: number | null;
 }
 /**
  * One recorded change of a time entry.
@@ -1223,6 +1292,18 @@ export interface TimeEntryResponse {
      */
     'isFailure'?: boolean;
     'createdAt'?: string;
+    /**
+     * Where the entry was created: App, Terminal, Manual, Import or Admin.
+     */
+    'source'?: string | null;
+    /**
+     * Name of the terminal that started the entry, if one did.
+     */
+    'terminalStartName'?: string | null;
+    /**
+     * Name of the terminal that stopped (or closed) the entry, if one did.
+     */
+    'terminalStopName'?: string | null;
     /**
      * Working Time Act warnings, filled on stop, edit and manual/admin create:  \"dailyMax\" (more than 10 h net that day), \"restPeriod\" (less than 11 h rest before  this day or before the next). Null where not computed (lists).
      */
@@ -1299,10 +1380,36 @@ export interface TwoFactorVerifyRequest {
     'code': string;
 }
 /**
+ * A card a terminal scanned recently that belongs to nobody (grouped per card).
+ */
+export interface UnknownCardResponse {
+    /**
+     * The latest scan of the card; pass it as `fromPunchId` to assign the card.
+     */
+    'punchId'?: number;
+    'cardHint': string | null;
+    'terminalName'?: string | null;
+    'lastSeenAt'?: string;
+    'count'?: number;
+}
+/**
  * Number of unread notifications.
  */
 export interface UnreadCountResponse {
     'count'?: number;
+}
+/**
+ * Rename a key (its name is the terminal name in the punch protocol and on entries).
+ */
+export interface UpdateApiKeyRequest {
+    'name': string;
+}
+/**
+ * Change a card\'s label or block/unblock it; unset fields stay.
+ */
+export interface UpdateBadgeCardRequest {
+    'label'?: string | null;
+    'isBlocked'?: boolean | null;
 }
 export interface UpdateGroupMemberRoleRequest {
     'role'?: string | null;
@@ -2457,7 +2564,7 @@ export const ApiKeysApiAxiosParamCreator = function (configuration?: Configurati
         },
         /**
          * 
-         * @summary Revoke (delete) an API key (admins only).
+         * @summary Revoke (delete) an API key (admins only). Its punch protocol rows stay.
          * @param {string} slug 
          * @param {number} keyId 
          * @param {*} [options] Override http request option.
@@ -2491,6 +2598,52 @@ export const ApiKeysApiAxiosParamCreator = function (configuration?: Configurati
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Rename an API key (admins only); the name is the terminal name in the punch protocol and on entries.
+         * @param {string} slug 
+         * @param {number} keyId 
+         * @param {UpdateApiKeyRequest} [updateApiKeyRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugApiKeysKeyIdPut: async (slug: string, keyId: number, updateApiKeyRequest?: UpdateApiKeyRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugApiKeysKeyIdPut', 'slug', slug)
+            // verify required parameter 'keyId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugApiKeysKeyIdPut', 'keyId', keyId)
+            const localVarPath = `/api/v1/organizations/{slug}/api-keys/{keyId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"keyId"}}`, encodeURIComponent(String(keyId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updateApiKeyRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -2541,21 +2694,71 @@ export const ApiKeysApiAxiosParamCreator = function (configuration?: Configurati
         },
         /**
          * 
-         * @summary Assign or clear (null) a member\'s badge ID (admins only).
+         * @summary Remove a card (admins only).
          * @param {string} slug 
          * @param {number} memberId 
-         * @param {SetBadgeRequest} [setBadgeRequest] 
+         * @param {number} cardId 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugMembersMemberIdBadgePut: async (slug: string, memberId: number, setBadgeRequest?: SetBadgeRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        apiV1OrganizationsSlugMembersMemberIdCardsCardIdDelete: async (slug: string, memberId: number, cardId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'slug' is not null or undefined
-            assertParamExists('apiV1OrganizationsSlugMembersMemberIdBadgePut', 'slug', slug)
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdCardsCardIdDelete', 'slug', slug)
             // verify required parameter 'memberId' is not null or undefined
-            assertParamExists('apiV1OrganizationsSlugMembersMemberIdBadgePut', 'memberId', memberId)
-            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/badge`
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdCardsCardIdDelete', 'memberId', memberId)
+            // verify required parameter 'cardId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdCardsCardIdDelete', 'cardId', cardId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/cards/{cardId}`
                 .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
-                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)))
+                .replace(`{${"cardId"}}`, encodeURIComponent(String(cardId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Change a card\'s label or block/unblock it (admins only).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} cardId 
+         * @param {UpdateBadgeCardRequest} [updateBadgeCardRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdCardsCardIdPut: async (slug: string, memberId: number, cardId: number, updateBadgeCardRequest?: UpdateBadgeCardRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdCardsCardIdPut', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdCardsCardIdPut', 'memberId', memberId)
+            // verify required parameter 'cardId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdCardsCardIdPut', 'cardId', cardId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/cards/{cardId}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)))
+                .replace(`{${"cardId"}}`, encodeURIComponent(String(cardId)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -2578,7 +2781,7 @@ export const ApiKeysApiAxiosParamCreator = function (configuration?: Configurati
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(setBadgeRequest, localVarRequestOptions, configuration)
+            localVarRequestOptions.data = serializeDataIfNeeded(updateBadgeCardRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -2587,7 +2790,190 @@ export const ApiKeysApiAxiosParamCreator = function (configuration?: Configurati
         },
         /**
          * 
-         * @summary Terminal endpoint: authenticates with an organization API key in the `X-Api-Key`  header (no user login) and toggles the badge owner\'s timer — stops it if running,  otherwise starts a new entry in the key\'s organization.
+         * @summary A member\'s terminal cards (admins only); only the last characters of each card value.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdCardsGet: async (slug: string, memberId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdCardsGet', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdCardsGet', 'memberId', memberId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/cards`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Add a card to a member (admins only): typed in (`cardId`) or adopted from an unknown scan (`fromPunchId`).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {AddBadgeCardRequest} [addBadgeCardRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdCardsPost: async (slug: string, memberId: number, addBadgeCardRequest?: AddBadgeCardRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdCardsPost', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdCardsPost', 'memberId', memberId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/cards`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(addBadgeCardRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Punch protocol, newest first (admins only). from/to are UTC instants on the scan time; limit 1-1000 (default 200).
+         * @param {string} slug 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {number} [limit] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugTerminalPunchesGet: async (slug: string, from?: string, to?: string, limit?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugTerminalPunchesGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/terminal/punches`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (from !== undefined) {
+                localVarQueryParameter['from'] = (from as any instanceof Date) ?
+                    (from as any).toISOString() :
+                    from;
+            }
+
+            if (to !== undefined) {
+                localVarQueryParameter['to'] = (to as any instanceof Date) ?
+                    (to as any).toISOString() :
+                    to;
+            }
+
+            if (limit !== undefined) {
+                localVarQueryParameter['limit'] = limit;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Cards scanned in the last 7 days that belong to nobody, grouped per card, newest first (admins only).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugTerminalUnknownCardsGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugTerminalUnknownCardsGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/terminal/unknown-cards`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Terminal endpoint: authenticates with an organization API key in the `X-Api-Key`  header (no user login) and toggles the card owner\'s timer: stops it if running,  otherwise starts a new entry in the key\'s organization. See docs/TERMINAL.md for the  double-scan, offline queue and idempotency rules.
          * @param {string} [xApiKey] 
          * @param {PunchRequest} [punchRequest] 
          * @param {*} [options] Override http request option.
@@ -2651,7 +3037,7 @@ export const ApiKeysApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Revoke (delete) an API key (admins only).
+         * @summary Revoke (delete) an API key (admins only). Its punch protocol rows stay.
          * @param {string} slug 
          * @param {number} keyId 
          * @param {*} [options] Override http request option.
@@ -2661,6 +3047,21 @@ export const ApiKeysApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugApiKeysKeyIdDelete(slug, keyId, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugApiKeysKeyIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Rename an API key (admins only); the name is the terminal name in the punch protocol and on entries.
+         * @param {string} slug 
+         * @param {number} keyId 
+         * @param {UpdateApiKeyRequest} [updateApiKeyRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugApiKeysKeyIdPut(slug: string, keyId: number, updateApiKeyRequest?: UpdateApiKeyRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ApiKeyResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugApiKeysKeyIdPut(slug, keyId, updateApiKeyRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugApiKeysKeyIdPut']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -2679,22 +3080,96 @@ export const ApiKeysApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Assign or clear (null) a member\'s badge ID (admins only).
+         * @summary Remove a card (admins only).
          * @param {string} slug 
          * @param {number} memberId 
-         * @param {SetBadgeRequest} [setBadgeRequest] 
+         * @param {number} cardId 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1OrganizationsSlugMembersMemberIdBadgePut(slug: string, memberId: number, setBadgeRequest?: SetBadgeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdBadgePut(slug, memberId, setBadgeRequest, options);
+        async apiV1OrganizationsSlugMembersMemberIdCardsCardIdDelete(slug: string, memberId: number, cardId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdCardsCardIdDelete(slug, memberId, cardId, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugMembersMemberIdBadgePut']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugMembersMemberIdCardsCardIdDelete']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
          * 
-         * @summary Terminal endpoint: authenticates with an organization API key in the `X-Api-Key`  header (no user login) and toggles the badge owner\'s timer — stops it if running,  otherwise starts a new entry in the key\'s organization.
+         * @summary Change a card\'s label or block/unblock it (admins only).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} cardId 
+         * @param {UpdateBadgeCardRequest} [updateBadgeCardRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdCardsCardIdPut(slug: string, memberId: number, cardId: number, updateBadgeCardRequest?: UpdateBadgeCardRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BadgeCardResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdCardsCardIdPut(slug, memberId, cardId, updateBadgeCardRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugMembersMemberIdCardsCardIdPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary A member\'s terminal cards (admins only); only the last characters of each card value.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdCardsGet(slug: string, memberId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<BadgeCardResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdCardsGet(slug, memberId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugMembersMemberIdCardsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Add a card to a member (admins only): typed in (`cardId`) or adopted from an unknown scan (`fromPunchId`).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {AddBadgeCardRequest} [addBadgeCardRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdCardsPost(slug: string, memberId: number, addBadgeCardRequest?: AddBadgeCardRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<BadgeCardResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdCardsPost(slug, memberId, addBadgeCardRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugMembersMemberIdCardsPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Punch protocol, newest first (admins only). from/to are UTC instants on the scan time; limit 1-1000 (default 200).
+         * @param {string} slug 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {number} [limit] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugTerminalPunchesGet(slug: string, from?: string, to?: string, limit?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<TerminalPunchResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugTerminalPunchesGet(slug, from, to, limit, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugTerminalPunchesGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Cards scanned in the last 7 days that belong to nobody, grouped per card, newest first (admins only).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugTerminalUnknownCardsGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<UnknownCardResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugTerminalUnknownCardsGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ApiKeysApi.apiV1OrganizationsSlugTerminalUnknownCardsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Terminal endpoint: authenticates with an organization API key in the `X-Api-Key`  header (no user login) and toggles the card owner\'s timer: stops it if running,  otherwise starts a new entry in the key\'s organization. See docs/TERMINAL.md for the  double-scan, offline queue and idempotency rules.
          * @param {string} [xApiKey] 
          * @param {PunchRequest} [punchRequest] 
          * @param {*} [options] Override http request option.
@@ -2727,7 +3202,7 @@ export const ApiKeysApiFactory = function (configuration?: Configuration, basePa
         },
         /**
          * 
-         * @summary Revoke (delete) an API key (admins only).
+         * @summary Revoke (delete) an API key (admins only). Its punch protocol rows stay.
          * @param {string} slug 
          * @param {number} keyId 
          * @param {*} [options] Override http request option.
@@ -2735,6 +3210,18 @@ export const ApiKeysApiFactory = function (configuration?: Configuration, basePa
          */
         apiV1OrganizationsSlugApiKeysKeyIdDelete(slug: string, keyId: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
             return localVarFp.apiV1OrganizationsSlugApiKeysKeyIdDelete(slug, keyId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Rename an API key (admins only); the name is the terminal name in the punch protocol and on entries.
+         * @param {string} slug 
+         * @param {number} keyId 
+         * @param {UpdateApiKeyRequest} [updateApiKeyRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugApiKeysKeyIdPut(slug: string, keyId: number, updateApiKeyRequest?: UpdateApiKeyRequest, options?: RawAxiosRequestConfig): AxiosPromise<ApiKeyResponse> {
+            return localVarFp.apiV1OrganizationsSlugApiKeysKeyIdPut(slug, keyId, updateApiKeyRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -2749,19 +3236,78 @@ export const ApiKeysApiFactory = function (configuration?: Configuration, basePa
         },
         /**
          * 
-         * @summary Assign or clear (null) a member\'s badge ID (admins only).
+         * @summary Remove a card (admins only).
          * @param {string} slug 
          * @param {number} memberId 
-         * @param {SetBadgeRequest} [setBadgeRequest] 
+         * @param {number} cardId 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugMembersMemberIdBadgePut(slug: string, memberId: number, setBadgeRequest?: SetBadgeRequest, options?: RawAxiosRequestConfig): AxiosPromise<void> {
-            return localVarFp.apiV1OrganizationsSlugMembersMemberIdBadgePut(slug, memberId, setBadgeRequest, options).then((request) => request(axios, basePath));
+        apiV1OrganizationsSlugMembersMemberIdCardsCardIdDelete(slug: string, memberId: number, cardId: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdCardsCardIdDelete(slug, memberId, cardId, options).then((request) => request(axios, basePath));
         },
         /**
          * 
-         * @summary Terminal endpoint: authenticates with an organization API key in the `X-Api-Key`  header (no user login) and toggles the badge owner\'s timer — stops it if running,  otherwise starts a new entry in the key\'s organization.
+         * @summary Change a card\'s label or block/unblock it (admins only).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} cardId 
+         * @param {UpdateBadgeCardRequest} [updateBadgeCardRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdCardsCardIdPut(slug: string, memberId: number, cardId: number, updateBadgeCardRequest?: UpdateBadgeCardRequest, options?: RawAxiosRequestConfig): AxiosPromise<BadgeCardResponse> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdCardsCardIdPut(slug, memberId, cardId, updateBadgeCardRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary A member\'s terminal cards (admins only); only the last characters of each card value.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdCardsGet(slug: string, memberId: number, options?: RawAxiosRequestConfig): AxiosPromise<Array<BadgeCardResponse>> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdCardsGet(slug, memberId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Add a card to a member (admins only): typed in (`cardId`) or adopted from an unknown scan (`fromPunchId`).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {AddBadgeCardRequest} [addBadgeCardRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdCardsPost(slug: string, memberId: number, addBadgeCardRequest?: AddBadgeCardRequest, options?: RawAxiosRequestConfig): AxiosPromise<BadgeCardResponse> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdCardsPost(slug, memberId, addBadgeCardRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Punch protocol, newest first (admins only). from/to are UTC instants on the scan time; limit 1-1000 (default 200).
+         * @param {string} slug 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {number} [limit] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugTerminalPunchesGet(slug: string, from?: string, to?: string, limit?: number, options?: RawAxiosRequestConfig): AxiosPromise<Array<TerminalPunchResponse>> {
+            return localVarFp.apiV1OrganizationsSlugTerminalPunchesGet(slug, from, to, limit, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Cards scanned in the last 7 days that belong to nobody, grouped per card, newest first (admins only).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugTerminalUnknownCardsGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<Array<UnknownCardResponse>> {
+            return localVarFp.apiV1OrganizationsSlugTerminalUnknownCardsGet(slug, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Terminal endpoint: authenticates with an organization API key in the `X-Api-Key`  header (no user login) and toggles the card owner\'s timer: stops it if running,  otherwise starts a new entry in the key\'s organization. See docs/TERMINAL.md for the  double-scan, offline queue and idempotency rules.
          * @param {string} [xApiKey] 
          * @param {PunchRequest} [punchRequest] 
          * @param {*} [options] Override http request option.
@@ -2790,7 +3336,7 @@ export class ApiKeysApi extends BaseAPI {
 
     /**
      * 
-     * @summary Revoke (delete) an API key (admins only).
+     * @summary Revoke (delete) an API key (admins only). Its punch protocol rows stay.
      * @param {string} slug 
      * @param {number} keyId 
      * @param {*} [options] Override http request option.
@@ -2798,6 +3344,19 @@ export class ApiKeysApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugApiKeysKeyIdDelete(slug: string, keyId: number, options?: RawAxiosRequestConfig) {
         return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugApiKeysKeyIdDelete(slug, keyId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Rename an API key (admins only); the name is the terminal name in the punch protocol and on entries.
+     * @param {string} slug 
+     * @param {number} keyId 
+     * @param {UpdateApiKeyRequest} [updateApiKeyRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugApiKeysKeyIdPut(slug: string, keyId: number, updateApiKeyRequest?: UpdateApiKeyRequest, options?: RawAxiosRequestConfig) {
+        return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugApiKeysKeyIdPut(slug, keyId, updateApiKeyRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -2814,20 +3373,84 @@ export class ApiKeysApi extends BaseAPI {
 
     /**
      * 
-     * @summary Assign or clear (null) a member\'s badge ID (admins only).
+     * @summary Remove a card (admins only).
      * @param {string} slug 
      * @param {number} memberId 
-     * @param {SetBadgeRequest} [setBadgeRequest] 
+     * @param {number} cardId 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public apiV1OrganizationsSlugMembersMemberIdBadgePut(slug: string, memberId: number, setBadgeRequest?: SetBadgeRequest, options?: RawAxiosRequestConfig) {
-        return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdBadgePut(slug, memberId, setBadgeRequest, options).then((request) => request(this.axios, this.basePath));
+    public apiV1OrganizationsSlugMembersMemberIdCardsCardIdDelete(slug: string, memberId: number, cardId: number, options?: RawAxiosRequestConfig) {
+        return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdCardsCardIdDelete(slug, memberId, cardId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
      * 
-     * @summary Terminal endpoint: authenticates with an organization API key in the `X-Api-Key`  header (no user login) and toggles the badge owner\'s timer — stops it if running,  otherwise starts a new entry in the key\'s organization.
+     * @summary Change a card\'s label or block/unblock it (admins only).
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {number} cardId 
+     * @param {UpdateBadgeCardRequest} [updateBadgeCardRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdCardsCardIdPut(slug: string, memberId: number, cardId: number, updateBadgeCardRequest?: UpdateBadgeCardRequest, options?: RawAxiosRequestConfig) {
+        return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdCardsCardIdPut(slug, memberId, cardId, updateBadgeCardRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary A member\'s terminal cards (admins only); only the last characters of each card value.
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdCardsGet(slug: string, memberId: number, options?: RawAxiosRequestConfig) {
+        return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdCardsGet(slug, memberId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Add a card to a member (admins only): typed in (`cardId`) or adopted from an unknown scan (`fromPunchId`).
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {AddBadgeCardRequest} [addBadgeCardRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdCardsPost(slug: string, memberId: number, addBadgeCardRequest?: AddBadgeCardRequest, options?: RawAxiosRequestConfig) {
+        return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdCardsPost(slug, memberId, addBadgeCardRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Punch protocol, newest first (admins only). from/to are UTC instants on the scan time; limit 1-1000 (default 200).
+     * @param {string} slug 
+     * @param {string} [from] 
+     * @param {string} [to] 
+     * @param {number} [limit] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugTerminalPunchesGet(slug: string, from?: string, to?: string, limit?: number, options?: RawAxiosRequestConfig) {
+        return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugTerminalPunchesGet(slug, from, to, limit, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Cards scanned in the last 7 days that belong to nobody, grouped per card, newest first (admins only).
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugTerminalUnknownCardsGet(slug: string, options?: RawAxiosRequestConfig) {
+        return ApiKeysApiFp(this.configuration).apiV1OrganizationsSlugTerminalUnknownCardsGet(slug, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Terminal endpoint: authenticates with an organization API key in the `X-Api-Key`  header (no user login) and toggles the card owner\'s timer: stops it if running,  otherwise starts a new entry in the key\'s organization. See docs/TERMINAL.md for the  double-scan, offline queue and idempotency rules.
      * @param {string} [xApiKey] 
      * @param {PunchRequest} [punchRequest] 
      * @param {*} [options] Override http request option.

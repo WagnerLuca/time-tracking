@@ -152,8 +152,20 @@ export const de = {
 		memberNotFound: 'Mitglied nicht in der Gruppe gefunden.'
 	},
 	apiKey: {
-		badgeTaken: 'Dieser Ausweis ist bereits einem anderen Mitglied zugeordnet.',
 		notFound: 'API-Schlüssel nicht gefunden.'
+	},
+	terminal: {
+		invalidKey: 'Der API-Schlüssel fehlt oder ist ungültig.',
+		unknownCard: 'Unbekannte Karte.',
+		cardBlocked: 'Diese Karte ist gesperrt.',
+		tooManyUnknown: 'Zu viele unbekannte Karten gescannt. Bitte später erneut versuchen.',
+		scannedAtOutOfRange: 'Die Scan-Zeit muss zwischen vor 72 Stunden und in 2 Minuten liegen.',
+		outOfOrder: 'Dieser Scan ist älter als der letzte Stempel des Mitglieds.',
+		timerElsewhere: 'Ein Timer läuft außerhalb dieser Organisation. Bitte zuerst in der App stoppen.',
+		cardTaken: 'Diese Karte ist bereits registriert.',
+		cardRequired: 'Gib eine Karten-ID ein oder wähle eine gescannte Karte.',
+		cardNotFound: 'Karte nicht gefunden.',
+		scanNotFound: 'Scan nicht gefunden.'
 	}
 };
 
@@ -304,7 +316,19 @@ export const en: typeof de = {
 		memberNotFound: 'Member not found in the group.'
 	},
 	apiKey: {
-		badgeTaken: 'This badge is already assigned to another member.',
 		notFound: 'API key not found.'
+	},
+	terminal: {
+		invalidKey: 'The API key is missing or invalid.',
+		unknownCard: 'Unknown card.',
+		cardBlocked: 'This card is blocked.',
+		tooManyUnknown: 'Too many unknown cards were scanned. Try again later.',
+		scannedAtOutOfRange: 'The scan time must lie between 72 hours ago and 2 minutes from now.',
+		outOfOrder: "This scan is older than the member's last punch.",
+		timerElsewhere: 'A timer is running outside this organization. Stop it in the app first.',
+		cardTaken: 'This card is already registered.',
+		cardRequired: 'Enter a card ID or pick a scanned card.',
+		cardNotFound: 'Card not found.',
+		scanNotFound: 'Scan not found.'
 	}
 };

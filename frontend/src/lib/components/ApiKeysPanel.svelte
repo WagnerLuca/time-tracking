@@ -1,8 +1,9 @@
 <script lang="ts">
 	/**
-	 * Admin panel for organization terminal API keys (e.g. an RFID scanner).
-	 * A key can only punch members in/out by badge ID via POST /api/v1/terminal/punch;
-	 * the plaintext key is shown once, right after creation.
+	 * Admin panel for the organization's terminals (e.g. an RFID scanner): API keys (the
+	 * plaintext key is shown once, right after creation; the key's name is the terminal name),
+	 * unknown scanned cards to assign, and the punch protocol. A key can only punch members
+	 * in/out by card via POST /api/v1/terminal/punch (docs/TERMINAL.md).
 	 */
 	import { apiKeysApi } from '$lib/apiClient';
 	import { t } from '$lib/i18n';
@@ -10,9 +11,11 @@
 	import { formatTimeAgo } from '$lib/utils/formatters';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import type { ApiKeyResponse } from '$lib/api';
+	import type { ApiKeyResponse, OrganizationMemberResponse } from '$lib/api';
+	import UnknownCards from './terminal/UnknownCards.svelte';
+	import PunchLog from './terminal/PunchLog.svelte';
 
-	let { orgSlug }: { orgSlug: string } = $props();
+	let { orgSlug, members = [] }: { orgSlug: string; members?: OrganizationMemberResponse[] } = $props();
 
 	let keys = $state<ApiKeyResponse[]>([]);
 	let loading = $state(true);
@@ -21,6 +24,10 @@
 	let creating = $state(false);
 	let createdKey = $state<string | null>(null);
 	let revokingId = $state<number | null>(null);
+	let renamingId = $state<number | null>(null);
+	let renameValue = $state('');
+	let renameSaving = $state(false);
+	let punchLog = $state<ReturnType<typeof PunchLog>>();
 	const fieldId = $props.id();
 
 	$effect(() => {
@@ -79,6 +86,28 @@
 		}
 	}
 
+	function startRename(key: ApiKeyResponse) {
+		renamingId = key.id ?? null;
+		renameValue = key.name ?? '';
+	}
+
+	async function saveRename(e: SubmitEvent) {
+		e.preventDefault();
+		if (renamingId == null || !renameValue.trim()) return;
+		renameSaving = true;
+		try {
+			await apiKeysApi.apiV1OrganizationsSlugApiKeysKeyIdPut(orgSlug, renamingId, { name: renameValue.trim() });
+			toast.success(t('orgSettings.apiKeys.renamed'));
+			renamingId = null;
+			await load();
+			punchLog?.load();
+		} catch (err) {
+			toast.error(err, t('orgSettings.apiKeys.renameFailed'));
+		} finally {
+			renameSaving = false;
+		}
+	}
+
 	async function copyKey() {
 		try {
 			await navigator.clipboard.writeText(createdKey ?? '');
@@ -130,13 +159,25 @@
 				<ul class="divide-y divide-base-300">
 					{#each keys as key (key.id)}
 						<li class="flex items-center justify-between gap-3 py-2">
-							<div class="min-w-0">
-								<div class="text-sm font-medium break-words">{key.name}</div>
+							<div class="min-w-0 flex-1">
+								{#if renamingId === key.id}
+									<form class="flex gap-2 flex-wrap" onsubmit={saveRename}>
+										<label for="{fieldId}-rename-{key.id}" class="sr-only">{t('orgSettings.apiKeys.keyName')}</label>
+										<input id="{fieldId}-rename-{key.id}" class="input input-bordered input-xs flex-1 min-w-[10rem]" maxlength="100" bind:value={renameValue} disabled={renameSaving} />
+										<button type="submit" class="btn btn-primary btn-xs" disabled={renameSaving || !renameValue.trim()}>{renameSaving ? t('common.saving') : t('common.save')}</button>
+										<button type="button" class="btn btn-ghost btn-xs" onclick={() => (renamingId = null)} disabled={renameSaving}>{t('common.cancel')}</button>
+									</form>
+								{:else}
+									<div class="text-sm font-medium break-words">{key.name}</div>
+								{/if}
 								<div class="text-xs text-base-content/60">
 									<code>{key.keyPrefix}…</code> · {t('orgSettings.apiKeys.createdAgo', { time: formatTimeAgo(key.createdAt) })} ·
 									{key.lastUsedAt ? t('orgSettings.apiKeys.lastUsed', { time: formatTimeAgo(key.lastUsedAt) }) : t('orgSettings.apiKeys.neverUsed')}
 								</div>
 							</div>
+							{#if renamingId !== key.id}
+								<button class="btn btn-ghost btn-xs shrink-0" onclick={() => startRename(key)}>{t('orgSettings.apiKeys.rename')}</button>
+							{/if}
 							<button class="btn btn-ghost btn-xs text-error shrink-0" disabled={revokingId === key.id} onclick={() => revoke(key)}>{revokingId === key.id ? t('orgSettings.apiKeys.revoking') : t('orgSettings.apiKeys.revoke')}</button>
 						</li>
 					{/each}
@@ -144,4 +185,7 @@
 			{/if}
 		</div>
 	</div>
+
+	<UnknownCards {orgSlug} {members} onassigned={() => punchLog?.load()} />
+	<PunchLog bind:this={punchLog} {orgSlug} />
 </section>

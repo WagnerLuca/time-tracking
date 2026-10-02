@@ -5,10 +5,11 @@
 	import { formatTime, formatDateShort, formatDuration, formatClock } from '$lib/utils/formatters';
 	import EntryEditForm from './EntryEditForm.svelte';
 	import EntryHistory from './EntryHistory.svelte';
+	import { entrySourceBadge } from '$lib/utils/terminal';
 	import { t } from '$lib/i18n';
 
 	/**
-	 * One time entry: time range, note, badges (org, running, needs correction, pause),
+	 * One time entry: time range, note, badges (org, source, running, needs correction, pause),
 	 * duration and — when an editor is passed — edit / request / delete actions plus
 	 * the inline edit form. Permissions are resolved by the caller (effective perms).
 	 */
@@ -41,6 +42,7 @@
 	const editing = $derived(!!editor && editor.editingEntryId === entry.id);
 	const actionable = $derived(!!editor && !entry.isRunning);
 	const pause = $derived(entry.pauseDurationMinutes ?? 0);
+	const source = $derived(entrySourceBadge(entry));
 	const liveElapsed = $derived(entry.isRunning && timer.current?.id === entry.id ? formatClock(timer.elapsedSeconds) : null);
 </script>
 
@@ -74,6 +76,9 @@
 			<div class="flex flex-wrap gap-1 mt-1 empty:hidden">
 				{#if showOrg && entry.organizationName}
 					<span class="badge badge-info badge-sm">{entry.organizationName}</span>
+				{/if}
+				{#if source}
+					<span class="badge badge-ghost badge-sm" title={source.title}>{source.label}</span>
 				{/if}
 				{#if entry.isRunning}
 					<span class="badge badge-success badge-sm font-semibold">{t('entries.running')}</span>

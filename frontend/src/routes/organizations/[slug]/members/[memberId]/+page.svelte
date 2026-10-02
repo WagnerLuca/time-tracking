@@ -18,7 +18,7 @@
 	import MemberPermissions from '$lib/components/member/MemberPermissions.svelte';
 	import MemberSchedule from '$lib/components/member/MemberSchedule.svelte';
 	import MemberVacation from '$lib/components/member/MemberVacation.svelte';
-	import MemberBadge from '$lib/components/member/MemberBadge.svelte';
+	import MemberCards from '$lib/components/member/MemberCards.svelte';
 	import type {
 		OrganizationDetailResponse,
 		OrganizationMemberResponse,
@@ -211,7 +211,7 @@
 		<InitialOvertimeEditor class="mb-5" {orgSlug} {memberId} hours={schedule?.initialOvertimeHours ?? 0} editable={isAdmin} onsaved={async () => { await loadSchedule(); await calendar?.reloadBalance(); }} />
 		<MemberVacation class="mb-5" {orgSlug} {member} canEdit={isAdmin} onchanged={reloadOrg} />
 		{#if isAdmin}
-			<MemberBadge {orgSlug} {member} onchanged={reloadOrg} />
+			<MemberCards {orgSlug} {memberId} onchanged={reloadOrg} />
 		{/if}
 		<SchedulePeriodEditor class="mb-5" {orgSlug} {memberId} editable={isAdmin} onchanged={loadSchedule} />
 	{/if}

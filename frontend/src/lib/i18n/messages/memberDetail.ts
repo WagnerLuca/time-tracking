@@ -97,14 +97,32 @@ export const de = {
 		none: 'Kein Urlaubsanspruch hinterlegt.',
 		askAdmin: 'Ein Admin kann ihn festlegen.'
 	},
-	badge: {
-		title: 'Terminal-Ausweis',
-		label: 'Ausweis-ID',
-		placeholder: 'RFID-Tag / Ausweis-ID',
-		saved: 'Ausweis-ID gespeichert.',
-		removed: 'Ausweis-ID entfernt.',
-		saveFailed: 'Die Ausweis-ID konnte nicht gespeichert werden.',
-		hint: 'Wird dieser Ausweis an einem Terminal gescannt, startet oder stoppt der Timer dieses Mitglieds. Terminal-Schlüssel werden in den Einstellungen der Organisation verwaltet.'
+	cards: {
+		title: 'Terminal-Karten',
+		empty: 'Noch keine Karten.',
+		cardId: 'Karten-ID',
+		cardIdPlaceholder: 'z. B. 04:A2:3B:9C',
+		label: 'Bezeichnung',
+		labelPlaceholder: 'z. B. Schlüsselanhänger',
+		add: 'Karte hinzufügen',
+		added: 'Karte hinzugefügt.',
+		addFailed: 'Die Karte konnte nicht hinzugefügt werden.',
+		loadFailed: 'Die Karten konnten nicht geladen werden.',
+		updateFailed: 'Die Karte konnte nicht geändert werden.',
+		blocked: 'Gesperrt',
+		block: 'Sperren',
+		unblock: 'Entsperren',
+		blockedToast: 'Karte gesperrt.',
+		unblockedToast: 'Karte entsperrt.',
+		editLabel: 'Bezeichnung ändern',
+		labelSaved: 'Bezeichnung gespeichert.',
+		remove: 'Entfernen',
+		removeTitle: 'Karte …{hint} entfernen?',
+		removeMessage: 'Die Karte funktioniert danach an keinem Terminal mehr. Das Stempelprotokoll bleibt erhalten.',
+		removed: 'Karte entfernt.',
+		lastUsed: 'zuletzt benutzt {time}',
+		neverUsed: 'nie benutzt',
+		hint: 'Wird eine dieser Karten an einem Terminal gescannt, startet oder stoppt der Timer dieses Mitglieds. Gespeichert werden nur ein Fingerabdruck der Karten-ID und ihre letzten vier Zeichen. Unbekannte gescannte Karten lassen sich in den Einstellungen der Organisation zuordnen.'
 	}
 };
 
@@ -206,13 +224,31 @@ export const en: typeof de = {
 		none: 'No vacation allowance set.',
 		askAdmin: 'An admin can set it.'
 	},
-	badge: {
-		title: 'Terminal badge',
-		label: 'Badge ID',
-		placeholder: 'RFID tag / badge ID',
-		saved: 'Badge ID saved.',
-		removed: 'Badge ID removed.',
-		saveFailed: 'Could not save the badge ID.',
-		hint: "Scanning this badge at a terminal starts or stops this member's timer. Terminal keys are managed in the organization settings."
+	cards: {
+		title: 'Terminal cards',
+		empty: 'No cards yet.',
+		cardId: 'Card ID',
+		cardIdPlaceholder: 'e.g. 04:A2:3B:9C',
+		label: 'Label',
+		labelPlaceholder: 'e.g. key fob',
+		add: 'Add card',
+		added: 'Card added.',
+		addFailed: 'Could not add the card.',
+		loadFailed: 'Could not load the cards.',
+		updateFailed: 'Could not change the card.',
+		blocked: 'Blocked',
+		block: 'Block',
+		unblock: 'Unblock',
+		blockedToast: 'Card blocked.',
+		unblockedToast: 'Card unblocked.',
+		editLabel: 'Change label',
+		labelSaved: 'Label saved.',
+		remove: 'Remove',
+		removeTitle: 'Remove card …{hint}?',
+		removeMessage: 'The card stops working at every terminal. The punch protocol is kept.',
+		removed: 'Card removed.',
+		lastUsed: 'last used {time}',
+		neverUsed: 'never used',
+		hint: "Scanning one of these cards at a terminal starts or stops this member's timer. Only a fingerprint of the card ID and its last four characters are stored. Unknown scanned cards can be assigned in the organization settings."
 	}
 };
