@@ -484,6 +484,7 @@ public class RequestService : IRequestService
                     StartTime = manual.StartTime,
                     EndTime = manual.EndTime,
                     Description = manual.Description,
+                    Source = TimeEntrySource.Manual,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
                 };
@@ -661,6 +662,7 @@ public class RequestService : IRequestService
                 PauseDurationMinutes = entry.PauseMinutes,
                 PauseIsManual = true,   // imported records keep their pause
                 Description = entry.Description,
+                Source = TimeEntrySource.Import,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             });

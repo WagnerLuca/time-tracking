@@ -71,8 +71,13 @@ public class RefreshTokenCleanupService : BackgroundService
         context.Notifications.RemoveRange(await context.Notifications
             .Where(n => n.IsRead && n.CreatedAt < notificationCutoff)
             .ToListAsync(cancellationToken));
+        // Punch protocol: kept 400 days (a year of payroll questions plus slack)
+        var punchCutoff = cutoff.AddDays(-400);
+        context.TerminalPunches.RemoveRange(await context.TerminalPunches.IgnoreQueryFilters()
+            .Where(p => p.ReceivedAt < punchCutoff)
+            .ToListAsync(cancellationToken));
         var removed = await context.SaveChangesAsync(cancellationToken);
         if (removed > 0)
-            _logger.LogInformation("Retention cleanup removed {Count} old links and notifications.", removed);
+            _logger.LogInformation("Retention cleanup removed {Count} old links, notifications and punch protocol rows.", removed);
     }
 }

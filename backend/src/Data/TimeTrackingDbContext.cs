@@ -40,6 +40,8 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<Group> Groups { get; set; }
     public DbSet<GroupMember> GroupMembers { get; set; }
     public DbSet<ApiKey> ApiKeys { get; set; }
+    public DbSet<BadgeCard> BadgeCards { get; set; }
+    public DbSet<TerminalPunch> TerminalPunches { get; set; }
     public DbSet<UserToken> UserTokens { get; set; }
     public DbSet<OrgInvitation> OrgInvitations { get; set; }
     public DbSet<TimeEntryChange> TimeEntryChanges { get; set; }
@@ -140,10 +142,6 @@ public class TimeTrackingDbContext : DbContext
 
             // Defense in depth for the API's strict enum parsing: no role outside Member..Owner
             entity.ToTable(t => t.HasCheckConstraint("CK_UserOrganizations_Role", "\"Role\" BETWEEN 0 AND 2"));
-
-            // A badge identifies one member per organization (NULLs are not unique-checked)
-            entity.Property(e => e.BadgeId).HasMaxLength(100);
-            entity.HasIndex(e => new { e.OrganizationId, e.BadgeId }).IsUnique();
 
             // Global query filter: automatically exclude soft-deleted memberships
             entity.HasQueryFilter(e => e.IsActive);
@@ -531,6 +529,67 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasQueryFilter(e => e.Organization.IsActive);
+        });
+
+        // Configure BadgeCard entity (a member's terminal cards; only hash + hint are stored)
+        modelBuilder.Entity<BadgeCard>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.CardHash).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.CardHint).IsRequired().HasMaxLength(8);
+            entity.Property(e => e.Label).HasMaxLength(100);
+            entity.HasIndex(e => new { e.OrganizationId, e.CardHash }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasQueryFilter(e => e.Organization.IsActive);
+        });
+
+        // Configure TerminalPunch entity (punch protocol of the terminals)
+        modelBuilder.Entity<TerminalPunch>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.CardHash).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.CardHint).IsRequired().HasMaxLength(8);
+            entity.Property(e => e.ClientPunchId).HasMaxLength(64);
+            // Last accepted punch of a member (double scan, order check), protocol, unknown-scan budget
+            entity.HasIndex(e => new { e.OrganizationId, e.UserId, e.ScannedAt });
+            entity.HasIndex(e => new { e.OrganizationId, e.ScannedAt });
+            entity.HasIndex(e => new { e.ApiKeyId, e.ReceivedAt });
+            entity.HasIndex(e => e.TimeEntryId);
+            // A terminal's punch id is applied once (idempotent offline replays)
+            entity.HasIndex(e => new { e.ApiKeyId, e.ClientPunchId }).IsUnique().HasFilter("\"ClientPunchId\" IS NOT NULL");
+
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.ApiKey)
+                .WithMany()
+                .HasForeignKey(e => e.ApiKeyId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.BadgeCard)
+                .WithMany()
+                .HasForeignKey(e => e.BadgeCardId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.TimeEntry)
+                .WithMany()
+                .HasForeignKey(e => e.TimeEntryId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             entity.HasQueryFilter(e => e.Organization.IsActive);
         });

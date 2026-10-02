@@ -1,3 +1,4 @@
+using TimeTracking.Api.Models;
 using TimeTracking.Api.Models.Dtos;
 
 namespace TimeTracking.Api.Services;
@@ -7,8 +8,13 @@ namespace TimeTracking.Api.Services;
 /// </summary>
 public interface ITimeTrackingService
 {
-    Task<ServiceResult<TimeEntryResponse>> StartAsync(int userId, StartTimeEntryRequest? request);
-    Task<ServiceResult<TimeEntryResponse>> StopAsync(int userId, StopTimeEntryRequest? request);
+    /// <summary>
+    /// Starts a timer now, or at <paramref name="atUtc"/> (a terminal's queued scan: validated with
+    /// <see cref="EntryTimes"/> and against overlapping entries).
+    /// </summary>
+    Task<ServiceResult<TimeEntryResponse>> StartAsync(int userId, StartTimeEntryRequest? request, DateTime? atUtc = null, TimeEntrySource source = TimeEntrySource.App);
+    /// <summary>Stops the running timer now, or at <paramref name="atUtc"/> (validated with <see cref="EntryTimes"/>).</summary>
+    Task<ServiceResult<TimeEntryResponse>> StopAsync(int userId, StopTimeEntryRequest? request, DateTime? atUtc = null);
     Task<ServiceResult<TimeEntryResponse>> GetCurrentAsync(int userId);
     /// <summary>The caller's unresolved failure entries (auto-stopped at business day end), newest first.</summary>
     Task<ServiceResult<List<TimeEntryResponse>>> GetFailuresAsync(int userId);

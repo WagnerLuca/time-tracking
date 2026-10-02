@@ -257,6 +257,14 @@ builder.Services.AddRateLimiter(options =>
 
     // General policy for data-access endpoints (prevent rapid enumeration), per user
     options.AddPolicy("General", ctx => RateLimitPartition.GetFixedWindowLimiter(UserOrIp(ctx), _ => Window(300)));
+
+    // Terminal punches, per API key (hashed, so the key never sits in limiter state), else per IP.
+    // Unknown-card guessing has its own, tighter budget in ApiKeyService.
+    options.AddPolicy("Terminal", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        ctx.Request.Headers[TimeTracking.Api.Controllers.ApiKeysController.ApiKeyHeader].ToString() is { Length: > 0 } key
+            ? "key:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key.Trim())))
+            : $"ip:{ClientIp(ctx)}",
+        _ => Window(120)));
 });
 
 // Behind a reverse proxy, take the client IP from X-Forwarded-For — only when explicitly

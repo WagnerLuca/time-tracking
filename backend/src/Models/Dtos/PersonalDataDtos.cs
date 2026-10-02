@@ -8,6 +8,8 @@ public record PersonalDataExport
     public DateTime CreatedAt { get; init; }
     public DateTime? LastLoginAt { get; init; }
     public required List<PersonalMembership> Memberships { get; init; }
+    /// <summary>Terminal cards, by hint and label (the card value itself is not stored).</summary>
+    public required List<PersonalCard> Cards { get; init; }
     public required List<PersonalTimeEntry> TimeEntries { get; init; }
     public required List<PersonalAbsence> Absences { get; init; }
     public required List<PersonalRequest> Requests { get; init; }
@@ -15,7 +17,8 @@ public record PersonalDataExport
     public required List<PersonalEntryChange> EntryChanges { get; init; }
 }
 
-public record PersonalMembership(string Organization, string Role, DateTime JoinedAt, bool Active, double VacationDaysPerYear, double InitialOvertimeHours, string? BadgeId);
+public record PersonalMembership(string Organization, string Role, DateTime JoinedAt, bool Active, double VacationDaysPerYear, double InitialOvertimeHours);
+public record PersonalCard(string Organization, string CardHint, string? Label, bool IsBlocked, DateTime CreatedAt, DateTime? LastUsedAt);
 public record PersonalTimeEntry(string? Organization, DateTime StartTime, DateTime? EndTime, int PauseMinutes, string? Description, bool IsFailure);
 public record PersonalAbsence(string Organization, DateOnly Date, string Type, bool IsHalfDay, string? Note);
 public record PersonalRequest(string Organization, string Type, string Status, string? Message, string? RequestData, DateTime CreatedAt, DateTime? RespondedAt);

@@ -2,6 +2,20 @@ using System.ComponentModel.DataAnnotations;
 
 namespace TimeTracking.Api.Models;
 
+/// <summary>Where an entry was created.</summary>
+public enum TimeEntrySource
+{
+    /// <summary>Timer started in the app.</summary>
+    App = 0,
+    Terminal = 1,
+    /// <summary>Added by hand by the member (directly or via an approved request).</summary>
+    Manual = 2,
+    /// <summary>CSV import (directly or via an approved request).</summary>
+    Import = 3,
+    /// <summary>Created by an admin for the member.</summary>
+    Admin = 4
+}
+
 public class TimeEntry
 {
     public int Id { get; set; }
@@ -37,6 +51,8 @@ public class TimeEntry
 
     /// <summary>When the "timer still running shortly before business day end" reminder went out (once per entry).</summary>
     public DateTime? DayEndReminderSentAt { get; set; }
+
+    public TimeEntrySource Source { get; set; }
 
     public DateTime CreatedAt { get; set; }
 

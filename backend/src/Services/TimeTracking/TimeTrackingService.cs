@@ -19,8 +19,17 @@ public class TimeTrackingService : ITimeTrackingService
         _logger = logger;
     }
 
-    public async Task<ServiceResult<TimeEntryResponse>> StartAsync(int userId, StartTimeEntryRequest? request)
+    public async Task<ServiceResult<TimeEntryResponse>> StartAsync(int userId, StartTimeEntryRequest? request, DateTime? atUtc = null, TimeEntrySource source = TimeEntrySource.App)
     {
+        var startTime = atUtc ?? DateTime.UtcNow;
+        if (atUtc.HasValue)
+        {
+            if (EntryTimes.Validate(startTime, null) is { } timeError)
+                return ServiceResult.BadRequest<TimeEntryResponse>(timeError);
+            if (await EntryTimes.OverlapsAsync(_context, userId, startTime, DateTime.UtcNow.AddDays(1)))
+                return ServiceResult.Conflict<TimeEntryResponse>("The entry overlaps one of your existing entries.");
+        }
+
         // Resolve organization
         int? orgId = request?.OrganizationId;
         if (orgId == null && !string.IsNullOrWhiteSpace(request?.OrganizationSlug))
@@ -56,7 +65,7 @@ public class TimeTrackingService : ITimeTrackingService
             .FirstOrDefaultAsync(e => e.UserId == userId && e.IsRunning);
         if (running != null)
         {
-            running.EndTime = DateTime.UtcNow;
+            running.EndTime = startTime;
             running.IsRunning = false;
             running.UpdatedAt = DateTime.UtcNow;
             await ApplyPauseRulesAsync(running);
@@ -68,8 +77,9 @@ public class TimeTrackingService : ITimeTrackingService
             UserId = userId,
             OrganizationId = orgId,
             Description = request?.Description,
-            StartTime = DateTime.UtcNow,
+            StartTime = startTime,
             IsRunning = true,
+            Source = source,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -93,7 +103,7 @@ public class TimeTrackingService : ITimeTrackingService
         return ServiceResult.Ok(MapToResponse(entry));
     }
 
-    public async Task<ServiceResult<TimeEntryResponse>> StopAsync(int userId, StopTimeEntryRequest? request)
+    public async Task<ServiceResult<TimeEntryResponse>> StopAsync(int userId, StopTimeEntryRequest? request, DateTime? atUtc = null)
     {
         var running = await _context.TimeEntries
             .Include(e => e.Organization)
@@ -101,8 +111,10 @@ public class TimeTrackingService : ITimeTrackingService
 
         if (running == null)
             return ServiceResult.NotFound<TimeEntryResponse>("No running time entry found.");
+        if (atUtc.HasValue && EntryTimes.Validate(running.StartTime, atUtc) is { } timeError)
+            return ServiceResult.BadRequest<TimeEntryResponse>(timeError);
 
-        running.EndTime = DateTime.UtcNow;
+        running.EndTime = atUtc ?? DateTime.UtcNow;
         running.IsRunning = false;
         running.UpdatedAt = DateTime.UtcNow;
 
@@ -169,7 +181,7 @@ public class TimeTrackingService : ITimeTrackingService
 
         return ServiceResult.Ok(new PaginatedResponse<TimeEntryResponse>
         {
-            Items = entries.Select(MapToResponse).ToList(),
+            Items = await TerminalNames.FillAsync(_context, entries.Select(MapToResponse).ToList()),
             TotalCount = totalCount,
             Limit = limit,
             Offset = offset
@@ -318,6 +330,7 @@ public class TimeTrackingService : ITimeTrackingService
             Description = request.Description,
             StartTime = request.StartTime,
             EndTime = request.EndTime,
+            Source = TimeEntrySource.Manual,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -447,7 +460,8 @@ public class TimeTrackingService : ITimeTrackingService
             PauseDurationMinutes = entry.PauseDurationMinutes,
             NetDurationMinutes = netDuration.HasValue ? Math.Round(netDuration.Value, 2) : null,
             IsFailure = entry.IsFailure,
-            CreatedAt = entry.CreatedAt
+            CreatedAt = entry.CreatedAt,
+            Source = entry.Source.ToString()
         };
     }
 }

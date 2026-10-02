@@ -96,7 +96,7 @@ public class SecurityRegressionTests : IClassFixture<TimeTrackingApiFactory>
     public async Task TerminalOfOneOrganization_DoesNotTouchTimersElsewhere()
     {
         var (owner, slug, _, member, login) = await OrgWithMemberAsync("sec-punch");
-        (await owner.PutAsJsonAsync($"/api/v1/organizations/{slug}/members/{login.User.Id}/badge", new { badgeId = "SEC-1" })).EnsureSuccessStatusCode();
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{login.User.Id}/cards", new { cardId = "SEC-1" })).EnsureSuccessStatusCode();
         var key = (await (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/api-keys", new { name = "Door" }))
             .Content.ReadFromJsonAsync<JsonElement>()).GetProperty("key").GetString();
 

@@ -137,8 +137,21 @@ public static class ErrorCodes
         ["Group not found."] = "group.notFound",
         ["User is already in this group."] = "group.alreadyMember",
         ["Member not found in group."] = "group.memberNotFound",
-        ["This badge is already assigned to another member."] = "apiKey.badgeTaken",
         ["API key not found"] = "apiKey.notFound",
+
+        // ── Terminal ──
+        ["Missing API key."] = "terminal.invalidKey",
+        ["Invalid API key."] = "terminal.invalidKey",
+        ["Unknown card."] = "terminal.unknownCard",
+        ["This card is blocked."] = "terminal.cardBlocked",
+        ["Too many unknown cards were scanned. Try again later."] = "terminal.tooManyUnknown",
+        ["The scan time must lie between 72 hours ago and 2 minutes from now."] = "terminal.scannedAtOutOfRange",
+        ["This scan is older than the member's last punch. Send queued scans in order."] = "terminal.outOfOrder",
+        ["A timer is running outside this organization. Stop it in the app first."] = "terminal.timerElsewhere",
+        ["This card is already registered."] = "terminal.cardTaken",
+        ["Enter a card ID or pick a scanned card."] = "terminal.cardRequired",
+        ["Card not found."] = "terminal.cardNotFound",
+        ["Scan not found."] = "terminal.scanNotFound",
     };
 
     /// <summary>The code for a failure message, or null for messages without one.</summary>

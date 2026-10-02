@@ -233,10 +233,9 @@ public class AuthService : IAuthService
         user.UpdatedAt = DateTime.UtcNow;
 
         foreach (var membership in await _context.UserOrganizations.Where(uo => uo.UserId == userId).ToListAsync())
-        {
             membership.IsActive = false;
-            membership.BadgeId = null;
-        }
+        // Terminal cards go; the punch protocol keeps its rows (hash + hint only, no card value)
+        _context.BadgeCards.RemoveRange(_context.BadgeCards.IgnoreQueryFilters().Where(c => c.UserId == userId));
         // Free-text the person wrote may name them; the request itself stays for the audit trail
         foreach (var request in await _context.OrgRequests.Where(r => r.UserId == userId).ToListAsync())
             request.Message = null;
@@ -314,7 +313,12 @@ public class AuthService : IAuthService
             Memberships = await _context.UserOrganizations.IgnoreQueryFilters().AsNoTracking()
                 .Where(uo => uo.UserId == userId)
                 .Select(uo => new PersonalMembership(uo.Organization.Name, uo.Role.ToString(), uo.JoinedAt, uo.IsActive,
-                    uo.VacationDaysPerYear, uo.InitialOvertimeHours, uo.BadgeId))
+                    uo.VacationDaysPerYear, uo.InitialOvertimeHours))
+                .ToListAsync(),
+            Cards = await _context.BadgeCards.IgnoreQueryFilters().AsNoTracking()
+                .Where(c => c.UserId == userId)
+                .OrderBy(c => c.CreatedAt)
+                .Select(c => new PersonalCard(c.Organization.Name, c.CardHint, c.Label, c.IsBlocked, c.CreatedAt, c.LastUsedAt))
                 .ToListAsync(),
             TimeEntries = await _context.TimeEntries.IgnoreQueryFilters().AsNoTracking()
                 .Where(t => t.UserId == userId)

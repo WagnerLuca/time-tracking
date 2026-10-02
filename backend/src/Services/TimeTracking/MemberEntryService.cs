@@ -33,6 +33,7 @@ public class MemberEntryService(TimeTrackingDbContext context, ILogger<MemberEnt
             StartTime = request.StartTime,
             EndTime = request.EndTime,
             Description = request.Description,
+            Source = TimeEntrySource.Admin,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };

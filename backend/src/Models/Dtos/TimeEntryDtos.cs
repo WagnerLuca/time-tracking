@@ -70,6 +70,12 @@ public record TimeEntryResponse
     /// </summary>
     public bool IsFailure { get; init; }
     public DateTime CreatedAt { get; init; }
+    /// <summary>Where the entry was created: App, Terminal, Manual, Import or Admin.</summary>
+    public string Source { get; init; } = "App";
+    /// <summary>Name of the terminal that started the entry, if one did.</summary>
+    public string? TerminalStartName { get; init; }
+    /// <summary>Name of the terminal that stopped (or closed) the entry, if one did.</summary>
+    public string? TerminalStopName { get; init; }
 
     /// <summary>
     /// Working Time Act warnings, filled on stop, edit and manual/admin create:

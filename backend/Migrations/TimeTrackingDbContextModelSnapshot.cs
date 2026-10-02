@@ -165,6 +165,53 @@ namespace TimeTracking.Api.Migrations
                     b.ToTable("ApiKeys");
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.BadgeCard", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CardHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("CardHint")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsBlocked")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("OrganizationId", "CardHash")
+                        .IsUnique();
+
+                    b.ToTable("BadgeCards");
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.Group", b =>
                 {
                     b.Property<int>("Id")
@@ -671,6 +718,73 @@ namespace TimeTracking.Api.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.TerminalPunch", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int?>("ApiKeyId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("BadgeCardId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CardHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("CardHint")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<string>("ClientPunchId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Result")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ScannedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("TimeEntryId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BadgeCardId");
+
+                    b.HasIndex("TimeEntryId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ApiKeyId", "ClientPunchId")
+                        .IsUnique()
+                        .HasFilter("\"ClientPunchId\" IS NOT NULL");
+
+                    b.HasIndex("ApiKeyId", "ReceivedAt");
+
+                    b.HasIndex("OrganizationId", "ScannedAt");
+
+                    b.HasIndex("OrganizationId", "UserId", "ScannedAt");
+
+                    b.ToTable("TerminalPunches");
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.TimeEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -710,6 +824,9 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<bool>("PauseIsManual")
                         .HasColumnType("boolean");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("timestamp with time zone");
@@ -866,10 +983,6 @@ namespace TimeTracking.Api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("BadgeId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
                     b.Property<double>("InitialOvertimeHours")
                         .HasColumnType("double precision");
 
@@ -897,8 +1010,7 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrganizationId", "BadgeId")
-                        .IsUnique();
+                    b.HasIndex("OrganizationId");
 
                     b.HasIndex("UserId", "OrganizationId")
                         .IsUnique();
@@ -1058,6 +1170,25 @@ namespace TimeTracking.Api.Migrations
                     b.Navigation("Organization");
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.BadgeCard", b =>
+                {
+                    b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TimeTracking.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.Group", b =>
                 {
                     b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
@@ -1179,6 +1310,45 @@ namespace TimeTracking.Api.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TimeTracking.Api.Models.TerminalPunch", b =>
+                {
+                    b.HasOne("TimeTracking.Api.Models.ApiKey", "ApiKey")
+                        .WithMany()
+                        .HasForeignKey("ApiKeyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TimeTracking.Api.Models.BadgeCard", "BadgeCard")
+                        .WithMany()
+                        .HasForeignKey("BadgeCardId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TimeTracking.Api.Models.TimeEntry", "TimeEntry")
+                        .WithMany()
+                        .HasForeignKey("TimeEntryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TimeTracking.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ApiKey");
+
+                    b.Navigation("BadgeCard");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("TimeEntry");
 
                     b.Navigation("User");
                 });

@@ -97,7 +97,7 @@ public class OrganizationService : IOrganizationService
                         JoinedAt = uo.JoinedAt,
                         InitialOvertimeHours = uo.InitialOvertimeHours,
                         VacationDaysPerYear = uo.VacationDaysPerYear,
-                        BadgeId = uo.BadgeId
+                        CardCount = _context.BadgeCards.Count(c => c.OrganizationId == uo.OrganizationId && c.UserId == uo.UserId)
                     })
                     .ToList(),
                 PauseRules = o.PauseRules
@@ -205,7 +205,7 @@ public class OrganizationService : IOrganizationService
                 VacationDaysTaken = visible ? taken : 0,
                 VacationDaysPlanned = visible ? planned : 0,
                 VacationDaysRemaining = visible ? Math.Max(0, m.VacationDaysPerYear - used) : 0,
-                BadgeId = callerIsAdmin ? m.BadgeId : null,
+                CardCount = callerIsAdmin ? m.CardCount : 0,
                 // Starting overtime balance is payroll data: the person and admins only
                 InitialOvertimeHours = callerIsAdmin || m.Id == callerUserId.Value ? m.InitialOvertimeHours : 0,
                 Groups = groupsByUser.GetValueOrDefault(m.Id) ?? new List<MemberGroupResponse>()
@@ -447,8 +447,8 @@ public class OrganizationService : IOrganizationService
         }
 
         membership.IsActive = false;
-        // Leaving ends group roles too (they must not come back on rejoining) and frees the badge
-        membership.BadgeId = null;
+        // Leaving ends group roles too (they must not come back on rejoining) and frees the cards
+        _context.BadgeCards.RemoveRange(_context.BadgeCards.Where(c => c.UserId == userId && c.OrganizationId == org.Id));
         _context.GroupMembers.RemoveRange(_context.GroupMembers.Where(gm => gm.UserId == userId && gm.Group.OrganizationId == org.Id));
 
         _logger.LogInformation("Member {UserId} removed from org {OrgId} by user {CallerId}", userId, org.Id, callerUserId);
@@ -718,13 +718,14 @@ public class OrganizationService : IOrganizationService
                     ? Math.Round((te.EndTime.Value - te.StartTime).TotalMinutes - te.PauseDurationMinutes, 1)
                     : (double?)null,
                 IsFailure = te.IsFailure,
-                CreatedAt = te.CreatedAt
+                CreatedAt = te.CreatedAt,
+                Source = te.Source.ToString()
             })
             .ToListAsync();
 
         return ServiceResult.Ok(new PaginatedResponse<TimeEntryResponse>
         {
-            Items = entries,
+            Items = await TerminalNames.FillAsync(_context, entries),
             TotalCount = totalCount,
             Limit = limit,
             Offset = offset

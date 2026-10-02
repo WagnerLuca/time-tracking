@@ -90,7 +90,9 @@ public class PayrollExportService(TimeTrackingDbContext context, ILogger<Payroll
             var other = Days(memberAbsences) - vacation - sick;
 
             csv.AppendLine(string.Join(';',
-                Escape(member.BadgeId ?? ""),
+                // ponytail: the column keeps the file layout payroll tools map by position; it was filled from
+                // the old single badge ID, which is now hashed cards. Fill it once members get a personnel number field.
+                "",
                 Escape($"{member.User.FirstName} {member.User.LastName}"),
                 Escape(member.User.Email),
                 Number(target), Number(worked), Number(overtime), Number(balance),

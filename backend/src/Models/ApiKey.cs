@@ -2,8 +2,9 @@ namespace TimeTracking.Api.Models;
 
 /// <summary>
 /// Organization-scoped API key for unattended devices such as an RFID terminal.
-/// A key can only punch members of its organization in/out by badge ID
-/// (<see cref="UserOrganization.BadgeId"/>); it grants no other API access.
+/// A key can only punch members of its organization in/out by card
+/// (<see cref="BadgeCard"/>); it grants no other API access. Its name is the terminal name
+/// shown in the punch protocol and on entries.
 /// Only the SHA-256 hash is stored — the plaintext is shown once on creation.
 /// </summary>
 public class ApiKey
