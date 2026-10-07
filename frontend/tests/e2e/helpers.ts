@@ -64,3 +64,27 @@ export async function myOrgs(request: APIRequestContext, token: string) {
 	expect(res.ok()).toBeTruthy();
 	return (await res.json()) as { organizationId: number; slug: string; name: string; role: string }[];
 }
+
+/**
+ * A weekday (yyyy-MM-dd) from `firstYear` on that differs per run: Feb/Mar/Jul/Aug/Sep only, so it is
+ * never one of the seeded recurring holidays.
+ */
+export function futureWorkday(firstYear: number, stamp = Date.now()): string {
+	const n = Math.floor(stamp / 1000);
+	const d = new Date(firstYear + (n % 4), [1, 2, 6, 7, 8][Math.floor(n / 4) % 5], 2 + (Math.floor(n / 20) % 24));
+	while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Removes every absence of `email` on `date` in the seeded org (as the owner, who may delete any). */
+export async function removeAbsences(request: APIRequestContext, email: string, date: string) {
+	const headers = { Authorization: `Bearer ${await apiToken(request, 'max.mueller@example.com')}` };
+	const org = await (await request.get(`${API}/organizations/mueller-software`, { headers })).json();
+	const user = org.members.find((m: { email: string }) => m.email === email);
+	const res = await request.get(`${API}/organizations/mueller-software/absences?userId=${user.id}&from=${date}&to=${date}`, { headers });
+	expect(res.ok(), await res.text()).toBeTruthy();
+	for (const a of (await res.json()).items as { id: number }[]) {
+		const del = await request.delete(`${API}/organizations/mueller-software/absences/${a.id}`, { headers });
+		expect(del.ok(), await del.text()).toBeTruthy();
+	}
+}
