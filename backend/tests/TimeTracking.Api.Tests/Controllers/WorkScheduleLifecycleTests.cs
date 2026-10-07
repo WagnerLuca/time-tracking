@@ -62,6 +62,22 @@ public class WorkScheduleLifecycleTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     [Fact]
+    public async Task DeletingTheNewestPeriod_ReopensThePredecessor()
+    {
+        var (_, member, slug, _, _) = await SetupAsync("wsl-reopen", new { workScheduleChangeMode = Allowed });
+        var url = $"/api/v1/organizations/{slug}/work-schedules";
+        var first = await CreateAsync(member, url, new { validFrom = D(Today.AddMonths(-6)), weeklyWorkHours = 40, distributeEvenly = true });
+        var future = await CreateAsync(member, url, new { validFrom = D(Today.AddMonths(2)), weeklyWorkHours = 20, distributeEvenly = true });
+
+        (await member.DeleteAsync($"{url}/{future.Id}")).EnsureSuccessStatusCode();
+
+        // The schedule does not silently end on the day before the deleted period
+        var remaining = (await ListAsync(member, url)).Single();
+        remaining.Id.Should().Be(first.Id);
+        remaining.ValidTo.Should().BeNull();
+    }
+
+    [Fact]
     public async Task OverlappingPeriods_AreRejected()
     {
         var (_, member, slug, _, _) = await SetupAsync("wsl-overlap", new { workScheduleChangeMode = Allowed });

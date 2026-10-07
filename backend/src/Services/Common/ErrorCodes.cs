@@ -167,6 +167,7 @@ public static class ErrorCodes
         if (message.StartsWith("You own ")) return "account.ownsOrganizations";
         if (message.EndsWith(" require two-factor authentication. Leave them first, or ask an admin to turn the requirement off.")) return "account.twoFactorRequiredByOrgs";
         if (message.StartsWith("Unknown time zone ")) return "org.unknownTimeZone";
+        if (message.StartsWith("This schedule overlaps with an existing one ")) return "schedule.overlap";
         // OrgRuleHelper.EnforceAllowed / WorkScheduleService.CheckRuleMode ("<feature> is/are disabled…")
         if (message.EndsWith(" is disabled in this organization.") || message.EndsWith(" are disabled for this organization.")) return "org.featureDisabled";
         if (message.Contains(" require admin approval") || message.Contains(" requires admin approval")) return "org.featureRequiresApproval";

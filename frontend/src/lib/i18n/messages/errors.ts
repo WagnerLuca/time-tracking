@@ -132,7 +132,8 @@ export const de = {
 		wrongEmail: 'Diese Einladung wurde an eine andere E-Mail-Adresse geschickt. Melde dich mit dieser Adresse an, um sie anzunehmen.'
 	},
 	schedule: {
-		notFound: 'Arbeitszeitmodell nicht gefunden.'
+		notFound: 'Arbeitszeitmodell nicht gefunden.',
+		overlap: 'Dieser Zeitraum überschneidet sich mit einem bestehenden Arbeitszeitmodell. Es darf immer nur eines gelten.'
 	},
 	overtime: {
 		initialDisabled: 'Anfangsüberstunden sind in dieser Organisation deaktiviert.',
@@ -296,7 +297,8 @@ export const en: typeof de = {
 		wrongEmail: 'This invitation was sent to a different email address. Sign in with that address to accept it.'
 	},
 	schedule: {
-		notFound: 'Work schedule not found.'
+		notFound: 'Work schedule not found.',
+		overlap: 'This period overlaps an existing work schedule. Only one may apply at a time.'
 	},
 	overtime: {
 		initialDisabled: 'Initial overtime is disabled in this organization.',

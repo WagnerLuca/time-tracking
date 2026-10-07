@@ -126,7 +126,7 @@ public class WorkScheduleService : IWorkScheduleService
         if (schedule == null)
             return ServiceResult.NotFound("Work schedule not found");
 
-        _context.WorkSchedules.Remove(schedule);
+        await RemoveScheduleAsync(schedule);
         await _context.SaveChangesAsync();
         _logger.LogInformation("Work schedule {ScheduleId} deleted by user {UserId}", scheduleId, userId);
         return ServiceResult.Ok();
@@ -267,7 +267,7 @@ public class WorkScheduleService : IWorkScheduleService
         if (schedule == null)
             return ServiceResult.NotFound("Work schedule not found");
 
-        _context.WorkSchedules.Remove(schedule);
+        await RemoveScheduleAsync(schedule);
         await _context.SaveChangesAsync();
         return ServiceResult.Ok();
     }
@@ -275,6 +275,20 @@ public class WorkScheduleService : IWorkScheduleService
     // ────────────────────────────────────────────────────
     //  Private helpers
     // ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Removes a period. Adding it had closed the period right before it, so that one now runs
+    /// over the removed range again (open-ended if the removed period was) — no silent gap.
+    /// </summary>
+    private async Task RemoveScheduleAsync(WorkSchedule schedule)
+    {
+        var dayBefore = schedule.ValidFrom.AddDays(-1);
+        var predecessor = await _context.WorkSchedules.FirstOrDefaultAsync(s =>
+            s.UserId == schedule.UserId && s.OrganizationId == schedule.OrganizationId && s.ValidTo == dayBefore);
+        if (predecessor != null)
+            predecessor.ValidTo = schedule.ValidTo;
+        _context.WorkSchedules.Remove(schedule);
+    }
 
     private static (ServiceErrorType Type, string Message)? CheckRuleMode(RuleMode mode, string featureName)
     {
