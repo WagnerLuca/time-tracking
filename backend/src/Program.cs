@@ -226,6 +226,8 @@ builder.Services.AddCors(options =>
 
 // Add Rate Limiting — partitioned per client IP (auth) or per user (data access), so one
 // noisy client cannot exhaust everybody else's budget
+// General permits per user and minute; appsettings.Development.json raises it so a full e2e run fits
+var generalPerMinute = builder.Configuration.GetValue("RateLimiting:GeneralPerMinute", 300);
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -256,7 +258,7 @@ builder.Services.AddRateLimiter(options =>
     options.AddPolicy("AuthModerate", ctx => RateLimitPartition.GetFixedWindowLimiter(ClientIp(ctx), _ => Window(30)));
 
     // General policy for data-access endpoints (prevent rapid enumeration), per user
-    options.AddPolicy("General", ctx => RateLimitPartition.GetFixedWindowLimiter(UserOrIp(ctx), _ => Window(300)));
+    options.AddPolicy("General", ctx => RateLimitPartition.GetFixedWindowLimiter(UserOrIp(ctx), _ => Window(generalPerMinute)));
 
     // Terminal punches, per API key (hashed, so the key never sits in limiter state), else per IP.
     // Unknown-card guessing has its own, tighter budget in ApiKeyService.
@@ -339,12 +341,6 @@ if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Swagger
 // Enable CORS
 app.UseCors("AllowOrigins");
 
-// Enable Rate Limiting (disabled in Testing environment for integration tests)
-if (!app.Environment.IsEnvironment("Testing"))
-{
-    app.UseRateLimiter();
-}
-
 // Disable HTTPS redirection in development for testing
 if (!app.Environment.IsDevelopment())
 {
@@ -353,6 +349,12 @@ if (!app.Environment.IsDevelopment())
 
 // Authentication & Authorization middleware (order matters!)
 app.UseAuthentication();
+// Rate limiting after authentication: the per-user "General" partition reads ctx.User
+// (before it, every caller fell back to the shared per-IP budget). Disabled in Testing.
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseRateLimiter();
+}
 app.UseAuthorization();
 
 app.MapControllers();
