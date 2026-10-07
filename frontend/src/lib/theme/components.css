@@ -9,14 +9,15 @@
 @layer base {
 	:root {
 		color: var(--color-base-content);
-		background-color: var(--color-base-100);
+		/* The page colour lives on the root, so it fills the whole window however short the content */
+		background-color: var(--color-bg);
 		scrollbar-color: color-mix(in oklch, currentColor 35%, #0000) #0000;
 	}
 
 	/* Open modal: lock the page scroll, keep the scrollbar's gutter only if there was one */
 	:root:has(.modal[open]) {
 		overflow: hidden;
-		background-color: color-mix(in srgb, var(--color-base-100), #000 40%);
+		background-color: color-mix(in srgb, var(--color-bg), #000 40%);
 		animation: forwards set-page-has-scroll;
 		animation-timeline: scroll();
 		scrollbar-gutter: if(style(--page-has-scroll: 1): stable; else: unset);
