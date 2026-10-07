@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Used by the coverage run: dotnet test with settings coverlet.runsettings and the XPlat Code Coverage collector -->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Include>[TimeTracking.Api]*</Include>
+          <!-- EF migrations are generated code; DesignTimeDbContextFactory only runs for `dotnet ef` -->
+          <ExcludeByFile>**/Migrations/*.cs</ExcludeByFile>
+          <Exclude>[TimeTracking.Api]TimeTracking.Api.Data.DesignTimeDbContextFactory</Exclude>
+          <ExcludeByAttribute>GeneratedCodeAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <SkipAutoProps>true</SkipAutoProps>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
