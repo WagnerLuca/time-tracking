@@ -25,7 +25,7 @@ dotnet run
 
 # Frontend — http://localhost:5179
 cd frontend
-export NODE_AUTH_TOKEN=<GitHub PAT with read:packages>   # @wagnerluca/ui is on GitHub Packages
+export NODE_AUTH_TOKEN=<GitHub PAT with read:packages>   # optional: @wagnerluca/ui from GitHub Packages, else bundled tokens
 npm install
 npm run dev
 ```

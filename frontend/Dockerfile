@@ -9,10 +9,17 @@ WORKDIR /app
 # Copy package files first (for better layer caching)
 COPY package*.json .npmrc ./
 
-# Install all dependencies (including @sveltejs/adapter-node). @wagnerluca/ui
-# comes from GitHub Packages (see .npmrc), which needs a read:packages token,
-# passed as a BuildKit secret so it never lands in an image layer.
-RUN --mount=type=secret,id=NODE_AUTH_TOKEN     if [ ! -s /run/secrets/NODE_AUTH_TOKEN ]; then       echo "ERROR: NODE_AUTH_TOKEN secret not provided to the build (needed to install @wagnerluca/ui from GitHub Packages)" >&2;       exit 1;     fi &&     NODE_AUTH_TOKEN="$(cat /run/secrets/NODE_AUTH_TOKEN)" npm ci
+# Install all dependencies (including @sveltejs/adapter-node). @wagnerluca/ui is an
+# optional dependency from GitHub Packages (see .npmrc), which needs a read:packages
+# token, passed as a BuildKit secret so it never lands in an image layer. Without the
+# secret npm skips it and the build uses the bundled fallback tokens (vite.config.ts).
+RUN --mount=type=secret,id=NODE_AUTH_TOKEN \
+    if [ -s /run/secrets/NODE_AUTH_TOKEN ]; then \
+      NODE_AUTH_TOKEN="$(cat /run/secrets/NODE_AUTH_TOKEN)" npm ci; \
+    else \
+      echo "NODE_AUTH_TOKEN not provided: building with the bundled Wagner Luca design tokens"; \
+      npm ci; \
+    fi
 
 # Copy source code
 COPY . ./
@@ -32,10 +39,10 @@ RUN apk add --no-cache dumb-init
 WORKDIR /app
 
 # The server bundle in build/ still imports the runtime dependencies (axios, ...),
-# so install those; @wagnerluca/ui and the rest of the toolchain are devDependencies.
+# so install those; @wagnerluca/ui (optional, CSS only) and the toolchain are not needed.
 # Files stay root-owned: the app user can read but not modify its own code.
 COPY --from=builder /app/package.json /app/package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN npm ci --omit=dev --omit=optional --ignore-scripts && npm cache clean --force
 COPY --from=builder /app/build ./build
 
 # Run as the image's built-in non-root user

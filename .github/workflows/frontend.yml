@@ -38,7 +38,7 @@ jobs:
         run: npm ci
         working-directory: frontend
         env:
-          # @wagnerluca/ui lives on GitHub Packages; needs a PAT with read:packages
+          # @wagnerluca/ui (optional) lives on GitHub Packages; needs a PAT with read:packages, else the bundled tokens are used
           NODE_AUTH_TOKEN: ${{ secrets.GHP_READ_TOKEN }}
 
       - name: Check
