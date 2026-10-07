@@ -101,6 +101,33 @@ public static class TestHelpers
         return await invitee.PostAsJsonAsync("/api/v1/invitations/accept", new { token });
     }
 
+    /// <summary>
+    /// A fresh organization (owner = a new user) with the given settings and one plain member.
+    /// Emails are <c>{prefix}-owner@{domain}</c> / <c>{prefix}-m@{domain}</c>, the slug <c>{prefix}-org</c>.
+    /// </summary>
+    public static async Task<(HttpClient Owner, HttpClient Member, string Slug, int OrgId, int MemberId)> OrgWithMemberAsync(
+        Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory, string prefix, object settings, string domain = "t.test")
+    {
+        var (owner, _) = await CreateAuthenticatedUserAsync(factory, $"{prefix}-owner@{domain}");
+        var org = await CreateOrganizationAsync(owner, $"{prefix} Org", $"{prefix}-org");
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/settings", settings)).EnsureSuccessStatusCode();
+        var (member, m) = await CreateAuthenticatedUserAsync(factory, $"{prefix}-m@{domain}");
+        (await AddMemberAsync(factory, owner, org.Slug, m)).EnsureSuccessStatusCode();
+        return (owner, member, org.Slug, org.Id, m.User.Id);
+    }
+
+    /// <summary>Creates a group with the given members (role "Member"/"Admin") and permission overrides; returns its id.</summary>
+    public static async Task<int> CreateGroupAsync(HttpClient admin, string slug, string name, object permissions, params (int UserId, string Role)[] members)
+    {
+        var created = await admin.PostAsJsonAsync($"/api/v1/Organizations/{slug}/groups", new { name });
+        created.EnsureSuccessStatusCode();
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+        foreach (var (userId, role) in members)
+            (await admin.PostAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{id}/members", new { userId, role })).EnsureSuccessStatusCode();
+        (await admin.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{id}/permissions", permissions)).EnsureSuccessStatusCode();
+        return id;
+    }
+
     /// <summary>Register a new user, log them in, and return the client with auth set.</summary>
     public static async Task<(HttpClient Client, LoginResponseDto Login)> CreateAuthenticatedUserAsync(
         Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory, string email, string firstName = "Test", string lastName = "User")
@@ -265,6 +292,8 @@ public record WorkScheduleResponseDto
     public double TargetWed { get; init; }
     public double TargetThu { get; init; }
     public double TargetFri { get; init; }
+    public double TargetSat { get; init; }
+    public double TargetSun { get; init; }
     public double InitialOvertimeHours { get; init; }
     public string InitialOvertimeMode { get; init; } = "";
     public string WorkScheduleChangeMode { get; init; } = "";

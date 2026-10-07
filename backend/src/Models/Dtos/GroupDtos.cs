@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using TimeTracking.Api.Infrastructure;
+
 namespace TimeTracking.Api.Models.Dtos;
 
 public record GroupResponse(
@@ -77,15 +80,15 @@ public record GroupPermissionsResponse(
 );
 
 public record UpdateGroupPermissionsRequest(
-    RuleMode? EditPastEntriesMode,
-    RuleMode? EditPauseMode,
-    RuleMode? CsvImportMode,
-    RuleMode? WorkScheduleChangeMode,
-    RuleMode? InitialOvertimeMode,
-    RuleMode? AbsenceSelfServiceMode,
-    VisibilityMode? VacationVisibility,
-    VisibilityMode? SickDayVisibility,
-    VisibilityMode? TimeEntryVisibility,
+    [property: JsonConverter(typeof(EnumOverrideConverter<RuleMode>))] RuleMode? EditPastEntriesMode,
+    [property: JsonConverter(typeof(EnumOverrideConverter<RuleMode>))] RuleMode? EditPauseMode,
+    [property: JsonConverter(typeof(EnumOverrideConverter<RuleMode>))] RuleMode? CsvImportMode,
+    [property: JsonConverter(typeof(EnumOverrideConverter<RuleMode>))] RuleMode? WorkScheduleChangeMode,
+    [property: JsonConverter(typeof(EnumOverrideConverter<RuleMode>))] RuleMode? InitialOvertimeMode,
+    [property: JsonConverter(typeof(EnumOverrideConverter<RuleMode>))] RuleMode? AbsenceSelfServiceMode,
+    [property: JsonConverter(typeof(EnumOverrideConverter<VisibilityMode>))] VisibilityMode? VacationVisibility,
+    [property: JsonConverter(typeof(EnumOverrideConverter<VisibilityMode>))] VisibilityMode? SickDayVisibility,
+    [property: JsonConverter(typeof(EnumOverrideConverter<VisibilityMode>))] VisibilityMode? TimeEntryVisibility,
     bool? GroupAdminCanApproveAbsences,
     bool? GroupAdminCanApproveTimeEdits,
     bool? GroupAdminCanApproveScheduleChanges,

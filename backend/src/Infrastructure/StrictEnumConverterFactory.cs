@@ -6,7 +6,8 @@ namespace TimeTracking.Api.Infrastructure;
 /// <summary>
 /// Rejects enum values that are not defined (System.Text.Json accepts any integer by default),
 /// so e.g. an admin cannot send <c>"role": 3</c> and end up above Owner. For nullable enums a
-/// negative number means "no value" — the UI sends -1 for "inherit from organization".
+/// negative number means "no value"; group override fields use <see cref="EnumOverrideConverter{T}"/> instead,
+/// so their -1 ("inherit from organization") survives as "clear the override".
 /// </summary>
 public sealed class StrictEnumConverterFactory : JsonConverterFactory
 {
@@ -48,7 +49,7 @@ public sealed class StrictEnumConverterFactory : JsonConverterFactory
         }
     }
 
-    private static T ReadDefined<T>(ref Utf8JsonReader reader) where T : struct, Enum
+    internal static T ReadDefined<T>(ref Utf8JsonReader reader) where T : struct, Enum
     {
         T value;
         if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt64(out var number))
@@ -62,5 +63,27 @@ public sealed class StrictEnumConverterFactory : JsonConverterFactory
         if (!Enum.IsDefined(value))
             throw new JsonException($"Invalid value for {typeof(T).Name}.");
         return value;
+    }
+}
+
+/// <summary>
+/// For a partial-update field where null means "leave unchanged": a negative number is kept
+/// (as an undefined value) so the service can tell "clear the override" (-1 from the UI's
+/// "inherit") apart from "not sent". Any other value must be defined. Put it on the property:
+/// <c>[property: JsonConverter(typeof(EnumOverrideConverter&lt;RuleMode&gt;))]</c>.
+/// </summary>
+public sealed class EnumOverrideConverter<T> : JsonConverter<T?> where T : struct, Enum
+{
+    public override T? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt64(out var n) && n < 0)
+            return (T)Enum.ToObject(typeof(T), -1);
+        return StrictEnumConverterFactory.ReadDefined<T>(ref reader);
+    }
+
+    public override void Write(Utf8JsonWriter writer, T? value, JsonSerializerOptions options)
+    {
+        if (value.HasValue) writer.WriteNumberValue(Convert.ToInt64(value.Value));
+        else writer.WriteNullValue();
     }
 }
