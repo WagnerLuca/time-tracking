@@ -20,6 +20,8 @@ console.log(`[theme] design tokens from ${usingPackage ? '@wagnerluca/ui' : 'the
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	resolve: { alias: { '@wagnerluca/ui/tokens.css': designTokens } },
-	// 5173 is usually taken by other projects; the backend's dev CORS and the e2e config expect 5179
-	server: { port: 5179, strictPort: true }
+	// 5173 is usually taken by other projects; the e2e config expects 5179. /api goes to the
+	// backend so the browser stays same-origin, exactly like behind Caddy in production.
+	server: { port: 5179, strictPort: true, proxy: { '/api': 'http://localhost:7000' } },
+	preview: { proxy: { '/api': 'http://localhost:7000' } }
 });

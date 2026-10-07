@@ -13,8 +13,8 @@ const getApiBaseUrl = (): string => {
     }
 
     if (typeof window !== 'undefined') {
-        // Browser: same host, backend on port 7000
-        return `${window.location.protocol}//${window.location.hostname}:7000`;
+        // Browser: same origin — Caddy routes /api/* in production, the Vite proxy in dev
+        return window.location.origin;
     }
     // SSR: Docker internal or fallback
     return 'http://backend:7000';
