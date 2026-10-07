@@ -97,7 +97,7 @@
 								<form class="flex flex-wrap items-end gap-2 mt-2" onsubmit={assign}>
 									<label class="flex flex-col gap-1 text-xs text-base-content/70">
 										{t('orgSettings.terminal.member')}
-										<select class="select select-bordered select-sm min-w-[12rem]" bind:value={memberId} disabled={saving} required>
+										<select class="select select-sm min-w-[12rem]" bind:value={memberId} disabled={saving} required>
 											<option value={null} disabled>{t('orgSettings.terminal.chooseMember')}</option>
 											{#each sortedMembers as m (m.id)}
 												<option value={m.id}>{m.firstName} {m.lastName}</option>
@@ -106,7 +106,7 @@
 									</label>
 									<label class="flex flex-col gap-1 text-xs text-base-content/70">
 										{t('orgSettings.terminal.cardLabel')}
-										<input class="input input-bordered input-sm w-40" maxlength="100" bind:value={label} disabled={saving} />
+										<input class="input input-sm w-40" maxlength="100" bind:value={label} disabled={saving} />
 									</label>
 									<button type="submit" class="btn btn-primary btn-sm" disabled={saving || memberId == null}>{saving ? t('common.saving') : t('orgSettings.terminal.assign')}</button>
 									<button type="button" class="btn btn-ghost btn-sm" onclick={() => (assigningId = null)} disabled={saving}>{t('common.cancel')}</button>

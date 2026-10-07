@@ -1,6 +1,6 @@
 /**
  * One place for the app's colour decisions. Everything here resolves to the
- * DaisyUI theme (app.css) or to @wagnerluca/ui's accent tokens, so it flips
+ * theme colours in app.css or to @wagnerluca/ui's accent tokens, so it flips
  * correctly in dark mode — no hardcoded Tailwind palette classes or hex values
  * in components. Colours the user picks (group / custom absence type) stay user
  * data; they are only ever used as a tint via color-mix, so text keeps the
@@ -51,7 +51,7 @@ export interface DayTypeClasses {
 	dot: string;
 	/** Soft row / cell background. */
 	soft: string;
-	/** DaisyUI badge colour modifier. */
+	/** Badge colour modifier (lib/theme/components.css). */
 	badge: string;
 	/** Emoji marker used in compact calendar cells. */
 	icon: string;

@@ -220,7 +220,7 @@
 			<input
 				id="joinSlug"
 				type="text"
-				class="input input-bordered input-sm w-full"
+				class="input input-sm w-full"
 				class:input-error={joinSlugInvalid}
 				placeholder={t('orgs.join.placeholder')}
 				autocomplete="off"

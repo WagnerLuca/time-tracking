@@ -22,7 +22,7 @@
 		<a href="/organizations" class="text-base-content/60 no-underline text-sm inline-block mb-3 hover:text-primary">{t('orgs.tabs.back')}</a>
 
 		<nav class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0" aria-label={t('orgs.tabs.label')}>
-			<div class="tabs tabs-bordered flex-nowrap w-max min-w-full">
+			<div class="tabs flex-nowrap w-max min-w-full">
 				<a href={tabHref('')} class="tab whitespace-nowrap gap-1.5" class:tab-active={currentPath === tabHref('')} aria-current={currentPath === tabHref('') ? 'page' : undefined}>
 					<svg class="w-4.5 h-4.5 shrink-0" aria-hidden="true" viewBox="0 0 20 20" fill="currentColor"><path d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
 					{t('orgs.tabs.schedule')}

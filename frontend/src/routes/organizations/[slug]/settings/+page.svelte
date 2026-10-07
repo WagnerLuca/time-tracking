@@ -552,7 +552,7 @@
 							<input
 								id="default-vacation-days"
 								type="number"
-								class="input input-bordered input-sm w-20 text-center"
+								class="input input-sm w-20 text-center"
 								step="0.5"
 								min="0"
 								max="365"
@@ -572,14 +572,14 @@
 						<div class="flex items-center gap-2 flex-wrap">
 							<input
 								type="time"
-								class="input input-bordered input-sm w-28"
+								class="input input-sm w-28"
 								value={org.businessDayEnd ?? '00:00'}
 								aria-label={t('orgSettings.businessDayEnd.label')}
 								onchange={saveBusinessDayEnd}
 								disabled={settingsSaving}
 							/>
 							<select
-								class="select select-bordered select-sm w-52 max-w-full"
+								class="select select-sm w-52 max-w-full"
 								value={org.timeZone ?? 'Europe/Berlin'}
 								onchange={saveTimeZone}
 								disabled={settingsSaving}
@@ -619,12 +619,12 @@
 							{/if}
 							<div class="flex flex-col gap-1 w-full sm:w-auto">
 								<label for="new-type-name" class="text-xs font-medium text-base-content/60">{t('orgSettings.absenceTypes.name')}</label>
-								<input id="new-type-name" type="text" class="input input-bordered input-sm w-full sm:w-44" class:input-error={newTypeSubmitted && !newTypeName.trim()} placeholder={t('orgSettings.absenceTypes.namePlaceholder')} bind:value={newTypeName} required disabled={typeSaving} />
+								<input id="new-type-name" type="text" class="input input-sm w-full sm:w-44" class:input-error={newTypeSubmitted && !newTypeName.trim()} placeholder={t('orgSettings.absenceTypes.namePlaceholder')} bind:value={newTypeName} required disabled={typeSaving} />
 								{#if newTypeSubmitted && !newTypeName.trim()}<span class="text-xs text-error">{t('common.required')}</span>{/if}
 							</div>
 							<div class="flex flex-col gap-1 w-full sm:w-auto">
 								<label for="new-type-credit" class="text-xs font-medium text-base-content/60">{t('orgSettings.absenceTypes.creditMode')}</label>
-								<select id="new-type-credit" class="select select-bordered select-sm w-full" bind:value={newTypeCreditMode} disabled={typeSaving}>
+								<select id="new-type-credit" class="select select-sm w-full" bind:value={newTypeCreditMode} disabled={typeSaving}>
 									{#each creditModeOptions as o (o.value)}
 										<option value={o.value}>{o.label}</option>
 									{/each}
@@ -673,7 +673,7 @@
 									</div>
 									<div class="flex items-center gap-2 flex-wrap">
 										<select
-											class="select select-bordered select-xs"
+											class="select select-xs"
 											value={parseCreditMode(at.creditMode)}
 											onchange={(e) => updateAbsenceType(at, { creditMode: parseInt(e.currentTarget.value) })}
 											disabled={typeSaving}
@@ -836,12 +836,12 @@
 								<form onsubmit={addPauseRule} class="flex gap-2 items-center flex-wrap" novalidate>
 									<div class="flex items-center gap-1.5">
 										<label for="new-rule-hours" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.whenTracked')}</label>
-										<input id="new-rule-hours" type="number" class="input input-bordered input-xs w-[70px] text-center" step="0.5" min="0.5" max="24" bind:value={newRuleMinHours} required disabled={addingRule} />
+										<input id="new-rule-hours" type="number" class="input input-xs w-[70px] text-center" step="0.5" min="0.5" max="24" bind:value={newRuleMinHours} required disabled={addingRule} />
 										<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.hours')}</span>
 									</div>
 									<div class="flex items-center gap-1.5">
 										<label for="new-rule-pause" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.deduct')}</label>
-										<input id="new-rule-pause" type="number" class="input input-bordered input-xs w-[70px] text-center" min="1" step="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
+										<input id="new-rule-pause" type="number" class="input input-xs w-[70px] text-center" min="1" step="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
 										<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.minPause')}</span>
 									</div>
 									<button type="submit" class="btn btn-primary btn-sm" disabled={addingRule}>
@@ -864,12 +864,12 @@
 												{/if}
 												<div class="flex items-center gap-1.5">
 													<label for="edit-rule-hours" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.whenTracked')}</label>
-													<input id="edit-rule-hours" type="number" class="input input-bordered input-xs w-[70px] text-center" step="0.5" min="0.5" max="24" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
+													<input id="edit-rule-hours" type="number" class="input input-xs w-[70px] text-center" step="0.5" min="0.5" max="24" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
 													<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.hoursShort')}</span>
 												</div>
 												<div class="flex items-center gap-1.5">
 													<label for="edit-rule-pause" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.deduct')}</label>
-													<input id="edit-rule-pause" type="number" class="input input-bordered input-xs w-[70px] text-center" min="1" step="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
+													<input id="edit-rule-pause" type="number" class="input input-xs w-[70px] text-center" min="1" step="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
 													<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.min')}</span>
 												</div>
 												<div class="flex items-center gap-1.5">

@@ -26,7 +26,7 @@
 	<textarea
 		bind:this={textarea}
 		id="{id}-reason"
-		class="textarea textarea-bordered w-full h-20"
+		class="textarea w-full h-20"
 		maxlength={MAX}
 		placeholder={t('common.declineReasonPlaceholder')}
 		bind:value={reason}

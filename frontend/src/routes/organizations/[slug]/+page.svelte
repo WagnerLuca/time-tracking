@@ -226,21 +226,21 @@
 				<form onsubmit={saveEdit} novalidate class="flex flex-col gap-4">
 					<div>
 						<label for="editName" class="label text-sm font-medium text-base-content/70">{t('orgHome.edit.name')}</label>
-						<input id="editName" type="text" class="input input-bordered w-full" class:input-error={nameError} aria-invalid={!!nameError} bind:value={editName} disabled={editSaving} />
+						<input id="editName" type="text" class="input w-full" class:input-error={nameError} aria-invalid={!!nameError} bind:value={editName} disabled={editSaving} />
 						{#if nameError}<p class="text-error text-xs mt-1">{nameError}</p>{/if}
 					</div>
 					<div>
 						<label for="editSlug" class="label text-sm font-medium text-base-content/70">{t('orgHome.edit.slug')}</label>
-						<input id="editSlug" type="text" class="input input-bordered w-full" class:input-error={slugError} aria-invalid={!!slugError} bind:value={editSlug} disabled={editSaving} />
+						<input id="editSlug" type="text" class="input w-full" class:input-error={slugError} aria-invalid={!!slugError} bind:value={editSlug} disabled={editSaving} />
 						{#if slugError}<p class="text-error text-xs mt-1">{slugError}</p>{/if}
 					</div>
 					<div>
 						<label for="editDesc" class="label text-sm font-medium text-base-content/70">{t('orgHome.edit.description')}</label>
-						<textarea id="editDesc" class="textarea textarea-bordered w-full" bind:value={editDescription} rows="3" disabled={editSaving}></textarea>
+						<textarea id="editDesc" class="textarea w-full" bind:value={editDescription} rows="3" disabled={editSaving}></textarea>
 					</div>
 					<div>
 						<label for="editWeb" class="label text-sm font-medium text-base-content/70">{t('orgHome.edit.website')}</label>
-						<input id="editWeb" type="url" class="input input-bordered w-full" bind:value={editWebsite} disabled={editSaving} />
+						<input id="editWeb" type="url" class="input w-full" bind:value={editWebsite} disabled={editSaving} />
 					</div>
 					<div class="flex gap-3 justify-end mt-2">
 						<button type="button" class="btn btn-ghost btn-sm" onclick={() => (editing = false)} disabled={editSaving}>{t('common.cancel')}</button>

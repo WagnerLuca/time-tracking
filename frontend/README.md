@@ -1,6 +1,6 @@
 # Time Tracking — Frontend
 
-SvelteKit (Svelte 5 runes, TypeScript) with Tailwind CSS 4 + DaisyUI 5, styled with the
+SvelteKit (Svelte 5 runes, TypeScript) with Tailwind CSS 4 and its own theme (no component library), styled with the
 Wagner Luca design system (`@wagnerluca/ui` tokens). German UI by default, English via the
 toggle in the nav or in Settings.
 

@@ -13,7 +13,7 @@
 		/** Heading, also used as the dialog's accessible name. */
 		title?: string;
 		children: Snippet;
-		/** Optional footer (buttons), rendered in DaisyUI's modal-action row. */
+		/** Optional footer (buttons), rendered in the modal-action row. */
 		actions?: Snippet;
 		maxWidth?: string;
 	}

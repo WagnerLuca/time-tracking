@@ -255,7 +255,7 @@
 				<div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
 					<div class="flex items-center gap-3">
 						<h2 class="text-xl font-bold text-base-content m-0">{t('holidays.title')}</h2>
-						<select class="select select-bordered select-sm w-auto" bind:value={selectedYear} aria-label={t('holidays.year')}>
+						<select class="select select-sm w-auto" bind:value={selectedYear} aria-label={t('holidays.year')}>
 							{#each availableYears as year (year)}
 								<option value={year}>{year}</option>
 							{/each}
@@ -289,7 +289,7 @@
 						<form onsubmit={importHolidays} class="flex gap-3 items-end flex-wrap" novalidate>
 							<div class="form-control w-full sm:w-auto">
 								<label for="holidayPreset" class="label text-xs">{t('holidays.import.region')}</label>
-								<select id="holidayPreset" class="select select-bordered select-sm w-full sm:w-64" bind:value={importPreset} disabled={importing || presets.length === 0}>
+								<select id="holidayPreset" class="select select-sm w-full sm:w-64" bind:value={importPreset} disabled={importing || presets.length === 0}>
 									{#each presets as p (p.key)}
 										<option value={p.key}>{p.name}</option>
 									{/each}
@@ -297,11 +297,11 @@
 							</div>
 							<div class="form-control">
 								<label for="importFrom" class="label text-xs">{t('holidays.import.fromYear')}</label>
-								<input id="importFrom" type="number" min="2000" max="2100" class="input input-bordered input-sm w-24" class:input-error={importRangeError} bind:value={importFromYear} disabled={importing} aria-describedby={importRangeError ? 'importRangeError' : undefined} />
+								<input id="importFrom" type="number" min="2000" max="2100" class="input input-sm w-24" class:input-error={importRangeError} bind:value={importFromYear} disabled={importing} aria-describedby={importRangeError ? 'importRangeError' : undefined} />
 							</div>
 							<div class="form-control">
 								<label for="importTo" class="label text-xs">{t('holidays.import.toYear')}</label>
-								<input id="importTo" type="number" min="2000" max="2100" class="input input-bordered input-sm w-24" class:input-error={importRangeError} bind:value={importToYear} disabled={importing} aria-describedby={importRangeError ? 'importRangeError' : undefined} />
+								<input id="importTo" type="number" min="2000" max="2100" class="input input-sm w-24" class:input-error={importRangeError} bind:value={importToYear} disabled={importing} aria-describedby={importRangeError ? 'importRangeError' : undefined} />
 							</div>
 							<button type="submit" class="btn btn-primary btn-sm" disabled={importing || !!importRangeError || presets.length === 0}>
 								{importing ? t('holidays.import.importing') : t('holidays.import.submit')}
@@ -319,12 +319,12 @@
 						<form onsubmit={addHoliday} class="flex gap-3 items-end flex-wrap" novalidate>
 							<div class="form-control w-full sm:w-auto">
 								<label for="holidayName" class="label text-xs">{t('holidays.name')}</label>
-								<input id="holidayName" type="text" class="input input-bordered input-sm w-full" class:input-error={addSubmitted && !newHolidayName.trim()} bind:value={newHolidayName} required disabled={addingHoliday} placeholder={t('holidays.namePlaceholder')} />
+								<input id="holidayName" type="text" class="input input-sm w-full" class:input-error={addSubmitted && !newHolidayName.trim()} bind:value={newHolidayName} required disabled={addingHoliday} placeholder={t('holidays.namePlaceholder')} />
 								{#if addSubmitted && !newHolidayName.trim()}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 							</div>
 							<div class="form-control w-full sm:w-auto">
 								<label for="holidayDate" class="label text-xs">{t('holidays.date')}</label>
-								<input id="holidayDate" type="date" class="input input-bordered input-sm w-full" class:input-error={addSubmitted && !newHolidayDate} bind:value={newHolidayDate} required disabled={addingHoliday} />
+								<input id="holidayDate" type="date" class="input input-sm w-full" class:input-error={addSubmitted && !newHolidayDate} bind:value={newHolidayDate} required disabled={addingHoliday} />
 								{#if addSubmitted && !newHolidayDate}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 							</div>
 							<label class="label cursor-pointer flex items-center gap-2 text-sm">
@@ -355,12 +355,12 @@
 										{/if}
 										<div class="form-control w-full sm:w-auto">
 											<label for="editHolidayName" class="label text-xs">{t('holidays.name')}</label>
-											<input id="editHolidayName" type="text" class="input input-bordered input-sm w-full" class:input-error={editSubmitted && !editHolidayName.trim()} bind:value={editHolidayName} required disabled={editHolidaySaving} />
+											<input id="editHolidayName" type="text" class="input input-sm w-full" class:input-error={editSubmitted && !editHolidayName.trim()} bind:value={editHolidayName} required disabled={editHolidaySaving} />
 											{#if editSubmitted && !editHolidayName.trim()}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 										</div>
 										<div class="form-control w-full sm:w-auto">
 											<label for="editHolidayDate" class="label text-xs">{t('holidays.date')}</label>
-											<input id="editHolidayDate" type="date" class="input input-bordered input-sm w-full" class:input-error={editSubmitted && !editHolidayDate} bind:value={editHolidayDate} required disabled={editHolidaySaving} />
+											<input id="editHolidayDate" type="date" class="input input-sm w-full" class:input-error={editSubmitted && !editHolidayDate} bind:value={editHolidayDate} required disabled={editHolidaySaving} />
 											{#if editSubmitted && !editHolidayDate}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 										</div>
 										<label class="label cursor-pointer flex items-center gap-2 text-sm">

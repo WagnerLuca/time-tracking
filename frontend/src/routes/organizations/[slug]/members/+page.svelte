@@ -109,7 +109,7 @@
 				{#if groupOptions.length > 0}
 					<label class="flex items-center gap-2 text-sm">
 						<span class="sr-only">{t('memberList.filterLabel')}</span>
-						<select bind:value={groupFilter} class="select select-bordered select-sm">
+						<select bind:value={groupFilter} class="select select-sm">
 							<option value={null}>{t('memberList.allGroups')}</option>
 							{#each groupOptions as g (g.id)}
 								<option value={g.id}>{g.name}</option>

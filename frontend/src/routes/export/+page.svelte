@@ -538,7 +538,7 @@
 			<div class="card bg-base-100 border border-base-300 shadow-sm">
 				<div class="card-body p-5 space-y-2">
 					<label for="targetMember" class="text-base font-semibold">{t('export.member.label')}</label>
-					<select id="targetMember" class="select select-bordered select-sm w-full sm:w-72" bind:value={targetUserId}>
+					<select id="targetMember" class="select select-sm w-full sm:w-72" bind:value={targetUserId}>
 						<option value={null}>{t('export.member.myself')}</option>
 						{#each exportableMembers as m (m.id)}
 							<option value={m.id}>{m.firstName} {m.lastName}</option>
@@ -591,7 +591,7 @@
 							<label class="label text-xs font-medium text-base-content/60" for="exportScope">{t('export.filters.scope')}</label>
 							<select
 								id="exportScope"
-								class="select select-bordered select-sm w-full"
+								class="select select-sm w-full"
 								bind:value={exportScope}
 								disabled={forceOrgScope || !orgContext.selectedOrg}
 							>
@@ -610,7 +610,7 @@
 						<!-- Time Range -->
 						<div>
 							<label class="label text-xs font-medium text-base-content/60" for="exportRange">{t('export.filters.range')}</label>
-							<select id="exportRange" class="select select-bordered select-sm w-full" bind:value={exportRange}>
+							<select id="exportRange" class="select select-sm w-full" bind:value={exportRange}>
 								{#each ['week', 'month', 'year', 'all', 'custom'] as const as r (r)}
 									<option value={r}>{t(`export.filters.ranges.${r}`)}</option>
 								{/each}
@@ -625,7 +625,7 @@
 								<input
 									id="customFrom"
 									type="date"
-									class="input input-bordered input-sm w-full"
+									class="input input-sm w-full"
 									class:input-error={customRangeInvalid}
 									max={customTo || undefined}
 									bind:value={customFrom}
@@ -636,7 +636,7 @@
 								<input
 									id="customTo"
 									type="date"
-									class="input input-bordered input-sm w-full"
+									class="input input-sm w-full"
 									class:input-error={customRangeInvalid}
 									min={customFrom || undefined}
 									aria-invalid={customRangeInvalid}
@@ -733,12 +733,12 @@
 						<h2 class="text-base font-semibold">{t('export.payroll.title')}</h2>
 						<p class="text-sm text-base-content/60">{t('export.payroll.text', { org: orgContext.selectedOrg?.name ?? '' })}</p>
 						<div class="flex items-center gap-2 flex-wrap">
-							<select class="select select-bordered select-sm" bind:value={payrollMonth} aria-label={t('export.payroll.month')}>
+							<select class="select select-sm" bind:value={payrollMonth} aria-label={t('export.payroll.month')}>
 								{#each Array.from({ length: 12 }, (_, i) => i + 1) as m (m)}
 									<option value={m}>{getMonthName(new Date(2000, m - 1))}</option>
 								{/each}
 							</select>
-							<input type="number" class="input input-bordered input-sm w-24" class:input-error={!validYear(payrollYear)} bind:value={payrollYear} min="2000" max="2100" aria-label={t('export.payroll.year')} aria-invalid={!validYear(payrollYear)} />
+							<input type="number" class="input input-sm w-24" class:input-error={!validYear(payrollYear)} bind:value={payrollYear} min="2000" max="2100" aria-label={t('export.payroll.year')} aria-invalid={!validYear(payrollYear)} />
 							<button type="button" class="btn btn-primary btn-sm" onclick={downloadPayroll} disabled={payrollDownloading || !validYear(payrollYear)}>
 								{#if payrollDownloading}
 									<span class="loading loading-spinner loading-xs"></span> {t('export.exporting')}
@@ -960,12 +960,12 @@
 						<h2 class="text-base font-semibold">{t('export.report.monthlyTitle')}</h2>
 						<p class="text-sm text-base-content/60">{t('export.report.monthlyText')}</p>
 						<div class="flex items-center gap-2 flex-wrap">
-							<select class="select select-bordered select-sm" bind:value={reportMonth} aria-label={t('export.report.month')}>
+							<select class="select select-sm" bind:value={reportMonth} aria-label={t('export.report.month')}>
 								{#each Array.from({ length: 12 }, (_, i) => i + 1) as m (m)}
 									<option value={m}>{getMonthName(new Date(2000, m - 1))}</option>
 								{/each}
 							</select>
-							<input type="number" class="input input-bordered input-sm w-24" class:input-error={!validYear(reportMonthYear)} bind:value={reportMonthYear} min="2000" max="2100" aria-label={t('export.report.year')} aria-invalid={!validYear(reportMonthYear)} />
+							<input type="number" class="input input-sm w-24" class:input-error={!validYear(reportMonthYear)} bind:value={reportMonthYear} min="2000" max="2100" aria-label={t('export.report.year')} aria-invalid={!validYear(reportMonthYear)} />
 							<button type="button" class="btn btn-primary btn-sm" onclick={downloadMonthlyReport} disabled={monthlyReportDownloading || !validYear(reportMonthYear)}>
 								{#if monthlyReportDownloading}
 									<span class="loading loading-spinner loading-xs"></span> {t('export.report.generating')}
@@ -982,7 +982,7 @@
 						<h2 class="text-base font-semibold">{t('export.report.yearlyTitle')}</h2>
 						<p class="text-sm text-base-content/60">{t('export.report.yearlyText')}</p>
 						<div class="flex items-center gap-2 flex-wrap">
-							<input type="number" class="input input-bordered input-sm w-24" class:input-error={!validYear(reportYear)} bind:value={reportYear} min="2000" max="2100" aria-label={t('export.report.year')} aria-invalid={!validYear(reportYear)} />
+							<input type="number" class="input input-sm w-24" class:input-error={!validYear(reportYear)} bind:value={reportYear} min="2000" max="2100" aria-label={t('export.report.year')} aria-invalid={!validYear(reportYear)} />
 							<button type="button" class="btn btn-primary btn-sm" onclick={downloadYearlyReport} disabled={yearlyReportDownloading || !validYear(reportYear)}>
 								{#if yearlyReportDownloading}
 									<span class="loading loading-spinner loading-xs"></span> {t('export.report.generating')}
@@ -1006,11 +1006,11 @@
 <Modal open={showRequestModal} onclose={() => { if (!requestSending) showRequestModal = false; }} title={t('export.request.title')}>
 	<p class="text-sm text-base-content/70 mb-3">{tp('export.request.text', selectedRows.size)}</p>
 	<label class="label" for="request-message">
-		<span class="label-text">{t('export.request.message')} ({t('common.optional')})</span>
+		<span>{t('export.request.message')} ({t('common.optional')})</span>
 	</label>
 	<textarea
 		id="request-message"
-		class="textarea textarea-bordered h-24 w-full"
+		class="textarea h-24 w-full"
 		placeholder={t('export.request.placeholder')}
 		bind:value={requestMessage}
 		disabled={requestSending}

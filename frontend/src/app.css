@@ -2,22 +2,16 @@
 @import "@wagnerluca/ui/tokens.css";
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/space-grotesk";
+@import "./lib/theme/components.css";
 
 /*
-  DaisyUI is kept for its components, but its only theme is the Wagner Luca
-  one: every colour is a var() onto @wagnerluca/ui's tokens.css, so the
-  `.dark` class (see stores/theme.svelte.ts) flips light/dark without a second
-  DaisyUI theme. Zeiterfassung's module accent is `time` (sage).
+  The app's theme: Tailwind colour names (bg-base-100, text-primary,
+  border-base-content/20, …) whose values are var()s onto @wagnerluca/ui's
+  tokens.css, so the `.dark` class on <html> (stores/theme.svelte.ts) flips
+  every colour at once. Zeiterfassung's module accent is `time` (sage).
+  The component classes (btn, card, …) live in lib/theme/components.css.
 */
-@plugin "daisyui" {
-  themes: false;
-}
-
-@plugin "daisyui/theme" {
-  name: "wagnerluca";
-  default: true;
-  color-scheme: light;
-
+@theme {
   --color-base-100: var(--color-surface);
   --color-base-200: var(--color-bg-alt);
   --color-base-300: var(--color-border);
@@ -44,18 +38,18 @@
   --radius-box: 22px;
   --radius-field: 10px;
   --radius-selector: 0.5rem;
+
+  --font-sans: 'Inter Variable', Inter, sans-serif;
+  --font-display: 'Space Grotesk Variable', 'Space Grotesk', sans-serif;
+}
+
+:root {
   --border: 1px;
-  --depth: 0;
-  --noise: 0;
+  color-scheme: light;
 }
 
 .dark {
   color-scheme: dark;
-}
-
-@theme {
-  --font-sans: 'Inter Variable', Inter, sans-serif;
-  --font-display: 'Space Grotesk Variable', 'Space Grotesk', sans-serif;
 }
 
 body {

@@ -384,12 +384,12 @@
 					<form onsubmit={createGroup} class="flex gap-3 items-end flex-wrap" novalidate>
 						<div class="form-control w-full sm:w-auto">
 							<label for="groupName" class="label text-xs">{t('groups.name')}</label>
-							<input id="groupName" type="text" class="input input-bordered input-sm w-full" class:input-error={createSubmitted && !createName.trim()} bind:value={createName} required disabled={creating} placeholder={t('groups.namePlaceholder')} />
+							<input id="groupName" type="text" class="input input-sm w-full" class:input-error={createSubmitted && !createName.trim()} bind:value={createName} required disabled={creating} placeholder={t('groups.namePlaceholder')} />
 							{#if createSubmitted && !createName.trim()}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 						</div>
 						<div class="form-control w-full sm:w-auto">
 							<label for="groupDesc" class="label text-xs">{t('groups.description')}</label>
-							<input id="groupDesc" type="text" class="input input-bordered input-sm w-full sm:w-56" bind:value={createDescription} disabled={creating} placeholder={t('groups.descriptionPlaceholder')} />
+							<input id="groupDesc" type="text" class="input input-sm w-full sm:w-56" bind:value={createDescription} disabled={creating} placeholder={t('groups.descriptionPlaceholder')} />
 						</div>
 						<div class="form-control">
 							<span class="label text-xs">{t('groups.color')}</span>
@@ -449,12 +449,12 @@
 												<div class="flex gap-3 items-end flex-wrap">
 													<div class="form-control w-full sm:w-auto">
 														<label for="editName" class="label text-xs">{t('groups.name')}</label>
-														<input id="editName" type="text" class="input input-bordered input-sm w-full" class:input-error={editSubmitted && !editName.trim()} bind:value={editName} required disabled={editSaving} />
+														<input id="editName" type="text" class="input input-sm w-full" class:input-error={editSubmitted && !editName.trim()} bind:value={editName} required disabled={editSaving} />
 														{#if editSubmitted && !editName.trim()}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 													</div>
 													<div class="form-control w-full sm:w-auto">
 														<label for="editDesc" class="label text-xs">{t('groups.description')}</label>
-														<input id="editDesc" type="text" class="input input-bordered input-sm w-full sm:w-56" bind:value={editDescription} disabled={editSaving} />
+														<input id="editDesc" type="text" class="input input-sm w-full sm:w-56" bind:value={editDescription} disabled={editSaving} />
 													</div>
 													<div class="form-control">
 														<span class="label text-xs">{t('groups.color')}</span>
@@ -477,7 +477,7 @@
 
 										<!-- Tab switcher (Members / Permissions) -->
 										{#if isAdmin}
-											<div class="tabs tabs-bordered mb-4" role="tablist">
+											<div class="tabs mb-4" role="tablist">
 												<button class="tab {detailTab === 'members' ? 'tab-active' : ''}" role="tab" aria-selected={detailTab === 'members'} onclick={() => (detailTab = 'members')}>{t('groups.tabs.members')}</button>
 												<button class="tab {detailTab === 'permissions' ? 'tab-active' : ''}" role="tab" aria-selected={detailTab === 'permissions'} onclick={() => (detailTab = 'permissions')}>{t('groups.tabs.permissions')}</button>
 											</div>
@@ -503,7 +503,7 @@
 													<form onsubmit={addMember} class="flex gap-2 items-end flex-wrap">
 														<div class="form-control flex-1 min-w-[12rem]">
 															<label for="addMemberId" class="label text-xs">{t('groups.members.select')}</label>
-															<select id="addMemberId" class="select select-bordered select-sm w-full" bind:value={addMemberUserId} disabled={addingMember}>
+															<select id="addMemberId" class="select select-sm w-full" bind:value={addMemberUserId} disabled={addingMember}>
 																<option value={null}>{t('groups.members.selectPlaceholder')}</option>
 																{#each availableMembers() as m}
 																	<option value={m.id}>{m.firstName} {m.lastName} ({m.email})</option>

@@ -44,7 +44,7 @@
 				<form onsubmit={handleSubmit}>
 					<div class="mb-5">
 						<label for="email" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.email')}</label>
-						<input id="email" type="email" autocomplete="email" class="input input-bordered w-full" bind:value={email} placeholder={t('auth.emailPlaceholder')} required disabled={submitting} />
+						<input id="email" type="email" autocomplete="email" class="input w-full" bind:value={email} placeholder={t('auth.emailPlaceholder')} required disabled={submitting} />
 					</div>
 					<button type="submit" class="btn btn-primary w-full" disabled={submitting || !email.trim()}>
 						{submitting ? t('auth.forgot.submitting') : t('auth.forgot.submit')}

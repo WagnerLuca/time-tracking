@@ -87,7 +87,7 @@
 	{#if canManage}
 		<div class="flex items-center gap-2 shrink-0">
 			<label for="member-role" class="sr-only">{t('memberDetail.header.role')}</label>
-			<select id="member-role" class="select select-bordered select-sm" value={roleValue} onchange={changeRole} disabled={pending}>
+			<select id="member-role" class="select select-sm" value={roleValue} onchange={changeRole} disabled={pending}>
 				<option value={0}>{roleLabel('Member')}</option>
 				<option value={1}>{roleLabel('Admin')}</option>
 				{#if callerIsOwner}<option value={2}>{roleLabel('Owner')}</option>{/if}

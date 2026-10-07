@@ -64,13 +64,13 @@
 		<div class="bg-base-200/40 border border-base-300 rounded-lg p-3.5">
 			<h3 class="font-semibold text-sm m-0 mb-2.5">{t('memberDetail.reports.monthly')}</h3>
 			<div class="flex items-start gap-2 flex-wrap">
-				<select class="select select-bordered select-sm" bind:value={month} aria-label={t('memberDetail.reports.month')} disabled={monthlyBusy}>
+				<select class="select select-sm" bind:value={month} aria-label={t('memberDetail.reports.month')} disabled={monthlyBusy}>
 					{#each Array.from({ length: 12 }, (_, i) => i + 1) as m}
 						<option value={m}>{getMonthName(new Date(2000, m - 1, 1))}</option>
 					{/each}
 				</select>
 				<div>
-					<input type="number" class="input input-bordered input-sm w-24" class:input-error={!validYear(monthYear)} aria-invalid={!validYear(monthYear)} bind:value={monthYear} min="2000" max="2100" aria-label={t('memberDetail.reports.year')} disabled={monthlyBusy} />
+					<input type="number" class="input input-sm w-24" class:input-error={!validYear(monthYear)} aria-invalid={!validYear(monthYear)} bind:value={monthYear} min="2000" max="2100" aria-label={t('memberDetail.reports.year')} disabled={monthlyBusy} />
 					{#if !validYear(monthYear)}<p class="text-error text-xs mt-1 mb-0">{t('memberDetail.reports.yearRange')}</p>{/if}
 				</div>
 				<button type="button" class="btn btn-primary btn-sm" onclick={downloadMonthly} disabled={monthlyBusy || !validYear(monthYear)}>
@@ -83,7 +83,7 @@
 			<h3 class="font-semibold text-sm m-0 mb-2.5">{t('memberDetail.reports.yearly')}</h3>
 			<div class="flex items-start gap-2 flex-wrap">
 				<div>
-					<input type="number" class="input input-bordered input-sm w-24" class:input-error={!validYear(year)} aria-invalid={!validYear(year)} bind:value={year} min="2000" max="2100" aria-label={t('memberDetail.reports.year')} disabled={yearlyBusy} />
+					<input type="number" class="input input-sm w-24" class:input-error={!validYear(year)} aria-invalid={!validYear(year)} bind:value={year} min="2000" max="2100" aria-label={t('memberDetail.reports.year')} disabled={yearlyBusy} />
 					{#if !validYear(year)}<p class="text-error text-xs mt-1 mb-0">{t('memberDetail.reports.yearRange')}</p>{/if}
 				</div>
 				<button type="button" class="btn btn-primary btn-sm" onclick={downloadYearly} disabled={yearlyBusy || !validYear(year)}>

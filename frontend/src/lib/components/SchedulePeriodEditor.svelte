@@ -190,18 +190,18 @@
 			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 				<div>
 					<label for="sp-from-{memberId ?? 'self'}" class="block text-sm font-medium text-base-content/80 mb-1">{t('schedule.periods.validFrom')}</label>
-					<input id="sp-from-{memberId ?? 'self'}" type="date" class="input input-bordered input-sm w-full" class:input-error={fromError} aria-invalid={!!fromError} bind:value={from} disabled={saving} />
+					<input id="sp-from-{memberId ?? 'self'}" type="date" class="input input-sm w-full" class:input-error={fromError} aria-invalid={!!fromError} bind:value={from} disabled={saving} />
 					{#if fromError}<p class="text-error text-xs mt-1">{fromError}</p>{/if}
 				</div>
 				<div>
 					<label for="sp-to-{memberId ?? 'self'}" class="block text-sm font-medium text-base-content/80 mb-1">{t('schedule.periods.validTo')} <span class="text-base-content/40">({t('common.optional')})</span></label>
-					<input id="sp-to-{memberId ?? 'self'}" type="date" class="input input-bordered input-sm w-full" class:input-error={toError} aria-invalid={!!toError} min={from || undefined} bind:value={to} disabled={saving} />
+					<input id="sp-to-{memberId ?? 'self'}" type="date" class="input input-sm w-full" class:input-error={toError} aria-invalid={!!toError} min={from || undefined} bind:value={to} disabled={saving} />
 					{#if toError}<p class="text-error text-xs mt-1">{toError}</p>{/if}
 				</div>
 			</div>
 			<div>
 				<label for="sp-weekly-{memberId ?? 'self'}" class="block text-sm font-medium text-base-content/80 mb-1">{t('schedule.periods.weeklyHours')}</label>
-				<input id="sp-weekly-{memberId ?? 'self'}" type="number" step="0.5" min="0" max={MAX_WEEKLY} class="input input-bordered input-sm w-32" class:input-error={weeklyError} aria-invalid={!!weeklyError} bind:value={weekly} disabled={saving} />
+				<input id="sp-weekly-{memberId ?? 'self'}" type="number" step="0.5" min="0" max={MAX_WEEKLY} class="input input-sm w-32" class:input-error={weeklyError} aria-invalid={!!weeklyError} bind:value={weekly} disabled={saving} />
 				{#if weeklyError}<p class="text-error text-xs mt-1">{weeklyError}</p>{/if}
 			</div>
 			<label class="flex items-center gap-2 text-sm text-base-content/80 cursor-pointer w-fit">
@@ -215,7 +215,7 @@
 						{#each dayNamesShort() as dayName, i}
 							<div class="flex flex-col items-center gap-1">
 								<label for="sp-day{i}-{memberId ?? 'self'}" class="text-xs font-semibold text-base-content/60">{dayName}</label>
-								<input id="sp-day{i}-{memberId ?? 'self'}" type="number" step="0.5" min="0" max={MAX_DAILY} class="input input-bordered input-xs w-full text-center" bind:value={days[i]} disabled={saving} />
+								<input id="sp-day{i}-{memberId ?? 'self'}" type="number" step="0.5" min="0" max={MAX_DAILY} class="input input-xs w-full text-center" bind:value={days[i]} disabled={saving} />
 							</div>
 						{/each}
 					</div>

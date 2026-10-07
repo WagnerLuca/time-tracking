@@ -74,7 +74,7 @@
 							id="firstName"
 							type="text"
 							autocomplete="given-name"
-							class="input input-bordered w-full"
+							class="input w-full"
 							class:input-error={attempted && !firstName.trim()}
 							bind:value={firstName}
 							placeholder={t('auth.register.firstNamePlaceholder')}
@@ -88,7 +88,7 @@
 							id="lastName"
 							type="text"
 							autocomplete="family-name"
-							class="input input-bordered w-full"
+							class="input w-full"
 							class:input-error={attempted && !lastName.trim()}
 							bind:value={lastName}
 							placeholder={t('auth.register.lastNamePlaceholder')}
@@ -104,7 +104,7 @@
 						id="email"
 						type="email"
 						autocomplete="email"
-						class="input input-bordered w-full"
+						class="input w-full"
 						class:input-error={attempted && !emailValid}
 						bind:value={email}
 						placeholder={t('auth.emailPlaceholder')}
@@ -119,7 +119,7 @@
 						id="password"
 						type="password"
 						autocomplete="new-password"
-						class="input input-bordered w-full"
+						class="input w-full"
 						class:input-error={attempted && passwordTooShort}
 						bind:value={password}
 						placeholder="••••••••"
@@ -140,7 +140,7 @@
 						id="confirmPassword"
 						type="password"
 						autocomplete="new-password"
-						class="input input-bordered w-full"
+						class="input w-full"
 						class:input-error={passwordMismatch}
 						bind:value={confirmPassword}
 						placeholder="••••••••"

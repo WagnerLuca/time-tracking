@@ -8,7 +8,7 @@ timers that were never stopped. German and English UI.
 | Part | Stack |
 |---|---|
 | Backend | ASP.NET Core / **.NET 10**, EF Core, PostgreSQL 16+ (row-level security) |
-| Frontend | SvelteKit, Svelte 5, Tailwind CSS 4 + DaisyUI 5, Wagner Luca design tokens (`@wagnerluca/ui`) |
+| Frontend | SvelteKit, Svelte 5, Tailwind CSS 4 with its own theme, Wagner Luca design tokens (`@wagnerluca/ui`) |
 | Ops | Docker images on GHCR, GitHub Actions, Serilog → Seq |
 
 Architecture and conventions for contributors are in [CLAUDE.md](CLAUDE.md).

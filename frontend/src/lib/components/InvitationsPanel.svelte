@@ -87,7 +87,7 @@
 					id="inviteEmail"
 					type="email"
 					autocomplete="off"
-					class="input input-bordered input-sm w-full"
+					class="input input-sm w-full"
 					class:input-error={formError}
 					aria-invalid={!!formError}
 					aria-describedby={formError ? 'inviteError' : undefined}
@@ -97,7 +97,7 @@
 			</div>
 			<div>
 				<label for="inviteRole" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('invitations.role')}</label>
-				<select id="inviteRole" class="select select-bordered select-sm w-full sm:w-36" bind:value={role} disabled={sending}>
+				<select id="inviteRole" class="select select-sm w-full sm:w-36" bind:value={role} disabled={sending}>
 					<option value={OrganizationRole.NUMBER_0}>{roleLabel('Member')}</option>
 					{#if isOwner}<option value={OrganizationRole.NUMBER_1}>{roleLabel('Admin')}</option>{/if}
 				</select>

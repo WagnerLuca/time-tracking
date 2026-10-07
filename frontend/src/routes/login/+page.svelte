@@ -101,7 +101,7 @@
 							type="text"
 							inputmode="numeric"
 							autocomplete="one-time-code"
-							class="input input-bordered w-full text-center text-2xl tracking-[0.3em] font-mono"
+							class="input w-full text-center text-2xl tracking-[0.3em] font-mono"
 							bind:value={twoFactorCode}
 							placeholder="000000"
 							maxlength="10"
@@ -139,7 +139,7 @@
 							id="email"
 							type="email"
 							autocomplete="email"
-							class="input input-bordered w-full"
+							class="input w-full"
 							bind:value={email}
 							placeholder={t('auth.emailPlaceholder')}
 							required
@@ -156,7 +156,7 @@
 							id="password"
 							type="password"
 							autocomplete="current-password"
-							class="input input-bordered w-full"
+							class="input w-full"
 							bind:value={password}
 							placeholder="••••••••"
 							required

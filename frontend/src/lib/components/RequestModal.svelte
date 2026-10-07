@@ -51,11 +51,11 @@
 			<div class="flex flex-col gap-3 mb-3">
 				<div class="flex flex-col gap-1">
 					<label for="{id}-start" class="text-xs font-semibold text-base-content/70">{t('entries.request.newStart')}</label>
-					<input id="{id}-start" class="input input-bordered input-sm w-full" type="datetime-local" bind:value={newStart} disabled={sending} />
+					<input id="{id}-start" class="input input-sm w-full" type="datetime-local" bind:value={newStart} disabled={sending} />
 				</div>
 				<div class="flex flex-col gap-1">
 					<label for="{id}-end" class="text-xs font-semibold text-base-content/70">{t('entries.request.newEnd')}</label>
-					<input id="{id}-end" class="input input-bordered input-sm w-full {endBeforeStart ? 'input-error' : ''}" type="datetime-local" bind:value={newEnd} min={newStart || undefined} disabled={sending} aria-invalid={endBeforeStart} />
+					<input id="{id}-end" class="input input-sm w-full {endBeforeStart ? 'input-error' : ''}" type="datetime-local" bind:value={newEnd} min={newStart || undefined} disabled={sending} aria-invalid={endBeforeStart} />
 					{#if endBeforeStart}
 						<span class="text-xs text-error">{t('entries.endAfterStart')}</span>
 					{/if}
@@ -64,14 +64,14 @@
 		{:else}
 			<div class="flex flex-col gap-1 mb-3">
 				<label for="{id}-pause" class="text-xs font-semibold text-base-content/70">{t('entries.request.newPause')}</label>
-				<input id="{id}-pause" class="input input-bordered input-sm w-full {pauseInvalid ? 'input-error' : ''}" type="number" min="0" step="1" bind:value={newPause} disabled={sending} aria-invalid={pauseInvalid} />
+				<input id="{id}-pause" class="input input-sm w-full {pauseInvalid ? 'input-error' : ''}" type="number" min="0" step="1" bind:value={newPause} disabled={sending} aria-invalid={pauseInvalid} />
 			</div>
 		{/if}
 
 		<label for="{id}-message" class="text-xs font-semibold text-base-content/70">{t('entries.request.message')}</label>
 		<textarea
 			id="{id}-message"
-			class="textarea textarea-bordered w-full text-sm mt-1"
+			class="textarea w-full text-sm mt-1"
 			bind:value={message}
 			rows="2"
 			disabled={sending}

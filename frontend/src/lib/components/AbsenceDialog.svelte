@@ -175,7 +175,7 @@
 		{#if members}
 			<div class="flex flex-col gap-1">
 				<label for="{fieldId}-member" class="text-sm font-medium text-base-content/70">{t('absences.dialog.member')}</label>
-				<select id="{fieldId}-member" bind:value={selectedUserId} class="select select-bordered select-sm w-full" class:select-error={submitted && memberMissing} aria-invalid={submitted && memberMissing} disabled={saving}>
+				<select id="{fieldId}-member" bind:value={selectedUserId} class="select select-sm w-full" class:select-error={submitted && memberMissing} aria-invalid={submitted && memberMissing} disabled={saving}>
 					<option value={null}>{t('absences.dialog.selectMember')}</option>
 					{#each members as m (m.id)}
 						<option value={m.id}>{m.firstName} {m.lastName}{m.id === auth.user?.id ? t('absences.youSuffix') : ''}</option>
@@ -187,18 +187,18 @@
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
 			<div class="flex flex-col gap-1">
 				<label for="{fieldId}-from" class="text-sm font-medium text-base-content/70">{t('absences.dialog.from')}</label>
-				<input id="{fieldId}-from" type="date" class="input input-bordered input-sm w-full" class:input-error={submitted && !fromDate} bind:value={fromDate} required disabled={saving} />
+				<input id="{fieldId}-from" type="date" class="input input-sm w-full" class:input-error={submitted && !fromDate} bind:value={fromDate} required disabled={saving} />
 				{#if submitted && !fromDate}<span class="text-xs text-error">{t('common.required')}</span>{/if}
 			</div>
 			<div class="flex flex-col gap-1">
 				<label for="{fieldId}-to" class="text-sm font-medium text-base-content/70">{t('absences.dialog.to')}</label>
-				<input id="{fieldId}-to" type="date" class="input input-bordered input-sm w-full" class:input-error={toBeforeFrom} aria-invalid={toBeforeFrom} bind:value={toDate} min={fromDate} disabled={saving} />
+				<input id="{fieldId}-to" type="date" class="input input-sm w-full" class:input-error={toBeforeFrom} aria-invalid={toBeforeFrom} bind:value={toDate} min={fromDate} disabled={saving} />
 				{#if toBeforeFrom}<span class="text-xs text-error">{t('absences.dialog.toBeforeFrom')}</span>{/if}
 			</div>
 		</div>
 		<div class="flex flex-col gap-1">
 			<label for="{fieldId}-type" class="text-sm font-medium text-base-content/70">{t('absences.dialog.type')}</label>
-			<select id="{fieldId}-type" bind:value={typeValue} class="select select-bordered select-sm w-full" disabled={saving}>
+			<select id="{fieldId}-type" bind:value={typeValue} class="select select-sm w-full" disabled={saving}>
 				<option value="0">{absenceTypeLabel('SickDay')}</option>
 				<option value="1">{absenceTypeLabel('Vacation')}</option>
 				<option value="2">{absenceTypeLabel('Other')}</option>
@@ -216,7 +216,7 @@
 		</div>
 		<div class="flex flex-col gap-1">
 			<label for="{fieldId}-note" class="text-sm font-medium text-base-content/70">{t('absences.dialog.note')}</label>
-			<input id="{fieldId}-note" type="text" class="input input-bordered input-sm w-full" bind:value={note} placeholder={t('absences.dialog.notePlaceholder')} disabled={saving} />
+			<input id="{fieldId}-note" type="text" class="input input-sm w-full" bind:value={note} placeholder={t('absences.dialog.notePlaceholder')} disabled={saving} />
 		</div>
 		<label class="label cursor-pointer flex items-center gap-2 text-sm">
 			<input type="checkbox" class="checkbox checkbox-sm" bind:checked={halfDay} disabled={saving} />

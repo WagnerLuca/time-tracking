@@ -62,12 +62,12 @@
 				<form onsubmit={handleSubmit} novalidate>
 					<div class="mb-5">
 						<label for="newPassword" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.reset.newPassword')}</label>
-						<input id="newPassword" type="password" autocomplete="new-password" class="input input-bordered w-full" class:input-error={attempted && problem === 'tooShort'} bind:value={password} aria-describedby="newPasswordHint" disabled={submitting} />
+						<input id="newPassword" type="password" autocomplete="new-password" class="input w-full" class:input-error={attempted && problem === 'tooShort'} bind:value={password} aria-describedby="newPasswordHint" disabled={submitting} />
 						<p id="newPasswordHint" class="text-xs mt-1 {problemText ? 'text-error' : 'text-base-content/50'}">{problemText || t('auth.register.passwordHint', { min: MIN_PASSWORD_LENGTH })}</p>
 					</div>
 					<div class="mb-5">
 						<label for="confirmPassword" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.register.confirmPassword')}</label>
-						<input id="confirmPassword" type="password" autocomplete="new-password" class="input input-bordered w-full" class:input-error={attempted && problem === 'mismatch'} bind:value={confirmPassword} disabled={submitting} />
+						<input id="confirmPassword" type="password" autocomplete="new-password" class="input w-full" class:input-error={attempted && problem === 'mismatch'} bind:value={confirmPassword} disabled={submitting} />
 					</div>
 					<button type="submit" class="btn btn-primary w-full" disabled={submitting}>
 						{submitting ? t('auth.reset.submitting') : t('auth.reset.submit')}

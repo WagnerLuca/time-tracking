@@ -113,7 +113,7 @@
 						{#if editingId === card.id}
 							<form class="flex gap-2 flex-wrap" onsubmit={(e) => { e.preventDefault(); update(card, { label: editLabel }, t('memberDetail.cards.labelSaved')); }}>
 								<label for="{fieldId}-label-{card.id}" class="sr-only">{t('memberDetail.cards.label')}</label>
-								<input id="{fieldId}-label-{card.id}" class="input input-bordered input-xs w-48" maxlength="100" bind:value={editLabel} disabled={busyId === card.id} />
+								<input id="{fieldId}-label-{card.id}" class="input input-xs w-48" maxlength="100" bind:value={editLabel} disabled={busyId === card.id} />
 								<button type="submit" class="btn btn-primary btn-xs" disabled={busyId === card.id}>{t('common.save')}</button>
 								<button type="button" class="btn btn-ghost btn-xs" onclick={() => (editingId = null)}>{t('common.cancel')}</button>
 							</form>
@@ -146,11 +146,11 @@
 	<form onsubmit={add} class="flex items-end gap-2 flex-wrap mt-3">
 		<label class="flex flex-col gap-1 text-xs text-base-content/70">
 			{t('memberDetail.cards.cardId')}
-			<input id="{fieldId}-card" bind:value={newCardId} maxlength="100" placeholder={t('memberDetail.cards.cardIdPlaceholder')} class="input input-bordered input-sm font-mono w-48" disabled={adding} autocomplete="off" />
+			<input id="{fieldId}-card" bind:value={newCardId} maxlength="100" placeholder={t('memberDetail.cards.cardIdPlaceholder')} class="input input-sm font-mono w-48" disabled={adding} autocomplete="off" />
 		</label>
 		<label class="flex flex-col gap-1 text-xs text-base-content/70">
 			{t('memberDetail.cards.label')}
-			<input bind:value={newLabel} maxlength="100" placeholder={t('memberDetail.cards.labelPlaceholder')} class="input input-bordered input-sm w-44" disabled={adding} />
+			<input bind:value={newLabel} maxlength="100" placeholder={t('memberDetail.cards.labelPlaceholder')} class="input input-sm w-44" disabled={adding} />
 		</label>
 		<button type="submit" class="btn btn-primary btn-sm" disabled={adding || !newCardId.trim()}>{adding ? t('common.adding') : t('memberDetail.cards.add')}</button>
 	</form>

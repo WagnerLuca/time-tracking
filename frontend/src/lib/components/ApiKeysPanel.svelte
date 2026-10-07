@@ -147,7 +147,7 @@
 		<div class="card-body p-4 gap-3">
 			<form onsubmit={create} class="flex gap-2 flex-wrap">
 				<label for="{fieldId}-name" class="sr-only">{t('orgSettings.apiKeys.keyName')}</label>
-				<input id="{fieldId}-name" class="input input-bordered input-sm flex-1 min-w-[12rem]" placeholder={t('orgSettings.apiKeys.namePlaceholder')} maxlength="100" bind:value={newName} disabled={creating} />
+				<input id="{fieldId}-name" class="input input-sm flex-1 min-w-[12rem]" placeholder={t('orgSettings.apiKeys.namePlaceholder')} maxlength="100" bind:value={newName} disabled={creating} />
 				<button type="submit" class="btn btn-primary btn-sm" disabled={creating || !newName.trim()}>{creating ? t('common.creating') : t('orgSettings.apiKeys.create')}</button>
 			</form>
 
@@ -163,7 +163,7 @@
 								{#if renamingId === key.id}
 									<form class="flex gap-2 flex-wrap" onsubmit={saveRename}>
 										<label for="{fieldId}-rename-{key.id}" class="sr-only">{t('orgSettings.apiKeys.keyName')}</label>
-										<input id="{fieldId}-rename-{key.id}" class="input input-bordered input-xs flex-1 min-w-[10rem]" maxlength="100" bind:value={renameValue} disabled={renameSaving} />
+										<input id="{fieldId}-rename-{key.id}" class="input input-xs flex-1 min-w-[10rem]" maxlength="100" bind:value={renameValue} disabled={renameSaving} />
 										<button type="submit" class="btn btn-primary btn-xs" disabled={renameSaving || !renameValue.trim()}>{renameSaving ? t('common.saving') : t('common.save')}</button>
 										<button type="button" class="btn btn-ghost btn-xs" onclick={() => (renamingId = null)} disabled={renameSaving}>{t('common.cancel')}</button>
 									</form>

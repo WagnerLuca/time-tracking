@@ -506,7 +506,7 @@
 			<div class="flex items-center justify-end gap-2 mb-3 flex-wrap">
 				{#if calendarUserOptions.length > 1}
 					<label class="text-xs text-base-content/60" for="calendar-user-filter">{t('absences.show')}</label>
-					<select id="calendar-user-filter" bind:value={calendarUserFilter} class="select select-bordered select-sm max-w-[14rem]">
+					<select id="calendar-user-filter" bind:value={calendarUserFilter} class="select select-sm max-w-[14rem]">
 						<option value={null}>{t('absences.allMembers')}</option>
 						{#each calendarUserOptions as u (u.id)}
 							<option value={u.id}>{u.name}{u.id === auth.user?.id ? t('absences.youSuffix') : ''}</option>
@@ -788,20 +788,20 @@
 		<section class="mt-8 bg-base-200/30 rounded-lg p-4 sm:p-5 border border-base-300">
 			<h2 class="text-xl font-bold text-base-content mb-4">{t('absences.list.title')}</h2>
 			<div class="flex flex-wrap gap-2 mb-4">
-				<select bind:value={selectedListYear} class="select select-bordered select-sm w-auto" aria-label={t('absences.list.year')}>
+				<select bind:value={selectedListYear} class="select select-sm w-auto" aria-label={t('absences.list.year')}>
 					{#each getAvailableAbsenceYears() as y (y)}
 						<option value={y}>{y}</option>
 					{/each}
 				</select>
 				{#if canEdit}
-				<select bind:value={adminAbsenceFilter} class="select select-bordered select-sm w-auto max-w-full" aria-label={t('absences.list.member')}>
+				<select bind:value={adminAbsenceFilter} class="select select-sm w-auto max-w-full" aria-label={t('absences.list.member')}>
 					<option value={null}>{t('absences.allMembers')}</option>
 					{#each (org?.members ?? []) as m (m.id)}
 						<option value={m.id}>{m.firstName} {m.lastName}</option>
 					{/each}
 				</select>
 				{/if}
-				<select bind:value={panelTypeFilter} class="select select-bordered select-sm w-auto" aria-label={t('absences.list.type')}>
+				<select bind:value={panelTypeFilter} class="select select-sm w-auto" aria-label={t('absences.list.type')}>
 					<option value="all">{t('absences.list.allTypes')}</option>
 					<option value="Vacation">{absenceTypeLabel('Vacation')}</option>
 					<option value="SickDay">{absenceTypeLabel('SickDay')}</option>

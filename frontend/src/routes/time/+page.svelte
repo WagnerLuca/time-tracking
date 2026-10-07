@@ -288,7 +288,7 @@
 				placeholder={t('timer.note')}
 				list={previousDescriptions.length > 0 ? `${noteListId}-suggestions` : undefined}
 				autocomplete="off"
-				class="input input-bordered input-sm w-full text-center bg-base-200/50"
+				class="input input-sm w-full text-center bg-base-200/50"
 				disabled={pending}
 			/>
 			<datalist id="{noteListId}-suggestions">

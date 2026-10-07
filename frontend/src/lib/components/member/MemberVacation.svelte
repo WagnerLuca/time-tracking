@@ -71,7 +71,7 @@
 			{#if saveError}<div class="alert alert-error text-sm py-2">{saveError}</div>{/if}
 			<label for="vac-days-{member.id}" class="text-sm font-medium text-base-content/80">{t('memberDetail.vacation.daysPerYear')}</label>
 			<div class="flex items-center gap-2 flex-wrap">
-				<input id="vac-days-{member.id}" type="number" step="0.5" min="0" max="365" class="input input-bordered input-sm w-28" class:input-error={daysError} aria-invalid={!!daysError} bind:value={days} disabled={saving} />
+				<input id="vac-days-{member.id}" type="number" step="0.5" min="0" max="365" class="input input-sm w-28" class:input-error={daysError} aria-invalid={!!daysError} bind:value={days} disabled={saving} />
 				<button type="submit" class="btn btn-primary btn-sm" disabled={saving}>{saving ? t('common.saving') : t('common.save')}</button>
 				<button type="button" class="btn btn-ghost btn-sm" onclick={() => (editing = false)} disabled={saving}>{t('common.cancel')}</button>
 			</div>

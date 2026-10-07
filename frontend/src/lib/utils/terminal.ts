@@ -38,7 +38,7 @@ export function punchResultLabel(result: string | null | undefined): string {
 	return result && resultKeys[result] ? t(resultKeys[result]) : (result ?? '');
 }
 
-/** DaisyUI badge class per punch result: accepted, harmless, refused. */
+/** Badge class per punch result: accepted, harmless, refused. */
 export function punchResultClass(result: string | null | undefined): string {
 	switch (result) {
 		case 'Started':

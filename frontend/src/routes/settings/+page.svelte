@@ -300,7 +300,7 @@
 <div class="max-w-3xl mx-auto">
 	<h1 class="text-2xl font-bold mb-4">{t('settings.title')}</h1>
 
-	<div class="tabs tabs-boxed p-1 bg-base-200/70 mb-6 w-full md:w-fit flex-wrap" role="tablist" aria-label={t('settings.tabsLabel')}>
+	<div class="tabs p-1 bg-base-200/70 mb-6 w-full md:w-fit flex-wrap" role="tablist" aria-label={t('settings.tabsLabel')}>
 		{#each ['profile', 'organization', 'appearance'] as const as tab}
 			<button
 				type="button"
@@ -324,25 +324,25 @@
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 					<div>
 						<label for="profileFirstName" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.profile.firstName')}</label>
-						<input id="profileFirstName" type="text" autocomplete="given-name" bind:value={profileFirstName} class="input input-bordered w-full" class:input-error={firstNameError} aria-invalid={!!firstNameError} disabled={profileSaving} />
+						<input id="profileFirstName" type="text" autocomplete="given-name" bind:value={profileFirstName} class="input w-full" class:input-error={firstNameError} aria-invalid={!!firstNameError} disabled={profileSaving} />
 						{#if firstNameError}<p class="text-error text-xs mt-1">{firstNameError}</p>{/if}
 					</div>
 					<div>
 						<label for="profileLastName" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.profile.lastName')}</label>
-						<input id="profileLastName" type="text" autocomplete="family-name" bind:value={profileLastName} class="input input-bordered w-full" class:input-error={lastNameError} aria-invalid={!!lastNameError} disabled={profileSaving} />
+						<input id="profileLastName" type="text" autocomplete="family-name" bind:value={profileLastName} class="input w-full" class:input-error={lastNameError} aria-invalid={!!lastNameError} disabled={profileSaving} />
 						{#if lastNameError}<p class="text-error text-xs mt-1">{lastNameError}</p>{/if}
 					</div>
 				</div>
 				<div>
 					<label for="profileEmail" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.profile.email')}</label>
-					<input id="profileEmail" type="email" autocomplete="email" bind:value={profileEmail} class="input input-bordered w-full max-w-md" class:input-error={emailError} aria-invalid={!!emailError} disabled={profileSaving} />
+					<input id="profileEmail" type="email" autocomplete="email" bind:value={profileEmail} class="input w-full max-w-md" class:input-error={emailError} aria-invalid={!!emailError} disabled={profileSaving} />
 					{#if emailError}<p class="text-error text-xs mt-1">{emailError}</p>{/if}
 					{#if auth.user?.pendingEmail}<p class="text-xs text-base-content/60 mt-1">{t('settings.profile.pendingEmail', { email: auth.user.pendingEmail })}</p>{/if}
 				</div>
 				{#if emailChanged}
 					<div>
 						<label for="profileCurrentPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.profile.currentPassword')}</label>
-						<input id="profileCurrentPw" type="password" autocomplete="current-password" bind:value={profileCurrentPassword} class="input input-bordered w-full max-w-xs" class:input-error={profileCurrentPasswordError} aria-invalid={!!profileCurrentPasswordError} aria-describedby="profileCurrentPwHint" disabled={profileSaving} />
+						<input id="profileCurrentPw" type="password" autocomplete="current-password" bind:value={profileCurrentPassword} class="input w-full max-w-xs" class:input-error={profileCurrentPasswordError} aria-invalid={!!profileCurrentPasswordError} aria-describedby="profileCurrentPwHint" disabled={profileSaving} />
 						<p id="profileCurrentPwHint" class="text-xs mt-1 {profileCurrentPasswordError ? 'text-error' : 'text-base-content/50'}">{profileCurrentPasswordError || t('settings.profile.currentPasswordHint')}</p>
 					</div>
 				{/if}
@@ -362,17 +362,17 @@
 				{/if}
 				<div>
 					<label for="currentPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.password.current')}</label>
-					<input id="currentPw" type="password" autocomplete="current-password" bind:value={currentPassword} class="input input-bordered w-full max-w-xs" class:input-error={currentPasswordError} aria-invalid={!!currentPasswordError} disabled={passwordSaving} />
+					<input id="currentPw" type="password" autocomplete="current-password" bind:value={currentPassword} class="input w-full max-w-xs" class:input-error={currentPasswordError} aria-invalid={!!currentPasswordError} disabled={passwordSaving} />
 					{#if currentPasswordError}<p class="text-error text-xs mt-1">{currentPasswordError}</p>{/if}
 				</div>
 				<div>
 					<label for="newPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.password.new')}</label>
-					<input id="newPw" type="password" autocomplete="new-password" minlength={MIN_PASSWORD_LENGTH} bind:value={newPassword} class="input input-bordered w-full max-w-xs" class:input-error={newPasswordError} aria-invalid={!!newPasswordError} aria-describedby="newPwHint" disabled={passwordSaving} />
+					<input id="newPw" type="password" autocomplete="new-password" minlength={MIN_PASSWORD_LENGTH} bind:value={newPassword} class="input w-full max-w-xs" class:input-error={newPasswordError} aria-invalid={!!newPasswordError} aria-describedby="newPwHint" disabled={passwordSaving} />
 					<p id="newPwHint" class="text-xs mt-1 {newPasswordError ? 'text-error' : 'text-base-content/50'}">{newPasswordError || t('settings.password.minLength', { min: MIN_PASSWORD_LENGTH })}</p>
 				</div>
 				<div>
 					<label for="confirmPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.password.repeat')}</label>
-					<input id="confirmPw" type="password" autocomplete="new-password" bind:value={confirmPassword} class="input input-bordered w-full max-w-xs" class:input-error={confirmPasswordError} aria-invalid={!!confirmPasswordError} disabled={passwordSaving} />
+					<input id="confirmPw" type="password" autocomplete="new-password" bind:value={confirmPassword} class="input w-full max-w-xs" class:input-error={confirmPasswordError} aria-invalid={!!confirmPasswordError} disabled={passwordSaving} />
 					{#if confirmPasswordError}<p class="text-error text-xs mt-1">{confirmPasswordError}</p>{/if}
 				</div>
 				<div>
@@ -405,7 +405,7 @@
 									type="password"
 									autocomplete="current-password"
 									bind:value={twoFactorDisablePassword}
-									class="input input-bordered input-sm w-full max-w-xs"
+									class="input input-sm w-full max-w-xs"
 									disabled={twoFactorSaving}
 								/>
 							</div>
@@ -416,7 +416,7 @@
 									type="text"
 									autocomplete="one-time-code"
 									bind:value={twoFactorDisableCode}
-									class="input input-bordered input-sm w-[180px] font-mono"
+									class="input input-sm w-[180px] font-mono"
 									aria-describedby="disable2faCodeHint"
 									maxlength="20"
 									disabled={twoFactorSaving}
@@ -464,7 +464,7 @@
 									inputmode="numeric"
 									autocomplete="one-time-code"
 									bind:value={twoFactorConfirmCode}
-									class="input input-bordered input-sm w-[160px] text-center tracking-[0.2em] font-mono"
+									class="input input-sm w-[160px] text-center tracking-[0.2em] font-mono"
 									placeholder="000000"
 									maxlength="6"
 									disabled={twoFactorSaving}
@@ -515,7 +515,7 @@
 				<p class="text-sm text-base-content/70 mb-4">{t('settings.account.deleteMessage')}</p>
 				{#if deleteError}<div class="alert alert-error text-sm mb-3" role="alert">{deleteError}</div>{/if}
 				<label for="deleteAccountPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.account.deletePassword')}</label>
-				<input id="deleteAccountPw" type="password" autocomplete="current-password" bind:value={deletePassword} class="input input-bordered w-full" disabled={deleteAccountSaving} />
+				<input id="deleteAccountPw" type="password" autocomplete="current-password" bind:value={deletePassword} class="input w-full" disabled={deleteAccountSaving} />
 			</form>
 			{#snippet actions()}
 				<button type="button" class="btn btn-ghost" onclick={() => (deleteOpen = false)} disabled={deleteAccountSaving}>{t('common.cancel')}</button>

@@ -98,7 +98,7 @@
 				<input
 					id="name"
 					type="text"
-					class="input input-bordered w-full"
+					class="input w-full"
 					class:input-error={nameError}
 					bind:value={name}
 					oninput={handleNameInput}
@@ -119,7 +119,7 @@
 				<input
 					id="slug"
 					type="text"
-					class="input input-bordered w-full"
+					class="input w-full"
 					class:input-error={slugError || slugMissing}
 					bind:value={slug}
 					oninput={handleSlugInput}
@@ -140,7 +140,7 @@
 				<label for="description" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('orgs.create.description')} <span class="text-base-content/50 font-normal">({t('common.optional')})</span></label>
 				<textarea
 					id="description"
-					class="textarea textarea-bordered w-full"
+					class="textarea w-full"
 					bind:value={description}
 					placeholder={t('orgs.create.descriptionPlaceholder')}
 					rows="3"
@@ -153,7 +153,7 @@
 				<input
 					id="website"
 					type="url"
-					class="input input-bordered w-full"
+					class="input w-full"
 					bind:value={website}
 					placeholder="https://example.com"
 					class:input-error={websiteError}
