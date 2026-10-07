@@ -6,11 +6,13 @@ on:
     tags: ['v*']
     paths:
       - 'backend/**'
+      - '.config/dotnet-tools.json'
       - '.github/workflows/backend.yml'
   pull_request:
     branches: [main]
     paths:
       - 'backend/**'
+      - '.config/dotnet-tools.json'
       - '.github/workflows/backend.yml'
 
 # Least privilege by default; only the publish job may write packages
@@ -46,9 +48,10 @@ jobs:
           dotnet ef migrations has-pending-model-changes
         working-directory: backend
 
-      # Includes the Postgres suite (Testcontainers; Docker is available on ubuntu-latest)
-      - name: Run tests
-        run: dotnet test --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --collect:"XPlat Code Coverage"
+      # Includes the Postgres suite (Testcontainers; Docker is available on ubuntu-latest).
+      # coverage.sh: coverlet (coverlet.runsettings) → ReportGenerator → job summary; fails below its thresholds
+      - name: Run tests with coverage
+        run: bash coverage.sh --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
         working-directory: backend/tests/TimeTracking.Api.Tests
         env:
           ASPNETCORE_ENVIRONMENT: Testing
@@ -59,13 +62,17 @@ jobs:
         with:
           name: test-results
           path: backend/tests/TimeTracking.Api.Tests/**/test-results.trx
+          retention-days: 14
 
+      # HTML report (open index.html) + merged Cobertura.xml
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: coverage-report
-          path: backend/tests/TimeTracking.Api.Tests/**/coverage.cobertura.xml
+          name: backend-coverage-report
+          path: backend/tests/TimeTracking.Api.Tests/TestResults/coverage-report/
+          retention-days: 14
+          if-no-files-found: ignore
 
   build-and-push:
     needs: test

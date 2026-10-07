@@ -1,0 +1,89 @@
+name: E2E
+
+# Playwright against the real stack inside one job: the backend in Development (in-memory DB,
+# seeded users) on :7000 and the built frontend via `vite preview` on :5179, which proxies /api.
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/e2e.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/e2e.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Start backend (in-memory, seeded)
+        working-directory: backend
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://localhost:7000
+        run: |
+          dotnet build TimeTracking.Api.csproj --configuration Release
+          nohup dotnet run --project TimeTracking.Api.csproj --configuration Release --no-build --no-launch-profile > backend.log 2>&1 &
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+        env:
+          # @wagnerluca/ui (optional) lives on GitHub Packages; without the token the bundled tokens are used
+          NODE_AUTH_TOKEN: ${{ secrets.GHP_READ_TOKEN }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Build and start frontend preview
+        working-directory: frontend
+        run: |
+          npm run build
+          nohup npx vite preview --port 5179 --strictPort > preview.log 2>&1 &
+
+      - name: Wait for both servers
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:7000/health > /dev/null && curl -sf http://localhost:5179/ > /dev/null && exit 0
+            sleep 2
+          done
+          echo "::error::servers did not come up"; cat backend/backend.log frontend/preview.log; exit 1
+
+      - name: Playwright
+        run: npx playwright test
+        working-directory: frontend
+
+      - name: Upload traces and server logs
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-traces
+          path: |
+            frontend/test-results/
+            backend/backend.log
+            frontend/preview.log
+          retention-days: 7
+          if-no-files-found: ignore
