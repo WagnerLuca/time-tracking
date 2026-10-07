@@ -39,6 +39,6 @@
 		"qrcode": "^1.5.4"
 	},
 	"optionalDependencies": {
-		"@wagnerluca/ui": "^0.0.2"
+		"@wagnerluca/ui": "^0.1.0"
 	}
 }
