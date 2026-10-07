@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { locale } from '$lib/stores/locale.svelte';
 import { t, tp } from './index';
@@ -86,11 +87,14 @@ describe('app dictionaries', () => {
 	});
 
 	it('every literal t()/tp() key used in the source exists', () => {
-		const sources = import.meta.glob<string>(['/src/**/*.{svelte,ts}', '!/src/lib/api/**', '!/src/**/*.test.ts'], {
-			query: '?raw',
-			import: 'default',
-			eager: true
-		});
+		// Read from disk rather than import.meta.glob('?raw'): the raw-string modules would
+		// shadow the real ones in the v8 coverage remapping (same path once the query is stripped).
+		const sources = Object.fromEntries(
+			readdirSync('src', { recursive: true, encoding: 'utf8' })
+				.map((f) => f.replaceAll('\\', '/'))
+				.filter((f) => /\.(svelte|ts)$/.test(f) && !f.endsWith('.test.ts') && !f.startsWith('lib/api/'))
+				.map((f) => [`/src/${f}`, readFileSync(`src/${f}`, 'utf8')])
+		);
 		expect(Object.keys(sources).length).toBeGreaterThan(20);
 		const known = new Set(leafPaths(de));
 		const missing: string[] = [];

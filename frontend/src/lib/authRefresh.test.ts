@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import axios, { AxiosError, type AxiosAdapter, type InternalAxiosRequestConfig } from 'axios';
 import { installRefreshInterceptor, type RefreshDeps } from './authRefresh';
 
@@ -210,4 +210,81 @@ describe('installRefreshInterceptor', () => {
 		expect(s.deps.refresh).not.toHaveBeenCalled();
 		expect(s.deps.onAuthFailure).toHaveBeenCalledTimes(1);
 	});
+});
+
+/** Server that 401s everything unless the request carries `Bearer new`; deps without an injected lock. */
+function plain() {
+	const instance = axios.create({
+		adapter: async (config) => {
+			if (config.headers?.Authorization === 'Bearer new') return { status: 200, statusText: 'OK', data: {}, headers: {}, config };
+			throw new AxiosError('401', 'ERR_BAD_REQUEST', config, null, { status: 401, statusText: 'x', data: {}, headers: {}, config });
+		}
+	});
+	const deps: RefreshDeps = {
+		getRefreshToken: () => 'r',
+		getAccessToken: () => 'old',
+		refresh: vi.fn(async () => ({ accessToken: 'new', refreshToken: 'r2' })),
+		onRefreshed: vi.fn(),
+		onAuthFailure: vi.fn()
+	};
+	installRefreshInterceptor(instance, deps);
+	return { instance, deps };
+}
+
+describe('installRefreshInterceptor defaults', () => {
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('serialises the refresh under the tt-auth-refresh Web Lock by default', async () => {
+		const request = vi.fn((_name: string, fn: () => Promise<unknown>) => fn());
+		vi.stubGlobal('navigator', { locks: { request } });
+		const { instance, deps } = plain();
+		await expect(instance.get('/api/v1/x')).resolves.toMatchObject({ status: 200 });
+		expect(request).toHaveBeenCalledTimes(1);
+		expect(request.mock.calls[0][0]).toBe('tt-auth-refresh');
+		expect(deps.refresh).toHaveBeenCalledTimes(1);
+		expect(deps.onAuthFailure).not.toHaveBeenCalled();
+	});
+
+	it('still refreshes (unlocked) where navigator.locks is unsupported', async () => {
+		vi.stubGlobal('navigator', {});
+		const { instance, deps } = plain();
+		await expect(instance.get('/api/v1/x')).resolves.toMatchObject({ status: 200 });
+		expect(deps.refresh).toHaveBeenCalledTimes(1);
+	});
+
+	it('still refreshes where there is no navigator at all', async () => {
+		vi.stubGlobal('navigator', undefined);
+		const { instance, deps } = plain();
+		await expect(instance.get('/api/v1/x')).resolves.toMatchObject({ status: 200 });
+		expect(deps.refresh).toHaveBeenCalledTimes(1);
+	});
+
+	it.each([
+		'/api/v1/auth/login',
+		'/api/v1/Auth/Login?x=1',
+		'/api/v1/AUTH/register',
+		'/api/v1/auth/Register?invite=abc',
+		'/api/v1/Auth/logout',
+		'/api/v1/auth/logout?all=true',
+		'/api/v1/Auth/2fa/verify',
+		'/api/v1/auth/2FA/Verify?remember=1'
+	])('a 401 from %s is a credential error, not a refresh trigger', async (url) => {
+		vi.stubGlobal('navigator', {});
+		const { instance, deps } = plain();
+		await expect(instance.post(url, {})).rejects.toMatchObject({ response: { status: 401 } });
+		expect(deps.refresh).not.toHaveBeenCalled();
+		expect(deps.onAuthFailure).not.toHaveBeenCalled();
+	});
+
+	it.each(['/api/v1/authors', '/api/v1/auth/login-history', '/api/v1/auth/2fa/setup', '/api/v1/oauth/login-x'])(
+		'a URL that merely contains "auth" (%s) does refresh',
+		async (url) => {
+			vi.stubGlobal('navigator', {});
+			const { instance, deps } = plain();
+			await expect(instance.get(url)).resolves.toMatchObject({ status: 200 });
+			expect(deps.refresh).toHaveBeenCalledTimes(1);
+		}
+	);
 });
