@@ -29,7 +29,8 @@ export const de = {
 		ownerRoleFixed: 'Die Rolle des Inhabers lässt sich nicht ändern. Übertrage zuerst die Inhaberschaft.',
 		ownerCannotLeave: 'Der Inhaber kann die Organisation nicht verlassen. Lösche sie oder übertrage die Inhaberschaft.',
 		enableOwnTwoFactorFirst: 'Aktiviere zuerst die Zwei-Faktor-Authentifizierung für dein eigenes Konto.',
-		unknownTimeZone: 'Unbekannte Zeitzone.'
+		unknownTimeZone: 'Unbekannte Zeitzone.',
+		coreHoursOrder: 'Die Kernarbeitszeit muss eine gültige Start- und Endzeit haben, der Beginn vor dem Ende.'
 	},
 	user: {
 		notFound: 'Benutzer nicht gefunden.'
@@ -194,7 +195,8 @@ export const en: typeof de = {
 		ownerRoleFixed: "The owner's role cannot be changed. Transfer ownership first.",
 		ownerCannotLeave: 'The owner cannot leave. Delete the organization or transfer ownership first.',
 		enableOwnTwoFactorFirst: 'Enable two-factor authentication for your own account first.',
-		unknownTimeZone: 'Unknown time zone.'
+		unknownTimeZone: 'Unknown time zone.',
+		coreHoursOrder: 'Core working hours need a valid start and end time, with the start before the end.'
 	},
 	user: {
 		notFound: 'User not found.'

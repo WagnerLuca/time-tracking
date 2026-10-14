@@ -221,7 +221,7 @@ export interface ChangePasswordRequest {
     'newPassword': string;
 }
 /**
- * A day that breaks the Working Time Act (see WorkingTimeAct).
+ * A day that breaks the Working Time Act (see WorkingTimeAct) or misses the core working hours (see CoreHours).
  */
 export interface ComplianceDayResponse {
     'date'?: string;
@@ -238,7 +238,35 @@ export interface ComplianceDayResponse {
      * Less than 11 h rest before this day.
      */
     'restPeriod'?: boolean;
+    /**
+     * The tracked time does not cover the core working hours (and still doesn\'t).
+     */
+    'coreHours'?: boolean;
+    /**
+     * With TimeTracking.Api.Models.Dtos.ComplianceDayResponse.CoreHours: \"late\", \"early\", \"gap\" and/or \"missing\" (nothing tracked).
+     */
+    'coreHoursIssues'?: Array<string> | null;
+    /**
+     * With TimeTracking.Api.Models.Dtos.ComplianceDayResponse.CoreHours: uncovered minutes of the checked window.
+     */
+    'coreHoursMissingMinutes'?: number;
+    /**
+     * With TimeTracking.Api.Models.Dtos.ComplianceDayResponse.CoreHours: the window that was checked, \"HH:mm-HH:mm\" (one half on a half day).
+     */
+    'coreHoursWindow'?: string | null;
 }
+/**
+ * A group\'s core working hours override (null on the group = inherit from the organization).
+ */
+
+export const CoreHoursMode = {
+    NUMBER_0: 0,
+    NUMBER_1: 1
+} as const;
+
+export type CoreHoursMode = typeof CoreHoursMode[keyof typeof CoreHoursMode];
+
+
 /**
  * Request payload for creating a personal absence day.
  */
@@ -525,6 +553,9 @@ export interface GroupPermissionsResponse {
     'groupAdminCanManageMembers'?: boolean | null;
     'groupAdminCanViewAllTimeEntries'?: boolean | null;
     'groupAdminCanExportData'?: boolean | null;
+    'coreHoursMode'?: string | null;
+    'coreHoursStart'?: string | null;
+    'coreHoursEnd'?: string | null;
 }
 export interface GroupResponse {
     'id'?: number;
@@ -702,7 +733,7 @@ export interface NotificationResponse {
     'createdAt'?: string;
     'organizationId'?: number | null;
     /**
-     * Time entry id (FailureEntry, TimerReminder) or request id (RequestAccepted, RequestDeclined) for deep links.
+     * Time entry id (FailureEntry, TimerReminder) , request id (RequestAccepted, RequestDeclined) or the affected member\'s user id (CoreHoursViolation) for deep links.
      */
     'relatedEntityId'?: number | null;
 }
@@ -811,6 +842,13 @@ export interface OrganizationDetailResponse {
      */
     'businessDayEnd'?: string | null;
     'timeZone'?: string | null;
+    /**
+     * Core working hours (see CoreHours); start/end as local \"HH:mm\".
+     */
+    'coreHoursEnabled'?: boolean;
+    'coreHoursStart'?: string | null;
+    'coreHoursEnd'?: string | null;
+    'coreHoursToleranceMinutes'?: number;
     'settingsUpdatedAt'?: string | null;
     'createdAt'?: string;
     'members': Array<OrganizationMemberResponse> | null;
@@ -917,6 +955,13 @@ export interface OrganizationSettingsResponse {
     'absenceSelfServiceMode': string | null;
     'businessDayEnd': string | null;
     'timeZone': string | null;
+    /**
+     * Core working hours (see CoreHours); start/end as local \"HH:mm\".
+     */
+    'coreHoursEnabled'?: boolean;
+    'coreHoursStart'?: string | null;
+    'coreHoursEnd'?: string | null;
+    'coreHoursToleranceMinutes'?: number;
 }
 /**
  * Automatic pause rule (deduct X minutes after Y hours worked).
@@ -1430,6 +1475,9 @@ export interface UpdateGroupPermissionsRequest {
     'groupAdminCanManageMembers'?: boolean | null;
     'groupAdminCanViewAllTimeEntries'?: boolean | null;
     'groupAdminCanExportData'?: boolean | null;
+    'coreHoursMode'?: CoreHoursMode;
+    'coreHoursStart'?: string | null;
+    'coreHoursEnd'?: string | null;
 }
 
 
@@ -1499,6 +1547,16 @@ export interface UpdateOrganizationSettingsRequest {
      * IANA time zone id, e.g. \"Europe/Berlin\".
      */
     'timeZone'?: string | null;
+    'coreHoursEnabled'?: boolean | null;
+    /**
+     * Core hours start as local \"HH:mm\"; must be before TimeTracking.Api.Models.Dtos.UpdateOrganizationSettingsRequest.CoreHoursEnd.
+     */
+    'coreHoursStart'?: string | null;
+    'coreHoursEnd'?: string | null;
+    /**
+     * Allowed late start / early leave / gap in minutes.
+     */
+    'coreHoursToleranceMinutes'?: number | null;
 }
 
 

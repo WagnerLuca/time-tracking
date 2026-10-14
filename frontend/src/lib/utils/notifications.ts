@@ -9,25 +9,49 @@ interface NotificationLike {
 	relatedEntityId?: number | null;
 }
 
+/** The first dd.MM.yyyy date in a notification message as YYYY-MM-DD. */
+function messageDate(message?: string | null): string | null {
+	const m = message?.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+	return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+}
+
+/**
+ * A CoreHoursViolation notice: its day and, when it is about someone else (`relatedEntityId`
+ * is the affected member), their name from the message ("Tom Weber did not keep … on 03.03.2026 …").
+ */
+export function coreHoursNotice(n: NotificationLike, currentUserId: number | null | undefined): { date: string | null; name: string | null } {
+	const own = n.relatedEntityId == null || n.relatedEntityId === currentUserId;
+	return {
+		date: messageDate(n.message),
+		name: own ? null : (n.message?.match(/^(.+?) did not keep the core working hours/)?.[1] ?? null)
+	};
+}
+
 /**
  * Where a notification leads. FailureEntry carries the entry id (`relatedEntityId`); the day
  * comes from that entry when it is still among the open failures, else from the start time
  * in the message ("… started 30.09.2026 08:00 …", org-local). A TimerReminder is about the
- * running timer, so it leads to the timer page.
+ * running timer, so it leads to the timer page. A CoreHoursViolation leads to the day in
+ * History for the member themselves, to the member's page (in `orgSlug(organizationId)`) for admins.
  */
 export function notificationTarget(
-	n: NotificationLike,
-	entries: { id?: number; startTime?: string }[]
+	n: NotificationLike & { organizationId?: number | null },
+	entries: { id?: number; startTime?: string }[],
+	currentUserId?: number | null,
+	orgSlug?: (orgId: number) => string | null | undefined
 ): { href: string | null; date: string | null } {
 	if (n.type === 'TimerReminder') return { href: '/time', date: null };
+	if (n.type === 'CoreHoursViolation') {
+		const date = messageDate(n.message);
+		const slug = n.organizationId != null ? orgSlug?.(n.organizationId) : null;
+		if (n.relatedEntityId != null && n.relatedEntityId !== currentUserId)
+			return { href: slug ? `/organizations/${slug}/members/${n.relatedEntityId}` : null, date };
+		return { href: date ? `/history?date=${date}` : '/history', date };
+	}
 	if (n.type !== 'FailureEntry') return { href: null, date: null };
 	const id = n.relatedEntityId ?? null;
 	const entry = id != null ? entries.find((e) => e.id === id) : undefined;
-	let date = entry?.startTime ? dateKey(new Date(entry.startTime)) : null;
-	if (!date) {
-		const m = n.message?.match(/(\d{2})\.(\d{2})\.(\d{4})/);
-		if (m) date = `${m[3]}-${m[2]}-${m[1]}`;
-	}
+	const date = entry?.startTime ? dateKey(new Date(entry.startTime)) : messageDate(n.message);
 	if (!date) return { href: '/history', date: null };
 	return { href: id != null ? `/history?date=${date}&entry=${id}` : `/history?date=${date}`, date };
 }

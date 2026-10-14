@@ -124,13 +124,19 @@
 		findEntry: (id) => entries.find((e) => e.id === id)
 	});
 
-	/** Working Time Act violations of the shown month, by day ('YYYY-MM-DD'). */
+	/** Working Time Act and core working hours violations of the shown month, by day ('YYYY-MM-DD'). */
 	let compliance = $state(new Map<string, ComplianceDayResponse>());
 
 	function complianceText(day: ComplianceDayResponse): string {
 		const parts: string[] = [];
 		if (day.dailyMax) parts.push(t('calendar.compliance.dailyMax', { hours: formatNumber(day.netHours ?? 0, { maximumFractionDigits: 1 }) }));
 		if (day.restPeriod) parts.push(t('calendar.compliance.restPeriod', { hours: formatNumber(day.restHoursBefore ?? 0, { maximumFractionDigits: 1 }) }));
+		if (day.coreHours)
+			parts.push(t('calendar.compliance.coreHours', {
+				window: (day.coreHoursWindow ?? '').replace('-', '–'),
+				issues: (day.coreHoursIssues ?? []).map((i) => t(`calendar.compliance.issues.${i as 'late' | 'early' | 'gap' | 'missing'}`)).join(', '),
+				minutes: day.coreHoursMissingMinutes ?? 0
+			}));
 		return parts.join(' ');
 	}
 

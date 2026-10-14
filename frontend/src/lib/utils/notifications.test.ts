@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bellNotifications, decisionNotificationIds, notificationTarget } from './notifications';
+import { bellNotifications, coreHoursNotice, decisionNotificationIds, notificationTarget } from './notifications';
 
 describe('notificationTarget', () => {
 	const message = 'Your timer started 30.09.2026 08:15 ran past the end of the business day and was stopped.';
@@ -24,6 +24,27 @@ describe('notificationTarget', () => {
 	it('sends timer reminders to the timer and other types nowhere', () => {
 		expect(notificationTarget({ type: 'TimerReminder', relatedEntityId: 9 }, failures).href).toBe('/time');
 		expect(notificationTarget({ type: 'SettingsChanged' }, failures).href).toBeNull();
+	});
+});
+
+describe('core hours notices', () => {
+	const message = 'Tom Weber did not keep the core working hours on 03.03.2026 (09:00-15:00): late start, 20 min not covered.';
+	const slugs = (id: number) => (id === 1 ? 'acme' : null);
+
+	it('lead the member to the day and admins to the member', () => {
+		expect(notificationTarget({ type: 'CoreHoursViolation', relatedEntityId: 7, organizationId: 1, message }, [], 7, slugs)).toEqual({
+			href: '/history?date=2026-03-03',
+			date: '2026-03-03'
+		});
+		expect(notificationTarget({ type: 'CoreHoursViolation', relatedEntityId: 7, organizationId: 1, message }, [], 2, slugs).href).toBe('/organizations/acme/members/7');
+		expect(notificationTarget({ type: 'CoreHoursViolation', relatedEntityId: 7, organizationId: 9, message }, [], 2, slugs).href).toBeNull();
+		expect(notificationTarget({ type: 'CoreHoursViolation', relatedEntityId: 7, message: 'x' }, [], 7).href).toBe('/history');
+	});
+
+	it('name the member only for others', () => {
+		expect(coreHoursNotice({ relatedEntityId: 7, message }, 7)).toEqual({ date: '2026-03-03', name: null });
+		expect(coreHoursNotice({ relatedEntityId: 7, message }, 2)).toEqual({ date: '2026-03-03', name: 'Tom Weber' });
+		expect(coreHoursNotice({ relatedEntityId: 7, message: 'reworded' }, 2)).toEqual({ date: null, name: null });
 	});
 });
 

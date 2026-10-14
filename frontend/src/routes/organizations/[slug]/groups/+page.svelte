@@ -311,7 +311,16 @@
 		}
 	}
 
-	async function setPermValue(key: string, value: number | boolean | null) {
+	/** Core hours override: null = inherit, 0 = off, 1 = own window (times default to 09:00-15:00). */
+	function setCoreHours(mode: number | null, start?: string, end?: string) {
+		if (mode !== 1) return setPermValue('coreHoursMode', mode);
+		return setPermValue('coreHoursMode', 1, {
+			coreHoursStart: start ?? permissions?.coreHoursStart ?? '09:00',
+			coreHoursEnd: end ?? permissions?.coreHoursEnd ?? '15:00'
+		});
+	}
+
+	async function setPermValue(key: string, value: number | boolean | null, extra: Record<string, unknown> = {}) {
 		if (!selectedGroup?.id) return;
 		permissionsSaving = true;
 		permissionsError = '';
@@ -319,7 +328,7 @@
 			// "Inherit" (null) is transmitted as -1; the backend clears the override
 			const payload = value === null ? -1 : value;
 			invalidateOrgDetail(orgSlug); // member/vacation figures change
-			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, selectedGroup.id, { [key]: payload } as any);
+			await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsPut(orgSlug, selectedGroup.id, { [key]: payload, ...extra } as any);
 			toast.success(t('groups.perm.saved'));
 			await loadPermissions(selectedGroup.id);
 		} catch (err) {
@@ -615,6 +624,36 @@
 														/>
 													</div>
 												{/each}
+
+												<!-- Core working hours override -->
+												<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">
+													<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">{t('groups.perm.coreHours.title')}</span>
+												</div>
+												<div class="flex items-center justify-between gap-3 p-3 border-b border-base-200 flex-wrap" data-testid="group-core-hours">
+													<div>
+														<div class="text-sm font-medium text-base-content">{t('groups.perm.coreHours.label')}</div>
+														<div class="text-xs text-base-content/50">{t('groups.perm.coreHours.description')}</div>
+													</div>
+													<ModeSelector
+														options={withInherit([
+															{ value: 0, label: t('groups.perm.coreHours.off'), activeClass: 'btn-neutral' },
+															{ value: 1, label: t('groups.perm.coreHours.own'), activeClass: 'btn-primary' }
+														])}
+														value={permissions.coreHoursMode === 'Own' ? 1 : permissions.coreHoursMode === 'Off' ? 0 : null}
+														onselect={(v) => setCoreHours(v as number | null)}
+														disabled={permissionsSaving}
+														size="xs"
+													/>
+													{#if permissions.coreHoursMode === 'Own'}
+														<div class="flex items-center gap-2 text-sm w-full justify-end">
+															<input type="time" class="input input-xs w-24" aria-label={t('groups.perm.coreHours.start')} value={permissions.coreHoursStart ?? '09:00'}
+																onchange={(e) => setCoreHours(1, e.currentTarget.value, undefined)} disabled={permissionsSaving} />
+															<span class="text-base-content/60">–</span>
+															<input type="time" class="input input-xs w-24" aria-label={t('groups.perm.coreHours.end')} value={permissions.coreHoursEnd ?? '15:00'}
+																onchange={(e) => setCoreHours(1, undefined, e.currentTarget.value)} disabled={permissionsSaving} />
+														</div>
+													{/if}
+												</div>
 
 												<!-- Group Admin capability flags -->
 												<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">

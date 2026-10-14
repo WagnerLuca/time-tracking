@@ -24,6 +24,7 @@ docs/BadgeCardResponse.md
 docs/BalanceResponse.md
 docs/ChangePasswordRequest.md
 docs/ComplianceDayResponse.md
+docs/CoreHoursMode.md
 docs/CreateAbsenceDayRequest.md
 docs/CreateAbsenceRangeRequest.md
 docs/CreateApiKeyRequest.md

@@ -26,6 +26,16 @@ export const de = {
 		timeZone: 'Zeitzone',
 		timeZoneFailed: 'Zeitzone konnte nicht gespeichert werden.'
 	},
+	coreHours: {
+		label: 'Kernarbeitszeit',
+		description: 'An ihren Arbeitstagen müssen Mitglieder diese Zeit (Ortszeit) mit erfassten Zeiten abdecken. Feiertage und Abwesenheiten sind ausgenommen, bei halben Tagen zählt eine Hälfte. Nach dem Ende wird geprüft; Verstöße (später Beginn, früheres Ende, Lücke über der Toleranz) gehen an das Mitglied und die Admins. Gruppen können eigene Kernzeiten haben oder sie abschalten.',
+		from: 'Von',
+		to: 'bis',
+		tolerance: 'Toleranz',
+		minutes: 'Min.',
+		failed: 'Kernarbeitszeit konnte nicht gespeichert werden.',
+		toleranceInvalid: 'Die Toleranz muss zwischen 0 und 120 Minuten liegen.'
+	},
 	absenceTypes: {
 		title: 'Abwesenheitsarten',
 		intro: 'Eigene Abwesenheitsarten wie „Dienstreise“ mit einstellbarer Wirkung auf die Soll-Stunden.',
@@ -219,6 +229,16 @@ export const en: typeof de = {
 		failed: 'Could not save the business day end.',
 		timeZone: 'Time zone',
 		timeZoneFailed: 'Could not save the time zone.'
+	},
+	coreHours: {
+		label: 'Core working hours',
+		description: 'On their working days members must cover this (local) time with tracked time. Holidays and absences are exempt; on half days one half counts. It is checked after the end; violations (late start, early leave, a gap beyond the tolerance) go to the member and the admins. Groups can set their own core hours or switch them off.',
+		from: 'From',
+		to: 'to',
+		tolerance: 'Tolerance',
+		minutes: 'min',
+		failed: 'Could not save the core working hours.',
+		toleranceInvalid: 'The tolerance must be between 0 and 120 minutes.'
 	},
 	absenceTypes: {
 		title: 'Absence types',

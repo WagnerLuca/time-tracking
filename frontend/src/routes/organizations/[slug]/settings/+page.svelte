@@ -377,6 +377,26 @@
 		saveSettings({ businessDayEnd: val }, t('orgSettings.businessDayEnd.failed'));
 	}
 
+	/** Saves start and end together, so moving the window never trips the start-before-end check halfway. */
+	function saveCoreHoursWindow() {
+		const start = (document.getElementById('core-hours-start') as HTMLInputElement | null)?.value;
+		const end = (document.getElementById('core-hours-end') as HTMLInputElement | null)?.value;
+		if (!start || !end) {
+			toast.error(t('orgSettings.businessDayEnd.timeRequired'));
+			return;
+		}
+		saveSettings({ coreHoursStart: start, coreHoursEnd: end }, t('orgSettings.coreHours.failed'));
+	}
+
+	function saveCoreHoursTolerance(e: Event) {
+		const val = Number((e.currentTarget as HTMLInputElement).value);
+		if (!Number.isInteger(val) || val < 0 || val > 120) {
+			toast.error(t('orgSettings.coreHours.toleranceInvalid'));
+			return;
+		}
+		saveSettings({ coreHoursToleranceMinutes: val }, t('orgSettings.coreHours.failed'));
+	}
+
 	function saveTimeZone(e: Event) {
 		saveSettings({ timeZone: (e.currentTarget as HTMLSelectElement).value }, t('orgSettings.businessDayEnd.timeZoneFailed'));
 	}
@@ -590,6 +610,38 @@
 								{/each}
 							</select>
 						</div>
+					</div>
+				</div>
+
+				<!-- Core working hours (Kernarbeitszeit) -->
+				<div class="bg-base-200/50 rounded-lg p-4 mt-4 border border-base-300" data-testid="core-hours-settings">
+					<div class="flex items-center justify-between gap-4 flex-wrap">
+						{@render settingInfo(t('orgSettings.coreHours.label'), t('orgSettings.coreHours.description'))}
+						<input
+							type="checkbox"
+							class="toggle toggle-primary shrink-0"
+							role="switch"
+							checked={!!org.coreHoursEnabled}
+							aria-checked={!!org.coreHoursEnabled}
+							aria-label={t('orgSettings.coreHours.label')}
+							disabled={settingsSaving}
+							onchange={(e) => { e.currentTarget.checked = !!org?.coreHoursEnabled; toggleSetting('coreHoursEnabled'); }}
+						/>
+					</div>
+					<div class="flex items-center gap-2 flex-wrap mt-3 text-sm">
+						<label class="flex items-center gap-2">
+							<span class="text-base-content/60">{t('orgSettings.coreHours.from')}</span>
+							<input id="core-hours-start" type="time" class="input input-sm w-28" value={org.coreHoursStart ?? '09:00'} onchange={saveCoreHoursWindow} disabled={settingsSaving} />
+						</label>
+						<label class="flex items-center gap-2">
+							<span class="text-base-content/60">{t('orgSettings.coreHours.to')}</span>
+							<input id="core-hours-end" type="time" class="input input-sm w-28" value={org.coreHoursEnd ?? '15:00'} onchange={saveCoreHoursWindow} disabled={settingsSaving} />
+						</label>
+						<label class="flex items-center gap-2">
+							<span class="text-base-content/60">{t('orgSettings.coreHours.tolerance')}</span>
+							<input id="core-hours-tolerance" type="number" class="input input-sm w-20 text-center" min="0" max="120" step="1" value={org.coreHoursToleranceMinutes ?? 5} onchange={saveCoreHoursTolerance} disabled={settingsSaving} />
+							<span class="text-base-content/60">{t('orgSettings.coreHours.minutes')}</span>
+						</label>
 					</div>
 				</div>
 

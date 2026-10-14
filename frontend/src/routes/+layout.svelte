@@ -12,7 +12,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { authApi, requestsApi, timeTrackingApi, notificationsApi } from '$lib/apiClient';
 	import type { NotificationResponse, OrgRequestResponse, TimeEntryResponse } from '$lib/api';
-	import { bellNotifications, decisionNotificationIds, notificationTarget } from '$lib/utils/notifications';
+	import { bellNotifications, coreHoursNotice, decisionNotificationIds, notificationTarget } from '$lib/utils/notifications';
 	import { invalidateOrgDetail } from '$lib/stores/orgDetail';
 	import { parseRequestData, formatRequestTypeFull, formatRequestType, formatRequestStatus, formatTimeAgo, formatDate, formatDateTime, formatClock, statusBadgeClass, roleLabel } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
@@ -51,8 +51,20 @@
 			case 'FailureEntry': return t('nav.notifications.failureTitle');
 			case 'TimerReminder': return t('nav.notifications.reminderTitle');
 			case 'SettingsChanged': return t('nav.notifications.settingsTitle');
+			case 'CoreHoursViolation': return t('nav.notifications.coreHoursTitle');
 			default: return n.title ?? '';
 		}
+	}
+
+	/** Where a notification leads; core hours notices about others go to the member page of their org. */
+	function notifTarget(n: NotificationResponse) {
+		return notificationTarget(n, failures, auth.user?.id, (id) => orgContext.organizations.find((o) => o.organizationId === id)?.slug);
+	}
+
+	function coreHoursText(n: NotificationResponse): string {
+		const { date, name } = coreHoursNotice(n, auth.user?.id);
+		const day = date ? formatDate(date) : '';
+		return name ? t('nav.notifications.coreHoursOther', { name, date: day }) : t('nav.notifications.coreHoursOwn', { date: day });
 	}
 
 	// Failure entries: timers auto-stopped at the business day end that still need a real end time
@@ -171,7 +183,7 @@
 
 	/** Opens where the notification leads (e.g. History at the stopped entry) and marks it read. */
 	async function openNotif(n: NotificationResponse) {
-		const { href } = notificationTarget(n, failures);
+		const { href } = notifTarget(n);
 		if (href) {
 			openMenu = null;
 			goto(href);
@@ -387,8 +399,8 @@
 											<span class="text-xs font-bold uppercase tracking-wider text-base-content/40">{t('nav.notifications.alerts')}</span>
 										</div>
 										{#each bellNotifs as n (n.id)}
-											{@const target = notificationTarget(n, failures)}
-											<button type="button" class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors border-l-4 {n.type === 'FailureEntry' ? 'border-l-error' : n.type === 'TimerReminder' ? 'border-l-warning' : 'border-l-info'}" onclick={() => openNotif(n)}>
+											{@const target = notifTarget(n)}
+											<button type="button" class="flex items-center justify-between px-4 py-2.5 border-b border-base-200 w-full bg-transparent cursor-pointer text-left hover:bg-base-200/50 transition-colors border-l-4 {n.type === 'FailureEntry' ? 'border-l-error' : n.type === 'TimerReminder' || n.type === 'CoreHoursViolation' ? 'border-l-warning' : 'border-l-info'}" onclick={() => openNotif(n)}>
 												<div class="flex flex-col gap-0.5 flex-1 min-w-0">
 													<span class="font-semibold text-xs {n.type === 'FailureEntry' ? 'text-error' : 'text-base-content'}">{notifTitle(n)}</span>
 													<span class="text-xs text-base-content/60 break-words">
@@ -396,6 +408,8 @@
 															{target.date ? t('nav.notifications.failureStarted', { date: formatDate(target.date) }) : t('nav.notifications.failureCorrect')}
 														{:else if n.type === 'TimerReminder'}
 															{t('nav.notifications.reminderText')}
+														{:else if n.type === 'CoreHoursViolation'}
+															{coreHoursText(n)}
 														{:else}
 															{n.message}
 														{/if}

@@ -55,6 +55,15 @@ export const de = {
 		rules: 'Regeln',
 		visibility: 'Sichtbarkeit',
 		capabilities: 'Rechte der Gruppen-Admins',
+		coreHours: {
+			title: 'Kernarbeitszeit',
+			label: 'Kernarbeitszeit der Gruppe',
+			description: 'Erben, abschalten oder eigene Zeiten. Bei mehreren Gruppen gilt die großzügigste: Aus vor allem anderen, sonst das kürzeste Fenster.',
+			off: 'Aus',
+			own: 'Eigene',
+			start: 'Beginn der Kernarbeitszeit',
+			end: 'Ende der Kernarbeitszeit'
+		},
 		disabled: 'Aus',
 		enabled: 'An',
 		loading: 'Berechtigungen werden geladen…',
@@ -135,6 +144,15 @@ export const en: typeof de = {
 		rules: 'Rules',
 		visibility: 'Visibility',
 		capabilities: 'Group admin capabilities',
+		coreHours: {
+			title: 'Core working hours',
+			label: "The group's core working hours",
+			description: 'Inherit, switch off or set own hours. With several groups the most permissive wins: off before anything else, otherwise the shortest window.',
+			off: 'Off',
+			own: 'Own',
+			start: 'Core hours start',
+			end: 'Core hours end'
+		},
 		disabled: 'Off',
 		enabled: 'On',
 		loading: 'Loading permissions…',
