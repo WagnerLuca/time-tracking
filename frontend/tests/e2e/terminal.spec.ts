@@ -22,7 +22,7 @@ test('terminal: unknown card is assigned from the list and then punches', async 
 	await stopTom();
 
 	await login(page, 'max.mueller@example.com');
-	await page.goto('/organizations/mueller-software/settings');
+	await page.goto('/organizations/mueller-software/terminal');
 	await page.getByPlaceholder('Name, z. B. Scanner Eingang').fill(terminal);
 	await page.getByRole('button', { name: 'Schlüssel erstellen' }).click();
 	const key = (await page.locator('code.select-all').textContent())?.trim() ?? '';

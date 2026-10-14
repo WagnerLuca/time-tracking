@@ -14,11 +14,10 @@ function permRow(page: Page, label: string) {
 
 /**
  * Sub-groups (#59): the owner builds department → team in the tree and sets two rules on the
- * department (past entries need approval, its admins approve time edits). Anna, in the team,
- * inherits them: her forgotten-day entry becomes a request, routed past the admin-less team to
- * the department, whose admin (Tom, a plain member) approves it from the bell.
- * Anna's seeded group only approves absences, so it never takes this request. (Anna and Tom are
- * already signed in by other specs: no extra login against the 10-per-minute auth limit.)
+ * department (past entries need approval, its admins approve time edits). Tom, a plain member in
+ * the team, inherits them: his forgotten-day entry becomes a request, routed past the admin-less
+ * team to the department, whose lead (Niklas, a group admin) approves it in his inbox.
+ * Tom's seeded groups only approve absences, so they never take this request.
  */
 test('a department rule reaches its team, and the department admin approves a team member', async ({ page, request }) => {
 	const stamp = Date.now();
@@ -27,16 +26,16 @@ test('a department rule reaches its team, and the department admin approves a te
 	const description = `E2E Nachtrag ${stamp}`;
 	const day = futureWorkday(2001, stamp);   // a past day, different per run
 	const headers = { Authorization: `Bearer ${await apiToken(request, 'max.mueller@example.com')}` };
-	const annaHeaders = { Authorization: `Bearer ${await apiToken(request, 'anna.schmidt@example.com')}` };
+	const tomHeaders = { Authorization: `Bearer ${await apiToken(request, 'tom.weber@example.com')}` };
 	const org = await (await request.get(`${API}/organizations/${SLUG}`, { headers })).json();
 	const userId = (email: string): number => org.members.find((m: { email: string }) => m.email === email).id;
-	const [annaId, tomId] = [userId('anna.schmidt@example.com'), userId('tom.weber@example.com')];
+	const [tomId, leadId] = [userId('tom.weber@example.com'), userId('niklas.hoffmann@example.com')];
 	const groupId = async (name: string) =>
 		((await (await request.get(`${API}/organizations/${SLUG}/groups`, { headers })).json()) as { id: number; name: string }[])
 			.find((g) => g.name === name)?.id;
 	const header = (name: string) => page.getByTestId('group-header').filter({ hasText: name });
-	const annaRule = async () =>
-		(await (await request.get(`${API}/organizations/${SLUG}/effective-permissions`, { headers: annaHeaders })).json()).editPastEntriesMode;
+	const tomRule = async () =>
+		(await (await request.get(`${API}/organizations/${SLUG}/effective-permissions`, { headers: tomHeaders })).json()).editPastEntriesMode;
 
 	try {
 		// Owner: department, then a team below it via "+ Untergruppe" (parent preselected)
@@ -59,11 +58,11 @@ test('a department rule reaches its team, and the department admin approves a te
 
 		const deptId = await groupId(dept);
 		const teamId = await groupId(team);
-		for (const [id, uid, role] of [[deptId, tomId, 'Admin'], [teamId, annaId, 'Member']] as const) {
+		for (const [id, uid, role] of [[deptId, leadId, 'Admin'], [teamId, tomId, 'Member']] as const) {
 			const added = await request.post(`${API}/organizations/${SLUG}/groups/${id}/members`, { headers, data: { userId: uid, role } });
 			expect(added.ok(), await added.text()).toBeTruthy();
 		}
-		expect(await annaRule()).toBe('Allowed');
+		expect(await tomRule()).toBe('Allowed');
 
 		// Department rules: past entries need approval, its admins approve time edits
 		await page.goto(`/organizations/${SLUG}/groups`);
@@ -82,32 +81,32 @@ test('a department rule reaches its team, and the department admin approves a te
 		await expect(permRow(page, 'Vergangene Einträge ändern').getByText(`geerbt von ${dept}: Genehmigung erforderlich`)).toBeVisible();
 		await expect(permRow(page, 'Zeitänderungen genehmigen').getByText(`geerbt von ${dept}: An`)).toBeVisible();
 
-		// Anna is affected: her forgotten day becomes a request, and it goes to the department
-		expect(await annaRule()).toBe('RequiresApproval');
-		const orgId = (await myOrgs(request, await apiToken(request, 'anna.schmidt@example.com'))).find((o) => o.slug === SLUG)!.organizationId;
+		// Tom is affected: his forgotten day becomes a request, and it goes to the department
+		expect(await tomRule()).toBe('RequiresApproval');
+		const orgId = (await myOrgs(request, await apiToken(request, 'tom.weber@example.com'))).find((o) => o.slug === SLUG)!.organizationId;
 		const manual = await request.post(`${API}/TimeTracking/manual`, {
-			headers: annaHeaders,
+			headers: tomHeaders,
 			data: { organizationId: orgId, startTime: `${day}T07:00:00Z`, endTime: `${day}T11:00:00Z`, description }
 		});
 		expect(manual.ok(), await manual.text()).toBeTruthy();
 		const req = (await manual.json()).request;
 		expect(req.groupName).toBe(dept);
 
-		// The department admin approves it from the bell
+		// The department lead approves it in the inbox ("Anfragen" in his navigation)
 		await page.context().clearCookies();
 		await page.evaluate(() => localStorage.clear());
-		await login(page, 'tom.weber@example.com');
-		await page.getByRole('button', { name: /Benachrichtigungen öffnen/ }).click();
-		await page.getByRole('button', { name: /Anna Schmidt/ }).filter({ hasText: `über ${dept}` }).click();
-		await page.getByRole('dialog').getByRole('button', { name: 'Annehmen' }).click();
-		await expect(page.getByRole('dialog')).toHaveCount(0);
-		const mine = await (await request.get(`${API}/organizations/my-requests`, { headers: annaHeaders })).json();
+		await login(page, 'niklas.hoffmann@example.com');
+		await page.getByRole('navigation', { name: 'Menü' }).getByRole('link', { name: /Anfragen/ }).click();
+		const item = page.getByTestId('inbox-approve').getByTestId('inbox-item').filter({ hasText: 'Tom Weber' }).filter({ hasText: `über ${dept}` });
+		await item.getByRole('button', { name: 'Annehmen' }).click();
+		await expect(item).toHaveCount(0);
+		const mine = await (await request.get(`${API}/organizations/my-requests`, { headers: tomHeaders })).json();
 		expect(mine.items.find((r: { id: number }) => r.id === req.id).status).toBe('Accepted');
 	} finally {
 		const deptId = await groupId(dept);
 		if (deptId) await request.delete(`${API}/organizations/${SLUG}/groups/${deptId}?subGroups=1`, { headers });
-		const entries = await (await request.get(`${API}/Organizations/${SLUG}/member-entries/${annaId}?from=${day}T00:00:00Z&to=${day}T23:59:59Z`, { headers })).json();
+		const entries = await (await request.get(`${API}/Organizations/${SLUG}/member-entries/${tomId}?from=${day}T00:00:00Z&to=${day}T23:59:59Z`, { headers })).json();
 		for (const e of (entries.items ?? []) as { id: number; description?: string }[])
-			if (e.description === description) await request.delete(`${API}/organizations/${SLUG}/members/${annaId}/entries/${e.id}`, { headers });
+			if (e.description === description) await request.delete(`${API}/organizations/${SLUG}/members/${tomId}/entries/${e.id}`, { headers });
 	}
 });

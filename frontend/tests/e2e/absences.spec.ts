@@ -32,10 +32,11 @@ test('member requests an absence, the owner approves it, the calendar shows it',
 		await expect(details.getByText('Urlaub', { exact: true })).toHaveCount(0); // only requested so far
 
 		await switchUser(page, 'max.mueller@example.com');
-		await page.goto('/organizations/mueller-software/settings');
-		const item = page.locator('li', { hasText: note });
+		await page.goto('/inbox');
+		const item = page.getByTestId('inbox-approve').getByTestId('inbox-item').filter({ hasText: note });
 		await item.getByRole('button', { name: 'Annehmen' }).click();
-		await expect(item.getByText('Angenommen', { exact: true })).toBeVisible();
+		await expect(page.getByText('Antrag von Tom Weber angenommen.')).toBeVisible();
+		await expect(item).toHaveCount(0);
 
 		await switchUser(page, 'tom.weber@example.com');
 		await page.goto(`/history?date=${date}`);

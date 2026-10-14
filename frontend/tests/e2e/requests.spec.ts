@@ -3,7 +3,7 @@ import { API, apiToken, login } from './helpers';
 
 /**
  * Decline with a reason: Tom requests an absence (his org requires approval), the owner
- * declines it with a reason, and Tom sees that reason with the decision in the bell.
+ * declines it with a reason in the inbox, and Tom sees that reason with the decision in his inbox.
  */
 test('admin declines a request with a reason the member then sees', async ({ page, request }) => {
 	const stamp = Date.now();
@@ -21,17 +21,20 @@ test('admin declines a request with a reason the member then sees', async ({ pag
 	expect(created.ok(), await created.text()).toBeTruthy();
 
 	await login(page, 'max.mueller@example.com');
-	await page.goto('/organizations/mueller-software/settings');
-	const item = page.locator('li', { hasText: note }).filter({ has: page.getByRole('button', { name: 'Ablehnen' }) });
+	await page.getByRole('link', { name: /Benachrichtigungen öffnen/ }).click();
+	await expect(page).toHaveURL(/\/inbox$/);
+	const item = page.getByTestId('inbox-approve').getByTestId('inbox-item').filter({ hasText: note });
 	await item.getByRole('button', { name: 'Ablehnen' }).click();
 	await item.getByLabel('Begründung (optional)').fill(reason);
 	await item.getByRole('button', { name: 'Ablehnen', exact: true }).click();
-	await expect(page.locator('li', { hasText: note }).getByText(`Begründung: ${reason}`)).toBeVisible();
+	await expect(page.getByText('Antrag von Tom Weber abgelehnt.')).toBeVisible();
+	await expect(item).toHaveCount(0);
 
-	// Tom: the decision with its reason, once, in "Meine Anträge"
+	// Tom: the decision with its reason, once, under "Antworten auf meine Anträge"
 	await page.context().clearCookies();
 	await page.evaluate(() => localStorage.clear());
 	await login(page, 'tom.weber@example.com');
-	await page.getByRole('button', { name: /Benachrichtigungen öffnen/ }).click();
+	await page.getByRole('link', { name: /Benachrichtigungen öffnen/ }).click();
+	await expect(page.getByTestId('inbox-decisions').getByText(`Begründung: ${reason}`)).toHaveCount(1);
 	await expect(page.getByText(`Begründung: ${reason}`)).toHaveCount(1);
 });
