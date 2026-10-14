@@ -8,7 +8,9 @@
 	/**
 	 * The member visibility matrix: rows = kinds of information, columns = in the viewer's own
 	 * groups / outside. `org` mode edits the organization's switches, `group` mode a group's
-	 * inherit / allow / deny per cell, `readonly` just shows the org values.
+	 * inherit / allow / deny per cell, `readonly` just shows the org values. In group mode `org` is
+	 * what the group inherits (for a sub-group: its parent's effective values), and
+	 * `inheritedSource` names the group a cell's value comes from (null = the organization).
 	 */
 	interface Props {
 		mode: 'org' | 'group' | 'readonly';
@@ -20,8 +22,17 @@
 		onorgchange?: (kind: VisibilityKind, inGroups: boolean, outsideGroups: boolean) => void;
 		/** Group mode: the new overrides of one row (null = inherit). */
 		ongroupchange?: (kind: VisibilityKind, inGroups: boolean | null, outsideGroups: boolean | null) => void;
+		/** Group mode: the ancestor group an inherited cell comes from (null = organization). */
+		inheritedSource?: (kind: VisibilityKind, column: Column) => string | null;
 	}
-	let { mode, org, group = null, disabled = false, onorgchange, ongroupchange }: Props = $props();
+	let { mode, org, group = null, disabled = false, onorgchange, ongroupchange, inheritedSource }: Props = $props();
+
+	function inheritLabel(kind: VisibilityKind, column: Column): string {
+		const yes = cell(org, kind, column);
+		const source = inheritedSource?.(kind, column);
+		if (source) return t(yes ? 'visibility.inheritFromYes' : 'visibility.inheritFromNo', { source });
+		return yes ? t('visibility.inheritYes') : t('visibility.inheritNo');
+	}
 
 	const COLUMNS: Column[] = ['inGroups', 'outsideGroups'];
 	const columnLabel = (c: Column) => (c === 'inGroups' ? t('visibility.inGroups') : t('visibility.outsideGroups'));
@@ -61,7 +72,7 @@
 							{disabled}
 							onchange={(e) => setGroup(kind, c, parseOverride(e.currentTarget.value))}
 						>
-							<option value="inherit">{cell(org, kind, c) ? t('visibility.inheritYes') : t('visibility.inheritNo')}</option>
+							<option value="inherit">{inheritLabel(kind, c)}</option>
 							<option value="allow">{t('visibility.allow')}</option>
 							<option value="deny">{t('visibility.deny')}</option>
 						</select>

@@ -306,6 +306,7 @@ export interface CreateGroupRequest {
     'name'?: string | null;
     'description'?: string | null;
     'color'?: string | null;
+    'parentGroupId'?: number | null;
 }
 /**
  * Request payload for creating a holiday.
@@ -523,6 +524,7 @@ export interface GroupDetailResponse {
     'color'?: string | null;
     'createdAt'?: string;
     'members'?: Array<GroupMemberResponse> | null;
+    'parentGroupId'?: number | null;
 }
 export interface GroupMemberResponse {
     'userId'?: number;
@@ -532,6 +534,7 @@ export interface GroupMemberResponse {
     'profileImageUrl'?: string | null;
     'role'?: string | null;
     'joinedAt'?: string;
+    'viaGroupName'?: string | null;
 }
 export interface GroupPermissionsResponse {
     'groupId'?: number;
@@ -552,6 +555,7 @@ export interface GroupPermissionsResponse {
     'coreHoursMode'?: string | null;
     'coreHoursStart'?: string | null;
     'coreHoursEnd'?: string | null;
+    'parentGroupId'?: number | null;
 }
 export interface GroupResponse {
     'id'?: number;
@@ -563,6 +567,8 @@ export interface GroupResponse {
     'memberCount'?: number;
     'isGroupAdmin'?: boolean;
     'groupAdminCanManageMembers'?: boolean;
+    'parentGroupId'?: number | null;
+    'canManageMembers'?: boolean;
 }
 /**
  * Sets a group\'s override of one matrix row (both cells; null = inherit). Kind is a MemberInfo name.
@@ -700,6 +706,10 @@ export interface MemberGroupResponse {
     'name': string | null;
     'color'?: string | null;
     'isGroupAdmin'?: boolean;
+    /**
+     * Set for an inherited membership (an ancestor of a direct group): the direct group it comes through.
+     */
+    'viaGroupName'?: string | null;
 }
 /**
  * A member\'s initial overtime after it was set.
@@ -1286,6 +1296,18 @@ export interface StopTimeEntryRequest {
      */
     'description'?: string | null;
 }
+/**
+ * What happens to the sub-groups of a group that is deleted.
+ */
+
+export const SubGroupAction = {
+    NUMBER_0: 0,
+    NUMBER_1: 1
+} as const;
+
+export type SubGroupAction = typeof SubGroupAction[keyof typeof SubGroupAction];
+
+
 export interface TeamGroupResponse {
     'id'?: number;
     'name'?: string | null;
@@ -1555,6 +1577,7 @@ export interface UpdateGroupPermissionsRequest {
     'coreHoursMode'?: CoreHoursMode;
     'coreHoursStart'?: string | null;
     'coreHoursEnd'?: string | null;
+    'inheritCapabilities'?: Array<string> | null;
 }
 
 
@@ -1562,6 +1585,7 @@ export interface UpdateGroupRequest {
     'name'?: string | null;
     'description'?: string | null;
     'color'?: string | null;
+    'parentGroupId'?: number | null;
 }
 /**
  * Request payload for updating a holiday.
@@ -5258,12 +5282,13 @@ export const GroupApiAxiosParamCreator = function (configuration?: Configuration
         /**
          * 
          * @summary Delete a group (admin only).
-         * @param {string} slug 
-         * @param {number} groupId 
+         * @param {string} slug Organization URL slug.
+         * @param {number} groupId Group ID.
+         * @param {SubGroupAction} [subGroups] Required when the group has sub-groups: MoveUp (they move to its parent) or Delete (the whole subtree).
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugGroupsGroupIdDelete: async (slug: string, groupId: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        apiV1OrganizationsSlugGroupsGroupIdDelete: async (slug: string, groupId: number, subGroups?: SubGroupAction, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'slug' is not null or undefined
             assertParamExists('apiV1OrganizationsSlugGroupsGroupIdDelete', 'slug', slug)
             // verify required parameter 'groupId' is not null or undefined
@@ -5285,6 +5310,10 @@ export const GroupApiAxiosParamCreator = function (configuration?: Configuration
             // authentication Bearer required
             // http bearer authentication required
             await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (subGroups !== undefined) {
+                localVarQueryParameter['subGroups'] = subGroups;
+            }
 
 
     
@@ -5655,7 +5684,7 @@ export const GroupApiAxiosParamCreator = function (configuration?: Configuration
         },
         /**
          * 
-         * @summary Create a new group (admin only).
+         * @summary Create a new group (org admins; group admins with member management may create sub-groups below their group).
          * @param {string} slug 
          * @param {CreateGroupRequest} [createGroupRequest] 
          * @param {*} [options] Override http request option.
@@ -5775,13 +5804,14 @@ export const GroupApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @summary Delete a group (admin only).
-         * @param {string} slug 
-         * @param {number} groupId 
+         * @param {string} slug Organization URL slug.
+         * @param {number} groupId Group ID.
+         * @param {SubGroupAction} [subGroups] Required when the group has sub-groups: MoveUp (they move to its parent) or Delete (the whole subtree).
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1OrganizationsSlugGroupsGroupIdDelete(slug: string, groupId: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsGroupIdDelete(slug, groupId, options);
+        async apiV1OrganizationsSlugGroupsGroupIdDelete(slug: string, groupId: number, subGroups?: SubGroupAction, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugGroupsGroupIdDelete(slug, groupId, subGroups, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['GroupApi.apiV1OrganizationsSlugGroupsGroupIdDelete']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -5905,7 +5935,7 @@ export const GroupApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Create a new group (admin only).
+         * @summary Create a new group (org admins; group admins with member management may create sub-groups below their group).
          * @param {string} slug 
          * @param {CreateGroupRequest} [createGroupRequest] 
          * @param {*} [options] Override http request option.
@@ -5963,13 +5993,14 @@ export const GroupApiFactory = function (configuration?: Configuration, basePath
         /**
          * 
          * @summary Delete a group (admin only).
-         * @param {string} slug 
-         * @param {number} groupId 
+         * @param {string} slug Organization URL slug.
+         * @param {number} groupId Group ID.
+         * @param {SubGroupAction} [subGroups] Required when the group has sub-groups: MoveUp (they move to its parent) or Delete (the whole subtree).
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugGroupsGroupIdDelete(slug: string, groupId: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
-            return localVarFp.apiV1OrganizationsSlugGroupsGroupIdDelete(slug, groupId, options).then((request) => request(axios, basePath));
+        apiV1OrganizationsSlugGroupsGroupIdDelete(slug: string, groupId: number, subGroups?: SubGroupAction, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugGroupsGroupIdDelete(slug, groupId, subGroups, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -6066,7 +6097,7 @@ export const GroupApiFactory = function (configuration?: Configuration, basePath
         },
         /**
          * 
-         * @summary Create a new group (admin only).
+         * @summary Create a new group (org admins; group admins with member management may create sub-groups below their group).
          * @param {string} slug 
          * @param {CreateGroupRequest} [createGroupRequest] 
          * @param {*} [options] Override http request option.
@@ -6118,13 +6149,14 @@ export class GroupApi extends BaseAPI {
     /**
      * 
      * @summary Delete a group (admin only).
-     * @param {string} slug 
-     * @param {number} groupId 
+     * @param {string} slug Organization URL slug.
+     * @param {number} groupId Group ID.
+     * @param {SubGroupAction} [subGroups] Required when the group has sub-groups: MoveUp (they move to its parent) or Delete (the whole subtree).
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public apiV1OrganizationsSlugGroupsGroupIdDelete(slug: string, groupId: number, options?: RawAxiosRequestConfig) {
-        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGroupIdDelete(slug, groupId, options).then((request) => request(this.axios, this.basePath));
+    public apiV1OrganizationsSlugGroupsGroupIdDelete(slug: string, groupId: number, subGroups?: SubGroupAction, options?: RawAxiosRequestConfig) {
+        return GroupApiFp(this.configuration).apiV1OrganizationsSlugGroupsGroupIdDelete(slug, groupId, subGroups, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -6230,7 +6262,7 @@ export class GroupApi extends BaseAPI {
 
     /**
      * 
-     * @summary Create a new group (admin only).
+     * @summary Create a new group (org admins; group admins with member management may create sub-groups below their group).
      * @param {string} slug 
      * @param {CreateGroupRequest} [createGroupRequest] 
      * @param {*} [options] Override http request option.

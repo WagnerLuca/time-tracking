@@ -80,7 +80,7 @@ export const de = {
 		open: 'Offen',
 		openHint: 'Jede Person kann direkt beitreten',
 		inherit: 'Erben',
-		inheritHint: 'Einstellung der Organisation verwenden'
+		inheritHint: 'Wert der übergeordneten Gruppe bzw. der Organisation verwenden'
 	},
 	rules: {
 		editPastEntriesMode: {
@@ -207,7 +207,7 @@ export const en: typeof de = {
 		open: 'Open',
 		openHint: 'Anyone can join freely',
 		inherit: 'Inherit',
-		inheritHint: 'Use the organization default'
+		inheritHint: 'Use the parent group’s or the organization’s value'
 	},
 	rules: {
 		editPastEntriesMode: {

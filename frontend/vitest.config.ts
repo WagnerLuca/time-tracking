@@ -18,7 +18,7 @@ export default defineConfig({
 			include: ['src/lib/**/*.ts'],
 			exclude: ['src/lib/api/**', 'src/lib/i18n/messages/**', '**/*.test.ts', '**/*.d.ts'],
 			// ~2 points below the measured totals: raise them when coverage goes up, never lower them.
-			thresholds: { lines: 56, statements: 56, functions: 93, branches: 94 }
+			thresholds: { lines: 58, statements: 58, functions: 93, branches: 94 }
 		}
 	}
 });

@@ -6,8 +6,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-MIN_LINE=94     # % line coverage; measured 94.5 on 2026-10-14 — raise it when coverage grows
-MIN_BRANCH=77   # % branch coverage; measured 78.0
+MIN_LINE=94     # % line coverage; measured 94.6 on 2026-10-14 (sub-groups) — raise it when coverage grows
+MIN_BRANCH=78   # % branch coverage; measured 78.8
 
 rm -rf TestResults/coverage TestResults/coverage-report
 dotnet test --settings coverlet.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults/coverage "$@"

@@ -111,6 +111,7 @@ docs/SetInitialOvertimeRequest.md
 docs/SetVacationDaysRequest.md
 docs/StartTimeEntryRequest.md
 docs/StopTimeEntryRequest.md
+docs/SubGroupAction.md
 docs/TeamGroupResponse.md
 docs/TeamMemberResponse.md
 docs/TeamOverviewResponse.md

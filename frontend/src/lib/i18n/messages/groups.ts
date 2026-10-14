@@ -24,6 +24,26 @@ export const de = {
 	adminBadge: 'Admin',
 	groupAdmin: 'Gruppen-Admin',
 	groupAdminSuffix: ' Admin',
+	parent: 'Übergeordnete Gruppe',
+	noParent: '– keine (oberste Ebene) –',
+	createSub: '+ Untergruppe',
+	subGroupOf: 'Untergruppe von {name}',
+	expand: '{name} aufklappen',
+	collapse: '{name} zuklappen',
+	treeLabel: 'Gruppen als Baum',
+	via: 'über {group}',
+	deleteSub: {
+		message: '„{name}“ hat Untergruppen. Was soll mit ihnen passieren?',
+		moveUp: 'Eine Ebene nach oben verschieben',
+		moveUpHint: 'Sie hängen danach direkt unter „{parent}“.',
+		moveUpTopHint: 'Sie werden danach zu Gruppen der obersten Ebene.',
+		delete: 'Mit löschen',
+		deleteHint: 'Alle Untergruppen (auch tiefere Ebenen) werden ebenfalls gelöscht.'
+	},
+	inherit: {
+		fromGroup: 'geerbt von {group}: {value}',
+		fromOrg: 'geerbt von der Organisation: {value}'
+	},
 	tabs: {
 		members: 'Mitglieder',
 		permissions: 'Berechtigungen'
@@ -51,7 +71,7 @@ export const de = {
 		roleFailed: 'Rolle konnte nicht geändert werden.'
 	},
 	perm: {
-		intro: 'Einstellungen der Organisation für diese Gruppe überschreiben. „Erben“ verwendet die Einstellung der Organisation.',
+		intro: 'Einstellungen für diese Gruppe überschreiben. „Erben“ übernimmt den Wert der übergeordneten Gruppe, ganz oben den der Organisation.',
 		rules: 'Regeln',
 		visibility: 'Sichtbarkeit',
 		capabilities: 'Rechte der Gruppen-Admins',
@@ -110,6 +130,26 @@ export const en: typeof de = {
 	adminBadge: 'Admin',
 	groupAdmin: 'Group admin',
 	groupAdminSuffix: ' Admin',
+	parent: 'Parent group',
+	noParent: '– none (top level) –',
+	createSub: '+ Sub-group',
+	subGroupOf: 'Sub-group of {name}',
+	expand: 'Expand {name}',
+	collapse: 'Collapse {name}',
+	treeLabel: 'Groups as a tree',
+	via: 'via {group}',
+	deleteSub: {
+		message: '"{name}" has sub-groups. What should happen to them?',
+		moveUp: 'Move them up one level',
+		moveUpHint: 'They will sit directly below "{parent}".',
+		moveUpTopHint: 'They become top-level groups.',
+		delete: 'Delete them too',
+		deleteHint: 'All sub-groups (including deeper levels) are deleted as well.'
+	},
+	inherit: {
+		fromGroup: 'inherited from {group}: {value}',
+		fromOrg: 'inherited from the organization: {value}'
+	},
 	tabs: {
 		members: 'Members',
 		permissions: 'Permissions'
@@ -137,7 +177,7 @@ export const en: typeof de = {
 		roleFailed: 'Could not change the role.'
 	},
 	perm: {
-		intro: 'Override organization defaults for this group. "Inherit" uses the org-level setting.',
+		intro: 'Override settings for this group. "Inherit" takes the parent group’s value, at the top the organization’s.',
 		rules: 'Rules',
 		visibility: 'Visibility',
 		capabilities: 'Group admin capabilities',
