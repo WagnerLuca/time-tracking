@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
@@ -18,7 +19,7 @@
 	import { canEditEntries, canRequestEditEntries, canEditPause, canRequestEditPause } from '$lib/utils/orgRules';
 	import { loadDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
 	import { createEntryEditor } from '$lib/utils/entryEditor.svelte';
-	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import DayTypeLegend from '$lib/components/DayTypeLegend.svelte';
 	import EntryRow from '$lib/components/EntryRow.svelte';
 	import RequestModal from '$lib/components/RequestModal.svelte';
@@ -300,7 +301,7 @@
 	</div>
 
 	{#if loading}
-		<LoadingSpinner size="sm" />
+		<Skeleton />
 	{:else}
 		<!-- Weekly summary -->
 		<section class="card bg-base-100 border border-base-300 p-4 sm:p-5 mb-8" aria-label={t('timer.weekSummary')}>
@@ -385,7 +386,7 @@
 			<h2 class="text-lg text-base-content/70 mb-4">{t('timer.entriesThisWeek')}</h2>
 
 			{#if weekEntries.length === 0}
-				{#if !weekError}<p class="text-base-content/50">{t('timer.noEntries')}</p>{/if}
+				{#if !weekError}<EmptyState text={t('timer.noEntries')} actionLabel={timer.current ? undefined : t('timer.startNow')} onaction={handleStart} />{/if}
 			{:else}
 				<ul class="card bg-base-100 border border-base-300 overflow-hidden">
 					{#each weekEntries as entry (entry.id)}

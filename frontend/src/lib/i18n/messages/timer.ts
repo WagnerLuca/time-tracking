@@ -30,7 +30,8 @@ export const de = {
 	thisWeek: 'Diese Woche bis heute',
 	weekOfTarget: '{worked} von {target}',
 	entriesThisWeek: 'Zeiteinträge dieser Woche',
-	noEntries: 'Keine Zeiteinträge in dieser Woche.'
+	noEntries: 'Noch keine Einträge in dieser Woche.',
+	startNow: 'Jetzt mit dem Timer beginnen'
 };
 
 export const en: typeof de = {
@@ -64,5 +65,6 @@ export const en: typeof de = {
 	thisWeek: 'This week so far',
 	weekOfTarget: '{worked} of {target}',
 	entriesThisWeek: 'Time entries this week',
-	noEntries: 'No time entries this week.'
+	noEntries: 'No entries this week yet.',
+	startNow: 'Begin with the timer now'
 };

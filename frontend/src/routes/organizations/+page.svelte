@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import { onMount } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
@@ -111,9 +112,7 @@
 	</div>
 
 	{#if loading}
-		<div class="flex items-center gap-2 text-base-content/60">
-			<span class="loading loading-spinner loading-sm"></span> {t('orgs.loading')}
-		</div>
+		<Skeleton message={t('orgs.loading')} />
 	{:else if error}
 		<div class="alert alert-error">
 			<span>{error}</span>

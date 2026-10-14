@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
@@ -166,10 +167,7 @@
 	</a>
 
 	{#if loading}
-		<div class="text-center py-12">
-			<span class="loading loading-spinner loading-md"></span>
-			<p class="text-base-content/50 text-sm">{t('common.loading')}</p>
-		</div>
+		<Skeleton />
 	{:else if error}
 		<div class="alert alert-error mb-4 text-sm">{error}</div>
 	{:else if member}

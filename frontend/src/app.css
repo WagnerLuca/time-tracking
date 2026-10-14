@@ -56,3 +56,21 @@ h1, h2, h3, .card-title {
   font-family: var(--font-display);
   letter-spacing: -0.01em;
 }
+
+/* Reduced motion: no pulsing, sliding or smooth scrolling anywhere (components.css handles its own cases too) */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visible keyboard focus on every link and plain button (the component classes style their own) */
+@layer base {
+  a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
