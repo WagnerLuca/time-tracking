@@ -10,7 +10,7 @@ public record NotificationResponse
     public bool IsRead { get; init; }
     public DateTime CreatedAt { get; init; }
     public int? OrganizationId { get; init; }
-    /// <summary>Time entry id (FailureEntry, TimerReminder) or request id (RequestAccepted, RequestDeclined) for deep links.</summary>
+    /// <summary>Time entry id (FailureEntry, TimerReminder) , request id (RequestAccepted, RequestDeclined) or the affected member's user id (CoreHoursViolation) for deep links.</summary>
     public int? RelatedEntityId { get; init; }
 }
 

@@ -9,6 +9,7 @@ namespace TimeTracking.Api.Services;
 /// as failure entries (<see cref="TimeEntry.IsFailure"/>): the member forgot to stop
 /// tracking. A failure entry counts as 0 worked time until the member corrects its end
 /// time, so a forgotten timer can neither run forever nor inflate dashboards and reports.
+/// The same minute loop also runs the daily core working hours check (<see cref="CoreHours.CheckDueAsync"/>).
 /// </summary>
 public class FailureEntryService : BackgroundService
 {
@@ -39,6 +40,10 @@ public class FailureEntryService : BackgroundService
                 var closed = await CloseOverdueEntriesAsync(context, now, stoppingToken, email, frontend);
                 if (closed > 0)
                     _logger.LogInformation("Auto-stopped {Count} timer(s) at business day end.", closed);
+                // Same loop and RLS bypass (no HttpContext = system work) for the daily core hours check
+                var missed = await CoreHours.CheckDueAsync(context, now, email, frontend, stoppingToken);
+                if (missed > 0)
+                    _logger.LogInformation("Notified {Count} core working hours violation(s).", missed);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {

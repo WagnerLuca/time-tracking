@@ -102,7 +102,7 @@ public class MemberEntryService(TimeTrackingDbContext context, ILogger<MemberEnt
         return ServiceResult.Ok();
     }
 
-    /// <summary>Days in [from, to] (default: the current local month) that break the Working Time Act.</summary>
+    /// <summary>Days in [from, to] (default: the current local month) that break the Working Time Act or miss the core hours.</summary>
     public async Task<ServiceResult<List<ComplianceDayResponse>>> GetComplianceAsync(string slug, int callerUserId, int memberId, DateOnly? from, DateOnly? to)
     {
         var org = await context.FindOrgBySlugAsync(slug);
@@ -118,8 +118,16 @@ public class MemberEntryService(TimeTrackingDbContext context, ILogger<MemberEnt
         if (EntryTimes.ValidateRange(first, last) is { } rangeError)
             return ServiceResult.BadRequest<List<ComplianceDayResponse>>(rangeError);
 
-        var days = await WorkingTimeAct.DaysAsync(context, memberId, org.Id, first, last);
-        return ServiceResult.Ok(days.Where(d => d.DailyMax || d.RestPeriod).ToList());
+        var days = (await WorkingTimeAct.DaysAsync(context, memberId, org.Id, first, last)).ToDictionary(d => d.Date);
+        foreach (var (date, core) in await CoreHours.OpenViolationsAsync(context, memberId, org.Id, first, last))
+            days[date] = (days.GetValueOrDefault(date) ?? new ComplianceDayResponse { Date = date }) with
+            {
+                CoreHours = true,
+                CoreHoursIssues = CoreHours.IssueNames(core.Issues),
+                CoreHoursMissingMinutes = core.MissingMinutes,
+                CoreHoursWindow = core.Window.ToString()
+            };
+        return ServiceResult.Ok(days.Values.Where(d => d.DailyMax || d.RestPeriod || d.CoreHours).OrderBy(d => d.Date).ToList());
     }
 
     private async Task<TimeEntryResponse> RespondAsync(TimeEntry entry, Organization org)

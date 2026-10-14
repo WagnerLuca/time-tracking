@@ -24,6 +24,26 @@ public static class EffectiveRuleResolver
         return overrides.Count == 0 ? orgDefault : overrides.Max();
     }
 
+    /// <summary>
+    /// <see cref="Combine{T}"/> for core working hours, where "more permissive" means fewer
+    /// core hours: without any group override the organization's window applies (null when the
+    /// org has core hours off); a group set to Off wins over every window; otherwise the
+    /// shortest window wins, i.e. the latest start and the earliest end of the groups' own
+    /// windows (which may come from different groups). An empty result counts as off.
+    /// Inheriting groups (null) have no say once another group overrides.
+    /// </summary>
+    public static CoreWindow? CombineCoreHours(Organization org, IEnumerable<Group> groups)
+    {
+        var overrides = groups.Where(g => g.CoreHoursMode != null).ToList();
+        if (overrides.Count == 0)
+            return org.CoreHoursEnabled ? new CoreWindow(org.CoreHoursStart, org.CoreHoursEnd) : null;
+        if (overrides.Any(g => g.CoreHoursMode == CoreHoursMode.Off || g.CoreHoursStart == null || g.CoreHoursEnd == null))
+            return null;
+        var start = overrides.Max(g => g.CoreHoursStart!.Value);
+        var end = overrides.Min(g => g.CoreHoursEnd!.Value);
+        return start < end ? new CoreWindow(start, end) : null;
+    }
+
     public static async Task<RuleMode> ResolveAsync(
         TimeTrackingDbContext context, Organization org, int userId, RequestType action)
     {

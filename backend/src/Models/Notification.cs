@@ -36,7 +36,8 @@ public class Notification
 
     /// <summary>
     /// The entity the notification is about, for deep links: the time entry id for
-    /// "FailureEntry"/"TimerReminder", the request id for "RequestAccepted"/"RequestDeclined".
+    /// "FailureEntry"/"TimerReminder", the request id for "RequestAccepted"/"RequestDeclined",
+    /// the affected member's user id for "CoreHoursViolation".
     /// </summary>
     public int? RelatedEntityId { get; set; }
     

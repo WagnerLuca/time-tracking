@@ -41,6 +41,11 @@ public record OrganizationDetailResponse
     /// <summary>Business day end as local "HH:mm" in <see cref="TimeZone"/>.</summary>
     public string BusinessDayEnd { get; init; } = "00:00";
     public string TimeZone { get; init; } = "Europe/Berlin";
+    /// <summary>Core working hours (see CoreHours); start/end as local "HH:mm".</summary>
+    public bool CoreHoursEnabled { get; init; }
+    public string CoreHoursStart { get; init; } = "09:00";
+    public string CoreHoursEnd { get; init; } = "15:00";
+    public int CoreHoursToleranceMinutes { get; init; } = 5;
     public DateTime? SettingsUpdatedAt { get; init; }
     public DateTime CreatedAt { get; init; }
     public required List<OrganizationMemberResponse> Members { get; init; }
@@ -167,6 +172,15 @@ public record UpdateOrganizationSettingsRequest
     /// <summary>IANA time zone id, e.g. "Europe/Berlin".</summary>
     [MaxLength(64)]
     public string? TimeZone { get; init; }
+    public bool? CoreHoursEnabled { get; init; }
+    /// <summary>Core hours start as local "HH:mm"; must be before <see cref="CoreHoursEnd"/>.</summary>
+    [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$", ErrorMessage = "Use HH:mm, e.g. 04:00.")]
+    public string? CoreHoursStart { get; init; }
+    [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$", ErrorMessage = "Use HH:mm, e.g. 04:00.")]
+    public string? CoreHoursEnd { get; init; }
+    /// <summary>Allowed late start / early leave / gap in minutes.</summary>
+    [Range(0, 120)]
+    public int? CoreHoursToleranceMinutes { get; init; }
 }
 
 /// <summary>Per-member time tracking statistics for the admin overview.</summary>
@@ -213,6 +227,11 @@ public record OrganizationSettingsResponse
     public required string AbsenceSelfServiceMode { get; init; }
     public required string BusinessDayEnd { get; init; }
     public required string TimeZone { get; init; }
+    /// <summary>Core working hours (see CoreHours); start/end as local "HH:mm".</summary>
+    public bool CoreHoursEnabled { get; init; }
+    public string CoreHoursStart { get; init; } = "09:00";
+    public string CoreHoursEnd { get; init; } = "15:00";
+    public int CoreHoursToleranceMinutes { get; init; } = 5;
 }
 
 /// <summary>A member's initial overtime after it was set.</summary>

@@ -299,7 +299,10 @@ public class GroupService : IGroupService
         group.GroupAdminCanApproveScheduleChanges,
         group.GroupAdminCanManageMembers,
         group.GroupAdminCanViewAllTimeEntries,
-        group.GroupAdminCanExportData
+        group.GroupAdminCanExportData,
+        group.CoreHoursMode?.ToString(),
+        group.CoreHoursStart?.ToString("HH:mm"),
+        group.CoreHoursEnd?.ToString("HH:mm")
     );
 
     public async Task<ServiceResult<GroupPermissionsResponse>> GetPermissionsAsync(string slug, int groupId, int callerUserId)
@@ -356,6 +359,19 @@ public class GroupService : IGroupService
         if (request.GroupAdminCanManageMembers.HasValue) group.GroupAdminCanManageMembers = request.GroupAdminCanManageMembers;
         if (request.GroupAdminCanViewAllTimeEntries.HasValue) group.GroupAdminCanViewAllTimeEntries = request.GroupAdminCanViewAllTimeEntries;
         if (request.GroupAdminCanExportData.HasValue) group.GroupAdminCanExportData = request.GroupAdminCanExportData;
+        if (request.CoreHoursMode.HasValue)
+        {
+            group.CoreHoursMode = NormalizeOverride(request.CoreHoursMode);
+            TimeOnly? start = null, end = null;
+            if (group.CoreHoursMode == CoreHoursMode.Own)
+            {
+                if (!TimeOnly.TryParseExact(request.CoreHoursStart, "HH:mm", out var s) || !TimeOnly.TryParseExact(request.CoreHoursEnd, "HH:mm", out var e) || s >= e)
+                    return ServiceResult.BadRequest<GroupPermissionsResponse>(OrganizationService.CoreHoursOrderMessage);
+                (start, end) = (s, e);
+            }
+            group.CoreHoursStart = start;
+            group.CoreHoursEnd = end;
+        }
 
         group.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();

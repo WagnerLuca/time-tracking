@@ -186,7 +186,7 @@ public class TimeEntryExportService : ITimeEntryExportService
                     "NetWorkedHours" => row.NetWorkedHours.ToString("F2", CultureInfo.InvariantCulture),
                     "Overtime" => row.Overtime.ToString("+0.00;-0.00;0.00", CultureInfo.InvariantCulture),
                     "CumulativeOvertime" => row.CumulativeOvertime.ToString("+0.00;-0.00;0.00", CultureInfo.InvariantCulture),
-                    "Status" => EscapeCsv(text.Status(row.Status)),
+                    "Status" => EscapeCsv(text.RowStatus(row)),
                     "HolidayName" => EscapeCsv(row.HolidayName ?? ""),
                     "AbsenceType" => row.AbsenceType is { } absenceType ? text.Absence(absenceType) : "",
                     "AbsenceNote" => EscapeCsv(row.AbsenceNote ?? ""),

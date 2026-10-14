@@ -24,7 +24,9 @@ public record DailyReportRow(
     string? AbsenceNote,
     string EntrySummary,
     /// <summary>The absence counts against the vacation budget (vacation, or a custom type that counts as vacation).</summary>
-    bool CountsAsVacation = false
+    bool CountsAsVacation = false,
+    // The tracked time does not cover the day's core working hours (see <see cref="CoreHours"/>).
+    bool CoreHoursMissed = false
 );
 
 /// <summary>
@@ -93,6 +95,7 @@ public static class DailyReportAggregator
         }
 
         var absencesByDate = absences.ToDictionary(a => a.Date, a => a);
+        var coreHoursMissed = await CoreHours.OpenViolationsAsync(context, userId, orgId, dateFrom, dateTo);
 
         var rows = new List<DailyReportRow>();
         var cumulativeOvertime = initialOvertimeHours;
@@ -147,7 +150,8 @@ public static class DailyReportAggregator
                 isAbsence ? absence!.Type : null,
                 isAbsence ? absence!.Note : null,
                 entrySummary,
-                isAbsence && (absence!.Type == AbsenceType.Vacation || absence.CustomType?.CountsAsVacation == true)
+                isAbsence && (absence!.Type == AbsenceType.Vacation || absence.CustomType?.CountsAsVacation == true),
+                coreHoursMissed.ContainsKey(currentDate)
             ));
 
             currentDate = currentDate.AddDays(1);

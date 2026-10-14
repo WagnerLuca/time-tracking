@@ -127,6 +127,7 @@ public static class ErrorCodes
         ["Cannot change the Owner's role. Transfer ownership first."] = "org.ownerRoleFixed",
         ["Owner cannot leave. Delete the organization or transfer ownership first."] = "org.ownerCannotLeave",
         ["Enable two-factor authentication for your own account before requiring it for the organization."] = "org.enableOwnTwoFactorFirst",
+        ["Core working hours must start before they end."] = "org.coreHoursOrder",
         ["Work schedule not found"] = "schedule.notFound",
         ["Initial overtime is disabled for this organization."] = "overtime.initialDisabled",
         ["Initial overtime requires admin approval. Please submit a request."] = "overtime.initialRequiresApproval",

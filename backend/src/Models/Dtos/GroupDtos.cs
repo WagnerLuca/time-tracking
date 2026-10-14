@@ -76,7 +76,11 @@ public record GroupPermissionsResponse(
     bool? GroupAdminCanApproveScheduleChanges,
     bool? GroupAdminCanManageMembers,
     bool? GroupAdminCanViewAllTimeEntries,
-    bool? GroupAdminCanExportData
+    bool? GroupAdminCanExportData,
+    // Core working hours override: null = inherit, "Off" or "Own" (with start/end as "HH:mm").
+    string? CoreHoursMode = null,
+    string? CoreHoursStart = null,
+    string? CoreHoursEnd = null
 );
 
 public record UpdateGroupPermissionsRequest(
@@ -94,7 +98,12 @@ public record UpdateGroupPermissionsRequest(
     bool? GroupAdminCanApproveScheduleChanges,
     bool? GroupAdminCanManageMembers,
     bool? GroupAdminCanViewAllTimeEntries,
-    bool? GroupAdminCanExportData
+    bool? GroupAdminCanExportData,
+    // Core working hours override; -1 = inherit from the organization. Own needs start and end.
+    [property: JsonConverter(typeof(EnumOverrideConverter<CoreHoursMode>))] CoreHoursMode? CoreHoursMode = null,
+    // "HH:mm"; only stored with CoreHoursMode Own.
+    string? CoreHoursStart = null,
+    string? CoreHoursEnd = null
 );
 
 // Resolved effective permissions for a user (combining org + group)

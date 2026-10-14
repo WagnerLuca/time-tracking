@@ -8,6 +8,15 @@ public enum GroupRole
     Admin = 1
 }
 
+/// <summary>A group's core working hours override (null on the group = inherit from the organization).</summary>
+public enum CoreHoursMode
+{
+    /// <summary>No core hours for members of this group.</summary>
+    Off = 0,
+    /// <summary>The group's own <see cref="Group.CoreHoursStart"/>–<see cref="Group.CoreHoursEnd"/>.</summary>
+    Own = 1
+}
+
 public class Group
 {
     public int Id { get; set; }
@@ -30,6 +39,10 @@ public class Group
     public VisibilityMode? VacationVisibility { get; set; }
     public VisibilityMode? SickDayVisibility { get; set; }
     public VisibilityMode? TimeEntryVisibility { get; set; }
+    public CoreHoursMode? CoreHoursMode { get; set; }
+    /// <summary>Only used with <see cref="Models.CoreHoursMode.Own"/>.</summary>
+    public TimeOnly? CoreHoursStart { get; set; }
+    public TimeOnly? CoreHoursEnd { get; set; }
 
     // Group Admin capability flags (null = false / disabled)
     public bool? GroupAdminCanApproveAbsences { get; set; }

@@ -46,6 +46,10 @@ public sealed class ReportText
     /// <summary>A <see cref="DailyReportRow.Status"/> (English key) in this language; custom absence type names pass through.</summary>
     public string Status(string status) => _texts.TryGetValue("status." + status, out var text) ? text : status;
 
+    /// <summary>The row's status cell: <see cref="Status"/>, plus a core hours note when the day missed them.</summary>
+    public string RowStatus(DailyReportRow row) =>
+        Status(row.Status) + (row.CoreHoursMissed ? ", " + this["status.CoreHoursMissed"] : "");
+
     /// <summary>An absence type as shown in reports.</summary>
     public string Absence(Models.AbsenceType type) => this["absence." + type];
 
@@ -65,6 +69,7 @@ public sealed class ReportText
         ["status.Day Off"] = "Day Off",
         ["status.Worked"] = "Worked",
         ["status.Missing"] = "Missing",
+        ["status.CoreHoursMissed"] = "Core hours missed",
         ["absence.Vacation"] = "Vacation",
         ["absence.SickDay"] = "Sick day",
         ["absence.Other"] = "Other",
@@ -128,6 +133,7 @@ public sealed class ReportText
         ["status.Weekend"] = "Wochenende",
         ["status.Day Off"] = "Frei",
         ["status.Worked"] = "Gearbeitet",
+        ["status.CoreHoursMissed"] = "Kernzeit verletzt",
         ["status.Missing"] = "Fehlt",
         ["absence.Vacation"] = "Urlaub",
         ["absence.SickDay"] = "Krankheitstag",

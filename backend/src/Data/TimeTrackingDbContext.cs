@@ -45,6 +45,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<UserToken> UserTokens { get; set; }
     public DbSet<OrgInvitation> OrgInvitations { get; set; }
     public DbSet<TimeEntryChange> TimeEntryChanges { get; set; }
+    public DbSet<CoreHoursCheck> CoreHoursChecks { get; set; }
 
     /// <summary>
     /// Saves, and records every change a user made to a finished time entry in
@@ -530,6 +531,22 @@ public class TimeTrackingDbContext : DbContext
                 .HasForeignKey(e => e.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasQueryFilter(e => e.Organization.IsActive);
+        });
+
+        // Configure CoreHoursCheck entity (daily core hours check per member; RLS like TimeEntries)
+        modelBuilder.Entity<CoreHoursCheck>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.OrganizationId, e.UserId, e.Date }).IsUnique();
+            entity.HasOne(e => e.Organization)
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasQueryFilter(e => e.Organization.IsActive);
         });
 

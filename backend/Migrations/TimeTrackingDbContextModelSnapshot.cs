@@ -212,6 +212,57 @@ namespace TimeTracking.Api.Migrations
                     b.ToTable("BadgeCards");
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.CoreHoursCheck", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("HalfDay")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Issues")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MissingMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("NotifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ToleranceMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<TimeOnly>("WindowEnd")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly>("WindowStart")
+                        .HasColumnType("time without time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("OrganizationId", "UserId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("CoreHoursChecks");
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.Group", b =>
                 {
                     b.Property<int>("Id")
@@ -225,6 +276,15 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<string>("Color")
                         .HasColumnType("text");
+
+                    b.Property<TimeOnly?>("CoreHoursEnd")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<int?>("CoreHoursMode")
+                        .HasColumnType("integer");
+
+                    b.Property<TimeOnly?>("CoreHoursStart")
+                        .HasColumnType("time without time zone");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -558,6 +618,18 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<TimeOnly>("BusinessDayEnd")
                         .HasColumnType("time without time zone");
+
+                    b.Property<bool>("CoreHoursEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<TimeOnly>("CoreHoursEnd")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<TimeOnly>("CoreHoursStart")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<int>("CoreHoursToleranceMinutes")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -1171,6 +1243,25 @@ namespace TimeTracking.Api.Migrations
                 });
 
             modelBuilder.Entity("TimeTracking.Api.Models.BadgeCard", b =>
+                {
+                    b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TimeTracking.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TimeTracking.Api.Models.CoreHoursCheck", b =>
                 {
                     b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
                         .WithMany()

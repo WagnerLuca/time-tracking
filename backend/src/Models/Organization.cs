@@ -139,6 +139,17 @@ public class Organization
 
     /// <summary>IANA time zone the business day end refers to.</summary>
     public string TimeZone { get; set; } = "Europe/Berlin";
+
+    /// <summary>
+    /// Core working hours (Kernarbeitszeit): on their working days members must have tracked
+    /// time covering [<see cref="CoreHoursStart"/>, <see cref="CoreHoursEnd"/>) local time.
+    /// Groups can override it (<see cref="Group.CoreHoursMode"/>). See <c>CoreHours</c>.
+    /// </summary>
+    public bool CoreHoursEnabled { get; set; }
+    public TimeOnly CoreHoursStart { get; set; } = new(9, 0);
+    public TimeOnly CoreHoursEnd { get; set; } = new(15, 0);
+    /// <summary>Allowed late start, early leave and gap length before a day counts as a violation.</summary>
+    public int CoreHoursToleranceMinutes { get; set; } = 5;
     
     /// <summary>
     /// Timestamp of the last settings update. Used to notify members of rule changes.

@@ -83,6 +83,10 @@ public class OrganizationService : IOrganizationService
                 DefaultVacationDays = o.DefaultVacationDays,
                 BusinessDayEnd = o.BusinessDayEnd.ToString("HH:mm"),
                 TimeZone = o.TimeZone,
+                CoreHoursEnabled = o.CoreHoursEnabled,
+                CoreHoursStart = o.CoreHoursStart.ToString("HH:mm"),
+                CoreHoursEnd = o.CoreHoursEnd.ToString("HH:mm"),
+                CoreHoursToleranceMinutes = o.CoreHoursToleranceMinutes,
                 SettingsUpdatedAt = o.SettingsUpdatedAt,
                 CreatedAt = o.CreatedAt,
                 Members = o.UserOrganizations
@@ -462,6 +466,8 @@ public class OrganizationService : IOrganizationService
     //  Settings
     // ────────────────────────────────────────────────────
 
+    public const string CoreHoursOrderMessage = "Core working hours must start before they end.";
+
     public async Task<ServiceResult<OrganizationSettingsResponse>> UpdateSettingsAsync(
         string slug, int callerUserId, UpdateOrganizationSettingsRequest request)
     {
@@ -500,6 +506,12 @@ public class OrganizationService : IOrganizationService
                 return ServiceResult.BadRequest<OrganizationSettingsResponse>($"Unknown time zone '{request.TimeZone}'.");
             org.TimeZone = request.TimeZone;
         }
+        if (request.CoreHoursEnabled.HasValue) org.CoreHoursEnabled = request.CoreHoursEnabled.Value;
+        if (request.CoreHoursStart != null) org.CoreHoursStart = TimeOnly.ParseExact(request.CoreHoursStart, "HH:mm");
+        if (request.CoreHoursEnd != null) org.CoreHoursEnd = TimeOnly.ParseExact(request.CoreHoursEnd, "HH:mm");
+        if (request.CoreHoursToleranceMinutes.HasValue) org.CoreHoursToleranceMinutes = request.CoreHoursToleranceMinutes.Value;
+        if (org.CoreHoursStart >= org.CoreHoursEnd)
+            return ServiceResult.BadRequest<OrganizationSettingsResponse>(CoreHoursOrderMessage);
 
         org.UpdatedAt = DateTime.UtcNow;
         org.SettingsUpdatedAt = DateTime.UtcNow;
@@ -541,7 +553,11 @@ public class OrganizationService : IOrganizationService
             CsvImportMode = org.CsvImportMode.ToString(),
             AbsenceSelfServiceMode = org.AbsenceSelfServiceMode.ToString(),
             BusinessDayEnd = org.BusinessDayEnd.ToString("HH:mm"),
-            TimeZone = org.TimeZone
+            TimeZone = org.TimeZone,
+            CoreHoursEnabled = org.CoreHoursEnabled,
+            CoreHoursStart = org.CoreHoursStart.ToString("HH:mm"),
+            CoreHoursEnd = org.CoreHoursEnd.ToString("HH:mm"),
+            CoreHoursToleranceMinutes = org.CoreHoursToleranceMinutes
         });
     }
 

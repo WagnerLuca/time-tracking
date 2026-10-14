@@ -165,7 +165,7 @@ public record TimeEntryFieldChangeResponse
     public string? NewValue { get; init; }
 }
 
-/// <summary>A day that breaks the Working Time Act (see WorkingTimeAct).</summary>
+/// <summary>A day that breaks the Working Time Act (see WorkingTimeAct) or misses the core working hours (see CoreHours).</summary>
 public record ComplianceDayResponse
 {
     public DateOnly Date { get; init; }
@@ -176,4 +176,12 @@ public record ComplianceDayResponse
     public bool DailyMax { get; init; }
     /// <summary>Less than 11 h rest before this day.</summary>
     public bool RestPeriod { get; init; }
+    /// <summary>The tracked time does not cover the core working hours (and still doesn't).</summary>
+    public bool CoreHours { get; init; }
+    /// <summary>With <see cref="CoreHours"/>: "late", "early", "gap" and/or "missing" (nothing tracked).</summary>
+    public List<string>? CoreHoursIssues { get; init; }
+    /// <summary>With <see cref="CoreHours"/>: uncovered minutes of the checked window.</summary>
+    public int CoreHoursMissingMinutes { get; init; }
+    /// <summary>With <see cref="CoreHours"/>: the window that was checked, "HH:mm-HH:mm" (one half on a half day).</summary>
+    public string? CoreHoursWindow { get; init; }
 }

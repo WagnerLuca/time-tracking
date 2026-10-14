@@ -361,7 +361,7 @@ public class PdfReportService : IPdfReportService
                     span.Span(FormatSigned(t, row.Overtime)).FontColor(row.Overtime < 0 ? Colors.Red.Darken1 : Colors.Green.Darken1);
                 });
                 table.Cell().Element(c => BodyCell(c, background)).AlignRight().Text(FormatSigned(t, row.CumulativeOvertime));
-                table.Cell().Element(c => BodyCell(c, background)).Text(t.Status(row.Status)).FontColor(row.Status == "Needs Correction" ? Colors.Red.Darken1 : Colors.Black);
+                table.Cell().Element(c => BodyCell(c, background)).Text(t.RowStatus(row)).FontColor(row.Status == "Needs Correction" || row.CoreHoursMissed ? Colors.Red.Darken1 : Colors.Black);
                 table.Cell().Element(c => BodyCell(c, background)).Text(BuildNote(t, row)).FontSize(7.5f);
             }
         });
