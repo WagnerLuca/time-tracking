@@ -611,10 +611,11 @@ public class OrganizationService : IOrganizationService
 
         // Admins (while the org lets them see members' hours) see all; everyone else the people whose
         // tracked times the visibility matrix or their group admin rights show them
+        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
         HashSet<int>? visibleMemberIds = null;
         if (!(callerRole >= OrganizationRole.Admin && org.MemberTimeEntryVisibility))
         {
-            visibleMemberIds = (await MemberVisibility.ForCallerAsync(_context, org, callerUserId)).Ids(MemberInfo.TrackedTime);
+            visibleMemberIds = visibility.Ids(MemberInfo.TrackedTime);
             if (!visibleMemberIds.Any(id => id != callerUserId))
                 return ServiceResult.Forbidden<List<MemberTimeOverviewResponse>>();
         }
@@ -674,9 +675,9 @@ public class OrganizationService : IOrganizationService
                 UserId = m.UserId,
                 FirstName = m.User.FirstName,
                 LastName = m.User.LastName,
-                Email = m.User.Email,
-                Role = m.Role.ToString(),
-                WeeklyWorkHours = schedule?.WeeklyWorkHours,
+                Email = visibility.Can(m.UserId, MemberInfo.Email) ? m.User.Email : null,
+                Role = visibility.Can(m.UserId, MemberInfo.Groups) ? m.Role.ToString() : null,
+                WeeklyWorkHours = visibility.Can(m.UserId, MemberInfo.WorkSchedule) ? schedule?.WeeklyWorkHours : null,
                 TotalTrackedMinutes = Math.Round(totalMinutes, 1),
                 NetTrackedMinutes = Math.Round(netMinutes, 1),
                 FailureEntryCount = memberEntries.Count - entries.Count,

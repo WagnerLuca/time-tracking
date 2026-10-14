@@ -191,7 +191,7 @@ public class MemberVisibilityTests : IClassFixture<TimeTrackingApiFactory>
     [Fact]
     public async Task TrackedTimesAndSchedule_OpenToGroupColleagues()
     {
-        var s = await SetupAsync("vis-time", ("TrackedTime", true, false), ("WorkSchedule", true, false), ("Presence", true, true));
+        var s = await SetupAsync("vis-time", ("TrackedTime", true, false), ("WorkSchedule", true, false), ("Presence", true, true), ("Email", false, false));
         (await s.Colleague.PostAsJsonAsync("/api/v1/TimeTracking/start", new { organizationId = s.OrgId })).EnsureSuccessStatusCode();
         (await s.Outsider.PostAsJsonAsync("/api/v1/TimeTracking/start", new { organizationId = s.OrgId })).EnsureSuccessStatusCode();
         var org = $"/api/v1/organizations/{s.Slug}";
@@ -205,6 +205,8 @@ public class MemberVisibilityTests : IClassFixture<TimeTrackingApiFactory>
 
         var overview = await s.Viewer.GetFromJsonAsync<JsonElement>($"/api/v1/Organizations/{s.Slug}/time-overview");
         overview.EnumerateArray().Select(m => m.GetProperty("userId").GetInt32()).Should().BeEquivalentTo([s.ViewerId, s.ColleagueId]);
+        overview.EnumerateArray().Single(m => m.GetProperty("userId").GetInt32() == s.ColleagueId)
+            .GetProperty("email").ValueKind.Should().Be(JsonValueKind.Null);
 
         // Presence: running timers, visible in and outside here
         var members = (await DetailAsync(s.Viewer, s.Slug)).Members;

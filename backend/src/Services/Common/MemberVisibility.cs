@@ -20,8 +20,8 @@ namespace TimeTracking.Api.Services;
 /// <see cref="EffectiveRuleResolver.Combine{T}"/> per kind: a group override replaces the org default
 /// in either direction, the most permissive overriding group wins, no override = org default.</item>
 /// <item>Nothing is visible about a person whose <see cref="MemberInfo.Member"/> is hidden.</item>
-/// <item>Group admins keep their capability-based rights over the members of the groups they
-/// administer, on top of the matrix: they always see them (name, email, groups);
+/// <item>Group admins (org admins too, which matters for tracked times) keep their capability-based
+/// rights over the members of the groups they administer, on top of the matrix: they always see them (name, email, groups);
 /// <c>GroupAdminCanApproveAbsences</c> adds all absence kinds, notes and the vacation balance;
 /// <c>GroupAdminCanViewAllTimeEntries</c> adds tracked times, work schedule and presence;
 /// <c>GroupAdminCanExportData</c> adds tracked times and work schedule; and

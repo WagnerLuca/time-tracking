@@ -204,8 +204,9 @@ public record MemberTimeOverviewResponse
     public int UserId { get; init; }
     public required string FirstName { get; init; }
     public required string LastName { get; init; }
-    public required string Email { get; init; }
-    public required string Role { get; init; }
+    /// <summary>Email / role / weekly hours are null where the member visibility matrix hides them from the caller.</summary>
+    public string? Email { get; init; }
+    public string? Role { get; init; }
     public double? WeeklyWorkHours { get; init; }
     public double TotalTrackedMinutes { get; init; }
     public double NetTrackedMinutes { get; init; }
