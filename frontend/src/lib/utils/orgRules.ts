@@ -129,37 +129,49 @@ export function withInherit(options: ModeOption[]): ModeOption[] {
 
 // ── Data-driven settings definitions ──
 
-export interface RuleSetting {
-	key: string;
-	label: string;
-	description: string;
-	labelFn?: (mode: string | null | undefined) => string;
-}
-
-export interface ToggleSetting {
-	key: string;
-	label: string;
-	description: string;
-}
-
 type RuleTextKey = 'editPastEntriesMode' | 'editPauseMode' | 'initialOvertimeMode' | 'joinPolicy' | 'workScheduleChangeMode' | 'csvImportMode' | 'absenceSelfServiceMode' | 'autoPauseEnabled' | 'memberTimeEntryVisibility' | 'require2fa';
+export type SettingKey = RuleTextKey;
 
-function setting(key: RuleTextKey) {
-	return { key, label: t(`format.rules.${key}.label`), description: t(`format.rules.${key}.description`) };
+export interface TopicSetting {
+	key: SettingKey;
+	label: string;
+	/** One line: what the setting does. */
+	description: string;
+	toggle: boolean;
 }
 
-export function ruleSettings(): RuleSetting[] {
+export interface SettingTopic {
+	id: 'time' | 'schedule' | 'absences' | 'access';
+	settings: TopicSetting[];
+}
+
+const TOGGLE_KEYS: SettingKey[] = ['autoPauseEnabled', 'memberTimeEntryVisibility', 'require2fa'];
+
+function setting(key: SettingKey): TopicSetting {
+	return { key, label: t(`format.rules.${key}.label`), description: t(`format.rules.${key}.description`), toggle: TOGGLE_KEYS.includes(key) };
+}
+
+/** The org settings grouped by what they are about (rules & visibility page). Functions, so labels follow the UI language. */
+export function settingTopics(): SettingTopic[] {
 	return [
-		setting('editPastEntriesMode'),
-		setting('editPauseMode'),
-		setting('initialOvertimeMode'),
-		{ ...setting('joinPolicy'), labelFn: joinPolicyLabel },
-		setting('workScheduleChangeMode'),
-		setting('csvImportMode'),
-		setting('absenceSelfServiceMode')
+		{ id: 'time', settings: [setting('editPastEntriesMode'), setting('editPauseMode'), setting('csvImportMode'), setting('autoPauseEnabled')] },
+		{ id: 'schedule', settings: [setting('workScheduleChangeMode'), setting('initialOvertimeMode')] },
+		{ id: 'absences', settings: [setting('absenceSelfServiceMode')] },
+		{ id: 'access', settings: [setting('joinPolicy'), setting('require2fa'), setting('memberTimeEntryVisibility')] }
 	];
 }
 
-export function toggleSettings(): ToggleSetting[] {
-	return [setting('autoPauseEnabled'), setting('memberTimeEntryVisibility'), setting('require2fa')];
+const RULE_KEYS: string[] = ['editPastEntriesMode', 'editPauseMode', 'csvImportMode', 'workScheduleChangeMode', 'initialOvertimeMode', 'absenceSelfServiceMode'];
+
+/**
+ * What a setting means for the caller ("Für dich gilt: …"): rule modes from the effective
+ * permissions (group overrides applied) before the org default; `fromGroup` when a group
+ * of the caller changed it.
+ */
+export function appliedSetting(key: SettingKey, perms: RuleSource, org: Partial<OrganizationDetailResponse> | null | undefined): { label: string; badge: string; fromGroup: boolean } {
+	const value = (org as Record<string, unknown> | null | undefined)?.[key];
+	if (TOGGLE_KEYS.includes(key)) return { label: value ? t('format.on') : t('format.off'), badge: value ? 'badge-success' : 'badge-ghost', fromGroup: false };
+	if (key === 'joinPolicy') return { label: joinPolicyLabel(value as string), badge: ruleModeButtonClass(value as string).replace('btn-', 'badge-'), fromGroup: false };
+	const mode = RULE_KEYS.includes(key) ? ruleMode(key as RuleKey, perms, org as RuleSource) : (value as string);
+	return { label: ruleModeLabel(mode), badge: ruleModeButtonClass(mode).replace('btn-', 'badge-'), fromGroup: !!mode && !!value && mode !== value };
 }

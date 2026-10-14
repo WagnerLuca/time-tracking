@@ -1,30 +1,30 @@
 <script lang="ts">
-	import DeclineForm from '$lib/components/DeclineForm.svelte';
 	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
-	import { organizationsApi, pauseRulesApi, requestsApi, absenceDayApi, groupApi } from '$lib/apiClient';
+	import { organizationsApi, pauseRulesApi, absenceDayApi, groupApi } from '$lib/apiClient';
 	import { t } from '$lib/i18n';
-	import { formatRequestType, formatRequestStatus, formatTimeAgo, formatNumber, statusBadgeClass, parseRequestData } from '$lib/utils/formatters';
+	import { formatNumber } from '$lib/utils/formatters';
 	import { DEFAULT_GROUP_COLOR, GROUP_COLOR_PRESETS, safeColor } from '$lib/utils/colors';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import {
-		isOrgAdmin, parseRuleMode, ruleModeLabel, ruleModeButtonClass,
-		ruleSettings, toggleSettings,
+		isOrgAdmin, parseRuleMode, ruleModeLabel,
+		settingTopics, appliedSetting, type TopicSetting,
 		ruleModeOptions, joinPolicyOptions
 	} from '$lib/utils/orgRules';
+	import { markSeen } from '$lib/utils/onboarding';
 	import { previewSentence, type VisibilityKind } from '$lib/utils/visibility';
 	import ModeSelector from '$lib/components/ModeSelector.svelte';
 	import VisibilityMatrix from '$lib/components/VisibilityMatrix.svelte';
-	import ApiKeysPanel from '$lib/components/ApiKeysPanel.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationSettingsRequest,
 		PauseRuleResponse,
-		OrgRequestResponse,
+		EffectivePermissionsResponse,
 		AbsenceTypeDefinitionResponse,
 		AbsenceCreditMode,
 		GroupResponse,
@@ -55,12 +55,13 @@
 	let editRuleError = $state('');
 	let editingRuleSaving = $state(false);
 
-	// Request history
-	let requestHistory = $state<OrgRequestResponse[]>([]);
-	let requestHistoryLoading = $state(false);
-	let requestHistoryError = $state('');
-	let requestHistoryFilter = $state<string>('all');
-	let respondingId = $state<number | null>(null);
+	// What applies to the caller (group overrides), for the member view
+	let perms = $state<EffectivePermissionsResponse | null>(null);
+
+	/** Topics of the page; "visibility" and "groups" are admin sections of their own. */
+	type TopicId = 'time' | 'schedule' | 'absences' | 'access' | 'visibility' | 'groups';
+	let topics = $derived(settingTopics());
+	let topicIds = $derived<TopicId[]>([...topics.map((tp) => tp.id), 'visibility', ...(canEdit ? (['groups'] as const) : [])]);
 
 	const orgSlug = $derived(page.params.slug ?? '');
 
@@ -79,9 +80,11 @@
 			const data = await getOrgDetail(orgSlug);
 			org = data;
 			if (isOrgAdmin(data.members?.find((m) => m.id === auth.user?.id)?.role)) {
-				loadRequestHistory();
+				if (auth.user?.id) markSeen(auth.user.id, orgSlug, 'rules');
 				loadAbsenceTypes();
 				loadPermGroups();
+			} else {
+				groupApi.apiV1OrganizationsSlugEffectivePermissionsGet(orgSlug).then((r) => (perms = r.data)).catch(() => (perms = null));
 			}
 		} catch (err) {
 			error = getErrorStatus(err) === 404 ? t('orgSettings.notFound') : extractErrorMessage(err, t('orgSettings.loadOrgFailed'));
@@ -99,37 +102,6 @@
 		} catch (err) {
 			toast.error(err, t('orgSettings.reloadFailed'));
 			return false;
-		}
-	}
-
-	async function loadRequestHistory() {
-		requestHistoryLoading = true;
-		requestHistoryError = '';
-		try {
-			const { data } = await requestsApi.apiV1OrganizationsSlugRequestsGet(orgSlug);
-			requestHistory = data.items ?? [];
-		} catch (err) {
-			requestHistoryError = extractErrorMessage(err, t('orgSettings.requests.loadFailed'));
-		} finally {
-			requestHistoryLoading = false;
-		}
-	}
-
-	/** The request whose decline form (optional reason) is open. */
-	let decliningId = $state<number | null>(null);
-
-	async function respondToRequest(req: OrgRequestResponse, accept: boolean, reason?: string) {
-		if (!req.id) return;
-		respondingId = req.id;
-		try {
-			await requestsApi.apiV1OrganizationsSlugRequestsIdPut(orgSlug, req.id, { accept, reason });
-			decliningId = null;
-			toast.success(accept ? t('orgSettings.requests.accepted') : t('orgSettings.requests.declined'));
-			await loadRequestHistory();
-		} catch (err) {
-			toast.error(err, accept ? t('orgSettings.requests.acceptFailed') : t('orgSettings.requests.declineFailed'));
-		} finally {
-			respondingId = null;
 		}
 	}
 
@@ -312,7 +284,13 @@
 		return { label: t('format.options.allowed'), cls: 'badge-success' };
 	}
 
-	let filteredRequests = $derived(requestHistoryFilter === 'all' ? requestHistory : requestHistory.filter((r) => r.status === requestHistoryFilter));
+	/** "Abweichend: Frontend → Erlaubt" — groups that override a rule (only rule modes can be overridden). */
+	function groupOverrides(key: string): string {
+		const list = permGroups
+			.filter((c) => (c.perms as Record<string, any>)[key] != null)
+			.map((c) => `${c.group.name}: ${ruleModeLabel((c.perms as Record<string, any>)[key])}`);
+		return list.length ? t('orgSettings.topics.overrides', { list: list.join(', ') }) : '';
+	}
 
 	/** Saves one setting, then refreshes the page's copy of the org. */
 	async function saveSettings(patch: UpdateOrganizationSettingsRequest, failMessage = t('orgSettings.settingFailed')) {
@@ -484,105 +462,141 @@
 {/snippet}
 
 <div class="max-w-5xl mx-auto sm:px-6 pb-6">
-	<div class="flex items-center gap-2 mb-6">
-		<a href="/organizations/{orgSlug}" class="text-base-content/60 no-underline text-sm hover:text-primary">&larr; {org?.name ?? t('nav.organization')}</a>
-	</div>
-
 	{#if loading}
-		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>{t('common.loading')}</span></div>
+		<Skeleton lines={4} />
 	{:else if error}
 		<div class="alert alert-error">{error}</div>
 	{:else if org}
 		<h1 class="text-2xl font-bold text-base-content mb-1">{canEdit ? t('orgSettings.titleAdmin') : t('orgSettings.titleMember')}</h1>
-		<p class="text-base-content/60 text-sm mb-6 leading-relaxed">
+		<p class="text-base-content/70 text-sm mb-4 leading-relaxed">
 			{canEdit ? t('orgSettings.introAdmin') : t('orgSettings.introMember')}
 		</p>
 
+		<!-- Jump to a topic -->
+		<nav class="flex flex-wrap gap-2 mb-6" aria-label={t('orgSettings.topics.jump')}>
+			{#each topicIds as id (id)}
+				<a href="#topic-{id}" class="btn btn-outline btn-sm rounded-full">{t(`orgSettings.topics.${id}.title`)}</a>
+			{/each}
+		</nav>
+
+		{#snippet topicHeader(id: TopicId)}
+			<h2 id="topic-{id}" class="text-lg font-bold text-base-content m-0 scroll-mt-20">{t(`orgSettings.topics.${id}.title`)}</h2>
+			<p class="text-sm text-base-content/70 mt-0.5 mb-3">{t(`orgSettings.topics.${id}.intro`)}</p>
+		{/snippet}
+
 		{#if canEdit}
-			<!-- ==================== Admin Settings ==================== -->
-			<section>
-				<h2 class="text-xl text-base-content/70 mb-4">{t('orgSettings.orgSettings')}</h2>
-
-				<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-					<!-- Toggle settings (booleans) -->
-					{#each toggleSettings() as ts (ts.key)}
-						{@const value = !!(org as Record<string, any>)[ts.key]}
-						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0">
-							{@render settingInfo(ts.label, ts.description)}
-							<input
-								type="checkbox"
-								class="toggle toggle-primary shrink-0"
-								role="switch"
-								checked={value}
-								aria-checked={value}
-								aria-label={ts.label}
-								disabled={settingsSaving}
-								onchange={(e) => { e.currentTarget.checked = value; toggleSetting(ts.key); }}
-							/>
-						</div>
-					{/each}
-
-					<!-- Rule mode settings (segmented: click an option) -->
-					{#each ruleSettings() as rs (rs.key)}
-						{@const mode = (org as Record<string, any>)[rs.key] as string | null}
-						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
-							{@render settingInfo(rs.label, rs.description)}
-							<ModeSelector
-								options={rs.key === 'joinPolicy' ? joinPolicyOptions() : ruleModeOptions()}
-								value={parseRuleMode(mode)}
-								onselect={(v) => setSetting(rs.key, v as number)}
-								disabled={settingsSaving}
-							/>
-						</div>
-					{/each}
-				</div>
-
-				<!-- Member visibility matrix -->
-				<div class="mt-6" data-testid="visibility-settings">
-					<h3 class="text-base font-bold text-base-content/70 m-0 mb-1">{t('visibility.title')}</h3>
-					<p class="text-sm text-base-content/60 mb-3">{t('visibility.intro')}</p>
-					<VisibilityMatrix mode="org" org={org.visibility} disabled={settingsSaving} onorgchange={saveVisibility} />
-					<div class="mt-3 p-3 rounded-lg bg-base-200/50 border border-base-300 text-sm">
-						{#if permGroups.length > 0}
-							<label class="flex items-center gap-2 flex-wrap mb-2">
-								<span class="text-base-content/60">{t('visibility.previewGroup')}</span>
-								<select class="select select-sm max-w-full" bind:value={previewGroupId}>
-									<option value={null}>{t('visibility.previewNoGroup')}</option>
-									{#each permGroups as col (col.group.id)}
-										<option value={col.group.id}>{col.group.name}</option>
-									{/each}
-								</select>
-							</label>
+			{#snippet adminRow(ts: TopicSetting)}
+				{@const raw = (org as Record<string, any>)[ts.key]}
+				<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
+					<div class="min-w-0 flex-1 basis-60">
+						<div class="font-semibold text-base-content mb-0.5">{ts.label}</div>
+						<div class="text-sm text-base-content/70 max-w-[440px]">{ts.description}</div>
+						{#if groupOverrides(ts.key)}
+							<div class="text-xs text-base-content/70 mt-1" data-testid="group-overrides">{groupOverrides(ts.key)}</div>
 						{/if}
-						<p class="m-0" aria-live="polite" data-testid="visibility-preview">
-							{previewSentence(org.visibility, previewGroup ? { name: previewGroup.group.name, visibility: previewGroup.perms.visibility } : null)}
-						</p>
-						<p class="m-0 mt-1 text-xs text-base-content/50">{t('visibility.preview.othersNote')}</p>
 					</div>
+					{#if ts.toggle}
+						<input
+							type="checkbox"
+							class="toggle toggle-primary shrink-0"
+							role="switch"
+							checked={!!raw}
+							aria-checked={!!raw}
+							aria-label={ts.label}
+							disabled={settingsSaving}
+							onchange={(e) => { e.currentTarget.checked = !!raw; toggleSetting(ts.key); }}
+						/>
+					{:else}
+						<ModeSelector
+							options={ts.key === 'joinPolicy' ? joinPolicyOptions() : ruleModeOptions()}
+							value={parseRuleMode(raw)}
+							onselect={(v) => setSetting(ts.key, v as number)}
+							disabled={settingsSaving}
+						/>
+					{/if}
 				</div>
+			{/snippet}
 
-				<!-- Default Vacation Days -->
-				<div class="bg-base-200/50 rounded-lg p-4 mt-4 border border-base-300">
-					<div class="flex items-center justify-between gap-4 flex-wrap">
-						{@render settingInfo(t('orgSettings.vacationDays.label'), t('orgSettings.vacationDays.description'))}
-						<div class="flex items-center gap-2">
-							<input
-								id="default-vacation-days"
-								type="number"
-								class="input input-sm w-20 text-center"
-								step="0.5"
-								min="0"
-								max="365"
-								value={org.defaultVacationDays ?? 0}
-								aria-label={t('orgSettings.vacationDays.label')}
-								onchange={saveDefaultVacationDays}
-								disabled={settingsSaving}
-							/>
-							<span class="text-sm text-base-content/60">{t('orgSettings.vacationDays.unit')}</span>
+			{#each topics as topic (topic.id)}
+				<section class="mb-8" aria-labelledby="topic-{topic.id}">
+					{@render topicHeader(topic.id)}
+					<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+						{#each topic.settings as ts (ts.key)}{@render adminRow(ts)}{/each}
+					</div>
+					{#if topic.id === 'time'}
+				<!-- Pause Rules -->
+				{#if org.autoPauseEnabled}
+					<div class="mt-4">
+						<div class="flex items-center justify-between gap-2 mb-4 flex-wrap">
+							<h3 class="text-base font-bold text-base-content/70 m-0">{t('orgSettings.pause.title')}</h3>
+							<button class="btn btn-primary btn-sm" onclick={toggleAddRule} aria-expanded={showAddRule}>
+								{showAddRule ? t('common.cancel') : t('orgSettings.pause.add')}
+							</button>
 						</div>
-					</div>
-				</div>
 
+						{#if showAddRule}
+							<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
+								{#if addRuleError}
+									<div class="alert alert-error mb-4 text-sm" role="alert">{addRuleError}</div>
+								{/if}
+								<form onsubmit={addPauseRule} class="flex gap-2 items-center flex-wrap" novalidate>
+									<div class="flex items-center gap-1.5">
+										<label for="new-rule-hours" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.whenTracked')}</label>
+										<input id="new-rule-hours" type="number" class="input input-xs w-[70px] text-center" step="0.5" min="0.5" max="24" bind:value={newRuleMinHours} required disabled={addingRule} />
+										<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.hours')}</span>
+									</div>
+									<div class="flex items-center gap-1.5">
+										<label for="new-rule-pause" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.deduct')}</label>
+										<input id="new-rule-pause" type="number" class="input input-xs w-[70px] text-center" min="1" step="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
+										<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.minPause')}</span>
+									</div>
+									<button type="submit" class="btn btn-primary btn-sm" disabled={addingRule}>
+										{addingRule ? t('common.adding') : t('orgSettings.pause.addSubmit')}
+									</button>
+								</form>
+							</div>
+						{/if}
+
+						{#if pauseRules.length === 0}
+							<p class="text-base-content/50">{t('orgSettings.pause.empty')}</p>
+						{:else}
+							<ul class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+								{#each pauseRules as rule (rule.id)}
+									<li class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0 flex-wrap gap-2">
+										{#if editingRuleId === rule.id}
+											<form onsubmit={(e) => saveEditRule(e, rule.id!)} class="flex items-center gap-3 flex-wrap w-full" novalidate>
+												{#if editRuleError}
+													<div class="alert alert-error text-sm w-full" role="alert">{editRuleError}</div>
+												{/if}
+												<div class="flex items-center gap-1.5">
+													<label for="edit-rule-hours" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.whenTracked')}</label>
+													<input id="edit-rule-hours" type="number" class="input input-xs w-[70px] text-center" step="0.5" min="0.5" max="24" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
+													<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.hoursShort')}</span>
+												</div>
+												<div class="flex items-center gap-1.5">
+													<label for="edit-rule-pause" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.deduct')}</label>
+													<input id="edit-rule-pause" type="number" class="input input-xs w-[70px] text-center" min="1" step="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
+													<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.min')}</span>
+												</div>
+												<div class="flex items-center gap-1.5">
+													<button type="submit" class="btn btn-primary btn-sm" disabled={editingRuleSaving}>{editingRuleSaving ? t('common.saving') : t('common.save')}</button>
+													<button type="button" class="btn btn-ghost btn-sm" onclick={() => (editingRuleId = null)}>{t('common.cancel')}</button>
+												</div>
+											</form>
+										{:else}
+											<div class="text-[0.9375rem] text-base-content/70">{@render pauseRuleText(rule)}</div>
+											<div class="flex items-center gap-1.5">
+												<button class="btn btn-ghost btn-sm" onclick={() => startEditRule(rule)}>{t('common.edit')}</button>
+												<button class="btn btn-ghost btn-xs text-error" title={t('orgSettings.pause.deleteLabel')} aria-label={t('orgSettings.pause.deleteLabel')} onclick={() => deleteRule(rule)}>&times;</button>
+											</div>
+										{/if}
+									</li>
+								{/each}
+							</ul>
+						{/if}
+					</div>
+				{/if}
+				<!-- Business day end -->
 				<div class="bg-base-200/50 rounded-lg p-4 mt-4 border border-base-300">
 					<div class="flex items-center justify-between gap-4 flex-wrap">
 						{@render settingInfo(t('orgSettings.businessDayEnd.label'), t('orgSettings.businessDayEnd.description'))}
@@ -639,6 +653,30 @@
 							<input id="core-hours-tolerance" type="number" class="input input-sm w-20 text-center" min="0" max="120" step="1" value={org.coreHoursToleranceMinutes ?? 5} onchange={saveCoreHoursTolerance} disabled={settingsSaving} />
 							<span class="text-base-content/60">{t('orgSettings.coreHours.minutes')}</span>
 						</label>
+					</div>
+				</div>
+
+
+					{:else if topic.id === 'absences'}
+				<!-- Default Vacation Days -->
+				<div class="bg-base-200/50 rounded-lg p-4 mt-4 border border-base-300">
+					<div class="flex items-center justify-between gap-4 flex-wrap">
+						{@render settingInfo(t('orgSettings.vacationDays.label'), t('orgSettings.vacationDays.description'))}
+						<div class="flex items-center gap-2">
+							<input
+								id="default-vacation-days"
+								type="number"
+								class="input input-sm w-20 text-center"
+								step="0.5"
+								min="0"
+								max="365"
+								value={org.defaultVacationDays ?? 0}
+								aria-label={t('orgSettings.vacationDays.label')}
+								onchange={saveDefaultVacationDays}
+								disabled={settingsSaving}
+							/>
+							<span class="text-sm text-base-content/60">{t('orgSettings.vacationDays.unit')}</span>
+						</div>
 					</div>
 				</div>
 
@@ -747,10 +785,45 @@
 					{/if}
 				</div>
 
+
+					{/if}
+				</section>
+			{/each}
+
+			<section class="mb-8" aria-labelledby="topic-visibility">
+				{@render topicHeader('visibility')}
+				<!-- Member visibility matrix -->
+				<div data-testid="visibility-settings">
+										<p class="text-sm text-base-content/60 mb-3">{t('visibility.intro')}</p>
+					<VisibilityMatrix mode="org" org={org.visibility} disabled={settingsSaving} onorgchange={saveVisibility} />
+					<div class="mt-3 p-3 rounded-lg bg-base-200/50 border border-base-300 text-sm">
+						{#if permGroups.length > 0}
+							<label class="flex items-center gap-2 flex-wrap mb-2">
+								<span class="text-base-content/60">{t('visibility.previewGroup')}</span>
+								<select class="select select-sm max-w-full" bind:value={previewGroupId}>
+									<option value={null}>{t('visibility.previewNoGroup')}</option>
+									{#each permGroups as col (col.group.id)}
+										<option value={col.group.id}>{col.group.name}</option>
+									{/each}
+								</select>
+							</label>
+						{/if}
+						<p class="m-0" aria-live="polite" data-testid="visibility-preview">
+							{previewSentence(org.visibility, previewGroup ? { name: previewGroup.group.name, visibility: previewGroup.perms.visibility } : null)}
+						</p>
+						<p class="m-0 mt-1 text-xs text-base-content/50">{t('visibility.preview.othersNote')}</p>
+					</div>
+				</div>
+
+
+			</section>
+
+			<section class="mb-8" aria-labelledby="topic-groups">
+				{@render topicHeader('groups')}
 				<!-- Unified Permissions Overview -->
 				<div class="mt-6">
 					<div class="flex items-center justify-between gap-2 mb-1 flex-wrap">
-						<h3 class="text-base font-bold text-base-content/70 m-0">{t('orgSettings.matrix.title')}</h3>
+						<span></span>
 						<a href="/organizations/{orgSlug}/groups" class="btn btn-ghost btn-xs">{t('orgSettings.matrix.openGroups')}</a>
 					</div>
 					<p class="text-sm text-base-content/60 mb-3">
@@ -839,197 +912,43 @@
 					{/if}
 				</div>
 
-				<!-- Pause Rules -->
-				{#if org.autoPauseEnabled}
-					<div class="mt-6">
-						<div class="flex items-center justify-between gap-2 mb-4 flex-wrap">
-							<h3 class="text-base font-bold text-base-content/70 m-0">{t('orgSettings.pause.title')}</h3>
-							<button class="btn btn-primary btn-sm" onclick={toggleAddRule} aria-expanded={showAddRule}>
-								{showAddRule ? t('common.cancel') : t('orgSettings.pause.add')}
-							</button>
-						</div>
 
-						{#if showAddRule}
-							<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
-								{#if addRuleError}
-									<div class="alert alert-error mb-4 text-sm" role="alert">{addRuleError}</div>
-								{/if}
-								<form onsubmit={addPauseRule} class="flex gap-2 items-center flex-wrap" novalidate>
-									<div class="flex items-center gap-1.5">
-										<label for="new-rule-hours" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.whenTracked')}</label>
-										<input id="new-rule-hours" type="number" class="input input-xs w-[70px] text-center" step="0.5" min="0.5" max="24" bind:value={newRuleMinHours} required disabled={addingRule} />
-										<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.hours')}</span>
-									</div>
-									<div class="flex items-center gap-1.5">
-										<label for="new-rule-pause" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.deduct')}</label>
-										<input id="new-rule-pause" type="number" class="input input-xs w-[70px] text-center" min="1" step="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
-										<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.minPause')}</span>
-									</div>
-									<button type="submit" class="btn btn-primary btn-sm" disabled={addingRule}>
-										{addingRule ? t('common.adding') : t('orgSettings.pause.addSubmit')}
-									</button>
-								</form>
-							</div>
-						{/if}
-
-						{#if pauseRules.length === 0}
-							<p class="text-base-content/50">{t('orgSettings.pause.empty')}</p>
-						{:else}
-							<ul class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-								{#each pauseRules as rule (rule.id)}
-									<li class="flex items-center justify-between p-3 border-b border-base-200 last:border-b-0 flex-wrap gap-2">
-										{#if editingRuleId === rule.id}
-											<form onsubmit={(e) => saveEditRule(e, rule.id!)} class="flex items-center gap-3 flex-wrap w-full" novalidate>
-												{#if editRuleError}
-													<div class="alert alert-error text-sm w-full" role="alert">{editRuleError}</div>
-												{/if}
-												<div class="flex items-center gap-1.5">
-													<label for="edit-rule-hours" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.whenTracked')}</label>
-													<input id="edit-rule-hours" type="number" class="input input-xs w-[70px] text-center" step="0.5" min="0.5" max="24" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
-													<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.hoursShort')}</span>
-												</div>
-												<div class="flex items-center gap-1.5">
-													<label for="edit-rule-pause" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.deduct')}</label>
-													<input id="edit-rule-pause" type="number" class="input input-xs w-[70px] text-center" min="1" step="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
-													<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.min')}</span>
-												</div>
-												<div class="flex items-center gap-1.5">
-													<button type="submit" class="btn btn-primary btn-sm" disabled={editingRuleSaving}>{editingRuleSaving ? t('common.saving') : t('common.save')}</button>
-													<button type="button" class="btn btn-ghost btn-sm" onclick={() => (editingRuleId = null)}>{t('common.cancel')}</button>
-												</div>
-											</form>
-										{:else}
-											<div class="text-[0.9375rem] text-base-content/70">{@render pauseRuleText(rule)}</div>
-											<div class="flex items-center gap-1.5">
-												<button class="btn btn-ghost btn-sm" onclick={() => startEditRule(rule)}>{t('common.edit')}</button>
-												<button class="btn btn-ghost btn-xs text-error" title={t('orgSettings.pause.deleteLabel')} aria-label={t('orgSettings.pause.deleteLabel')} onclick={() => deleteRule(rule)}>&times;</button>
-											</div>
-										{/if}
-									</li>
-								{/each}
-							</ul>
-						{/if}
-					</div>
-				{/if}
-			</section>
-
-			<ApiKeysPanel {orgSlug} members={org.members ?? []} />
-
-			<!-- Request History -->
-			<section class="mt-8">
-				<h2 class="text-xl font-bold text-base-content mb-4">{t('orgSettings.requests.title')}</h2>
-
-				{#if requestHistoryError}
-					<div class="alert alert-error text-sm mb-4" role="alert">
-						<span>{requestHistoryError}</span>
-						<button class="btn btn-sm" onclick={loadRequestHistory}>{t('common.retry')}</button>
-					</div>
-				{/if}
-
-				{#if requestHistoryLoading && requestHistory.length === 0}
-					<p class="text-base-content/50">{t('orgSettings.requests.loading')}</p>
-				{:else if !requestHistoryError}
-					<div class="flex gap-1.5 mb-4 flex-wrap">
-						{#each ['all', 'Pending', 'Accepted', 'Declined'] as f (f)}
-							<button
-								class="btn btn-sm rounded-full {requestHistoryFilter === f ? 'btn-neutral' : 'btn-outline'}"
-								aria-pressed={requestHistoryFilter === f}
-								onclick={() => (requestHistoryFilter = f)}
-							>
-								{f === 'all' ? t('orgSettings.requests.all') : formatRequestStatus(f)} ({f === 'all' ? requestHistory.length : requestHistory.filter((r) => r.status === f).length})
-							</button>
-						{/each}
-					</div>
-
-					{#if filteredRequests.length === 0}
-						<p class="text-base-content/50">{t('orgSettings.requests.empty')}</p>
-					{:else}
-						<ul class="flex flex-col gap-3">
-							{#each filteredRequests as req (req.id)}
-								<li class="bg-base-200/30 border border-base-300 rounded-lg p-4">
-									<div class="flex items-center gap-2 mb-2 flex-wrap">
-										<span class="badge badge-primary badge-sm">{formatRequestType(req.type)}</span>
-										<span class="badge badge-sm {statusBadgeClass(req.status)}">{formatRequestStatus(req.status)}</span>
-									</div>
-									<div class="text-sm">
-										<div class="mb-1 break-words">
-											<strong>{req.userFirstName} {req.userLastName}</strong>
-											<span class="text-base-content/50 text-sm ml-1.5">{req.userEmail}</span>
-										</div>
-										{#if req.requestData}
-											<div class="text-sm my-1 py-1 px-2 bg-primary/10 rounded-md inline-block">{parseRequestData(req.type, req.requestData).join(', ')}</div>
-										{/if}
-										{#if req.message}
-											<div class="text-base-content/60 italic text-sm my-1">"{req.message}"</div>
-										{/if}
-										<div class="text-base-content/50 text-xs mt-1.5">
-											<span>{t('orgSettings.requests.created', { time: formatTimeAgo(req.createdAt) })}</span>
-											{#if req.respondedAt}
-												<span>&middot; {t('orgSettings.requests.respondedBy', { status: formatRequestStatus(req.status), name: req.respondedByName ?? t('common.unknown'), time: formatTimeAgo(req.respondedAt) })}</span>
-											{/if}
-											{#if req.relatedEntityId}
-												<span>&middot; {t('orgSettings.requests.entry', { id: req.relatedEntityId })}</span>
-											{/if}
-										</div>
-										{#if req.responseReason}
-											<div class="text-base-content/70 text-sm mt-1 break-words">{t('common.reason', { reason: req.responseReason })}</div>
-										{/if}
-									</div>
-									{#if req.status === 'Pending'}
-										<div class="flex gap-1.5 mt-3 pt-3 border-t border-base-300">
-											{#if decliningId === req.id}
-												<DeclineForm busy={respondingId === req.id} onconfirm={(reason) => respondToRequest(req, false, reason)} oncancel={() => (decliningId = null)} />
-											{:else}
-												<button class="btn btn-success btn-sm" disabled={respondingId === req.id} onclick={() => respondToRequest(req, true)}>{t('orgSettings.requests.accept')}</button>
-												<button class="btn btn-outline btn-error btn-sm" disabled={respondingId === req.id} onclick={() => (decliningId = req.id ?? null)}>{t('orgSettings.requests.decline')}</button>
-											{/if}
-										</div>
-									{/if}
-								</li>
-							{/each}
-						</ul>
-					{/if}
-				{/if}
 			</section>
 		{:else}
-			<!-- ==================== Member read-only Rules view ==================== -->
-			<section>
-				<h2 class="text-xl text-base-content/70 mb-4">{t('orgSettings.orgRules')}</h2>
-
-				<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
-					{#each toggleSettings() as ts (ts.key)}
-						{@const value = (org as Record<string, any>)[ts.key]}
-						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
-							{@render settingInfo(ts.label, ts.description)}
-							<span class="badge {value ? 'badge-success' : 'badge-ghost'}">{value ? t('orgSettings.on') : t('orgSettings.off')}</span>
-						</div>
-					{/each}
-
-					{#each ruleSettings() as rs (rs.key)}
-						{@const mode = (org as Record<string, any>)[rs.key] as string | null}
-						{@const label = rs.labelFn ? rs.labelFn(mode) : ruleModeLabel(mode)}
-						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
-							{@render settingInfo(rs.label, rs.description)}
-							<span class="badge {ruleModeButtonClass(mode).replace('btn-', 'badge-')}">{label}</span>
-						</div>
-					{/each}
-				</div>
-
-				<div class="mt-6">
-					<h3 class="text-base font-bold text-base-content mb-1">{t('visibility.title')}</h3>
-					<p class="text-sm text-base-content/60 mb-3">{t('visibility.intro')}</p>
-					<VisibilityMatrix mode="readonly" org={org.visibility} />
-				</div>
-
+			<!-- ==================== Member: what applies to you ==================== -->
+			{#each topics as topic (topic.id)}
+				<section class="mb-8" aria-labelledby="topic-{topic.id}">
+					{@render topicHeader(topic.id)}
+					<ul class="m-0 p-0 list-none bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+						{#each topic.settings as ts (ts.key)}
+							{@const applied = appliedSetting(ts.key, perms, org)}
+							<li class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap" data-testid="applied-{ts.key}">
+								<div class="min-w-0 flex-1 basis-60">
+									<div class="font-semibold text-base-content mb-0.5">{ts.label}</div>
+									<div class="text-sm text-base-content/70 max-w-[440px]">{ts.description}</div>
+								</div>
+								<div class="text-sm text-right">
+									<span class="text-base-content/70">{t('orgSettings.topics.appliesToYou')}</span>
+									<span class="badge {applied.badge}">{applied.label}</span>
+									{#if applied.fromGroup}<div class="text-xs text-base-content/70 mt-1">{t('orgSettings.topics.fromYourGroup')}</div>{/if}
+								</div>
+							</li>
+						{/each}
+					</ul>
+				</section>
+			{/each}
+			<section class="mb-8" aria-labelledby="topic-visibility">
+				{@render topicHeader('visibility')}
+				<VisibilityMatrix mode="readonly" org={org.visibility} />
 				{#if org.autoPauseEnabled}
 					<div class="mt-6 pt-4 border-t border-base-300">
 						<h3 class="text-base font-bold text-base-content mb-3">{t('orgSettings.pause.title')}</h3>
 						{#if pauseRules.length === 0}
-							<p class="text-base-content/50">{t('orgSettings.pause.emptyMember')}</p>
+							<p class="text-base-content/70">{t('orgSettings.pause.emptyMember')}</p>
 						{:else}
 							<ul class="flex flex-col gap-2">
 								{#each pauseRules as rule (rule.id)}
-									<li class="p-2 bg-base-200/50 border border-base-300 rounded-lg text-sm text-base-content/70">{@render pauseRuleText(rule)}</li>
+									<li class="p-2 bg-base-200/50 border border-base-300 rounded-lg text-sm text-base-content/80">{@render pauseRuleText(rule)}</li>
 								{/each}
 							</ul>
 						{/if}

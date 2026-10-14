@@ -1,9 +1,21 @@
 /** Strings for the orgSettings area (settings/rules page, API keys panel). Add keys to both objects; `en` is typed against `de`. */
 export const de = {
-	titleAdmin: 'Einstellungen',
+	titleAdmin: 'Regeln & Sichtbarkeit',
 	titleMember: 'Regeln',
-	introAdmin: 'Regeln, Berechtigungen und Genehmigungsabläufe für die ganze Organisation.',
-	introMember: 'Aktuelle Regeln der Organisation. Nur Admins können diese Einstellungen ändern.',
+	introAdmin: 'Was Mitglieder selbst dürfen, was sie über andere sehen und wie Zeiten gezählt werden. Jede Änderung gilt sofort.',
+	introMember: 'Was in dieser Organisation für dich gilt. Nur Admins können diese Regeln ändern.',
+	topics: {
+		jump: 'Themen',
+		appliesToYou: 'Für dich gilt:',
+		fromYourGroup: 'durch deine Gruppe abweichend von der Organisation',
+		overrides: 'Abweichend in Gruppen: {list}',
+		time: { title: 'Zeiterfassung', intro: 'Wie Zeiten erfasst, korrigiert und gezählt werden.' },
+		schedule: { title: 'Arbeitszeit & Überstunden', intro: 'Wer die Soll-Stunden und den Überstunden-Übertrag festlegt.' },
+		absences: { title: 'Urlaub & Abwesenheiten', intro: 'Wie Urlaub eingetragen wird und welche Abwesenheitsarten es gibt.' },
+		access: { title: 'Mitglieder & Sicherheit', intro: 'Wer beitreten darf, Anmeldung und was Admins sehen.' },
+		visibility: { title: 'Sichtbarkeit', intro: 'Was Mitglieder über Kolleginnen und Kollegen sehen.' },
+		groups: { title: 'Gruppen-Abweichungen', intro: 'Gruppen können jede Regel für ihre Mitglieder anders setzen; hier alle auf einen Blick.' }
+	},
 	notFound: 'Organisation nicht gefunden.',
 	loadOrgFailed: 'Organisation konnte nicht geladen werden.',
 	reloadFailed: 'Einstellungen konnten nicht neu geladen werden.',
@@ -202,10 +214,22 @@ export const de = {
 };
 
 export const en: typeof de = {
-	titleAdmin: 'Settings',
+	titleAdmin: 'Rules & visibility',
 	titleMember: 'Rules',
-	introAdmin: 'Organization-wide rules, permissions and approval workflows.',
-	introMember: 'Current organization rules and policies. Only admins can change these settings.',
+	introAdmin: 'What members may do themselves, what they see about others and how time is counted. Every change applies at once.',
+	introMember: 'What applies to you in this organization. Only admins can change these rules.',
+	topics: {
+		jump: 'Topics',
+		appliesToYou: 'Applies to you:',
+		fromYourGroup: 'set differently by your group',
+		overrides: 'Different in groups: {list}',
+		time: { title: 'Time tracking', intro: 'How time is tracked, corrected and counted.' },
+		schedule: { title: 'Working time & overtime', intro: 'Who sets target hours and the overtime carry-over.' },
+		absences: { title: 'Vacation & absences', intro: 'How vacation is entered and which absence types exist.' },
+		access: { title: 'Members & security', intro: 'Who may join, sign-in and what admins see.' },
+		visibility: { title: 'Visibility', intro: 'What members see about their colleagues.' },
+		groups: { title: 'Group overrides', intro: 'Groups can set any rule differently for their members; all of them at a glance.' }
+	},
 	notFound: 'Organization not found.',
 	loadOrgFailed: 'Could not load the organization.',
 	reloadFailed: 'Could not reload the settings.',

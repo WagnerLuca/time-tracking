@@ -82,46 +82,48 @@ export const de = {
 		inherit: 'Erben',
 		inheritHint: 'Wert der übergeordneten Gruppe bzw. der Organisation verwenden'
 	},
+	on: 'An',
+	off: 'Aus',
 	rules: {
 		editPastEntriesMode: {
-			label: 'Vergangene Einträge ändern',
-			description: 'Legt fest, ob Mitglieder Beginn und Ende abgeschlossener Zeiteinträge ändern dürfen.'
+			label: 'Eigene Einträge nachträglich ändern',
+			description: 'Ob Mitglieder Beginn und Ende eines fertigen Eintrags selbst korrigieren – direkt, per Antrag oder gar nicht.'
 		},
 		editPauseMode: {
-			label: 'Pausendauer ändern',
-			description: 'Legt fest, ob Mitglieder die automatisch abgezogene Pause überschreiben dürfen.'
+			label: 'Pause selbst ändern',
+			description: 'Ob Mitglieder die automatisch abgezogene Pause eines Eintrags überschreiben dürfen.'
 		},
 		initialOvertimeMode: {
-			label: 'Anfangsüberstunden',
-			description: 'Legt fest, ob Mitglieder ihren Überstunden-Startsaldo selbst festlegen dürfen.'
+			label: 'Überstunden-Übertrag',
+			description: 'Ob Mitglieder ihre Überstunden aus der Zeit vor der Zeiterfassung selbst eintragen.'
 		},
 		joinPolicy: {
-			label: 'Beitrittsregel',
-			description: 'Legt fest, wie neue Mitglieder der Organisation beitreten können.'
+			label: 'Beitreten',
+			description: 'Wie neue Personen in die Organisation kommen – zusätzlich zu Einladungen.'
 		},
 		workScheduleChangeMode: {
-			label: 'Arbeitszeit-Zeiträume',
-			description: 'Legt fest, ob Mitglieder eigene Arbeitszeit-Zeiträume anlegen und ändern dürfen.'
+			label: 'Eigenes Arbeitszeitmodell ändern',
+			description: 'Ob Mitglieder ihre Soll-Stunden (Arbeitszeit-Zeiträume) selbst anlegen und ändern.'
 		},
 		csvImportMode: {
-			label: 'CSV-Import',
-			description: 'Legt fest, ob Mitglieder Zeiteinträge aus CSV-Dateien importieren dürfen.'
+			label: 'Einträge aus CSV importieren',
+			description: 'Ob Mitglieder Zeiteinträge aus einer CSV-Datei hochladen dürfen.'
 		},
 		absenceSelfServiceMode: {
-			label: 'Abwesenheiten & Urlaub',
-			description: 'Legt fest, ob Mitglieder eigene Abwesenheiten direkt eintragen, beantragen müssen (Genehmigung durch Gruppen- oder Organisations-Admins) oder nur Admins sie eintragen.'
+			label: 'Urlaub & Abwesenheiten eintragen',
+			description: 'Ob Mitglieder Urlaub und andere Abwesenheiten direkt eintragen oder beantragen – oder nur Admins sie eintragen.'
 		},
 		autoPauseEnabled: {
-			label: 'Automatische Pause',
-			description: 'Zieht Pausenzeiten anhand konfigurierbarer Regeln automatisch von der erfassten Zeit ab.'
+			label: 'Pause automatisch abziehen',
+			description: 'Zieht nach den Pausenregeln automatisch Pause von langen Arbeitstagen ab (ArbZG §4).'
 		},
 		memberTimeEntryVisibility: {
-			label: 'Arbeitszeiten für Admins sichtbar',
-			description: 'Wenn aktiv, können Admins die erfassten Arbeitszeiten der Mitglieder sehen. Mitglieder werden darauf hingewiesen.'
+			label: 'Admins sehen Arbeitszeiten',
+			description: 'Admins sehen die erfassten Zeiten aller Mitglieder; Mitglieder bekommen einen Hinweis darauf.'
 		},
 		require2fa: {
-			label: 'Zwei-Faktor-Authentifizierung verlangen',
-			description: 'Wenn aktiv, müssen alle Mitglieder 2FA einrichten, bevor sie die Anwendung nutzen können.'
+			label: 'Zwei-Faktor-Anmeldung verlangen',
+			description: 'Jedes Mitglied muss 2FA einrichten, bevor es die App nutzen kann.'
 		},
 	}
 };
@@ -209,46 +211,48 @@ export const en: typeof de = {
 		inherit: 'Inherit',
 		inheritHint: 'Use the parent group’s or the organization’s value'
 	},
+	on: 'On',
+	off: 'Off',
 	rules: {
 		editPastEntriesMode: {
-			label: 'Edit past entries',
-			description: 'Control whether members can edit start/end times of completed time entries.'
+			label: 'Change own past entries',
+			description: 'Whether members correct start and end of a finished entry themselves – directly, by request or not at all.'
 		},
 		editPauseMode: {
-			label: 'Edit pause duration',
-			description: 'Control whether members can override auto-deducted break time.'
+			label: 'Change own pause',
+			description: 'Whether members may override the automatically deducted pause of an entry.'
 		},
 		initialOvertimeMode: {
-			label: 'Initial overtime',
-			description: 'Control whether members can set their own initial overtime balance.'
+			label: 'Overtime carry-over',
+			description: 'Whether members enter their overtime from before time tracking themselves.'
 		},
 		joinPolicy: {
-			label: 'Join policy',
-			description: 'Control how new members can join the organization.'
+			label: 'Joining',
+			description: 'How new people get into the organization – in addition to invitations.'
 		},
 		workScheduleChangeMode: {
-			label: 'Schedule periods',
-			description: 'Control whether members can create/modify their own schedule periods.'
+			label: 'Change own work schedule',
+			description: 'Whether members create and change their target hours (schedule periods) themselves.'
 		},
 		csvImportMode: {
-			label: 'CSV import',
-			description: 'Control whether members can import time entries from CSV files.'
+			label: 'Import entries from CSV',
+			description: 'Whether members may upload time entries from a CSV file.'
 		},
 		absenceSelfServiceMode: {
-			label: 'Absences & vacation',
-			description: 'Control whether members can add their own absences directly, must request approval (group/org admins), or only admins can add them.'
+			label: 'Enter vacation & absences',
+			description: 'Whether members enter vacation and other absences directly or request them – or only admins enter them.'
 		},
 		autoPauseEnabled: {
-			label: 'Auto-pause tracking',
-			description: 'Automatically deduct break time from tracked hours based on configurable rules.'
+			label: 'Deduct pause automatically',
+			description: 'Deducts pause from long working days by the pause rules (German Working Hours Act §4).'
 		},
 		memberTimeEntryVisibility: {
-			label: 'Member time visibility',
-			description: "When enabled, admins can view members' tracked working hours. Members will see a notification about this."
+			label: 'Admins see working times',
+			description: 'Admins see every member’s tracked time; members are told so.'
 		},
 		require2fa: {
-			label: 'Require two-factor authentication',
-			description: 'When enabled, all members must set up 2FA before they can use the application.'
+			label: 'Require two-factor sign-in',
+			description: 'Every member must set up 2FA before using the app.'
 		},
 	}
 };

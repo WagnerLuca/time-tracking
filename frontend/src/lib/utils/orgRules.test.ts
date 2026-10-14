@@ -18,8 +18,8 @@ import {
 	ruleModeButtonClass,
 	ruleModeLabel,
 	ruleModeOptions,
-	ruleSettings,
-	toggleSettings,
+	settingTopics,
+	appliedSetting,
 	withInherit
 } from './orgRules';
 
@@ -140,23 +140,26 @@ describe('orgRules', () => {
 		expect(joinPolicyOptions()[2].label).toBe('Open');
 	});
 
-	it('settings definitions cover every rule with translated text', () => {
-		expect(ruleSettings().map((s) => s.key)).toEqual([
-			'editPastEntriesMode',
-			'editPauseMode',
-			'initialOvertimeMode',
-			'joinPolicy',
-			'workScheduleChangeMode',
-			'csvImportMode',
-			'absenceSelfServiceMode'
-		]);
-		expect(ruleSettings().find((s) => s.key === 'joinPolicy')?.labelFn).toBe(joinPolicyLabel);
-		expect(toggleSettings().map((s) => s.key)).toEqual(['autoPauseEnabled', 'memberTimeEntryVisibility', 'require2fa']);
-		for (const s of [...ruleSettings(), ...toggleSettings()]) {
+	it('settings topics cover every rule once, with translated one-line text', () => {
+		locale.set('de');
+		const keys = settingTopics().flatMap((topic) => topic.settings.map((s) => s.key));
+		expect(new Set(keys).size).toBe(10);
+		for (const s of settingTopics().flatMap((topic) => topic.settings)) {
 			// a missing key would come back as the key path itself
 			expect(s.label).not.toContain('format.rules');
 			expect(s.description).not.toContain('format.rules');
 		}
-		expect(ruleSettings()[0].label).toBe('Vergangene Einträge ändern');
+		expect(settingTopics()[0].settings.find((s) => s.key === 'autoPauseEnabled')?.toggle).toBe(true);
+		expect(settingTopics()[0].settings[0].label).toBe('Eigene Einträge nachträglich ändern');
+	});
+
+	it('says what applies to the caller, group overrides first', () => {
+		locale.set('de');
+		const org = { editPastEntriesMode: 'RequiresApproval', autoPauseEnabled: true, joinPolicy: 'Disabled', csvImportMode: 'Allowed' } as never;
+		expect(appliedSetting('editPastEntriesMode', { editPastEntriesMode: 'Allowed' }, org)).toEqual({ label: ruleModeLabel('Allowed'), badge: 'badge-success', fromGroup: true });
+		expect(appliedSetting('csvImportMode', null, org)).toMatchObject({ label: ruleModeLabel('Allowed'), fromGroup: false });
+		expect(appliedSetting('autoPauseEnabled', null, org)).toMatchObject({ badge: 'badge-success', fromGroup: false });
+		expect(appliedSetting('require2fa', null, org).badge).toBe('badge-ghost');
+		expect(appliedSetting('joinPolicy', null, org).label).toBe(joinPolicyLabel('Disabled'));
 	});
 });
