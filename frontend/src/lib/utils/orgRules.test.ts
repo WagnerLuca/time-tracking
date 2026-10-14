@@ -14,17 +14,12 @@ import {
 	joinPolicyLabel,
 	joinPolicyOptions,
 	parseRuleMode,
-	parseVisibilityMode,
 	ruleMode,
 	ruleModeButtonClass,
 	ruleModeLabel,
 	ruleModeOptions,
 	ruleSettings,
 	toggleSettings,
-	visibilityModeButtonClass,
-	visibilityModeLabel,
-	visibilityModeOptions,
-	visibilitySettings,
 	withInherit
 } from './orgRules';
 
@@ -124,18 +119,8 @@ describe('orgRules', () => {
 		expect(ruleModeButtonClass(null)).toBe('btn-success');
 	});
 
-	it('visibility helpers, unknown → Private', () => {
-		const vis = ['Private', 'AdminOnly', 'AllMembers'];
-		expect(vis.map(parseVisibilityMode)).toEqual([0, 1, 2]);
-		expect(parseVisibilityMode(undefined)).toBe(0);
-		expect(vis.map(visibilityModeLabel)).toEqual(['Privat', 'Nur Admins', 'Alle Mitglieder']);
-		expect(visibilityModeLabel('x')).toBe('Privat');
-		expect(vis.map(visibilityModeButtonClass)).toEqual(['btn-neutral', 'btn-warning', 'btn-success']);
-		expect(visibilityModeButtonClass(null)).toBe('btn-neutral');
-	});
-
 	it('option sets have values 0..2 with matching classes, inherit is prepended', () => {
-		for (const options of [ruleModeOptions(), joinPolicyOptions(), visibilityModeOptions()]) {
+		for (const options of [ruleModeOptions(), joinPolicyOptions()]) {
 			expect(options.map((o) => [o.value, o.activeClass])).toEqual([
 				[0, 'btn-neutral'],
 				[1, 'btn-warning'],
@@ -152,7 +137,7 @@ describe('orgRules', () => {
 		locale.set('en');
 		expect(ruleModeLabel('Disabled')).toBe('Disabled');
 		expect(withInherit([])[0].label).toBe('Inherit');
-		expect(visibilityModeOptions()[2].label).toBe('Everyone');
+		expect(joinPolicyOptions()[2].label).toBe('Open');
 	});
 
 	it('settings definitions cover every rule with translated text', () => {
@@ -167,8 +152,7 @@ describe('orgRules', () => {
 		]);
 		expect(ruleSettings().find((s) => s.key === 'joinPolicy')?.labelFn).toBe(joinPolicyLabel);
 		expect(toggleSettings().map((s) => s.key)).toEqual(['autoPauseEnabled', 'memberTimeEntryVisibility', 'require2fa']);
-		expect(visibilitySettings().map((s) => s.key)).toEqual(['vacationVisibility', 'sickDayVisibility']);
-		for (const s of [...ruleSettings(), ...toggleSettings(), ...visibilitySettings()]) {
+		for (const s of [...ruleSettings(), ...toggleSettings()]) {
 			// a missing key would come back as the key path itself
 			expect(s.label).not.toContain('format.rules');
 			expect(s.description).not.toContain('format.rules');

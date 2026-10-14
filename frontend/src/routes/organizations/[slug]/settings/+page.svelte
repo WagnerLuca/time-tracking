@@ -14,10 +14,11 @@
 	import {
 		isOrgAdmin, parseRuleMode, ruleModeLabel, ruleModeButtonClass,
 		ruleSettings, toggleSettings,
-		visibilitySettings, parseVisibilityMode, visibilityModeLabel, visibilityModeButtonClass,
-		ruleModeOptions, joinPolicyOptions, visibilityModeOptions
+		ruleModeOptions, joinPolicyOptions
 	} from '$lib/utils/orgRules';
+	import { previewSentence, type VisibilityKind } from '$lib/utils/visibility';
 	import ModeSelector from '$lib/components/ModeSelector.svelte';
+	import VisibilityMatrix from '$lib/components/VisibilityMatrix.svelte';
 	import ApiKeysPanel from '$lib/components/ApiKeysPanel.svelte';
 	import type {
 		OrganizationDetailResponse,
@@ -250,11 +251,6 @@
 	const MATRIX_CAPABILITY_KEYS = ['groupAdminCanApproveAbsences', 'groupAdminCanApproveTimeEdits', 'groupAdminCanApproveScheduleChanges', 'groupAdminCanManageMembers', 'groupAdminCanViewAllTimeEntries', 'groupAdminCanExportData'] as const;
 
 	let matrixRuleRows = $derived(MATRIX_RULE_KEYS.map((key) => ({ key, label: t(`format.rules.${key}.label`) })));
-	let matrixVisibilityRows = $derived([
-		{ key: 'vacationVisibility', label: t('format.rules.vacationVisibility.label') },
-		{ key: 'sickDayVisibility', label: t('format.rules.sickDayVisibility.label') },
-		{ key: 'timeEntryVisibility', label: t('orgSettings.matrix.timeEntryVisibility') }
-	]);
 	let matrixCapabilityRows = $derived(MATRIX_CAPABILITY_KEYS.map((key) => ({ key, label: t(`groups.perm.${key}.label`) })));
 
 	async function loadPermGroups() {
@@ -276,28 +272,15 @@
 	}
 
 	/** Cycles an org-level mode (3 states) from the matrix. */
-	async function cycleOrgMatrixCell(key: string, isVisibility: boolean) {
+	async function cycleOrgMatrixCell(key: string) {
 		if (!org) return;
-		if (key === 'timeEntryVisibility') {
-			// Org level is a boolean (admins may see member time)
-			await toggleSetting('memberTimeEntryVisibility');
-			return;
-		}
-		const current = isVisibility
-			? parseVisibilityMode((org as Record<string, any>)[key])
-			: parseRuleMode((org as Record<string, any>)[key]);
-		await setSetting(key, (current + 1) % 3);
+		await setSetting(key, (parseRuleMode((org as Record<string, any>)[key]) + 1) % 3);
 	}
 
-	/** Cycles a group override: Inherit -> Disabled/Private -> Approval/Admins -> Allowed/Everyone -> Inherit. */
-	async function cycleGroupMatrixCell(col: GroupPermsColumn, key: string, isVisibility: boolean) {
+	/** Cycles a group override: Inherit -> Disabled -> Approval -> Allowed -> Inherit. */
+	async function cycleGroupMatrixCell(col: GroupPermsColumn, key: string) {
 		const raw = (col.perms as Record<string, any>)[key];
-		let next: number;
-		if (raw == null) next = 0;
-		else {
-			const current = isVisibility ? parseVisibilityMode(raw) : parseRuleMode(raw);
-			next = current >= 2 ? -1 : current + 1; // -1 = back to inherit
-		}
+		const next = raw == null ? 0 : parseRuleMode(raw) >= 2 ? -1 : parseRuleMode(raw) + 1; // -1 = back to inherit
 		await saveGroupPerm(col, key, next);
 	}
 
@@ -322,13 +305,8 @@
 	}
 
 	/** Badge classes for a mode value in the matrix. */
-	function matrixBadge(mode: string | null | undefined, isVisibility: boolean): { label: string; cls: string } {
+	function matrixBadge(mode: string | null | undefined): { label: string; cls: string } {
 		if (mode == null) return { label: '—', cls: 'badge-ghost' };
-		if (isVisibility) {
-			if (mode === 'Private') return { label: t('format.options.private'), cls: 'badge-neutral' };
-			if (mode === 'AdminOnly') return { label: t('format.options.admins'), cls: 'badge-warning' };
-			return { label: t('format.options.everyone'), cls: 'badge-success' };
-		}
 		if (mode === 'Disabled') return { label: t('format.options.disabled'), cls: 'badge-neutral' };
 		if (mode === 'RequiresApproval') return { label: t('format.options.approval'), cls: 'badge-warning' };
 		return { label: t('format.options.allowed'), cls: 'badge-success' };
@@ -348,6 +326,15 @@
 		} finally {
 			settingsSaving = false;
 		}
+	}
+
+	// ── Member visibility matrix ──
+	/** Group whose members the preview sentence describes (null = a member without a group). */
+	let previewGroupId = $state<number | null>(null);
+	let previewGroup = $derived(permGroups.find((c) => c.group.id === previewGroupId) ?? null);
+
+	function saveVisibility(kind: VisibilityKind, inGroups: boolean, outsideGroups: boolean) {
+		return saveSettings({ visibility: [{ kind, inGroups, outsideGroups }] }, t('visibility.saveFailed'));
 	}
 
 	function setSetting(key: string, value: number) {
@@ -548,20 +535,30 @@
 							/>
 						</div>
 					{/each}
+				</div>
 
-					<!-- Visibility settings -->
-					{#each visibilitySettings() as vs (vs.key)}
-						{@const mode = (org as Record<string, any>)[vs.key] as string | null}
-						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
-							{@render settingInfo(vs.label, vs.description)}
-							<ModeSelector
-								options={visibilityModeOptions()}
-								value={parseVisibilityMode(mode)}
-								onselect={(v) => setSetting(vs.key, v as number)}
-								disabled={settingsSaving}
-							/>
-						</div>
-					{/each}
+				<!-- Member visibility matrix -->
+				<div class="mt-6" data-testid="visibility-settings">
+					<h3 class="text-base font-bold text-base-content/70 m-0 mb-1">{t('visibility.title')}</h3>
+					<p class="text-sm text-base-content/60 mb-3">{t('visibility.intro')}</p>
+					<VisibilityMatrix mode="org" org={org.visibility} disabled={settingsSaving} onorgchange={saveVisibility} />
+					<div class="mt-3 p-3 rounded-lg bg-base-200/50 border border-base-300 text-sm">
+						{#if permGroups.length > 0}
+							<label class="flex items-center gap-2 flex-wrap mb-2">
+								<span class="text-base-content/60">{t('visibility.previewGroup')}</span>
+								<select class="select select-sm max-w-full" bind:value={previewGroupId}>
+									<option value={null}>{t('visibility.previewNoGroup')}</option>
+									{#each permGroups as col (col.group.id)}
+										<option value={col.group.id}>{col.group.name}</option>
+									{/each}
+								</select>
+							</label>
+						{/if}
+						<p class="m-0" aria-live="polite" data-testid="visibility-preview">
+							{previewSentence(org.visibility, previewGroup ? { name: previewGroup.group.name, visibility: previewGroup.perms.visibility } : null)}
+						</p>
+						<p class="m-0 mt-1 text-xs text-base-content/50">{t('visibility.preview.othersNote')}</p>
+					</div>
 				</div>
 
 				<!-- Default Vacation Days -->
@@ -787,11 +784,11 @@
 								<tbody>
 									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 bg-base-200/30 py-1">{t('orgSettings.matrix.rulesSection')}</td></tr>
 									{#each matrixRuleRows as row (row.key)}
-										{@const orgBadge = matrixBadge((org as Record<string, any>)[row.key], false)}
+										{@const orgBadge = matrixBadge((org as Record<string, any>)[row.key])}
 										<tr>
 											<td class="font-medium text-sm whitespace-nowrap">{row.label}</td>
 											<td class="text-center">
-												<button class="badge badge-sm cursor-pointer {orgBadge.cls}" title={t('orgSettings.matrix.orgCellTitle')} onclick={() => cycleOrgMatrixCell(row.key, false)} disabled={settingsSaving}>
+												<button class="badge badge-sm cursor-pointer {orgBadge.cls}" title={t('orgSettings.matrix.orgCellTitle')} onclick={() => cycleOrgMatrixCell(row.key)} disabled={settingsSaving}>
 													{orgBadge.label}
 												</button>
 											</td>
@@ -799,40 +796,12 @@
 												{@const raw = (col.perms as Record<string, any>)[row.key]}
 												<td class="text-center">
 													{#if raw == null}
-														<button class="badge badge-sm badge-ghost opacity-60 cursor-pointer" title={t('orgSettings.matrix.inheritTitle')} onclick={() => cycleGroupMatrixCell(col, row.key, false)} disabled={permSaving}>
+														<button class="badge badge-sm badge-ghost opacity-60 cursor-pointer" title={t('orgSettings.matrix.inheritTitle')} onclick={() => cycleGroupMatrixCell(col, row.key)} disabled={permSaving}>
 															↳ {orgBadge.label}
 														</button>
 													{:else}
-														<button class="badge badge-sm cursor-pointer {matrixBadge(raw, false).cls}" title={t('orgSettings.matrix.overrideTitle')} onclick={() => cycleGroupMatrixCell(col, row.key, false)} disabled={permSaving}>
-															{matrixBadge(raw, false).label}
-														</button>
-													{/if}
-												</td>
-											{/each}
-										</tr>
-									{/each}
-
-									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 bg-base-200/30 py-1">{t('orgSettings.matrix.visibilitySection')}</td></tr>
-									{#each matrixVisibilityRows as row (row.key)}
-										{@const orgMode = row.key === 'timeEntryVisibility' ? (org.memberTimeEntryVisibility ? 'AdminOnly' : 'Private') : (org as Record<string, any>)[row.key]}
-										{@const orgBadge = matrixBadge(orgMode, true)}
-										<tr>
-											<td class="font-medium text-sm whitespace-nowrap">{row.label}</td>
-											<td class="text-center">
-												<button class="badge badge-sm cursor-pointer {orgBadge.cls}" title={t('orgSettings.matrix.orgCellTitle')} onclick={() => cycleOrgMatrixCell(row.key, true)} disabled={settingsSaving}>
-													{orgBadge.label}
-												</button>
-											</td>
-											{#each permGroups as col (col.group.id)}
-												{@const raw = (col.perms as Record<string, any>)[row.key]}
-												<td class="text-center">
-													{#if raw == null}
-														<button class="badge badge-sm badge-ghost opacity-60 cursor-pointer" title={t('orgSettings.matrix.inheritTitle')} onclick={() => cycleGroupMatrixCell(col, row.key, true)} disabled={permSaving}>
-															↳ {orgBadge.label}
-														</button>
-													{:else}
-														<button class="badge badge-sm cursor-pointer {matrixBadge(raw, true).cls}" title={t('orgSettings.matrix.overrideTitle')} onclick={() => cycleGroupMatrixCell(col, row.key, true)} disabled={permSaving}>
-															{matrixBadge(raw, true).label}
+														<button class="badge badge-sm cursor-pointer {matrixBadge(raw).cls}" title={t('orgSettings.matrix.overrideTitle')} onclick={() => cycleGroupMatrixCell(col, row.key)} disabled={permSaving}>
+															{matrixBadge(raw).label}
 														</button>
 													{/if}
 												</td>
@@ -1044,14 +1013,12 @@
 							<span class="badge {ruleModeButtonClass(mode).replace('btn-', 'badge-')}">{label}</span>
 						</div>
 					{/each}
+				</div>
 
-					{#each visibilitySettings() as vs (vs.key)}
-						{@const mode = (org as Record<string, any>)[vs.key] as string | null}
-						<div class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap">
-							{@render settingInfo(vs.label, vs.description)}
-							<span class="badge {visibilityModeButtonClass(mode).replace('btn-', 'badge-')}">{visibilityModeLabel(mode)}</span>
-						</div>
-					{/each}
+				<div class="mt-6">
+					<h3 class="text-base font-bold text-base-content mb-1">{t('visibility.title')}</h3>
+					<p class="text-sm text-base-content/60 mb-3">{t('visibility.intro')}</p>
+					<VisibilityMatrix mode="readonly" org={org.visibility} />
 				</div>
 
 				{#if org.autoPauseEnabled}

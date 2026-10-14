@@ -67,11 +67,6 @@ export const de = {
 		RequiresApproval: 'Genehmigung erforderlich',
 		Allowed: 'Offen'
 	},
-	visibility: {
-		Private: 'Privat',
-		AdminOnly: 'Nur Admins',
-		AllMembers: 'Alle Mitglieder'
-	},
 	options: {
 		disabled: 'Aus',
 		disabledHint: 'Funktion ist für Mitglieder ausgeschaltet',
@@ -84,12 +79,6 @@ export const de = {
 		joinApprovalHint: 'Beitrittsanfragen brauchen eine Admin-Genehmigung',
 		open: 'Offen',
 		openHint: 'Jede Person kann direkt beitreten',
-		private: 'Privat',
-		privateHint: 'Mitglieder sehen nur ihre eigenen Daten',
-		admins: 'Admins',
-		adminsHint: 'Admins sehen alle Mitglieder',
-		everyone: 'Alle',
-		everyoneHint: 'Alle Mitglieder sehen einander',
 		inherit: 'Erben',
 		inheritHint: 'Einstellung der Organisation verwenden'
 	},
@@ -134,14 +123,6 @@ export const de = {
 			label: 'Zwei-Faktor-Authentifizierung verlangen',
 			description: 'Wenn aktiv, müssen alle Mitglieder 2FA einrichten, bevor sie die Anwendung nutzen können.'
 		},
-		vacationVisibility: {
-			label: 'Sichtbarkeit von Urlaubstagen',
-			description: 'Legt fest, wer Urlaubsabwesenheiten und den verbleibenden Urlaubsanspruch der Mitglieder sehen kann.'
-		},
-		sickDayVisibility: {
-			label: 'Sichtbarkeit von Krankheitstagen',
-			description: 'Legt fest, wer die Krankheitstage der Mitglieder sehen kann.'
-		}
 	}
 };
 
@@ -213,11 +194,6 @@ export const en: typeof de = {
 		RequiresApproval: 'Requires approval',
 		Allowed: 'Open'
 	},
-	visibility: {
-		Private: 'Private',
-		AdminOnly: 'Admins only',
-		AllMembers: 'All members'
-	},
 	options: {
 		disabled: 'Off',
 		disabledHint: 'Feature is off for members',
@@ -230,12 +206,6 @@ export const en: typeof de = {
 		joinApprovalHint: 'Join requests need admin approval',
 		open: 'Open',
 		openHint: 'Anyone can join freely',
-		private: 'Private',
-		privateHint: 'Members only see their own data',
-		admins: 'Admins',
-		adminsHint: 'Admins can see all members',
-		everyone: 'Everyone',
-		everyoneHint: 'All members see each other',
 		inherit: 'Inherit',
 		inheritHint: 'Use the organization default'
 	},
@@ -280,13 +250,5 @@ export const en: typeof de = {
 			label: 'Require two-factor authentication',
 			description: 'When enabled, all members must set up 2FA before they can use the application.'
 		},
-		vacationVisibility: {
-			label: 'Vacation day visibility',
-			description: "Control who can see members' vacation absences and their remaining vacation-day balance."
-		},
-		sickDayVisibility: {
-			label: 'Sick day visibility',
-			description: "Control who can see members' sick days."
-		}
 	}
 };

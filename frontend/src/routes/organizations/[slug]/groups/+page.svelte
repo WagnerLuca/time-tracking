@@ -11,12 +11,15 @@
 	import { getInitials } from '$lib/utils/formatters';
 	import { DEFAULT_GROUP_COLOR, GROUP_COLOR_PRESETS, safeColor } from '$lib/utils/colors';
 	import ModeSelector from '$lib/components/ModeSelector.svelte';
-	import { isOrgAdmin, parseRuleMode, parseVisibilityMode, ruleModeOptions, visibilityModeOptions, withInherit } from '$lib/utils/orgRules';
+	import { isOrgAdmin, parseRuleMode, ruleModeOptions, withInherit } from '$lib/utils/orgRules';
+	import { previewSentence, type VisibilityKind } from '$lib/utils/visibility';
+	import VisibilityMatrix from '$lib/components/VisibilityMatrix.svelte';
 	import type {
 		GroupResponse,
 		GroupDetailResponse,
 		GroupMemberResponse,
-		GroupPermissionsResponse
+		GroupPermissionsResponse,
+		VisibilityRuleResponse
 	} from '$lib/api';
 
 	const orgSlug = $derived(page.params.slug ?? '');
@@ -56,8 +59,10 @@
 	let addingMember = $state(false);
 	let addMemberError = $state('');
 
-	// Org members for the add dropdown
-	let orgMembers = $state<Array<{ id: number; firstName: string; lastName: string; email: string }>>([]);
+	// Org members for the add dropdown (only the ones the caller may see; email may be hidden)
+	let orgMembers = $state<Array<{ id: number; firstName: string; lastName: string; email: string | null }>>([]);
+	// The organization's visibility matrix (what a group override inherits)
+	let orgVisibility = $state<VisibilityRuleResponse[]>([]);
 
 	// Permissions
 	let permissions = $state<GroupPermissionsResponse | null>(null);
@@ -210,7 +215,7 @@
 				id: m.id!,
 				firstName: m.firstName ?? '',
 				lastName: m.lastName ?? '',
-				email: m.email ?? ''
+				email: m.email ?? null
 			}));
 		} catch (err) {
 			orgMembers = [];
@@ -288,23 +293,25 @@
 
 	// Permission settings definitions (labels follow the UI language)
 	const PERM_RULE_KEYS = ['editPastEntriesMode', 'editPauseMode', 'csvImportMode', 'workScheduleChangeMode', 'initialOvertimeMode', 'absenceSelfServiceMode'] as const;
-	const PERM_VISIBILITY_KEYS = ['vacationVisibility', 'sickDayVisibility', 'timeEntryVisibility'] as const;
 	const PERM_ADMIN_FLAG_KEYS = ['groupAdminCanApproveAbsences', 'groupAdminCanApproveTimeEdits', 'groupAdminCanApproveScheduleChanges', 'groupAdminCanManageMembers', 'groupAdminCanViewAllTimeEntries', 'groupAdminCanExportData'] as const;
-	type PermKey = (typeof PERM_RULE_KEYS)[number] | (typeof PERM_VISIBILITY_KEYS)[number] | (typeof PERM_ADMIN_FLAG_KEYS)[number];
+	type PermKey = (typeof PERM_RULE_KEYS)[number] | (typeof PERM_ADMIN_FLAG_KEYS)[number];
 
 	function permSetting(key: PermKey) {
 		return { key, label: t(`groups.perm.${key}.label`), description: t(`groups.perm.${key}.description`) };
 	}
 
 	let permRuleSettings = $derived(PERM_RULE_KEYS.map(permSetting));
-	let permVisibilitySettings = $derived(PERM_VISIBILITY_KEYS.map(permSetting));
 	let permAdminFlags = $derived(PERM_ADMIN_FLAG_KEYS.map(permSetting));
 
 	async function loadPermissions(groupId: number) {
 		permissionsLoadError = '';
 		try {
-			const { data } = await groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(orgSlug, groupId);
+			const [{ data }, org] = await Promise.all([
+				groupApi.apiV1OrganizationsSlugGroupsGroupIdPermissionsGet(orgSlug, groupId),
+				getOrgDetail(orgSlug)
+			]);
 			permissions = data;
+			orgVisibility = org.visibility ?? [];
 		} catch (err) {
 			permissions = null;
 			permissionsLoadError = extractErrorMessage(err, t('groups.perm.loadFailed'));
@@ -320,7 +327,12 @@
 		});
 	}
 
-	async function setPermValue(key: string, value: number | boolean | null, extra: Record<string, unknown> = {}) {
+	/** One row of the group's visibility overrides (null = inherit), sent as is (no -1 marker). */
+	function setVisibility(kind: VisibilityKind, inGroups: boolean | null, outsideGroups: boolean | null) {
+		return setPermValue('visibility', [{ kind, inGroups, outsideGroups }]);
+	}
+
+	async function setPermValue(key: string, value: number | boolean | null | object, extra: Record<string, unknown> = {}) {
 		if (!selectedGroup?.id) return;
 		permissionsSaving = true;
 		permissionsError = '';
@@ -515,7 +527,7 @@
 															<select id="addMemberId" class="select select-sm w-full" bind:value={addMemberUserId} disabled={addingMember}>
 																<option value={null}>{t('groups.members.selectPlaceholder')}</option>
 																{#each availableMembers() as m}
-																	<option value={m.id}>{m.firstName} {m.lastName} ({m.email})</option>
+																	<option value={m.id}>{m.firstName} {m.lastName}{m.email ? ` (${m.email})` : ''}</option>
 																{/each}
 															</select>
 														</div>
@@ -547,7 +559,7 @@
 																{:else}
 																	<div class="text-sm font-medium text-base-content">{member.firstName} {member.lastName}</div>
 																{/if}
-																<div class="text-xs text-base-content/60 truncate">{member.email}</div>
+																{#if member.email}<div class="text-xs text-base-content/60 truncate">{member.email}</div>{/if}
 															</div>
 															{#if member.role === 'Admin'}
 																<span class="badge badge-xs badge-primary" title={t('groups.groupAdmin')}>{t('groups.adminBadge')}</span>
@@ -604,26 +616,15 @@
 													</div>
 												{/each}
 
-												<!-- Visibility overrides -->
+												<!-- Member visibility matrix overrides -->
 												<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">
 													<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">{t('groups.perm.visibility')}</span>
 												</div>
-												{#each permVisibilitySettings as vs}
-													{@const value = (permissions as Record<string, any>)[vs.key]}
-													<div class="flex items-center justify-between gap-3 p-3 border-b border-base-200 last:border-b-0 flex-wrap">
-														<div>
-															<div class="text-sm font-medium text-base-content">{vs.label}</div>
-															<div class="text-xs text-base-content/50">{vs.description}</div>
-														</div>
-														<ModeSelector
-															options={withInherit(visibilityModeOptions())}
-															value={value == null ? null : parseVisibilityMode(value)}
-															onselect={(v) => setPermValue(vs.key, v as number | null)}
-															disabled={permissionsSaving}
-															size="xs"
-														/>
-													</div>
-												{/each}
+												<div class="p-3 border-b border-base-200" data-testid="group-visibility">
+													<p class="text-xs text-base-content/50 mb-2">{t('visibility.groupIntro')}</p>
+													<VisibilityMatrix mode="group" org={orgVisibility} group={permissions.visibility} disabled={permissionsSaving} ongroupchange={setVisibility} />
+													<p class="text-sm mt-2 mb-0" aria-live="polite">{previewSentence(orgVisibility, { name: group.name, visibility: permissions.visibility })}</p>
+												</div>
 
 												<!-- Core working hours override -->
 												<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">

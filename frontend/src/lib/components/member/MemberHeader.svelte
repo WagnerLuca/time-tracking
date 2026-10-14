@@ -3,6 +3,7 @@
 	import { organizationsApi } from '$lib/apiClient';
 	import type { OrganizationMemberResponse, OrganizationRole } from '$lib/api';
 	import GroupTags from '$lib/components/GroupTags.svelte';
+	import PresenceDot from '$lib/components/PresenceDot.svelte';
 	import { formatDateFull, getInitials, roleLabel } from '$lib/utils/formatters';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -67,14 +68,17 @@
 
 <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-6 pb-6 border-b border-base-300">
 	<div class="flex items-center gap-4 flex-1 min-w-0">
-		<div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-xl font-bold shrink-0" aria-hidden="true">
-			{getInitials(member.firstName, member.lastName)}
+		<div class="relative shrink-0">
+			<div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-xl font-bold" aria-hidden="true">
+				{getInitials(member.firstName, member.lastName)}
+			</div>
+			<PresenceDot present={member.isPresent} />
 		</div>
 		<div class="min-w-0">
 			<h1 class="text-2xl font-bold text-base-content m-0 break-words">{name}</h1>
-			<p class="text-base-content/60 text-sm mt-0.5 mb-2 break-all">{member.email}</p>
+			{#if member.email}<p class="text-base-content/60 text-sm mt-0.5 mb-2 break-all">{member.email}</p>{/if}
 			<div class="flex items-center gap-2 flex-wrap">
-				<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>
+				{#if member.role}<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>{/if}
 				<GroupTags groups={member.groups} size="sm" />
 				{#if member.joinedAt}
 					<span class="text-base-content/40 text-xs">{t('memberDetail.header.joined', { date: formatDateFull(member.joinedAt) })}</span>

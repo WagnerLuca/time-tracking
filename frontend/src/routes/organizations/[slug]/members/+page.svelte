@@ -12,6 +12,8 @@
 	import { getWeekRange } from '$lib/utils/dateHelpers';
 	import { formatHours, formatNumber, getInitials, roleLabel } from '$lib/utils/formatters';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
+	import { canSee } from '$lib/utils/visibility';
+	import PresenceDot from '$lib/components/PresenceDot.svelte';
 	import type { OrganizationDetailResponse, MemberTimeOverviewResponse } from '$lib/api';
 
 	const orgSlug = $derived(page.params.slug ?? '');
@@ -74,7 +76,8 @@
 	let members = $derived.by(() => {
 		const all = org?.members ?? [];
 		if (groupFilter === null) return all;
-		if (groupFilter === 'none') return all.filter((m) => (m.groups ?? []).length === 0);
+		// "No group" only where the groups are visible at all
+		if (groupFilter === 'none') return all.filter((m) => canSee(m, 'Groups') && (m.groups ?? []).length === 0);
 		return all.filter((m) => (m.groups ?? []).some((g) => g.groupId === groupFilter));
 	});
 
@@ -128,8 +131,11 @@
 							class="group flex items-center gap-3 sm:gap-4 p-3.5 bg-base-100 border border-base-300 rounded-xl transition-all hover:border-primary/30 hover:shadow-md no-underline text-base-content"
 							href="/organizations/{orgSlug}/members/{member.id}"
 						>
-							<div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-sm font-semibold shrink-0" aria-hidden="true">
-								{getInitials(member.firstName, member.lastName)}
+							<div class="relative shrink-0">
+								<div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary text-primary-content flex items-center justify-center text-sm font-semibold" aria-hidden="true">
+									{getInitials(member.firstName, member.lastName)}
+								</div>
+								<PresenceDot present={member.isPresent} />
 							</div>
 							<div class="flex-1 min-w-0">
 								<div class="font-semibold text-[0.9375rem] flex items-center gap-1.5 flex-wrap">
@@ -139,9 +145,9 @@
 									{/if}
 									<GroupTags groups={member.groups} />
 								</div>
-								<div class="text-sm text-base-content/50 mt-0.5 truncate">{member.email}</div>
+								{#if member.email}<div class="text-sm text-base-content/50 mt-0.5 truncate">{member.email}</div>{/if}
 								<div class="flex gap-x-3 gap-y-1 mt-1.5 flex-wrap items-center text-xs text-base-content/60">
-									<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>
+									{#if member.role}<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>{/if}
 									{#if member.vacationVisible !== false && (member.vacationDaysPerYear ?? 0) > 0}
 										{@const left = member.vacationDaysRemaining ?? member.vacationDaysPerYear ?? 0}
 										<span title={t('memberList.vacationTitle', { used: formatNumber(member.vacationDaysUsed ?? 0), total: formatNumber(member.vacationDaysPerYear ?? 0) })}>

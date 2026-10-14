@@ -153,6 +153,9 @@ export const de = {
 		alreadyMember: 'Diese Person ist bereits in der Gruppe.',
 		memberNotFound: 'Mitglied nicht in der Gruppe gefunden.'
 	},
+	visibility: {
+		unknownKind: 'Unbekannte Art von Information.'
+	},
 	apiKey: {
 		notFound: 'API-Schlüssel nicht gefunden.'
 	},
@@ -318,6 +321,9 @@ export const en: typeof de = {
 		notFound: 'Group not found.',
 		alreadyMember: 'This person is already in the group.',
 		memberNotFound: 'Member not found in the group.'
+	},
+	visibility: {
+		unknownKind: 'Unknown kind of information.'
 	},
 	apiKey: {
 		notFound: 'API key not found.'

@@ -50,6 +50,8 @@ docs/GroupDetailResponse.md
 docs/GroupMemberResponse.md
 docs/GroupPermissionsResponse.md
 docs/GroupResponse.md
+docs/GroupVisibilityRuleRequest.md
+docs/GroupVisibilityRuleResponse.md
 docs/HolidayApi.md
 docs/HolidayPresetResponse.md
 docs/HolidayResponse.md
@@ -141,7 +143,8 @@ docs/UserInfo.md
 docs/UserNotificationResponse.md
 docs/UserOrganizationResponse.md
 docs/VerifyEmailRequest.md
-docs/VisibilityMode.md
+docs/VisibilityRuleRequest.md
+docs/VisibilityRuleResponse.md
 docs/WorkScheduleApi.md
 docs/WorkScheduleResponse.md
 git_push.sh

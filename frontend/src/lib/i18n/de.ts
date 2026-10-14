@@ -20,6 +20,7 @@ import * as settings from './messages/settings';
 import * as exportPage from './messages/export';
 import * as errors from './messages/errors';
 import * as invitations from './messages/invitations';
+import * as visibility from './messages/visibility';
 
 /** German is the default and the fallback for any missing English string. */
 export const de = {
@@ -44,7 +45,8 @@ export const de = {
 	settings: settings.de,
 	export: exportPage.de,
 	errors: errors.de,
-	invitations: invitations.de
+	invitations: invitations.de,
+	visibility: visibility.de
 };
 
 export type Dictionary = typeof de;

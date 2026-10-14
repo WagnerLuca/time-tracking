@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { EffectivePermissionsResponse } from '$lib/api';
-	import { ruleModeLabel, visibilityModeLabel } from '$lib/utils/orgRules';
+	import { ruleModeLabel } from '$lib/utils/orgRules';
+	import { effectiveMatrix } from '$lib/utils/visibility';
 	import { t } from '$lib/i18n';
 
 	/** Effective rights of a member (org rules with group overrides applied), read-only. */
@@ -21,10 +22,11 @@
 		{ label: t('format.rules.initialOvertimeMode.label'), mode: perms.initialOvertimeMode },
 		{ label: t('format.rules.csvImportMode.label'), mode: perms.csvImportMode }
 	]);
+	// What regular members see about this person (their groups' overrides already applied)
+	let seen = $derived(effectiveMatrix(perms.visibility, []));
 	let visibility = $derived([
-		{ label: t('format.rules.vacationVisibility.label'), mode: perms.vacationVisibility },
-		{ label: t('format.rules.sickDayVisibility.label'), mode: perms.sickDayVisibility },
-		{ label: t('memberDetail.permissions.timeEntryVisibility'), mode: perms.timeEntryVisibility }
+		{ label: t('visibility.self.inGroups'), kinds: seen.inGroups },
+		{ label: t('visibility.self.outside'), kinds: seen.outsideGroups }
 	]);
 	let capabilities = $derived([
 		{ label: t('memberDetail.permissions.caps.approveAbsences'), on: perms.canApproveAbsences },
@@ -58,11 +60,11 @@
 					<span class="badge badge-sm shrink-0 {modeBadge(r.mode)}">{ruleModeLabel(r.mode)}</span>
 				</div>
 			{/each}
-			<h3 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2 mt-4">{t('memberDetail.permissions.visibility')}</h3>
+			<h3 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2 mt-4">{isSelf ? t('visibility.self.title') : t('visibility.self.titleOther')}</h3>
 			{#each visibility as v}
-				<div class="flex items-center justify-between gap-2 py-1 text-sm">
-					<span class="text-base-content/70">{v.label}</span>
-					<span class="badge badge-sm badge-ghost shrink-0">{visibilityModeLabel(v.mode)}</span>
+				<div class="py-1 text-sm">
+					<span class="text-base-content/70">{v.label}:</span>
+					<span>{v.kinds.length === 0 ? t('visibility.preview.nothing') : v.kinds.map((k) => t(`visibility.short.${k}`)).join(', ')}</span>
 				</div>
 			{/each}
 		</div>

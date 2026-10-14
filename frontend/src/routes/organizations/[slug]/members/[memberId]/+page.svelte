@@ -8,6 +8,7 @@
 	import { organizationsApi, workScheduleApi, absenceDayApi, groupApi } from '$lib/apiClient';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
+	import { canSee } from '$lib/utils/visibility';
 	import MemberCalendar from '$lib/components/MemberCalendar.svelte';
 	import SchedulePeriodEditor from '$lib/components/SchedulePeriodEditor.svelte';
 	import InitialOvertimeEditor from '$lib/components/InitialOvertimeEditor.svelte';
@@ -52,12 +53,13 @@
 	let isSelf = $derived(auth.user?.id === memberId);
 	let memberName = $derived(member ? `${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() : '');
 
-	// Self, admin with visibility enabled, or the overview endpoint returned data
-	let canViewTime = $derived(isSelf || (isAdmin && (org?.memberTimeEntryVisibility ?? false)) || overview !== null);
+	// What the backend lets the caller see about this member (self and admins: everything, admins'
+	// view of tracked times per the org setting; others per the visibility matrix and group admin rights)
+	let canViewTime = $derived(canSee(member, 'TrackedTime'));
+	let canViewSchedule = $derived(canSee(member, 'WorkSchedule'));
+	let canViewAbsences = $derived(isAdmin || canSee(member, 'Vacation') || canSee(member, 'SickDays') || canSee(member, 'OtherAbsences'));
 
-	// Group admins sharing a group with the member may export too (backend is the source of truth)
 	let callerAdminGroupIds = $derived(new Set((org?.members?.find((m) => m.id === auth.user?.id)?.groups ?? []).filter((g) => g.isGroupAdmin).map((g) => g.groupId)));
-	let canGenerateReport = $derived(isSelf || isAdmin || (member?.groups ?? []).some((g) => callerAdminGroupIds.has(g.groupId)));
 	// Admin corrections of the member's entries: org admins, or group admins of a shared group for plain members.
 	// ponytail: the group's "may approve time edits" flag is not checked here; the backend answers 403 without it.
 	let canCorrect = $derived(!isSelf && (isAdmin || (member?.role === 'Member' && (member?.groups ?? []).some((g) => callerAdminGroupIds.has(g.groupId)))));
@@ -87,10 +89,10 @@
 			loading = false;
 		}
 		if (!member) return;
-		loadOverview();
+		if (canViewTime) loadOverview();
 		loadAbsenceTypes();
 		loadMemberPerms();
-		loadSchedule();
+		if (canViewSchedule) loadSchedule();
 	}
 
 	async function loadOrg(fresh = false) {
@@ -184,11 +186,11 @@
 			<MemberSummary {member} {overview} initialOvertimeHours={schedule?.initialOvertimeHours ?? 0} {balance} loading={overviewLoading} />
 		{/if}
 
-		{#if canGenerateReport}
+		{#if canViewTime}
 			<MemberReports {orgSlug} {memberId} subject={isSelf ? t('memberDetail.reports.subjectSelf') : memberName} />
 		{/if}
 
-		{#if isSelf || isAdmin}
+		{#if canViewAbsences}
 			<MemberAbsences
 				class="mb-5"
 				{orgSlug}
@@ -198,7 +200,7 @@
 				canDelete={isAdmin}
 				{isAdmin}
 				{absenceTypes}
-				showAudit
+				showAudit={isSelf || isAdmin}
 				onchanged={reloadOrg}
 			/>
 		{/if}
@@ -207,12 +209,21 @@
 			<MemberPermissions {orgSlug} perms={memberPerms} {isSelf} canManage={isAdmin} />
 		{/if}
 
-		<MemberSchedule class="mb-5" {schedule} loading={scheduleLoading} error={scheduleError} />
-		<InitialOvertimeEditor class="mb-5" {orgSlug} {memberId} hours={schedule?.initialOvertimeHours ?? 0} editable={isAdmin} onsaved={async () => { await loadSchedule(); await calendar?.reloadBalance(); }} />
-		<MemberVacation class="mb-5" {orgSlug} {member} canEdit={isAdmin} onchanged={reloadOrg} />
+		{#if canViewSchedule}
+			<MemberSchedule class="mb-5" {schedule} loading={scheduleLoading} error={scheduleError} />
+		{/if}
+		{#if isSelf || isAdmin}
+			<!-- The starting overtime balance is payroll data: the person and admins only -->
+			<InitialOvertimeEditor class="mb-5" {orgSlug} {memberId} hours={schedule?.initialOvertimeHours ?? 0} editable={isAdmin} onsaved={async () => { await loadSchedule(); await calendar?.reloadBalance(); }} />
+		{/if}
+		{#if canSee(member, 'VacationBalance')}
+			<MemberVacation class="mb-5" {orgSlug} {member} canEdit={isAdmin} onchanged={reloadOrg} />
+		{/if}
 		{#if isAdmin}
 			<MemberCards {orgSlug} {memberId} onchanged={reloadOrg} />
 		{/if}
-		<SchedulePeriodEditor class="mb-5" {orgSlug} {memberId} editable={isAdmin} onchanged={loadSchedule} />
+		{#if canViewSchedule}
+			<SchedulePeriodEditor class="mb-5" {orgSlug} {memberId} editable={isAdmin} onchanged={loadSchedule} />
+		{/if}
 	{/if}
 </div>

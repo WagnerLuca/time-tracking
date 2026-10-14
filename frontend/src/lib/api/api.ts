@@ -468,9 +468,7 @@ export interface EffectivePermissionsResponse {
     'workScheduleChangeMode'?: string | null;
     'initialOvertimeMode'?: string | null;
     'absenceSelfServiceMode'?: string | null;
-    'vacationVisibility'?: string | null;
-    'sickDayVisibility'?: string | null;
-    'timeEntryVisibility'?: string | null;
+    'visibility'?: Array<VisibilityRuleResponse> | null;
     'canApproveAbsences'?: boolean;
     'canApproveTimeEdits'?: boolean;
     'canApproveScheduleChanges'?: boolean;
@@ -544,9 +542,7 @@ export interface GroupPermissionsResponse {
     'workScheduleChangeMode'?: string | null;
     'initialOvertimeMode'?: string | null;
     'absenceSelfServiceMode'?: string | null;
-    'vacationVisibility'?: string | null;
-    'sickDayVisibility'?: string | null;
-    'timeEntryVisibility'?: string | null;
+    'visibility'?: Array<GroupVisibilityRuleResponse> | null;
     'groupAdminCanApproveAbsences'?: boolean | null;
     'groupAdminCanApproveTimeEdits'?: boolean | null;
     'groupAdminCanApproveScheduleChanges'?: boolean | null;
@@ -567,6 +563,22 @@ export interface GroupResponse {
     'memberCount'?: number;
     'isGroupAdmin'?: boolean;
     'groupAdminCanManageMembers'?: boolean;
+}
+/**
+ * Sets a group\'s override of one matrix row (both cells; null = inherit). Kind is a MemberInfo name.
+ */
+export interface GroupVisibilityRuleRequest {
+    'kind'?: string | null;
+    'inGroups'?: boolean | null;
+    'outsideGroups'?: boolean | null;
+}
+/**
+ * A group\'s override of one matrix row: true = allow, false = deny, null = inherit from the organization.
+ */
+export interface GroupVisibilityRuleResponse {
+    'kind'?: string | null;
+    'inGroups'?: boolean | null;
+    'outsideGroups'?: boolean | null;
 }
 /**
  * A country whose public holidays can be imported.
@@ -703,8 +715,11 @@ export interface MemberTimeOverviewResponse {
     'userId'?: number;
     'firstName': string | null;
     'lastName': string | null;
-    'email': string | null;
-    'role': string | null;
+    /**
+     * Email / role / weekly hours are null where the member visibility matrix hides them from the caller.
+     */
+    'email'?: string | null;
+    'role'?: string | null;
     'weeklyWorkHours'?: number | null;
     'totalTrackedMinutes'?: number;
     'netTrackedMinutes'?: number;
@@ -834,8 +849,10 @@ export interface OrganizationDetailResponse {
     'require2fa'?: boolean;
     'csvImportMode': string | null;
     'absenceSelfServiceMode'?: string | null;
-    'vacationVisibility': string | null;
-    'sickDayVisibility': string | null;
+    /**
+     * The member visibility matrix (org defaults), one row per kind of information.
+     */
+    'visibility'?: Array<VisibilityRuleResponse> | null;
     'defaultVacationDays'?: number;
     /**
      * Business day end as local \"HH:mm\" in TimeTracking.Api.Models.Dtos.OrganizationDetailResponse.TimeZone.
@@ -859,11 +876,17 @@ export interface OrganizationDetailResponse {
  */
 export interface OrganizationMemberResponse {
     'id'?: number;
-    'email': string | null;
+    /**
+     * Null when the caller may not see it (member visibility matrix).
+     */
+    'email'?: string | null;
     'firstName': string | null;
     'lastName': string | null;
     'profileImageUrl'?: string | null;
-    'role': string | null;
+    /**
+     * Org role; null when the caller may not see the member\'s groups and roles.
+     */
+    'role'?: string | null;
     'joinedAt'?: string;
     'initialOvertimeHours'?: number;
     /**
@@ -882,13 +905,21 @@ export interface OrganizationMemberResponse {
     'vacationDaysPlanned'?: number;
     'vacationDaysRemaining'?: number;
     /**
-     * Whether the caller may see this member\'s vacation balance (self, admins, or  per the effective VacationVisibility). When false, the vacation figures are zeroed.
+     * Whether the caller may see this member\'s vacation balance (self, admins, or  per the member visibility matrix, kind VacationBalance). When false, the vacation figures are zeroed.
      */
     'vacationVisible'?: boolean;
     /**
      * Number of terminal cards; only filled in for org admins.
      */
     'cardCount'?: number;
+    /**
+     * The kinds of information (TimeTracking.Api.Models.MemberInfo names) the caller may see about this member;  the UI shows only those sections. Hidden members are not in the list at all.
+     */
+    'visibleInfo'?: Array<string> | null;
+    /**
+     * Whether a timer is running right now; null when presence is not visible to the caller.
+     */
+    'isPresent'?: boolean | null;
 }
 /**
  * Summary view of an organization.
@@ -953,6 +984,7 @@ export interface OrganizationSettingsResponse {
     'require2fa'?: boolean;
     'csvImportMode': string | null;
     'absenceSelfServiceMode': string | null;
+    'visibility'?: Array<VisibilityRuleResponse> | null;
     'businessDayEnd': string | null;
     'timeZone': string | null;
     /**
@@ -1466,9 +1498,7 @@ export interface UpdateGroupPermissionsRequest {
     'workScheduleChangeMode'?: RuleMode;
     'initialOvertimeMode'?: RuleMode;
     'absenceSelfServiceMode'?: RuleMode;
-    'vacationVisibility'?: VisibilityMode;
-    'sickDayVisibility'?: VisibilityMode;
-    'timeEntryVisibility'?: VisibilityMode;
+    'visibility'?: Array<GroupVisibilityRuleRequest> | null;
     'groupAdminCanApproveAbsences'?: boolean | null;
     'groupAdminCanApproveTimeEdits'?: boolean | null;
     'groupAdminCanApproveScheduleChanges'?: boolean | null;
@@ -1536,8 +1566,10 @@ export interface UpdateOrganizationSettingsRequest {
     'require2fa'?: boolean | null;
     'csvImportMode'?: RuleMode;
     'absenceSelfServiceMode'?: RuleMode;
-    'vacationVisibility'?: VisibilityMode;
-    'sickDayVisibility'?: VisibilityMode;
+    /**
+     * Rows of the member visibility matrix to change (others stay as they are).
+     */
+    'visibility'?: Array<VisibilityRuleRequest> | null;
     'defaultVacationDays'?: number | null;
     /**
      * Business day end as local \"HH:mm\" (e.g. \"04:00\").
@@ -1683,18 +1715,21 @@ export interface VerifyEmailRequest {
     'token': string;
 }
 /**
- * Controls who can see certain data within an organization.
+ * Sets one row of the organization\'s visibility matrix. Kind is a TimeTracking.Api.Models.MemberInfo name, e.g. \"Vacation\".
  */
-
-export const VisibilityMode = {
-    NUMBER_0: 0,
-    NUMBER_1: 1,
-    NUMBER_2: 2
-} as const;
-
-export type VisibilityMode = typeof VisibilityMode[keyof typeof VisibilityMode];
-
-
+export interface VisibilityRuleRequest {
+    'kind'?: string | null;
+    'inGroups'?: boolean;
+    'outsideGroups'?: boolean;
+}
+/**
+ * One row of the member visibility matrix: may members see this kind about people in / outside their groups.
+ */
+export interface VisibilityRuleResponse {
+    'kind'?: string | null;
+    'inGroups'?: boolean;
+    'outsideGroups'?: boolean;
+}
 /**
  * Work schedule defining target hours per weekday.
  */
@@ -10942,7 +10977,7 @@ export const WorkScheduleApiAxiosParamCreator = function (configuration?: Config
         },
         /**
          * 
-         * @summary Get a specific member\'s active work schedule (admin only).
+         * @summary Get a specific member\'s active work schedule (admins, or per the member visibility matrix).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID.
          * @param {*} [options] Override http request option.
@@ -10984,7 +11019,7 @@ export const WorkScheduleApiAxiosParamCreator = function (configuration?: Config
         },
         /**
          * 
-         * @summary List all work schedules for a specific member (admin only).
+         * @summary List all work schedules for a specific member (admins, or per the member visibility matrix).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID.
          * @param {*} [options] Override http request option.
@@ -11397,7 +11432,7 @@ export const WorkScheduleApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Get a specific member\'s active work schedule (admin only).
+         * @summary Get a specific member\'s active work schedule (admins, or per the member visibility matrix).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID.
          * @param {*} [options] Override http request option.
@@ -11411,7 +11446,7 @@ export const WorkScheduleApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary List all work schedules for a specific member (admin only).
+         * @summary List all work schedules for a specific member (admins, or per the member visibility matrix).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID.
          * @param {*} [options] Override http request option.
@@ -11560,7 +11595,7 @@ export const WorkScheduleApiFactory = function (configuration?: Configuration, b
         },
         /**
          * 
-         * @summary Get a specific member\'s active work schedule (admin only).
+         * @summary Get a specific member\'s active work schedule (admins, or per the member visibility matrix).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID.
          * @param {*} [options] Override http request option.
@@ -11571,7 +11606,7 @@ export const WorkScheduleApiFactory = function (configuration?: Configuration, b
         },
         /**
          * 
-         * @summary List all work schedules for a specific member (admin only).
+         * @summary List all work schedules for a specific member (admins, or per the member visibility matrix).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID.
          * @param {*} [options] Override http request option.
@@ -11692,7 +11727,7 @@ export class WorkScheduleApi extends BaseAPI {
 
     /**
      * 
-     * @summary Get a specific member\'s active work schedule (admin only).
+     * @summary Get a specific member\'s active work schedule (admins, or per the member visibility matrix).
      * @param {string} slug Organization URL slug.
      * @param {number} memberId Member ID.
      * @param {*} [options] Override http request option.
@@ -11704,7 +11739,7 @@ export class WorkScheduleApi extends BaseAPI {
 
     /**
      * 
-     * @summary List all work schedules for a specific member (admin only).
+     * @summary List all work schedules for a specific member (admins, or per the member visibility matrix).
      * @param {string} slug Organization URL slug.
      * @param {number} memberId Member ID.
      * @param {*} [options] Override http request option.

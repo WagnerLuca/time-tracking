@@ -139,10 +139,10 @@
 					<button type="button" class="grid grid-cols-[2fr_0.7fr_0.7fr_0.8fr_0.8fr_0.6fr_0.8fr] gap-2 px-4 py-3 border-b border-base-200 bg-base-100 w-full text-left cursor-pointer transition-colors text-sm items-center hover:bg-base-200/50" aria-expanded={expandedUserId === member.userId} onclick={() => toggleMemberDetail(member.userId!)}>
 						<span class="overflow-hidden">
 							<span class="block font-semibold text-sm">{member.firstName} {member.lastName}</span>
-							<span class="block text-[0.6875rem] text-base-content/50 overflow-hidden text-ellipsis whitespace-nowrap">{member.email}</span>
+							{#if member.email}<span class="block text-[0.6875rem] text-base-content/50 overflow-hidden text-ellipsis whitespace-nowrap">{member.email}</span>{/if}
 						</span>
 						<span class="text-center">
-							<span class="badge badge-sm {member.role === 'Owner' ? 'badge-warning' : member.role === 'Admin' ? 'badge-info' : 'badge-ghost'}">{roleLabel(member.role)}</span>
+							{#if member.role}<span class="badge badge-sm {member.role === 'Owner' ? 'badge-warning' : member.role === 'Admin' ? 'badge-info' : 'badge-ghost'}">{roleLabel(member.role)}</span>{/if}
 						</span>
 						<span class="text-center">
 							{member.weeklyWorkHours ? t('common.hoursShort', { value: formatNumber(member.weeklyWorkHours) }) : '-'}

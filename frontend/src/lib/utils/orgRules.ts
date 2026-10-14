@@ -122,14 +122,6 @@ export function joinPolicyOptions(): ModeOption[] {
 	];
 }
 
-export function visibilityModeOptions(): ModeOption[] {
-	return [
-		{ value: 0, label: t('format.options.private'), activeClass: 'btn-neutral', hint: t('format.options.privateHint') },
-		{ value: 1, label: t('format.options.admins'), activeClass: 'btn-warning', hint: t('format.options.adminsHint') },
-		{ value: 2, label: t('format.options.everyone'), activeClass: 'btn-success', hint: t('format.options.everyoneHint') }
-	];
-}
-
 /** Prepends an Inherit option for group-level overrides (null = inherit from org). */
 export function withInherit(options: ModeOption[]): ModeOption[] {
 	return [{ value: null, label: t('format.options.inherit'), activeClass: 'btn-info', hint: t('format.options.inheritHint') }, ...options];
@@ -150,7 +142,7 @@ export interface ToggleSetting {
 	description: string;
 }
 
-type RuleTextKey = 'editPastEntriesMode' | 'editPauseMode' | 'initialOvertimeMode' | 'joinPolicy' | 'workScheduleChangeMode' | 'csvImportMode' | 'absenceSelfServiceMode' | 'autoPauseEnabled' | 'memberTimeEntryVisibility' | 'require2fa' | 'vacationVisibility' | 'sickDayVisibility';
+type RuleTextKey = 'editPastEntriesMode' | 'editPauseMode' | 'initialOvertimeMode' | 'joinPolicy' | 'workScheduleChangeMode' | 'csvImportMode' | 'absenceSelfServiceMode' | 'autoPauseEnabled' | 'memberTimeEntryVisibility' | 'require2fa';
 
 function setting(key: RuleTextKey) {
 	return { key, label: t(`format.rules.${key}.label`), description: t(`format.rules.${key}.description`) };
@@ -170,36 +162,4 @@ export function ruleSettings(): RuleSetting[] {
 
 export function toggleSettings(): ToggleSetting[] {
 	return [setting('autoPauseEnabled'), setting('memberTimeEntryVisibility'), setting('require2fa')];
-}
-
-// ── Visibility mode settings ──
-
-export interface VisibilitySetting {
-	key: string;
-	label: string;
-	description: string;
-}
-
-export function parseVisibilityMode(mode: string | null | undefined): number {
-	if (mode === 'Private') return 0;
-	if (mode === 'AdminOnly') return 1;
-	if (mode === 'AllMembers') return 2;
-	return 0;
-}
-
-export function visibilityModeLabel(mode: string | null | undefined): string {
-	if (mode === 'AdminOnly') return t('format.visibility.AdminOnly');
-	if (mode === 'AllMembers') return t('format.visibility.AllMembers');
-	return t('format.visibility.Private');
-}
-
-export function visibilityModeButtonClass(mode: string | null | undefined): string {
-	if (mode === 'Private') return 'btn-neutral';
-	if (mode === 'AdminOnly') return 'btn-warning';
-	if (mode === 'AllMembers') return 'btn-success';
-	return 'btn-neutral';
-}
-
-export function visibilitySettings(): VisibilitySetting[] {
-	return [setting('vacationVisibility'), setting('sickDayVisibility')];
 }

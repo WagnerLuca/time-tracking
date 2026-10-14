@@ -69,8 +69,6 @@ export const de = {
 		manage: 'Über Gruppen verwalten →',
 		intro: 'Effektive Rechte aus den Regeln der Organisation und den Gruppen-Überschreibungen.',
 		actions: 'Aktionen',
-		visibility: 'Sichtbarkeit',
-		timeEntryVisibility: 'Sichtbarkeit von Zeiteinträgen',
 		capabilities: 'Genehmigungen & Admin-Rechte',
 		caps: {
 			approveAbsences: 'Abwesenheitsanträge genehmigen',
@@ -196,8 +194,6 @@ export const en: typeof de = {
 		manage: 'Manage via groups →',
 		intro: 'Effective rights from the organization rules and group overrides.',
 		actions: 'Actions',
-		visibility: 'Visibility',
-		timeEntryVisibility: 'Time entry visibility',
 		capabilities: 'Approval & admin capabilities',
 		caps: {
 			approveAbsences: 'Approve absence requests',
