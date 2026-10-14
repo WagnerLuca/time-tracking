@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using TimeTracking.Api.Data;
 using TimeTracking.Api.Models;
 
@@ -7,10 +8,13 @@ public static class DbSeeder
 {
     public static async Task SeedAsync(TimeTrackingDbContext context)
     {
-        // Check if database is already seeded
-        if (context.Users.Any())
+        // Everything below belongs to the demo org and its @example.com users, so it can be
+        // added next to real data (SeedDemoData on a live test instance) — just only once
+        string[] demoEmails = ["max.mueller@example.com", "anna.schmidt@example.com", "tom.weber@example.com"];
+        if (context.Organizations.IgnoreQueryFilters().Any(o => o.Slug == "mueller-software")
+            || context.Users.IgnoreQueryFilters().Any(u => demoEmails.Contains(u.Email)))
         {
-            return; // Database already has data
+            return; // Already seeded
         }
 
         var rng = new Random(42); // deterministic seed for reproducibility
