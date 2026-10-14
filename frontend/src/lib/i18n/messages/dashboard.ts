@@ -1,5 +1,11 @@
 /** Strings for the dashboard (/). `en` is typed against `de`. */
 export const de = {
+	quick: {
+		label: 'Schnellzugriff',
+		addDay: '+ Vergessenen Tag nachtragen',
+		absence: '+ Urlaub oder Abwesenheit',
+		teamCalendar: 'Wer ist diese Woche da?'
+	},
 	pageTitle: 'Übersicht',
 	greeting: 'Hallo, {name}',
 	timer: 'Timer',
@@ -55,6 +61,12 @@ export const de = {
 };
 
 export const en: typeof de = {
+	quick: {
+		label: 'Quick actions',
+		addDay: '+ Add a forgotten day',
+		absence: '+ Vacation or absence',
+		teamCalendar: 'Who is in this week?'
+	},
 	pageTitle: 'Dashboard',
 	greeting: 'Hello, {name}',
 	timer: 'Timer',

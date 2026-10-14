@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
@@ -14,6 +15,7 @@
 	import { DAY_TYPE_CLASSES, dayTypeClasses, personChipStyle, personDotStyle, tintStyle } from '$lib/utils/colors';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
 	import { canSee } from '$lib/utils/visibility';
+	import { markSeen } from '$lib/utils/onboarding';
 	import AbsenceDialog from '$lib/components/AbsenceDialog.svelte';
 	import AbsenceTypeBadge from '$lib/components/AbsenceTypeBadge.svelte';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
@@ -72,6 +74,7 @@
 	$effect(() => {
 		if (!orgSlug) return;
 		untrack(() => {
+			if (auth.user?.id) markSeen(auth.user.id, orgSlug, 'teamCalendar');
 			loadOrg();
 		});
 	});
@@ -465,7 +468,7 @@
 	</div>
 
 	{#if loading}
-		<div class="flex items-center gap-3 justify-center py-12 text-base-content/50"><span class="loading loading-spinner loading-sm"></span><span>{t('common.loading')}</span></div>
+		<Skeleton />
 	{:else if error}
 		<div class="alert alert-error">{error}</div>
 	{:else if org}

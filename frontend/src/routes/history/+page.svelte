@@ -3,7 +3,7 @@
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import MemberCalendar from '$lib/components/MemberCalendar.svelte';
-	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import { t } from '$lib/i18n';
 
 	// Deep link from the failure banner: /history?date=YYYY-MM-DD&entry=<id>
@@ -11,6 +11,11 @@
 	const focusEntryId = $derived.by(() => {
 		const id = Number(page.url.searchParams.get('entry'));
 		return Number.isInteger(id) && id > 0 ? id : null;
+	});
+	// Quick actions: ?date=…&do=add (forgotten day) or &do=absence (request vacation)
+	const focusAction = $derived.by(() => {
+		const a = page.url.searchParams.get('do');
+		return a === 'add' || a === 'absence' ? a : null;
 	});
 </script>
 
@@ -30,10 +35,11 @@
 				isSelf={true}
 				{focusDate}
 				{focusEntryId}
+				{focusAction}
 			/>
 		{/key}
 	{:else if orgContext.loading}
-		<LoadingSpinner size="sm" />
+		<Skeleton />
 	{:else}
 		<div class="card bg-base-100 border border-base-300 p-5">
 			<h2 class="text-base font-semibold m-0">{t('calendar.noOrgTitle')}</h2>

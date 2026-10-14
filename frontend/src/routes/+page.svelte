@@ -15,9 +15,11 @@
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { dayTypeClasses } from '$lib/utils/colors';
 	import { loadDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
-	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import DayTypeLegend from '$lib/components/DayTypeLegend.svelte';
 	import TeamOverview from '$lib/components/TeamOverview.svelte';
+	import OnboardingChecklist from '$lib/components/OnboardingChecklist.svelte';
+	import { isOrgAdmin } from '$lib/utils/orgRules';
 	import { t } from '$lib/i18n';
 
 	interface Stats {
@@ -41,6 +43,8 @@
 	let pending = $state(false);
 
 	const selectedSlug = $derived(orgContext.selectedOrgSlug);
+	/** The forgotten day is usually yesterday. */
+	const yesterday = dateKey(new Date(Date.now() - 86_400_000));
 	const hasSchedule = $derived(!!workSchedule?.weeklyWorkHours);
 	const noOrganizations = $derived(!orgContext.loading && orgContext.organizations.length === 0);
 
@@ -198,12 +202,6 @@
 <div class="max-w-3xl mx-auto">
 	<div class="flex flex-wrap items-center justify-between gap-2 mb-5">
 		<h1 class="text-2xl font-bold text-base-content m-0">{t('dashboard.greeting', { name: auth.user?.firstName ?? '' })}</h1>
-		{#if selectedSlug}
-			<a href="/organizations/{selectedSlug}/absences" class="btn btn-outline btn-sm">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
-				{t('dashboard.teamCalendar')}
-			</a>
-		{/if}
 	</div>
 
 	<!-- Timer: the primary action -->
@@ -236,6 +234,15 @@
 		</div>
 	</section>
 
+	<!-- Quick actions: the everyday tasks one tap away -->
+	{#if selectedSlug}
+		<nav class="grid grid-cols-1 gap-2 mb-6 sm:grid-cols-3" aria-label={t('dashboard.quick.label')}>
+			<a href="/history?date={yesterday}&do=add" class="btn btn-outline justify-start">{t('dashboard.quick.addDay')}</a>
+			<a href="/history?date={dateKey(new Date())}&do=absence" class="btn btn-outline justify-start">{t('dashboard.quick.absence')}</a>
+			<a href="/organizations/{selectedSlug}/absences" class="btn btn-outline justify-start">{t('dashboard.quick.teamCalendar')}</a>
+		</nav>
+	{/if}
+
 	<!-- Actionable empty states -->
 	{#if noOrganizations}
 		<section class="card bg-base-100 border border-base-300 p-5 mb-6">
@@ -251,11 +258,13 @@
 	{/if}
 
 	{#if selectedSlug}
+		{#if isOrgAdmin(orgContext.selectedOrg?.role)}<OnboardingChecklist slug={selectedSlug} list="admin" />{/if}
+		<OnboardingChecklist slug={selectedSlug} list="member" />
 		<TeamOverview slug={selectedSlug} />
 	{/if}
 
 	{#if statsLoading && !stats}
-		<LoadingSpinner size="sm" />
+		<Skeleton />
 	{:else if statsError}
 		<div role="alert" class="alert alert-error mb-6 max-sm:alert-vertical">
 			<span>{statsError}</span>

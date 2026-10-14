@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { getOrgDetail, invalidateOrgDetail } from '$lib/stores/orgDetail';
 	import { onMount, tick, untrack } from 'svelte';
 	import { auth } from '$lib/stores/auth.svelte';
@@ -16,7 +17,7 @@
 	import { createEntryEditor } from '$lib/utils/entryEditor.svelte';
 	import { fetchAllPages } from '$lib/utils/pagination';
 	import { dayPress } from '$lib/utils/dayPress';
-	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import EntryRow from '$lib/components/EntryRow.svelte';
 	import EntryEditForm from '$lib/components/EntryEditForm.svelte';
 	import RequestModal from '$lib/components/RequestModal.svelte';
@@ -39,12 +40,14 @@
 		focusDate?: string | null;
 		/** … and pre-open the editor (or edit request) for this entry. */
 		focusEntryId?: number | null;
+		/** … or open the "add entry" form / the absence dialog for that day (dashboard quick actions). */
+		focusAction?: 'add' | 'absence' | null;
 		/** Called whenever the balance was (re)loaded, e.g. after an entry edit. */
 		onbalance?: (balance: BalanceMinutes | null) => void;
 		/** Admin corrections: the caller may add, edit and delete this member's entries (not with isSelf). */
 		canCorrect?: boolean;
 	}
-	let { orgSlug, orgId = null, userId, isSelf = false, orgDetail: orgDetailProp = null, focusDate = null, focusEntryId = null, onbalance, canCorrect = false }: Props = $props();
+	let { orgSlug, orgId = null, userId, isSelf = false, orgDetail: orgDetailProp = null, focusDate = null, focusEntryId = null, focusAction = null, onbalance, canCorrect = false }: Props = $props();
 	/** Correcting someone else's entries through the admin endpoints. */
 	const correcting = $derived(!isSelf && canCorrect);
 
@@ -164,11 +167,12 @@
 	$effect(() => {
 		const date = focusDate;
 		const entryId = focusEntryId;
+		const action = focusAction;
 		if (loading || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-		untrack(() => applyFocus(date, entryId));
+		untrack(() => applyFocus(date, entryId, action));
 	});
 
-	async function applyFocus(date: string, entryId: number | null) {
+	async function applyFocus(date: string, entryId: number | null, action: 'add' | 'absence' | null = null) {
 		const [y, m] = date.split('-').map(Number);
 		viewMode = 'month';
 		if (y !== currentYear || m - 1 !== currentMonth) {
@@ -184,6 +188,8 @@
 			if (entryPerms.canEdit) editor.startEditEntry(entry);
 			else if (entryPerms.canRequestEdit) editor.startRequest(entry.id!, 'edit');
 		}
+		if (action === 'add' && canAddEntry) editor.startCreate(date);
+		if (action === 'absence' && canAddAbsence) openAbsenceDialog(date);
 		await tick();
 		dayDetailsEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 	}
@@ -598,7 +604,7 @@
 	{/if}
 
 	{#if loading}
-		<LoadingSpinner size="sm" />
+		<Skeleton />
 	{:else if viewMode === 'month'}
 		<!-- MONTH VIEW -->
 		<div>
@@ -781,7 +787,7 @@
 							{/each}
 						</ul>
 					{:else}
-						<p class="text-sm text-base-content/60 m-0">{t('calendar.noEntries')}</p>
+						<EmptyState text={canAddEntry && isPastOrToday(dayDetails.date) ? t('calendar.noEntriesAdd') : t('calendar.noEntries')} />
 					{/if}
 				</section>
 			{/if}
@@ -863,7 +869,7 @@
 			</div>
 
 			{#if yearLoading}
-				<LoadingSpinner size="sm" />
+				<Skeleton />
 			{:else}
 				<!-- Year summary -->
 				{@const yearTotal = yearMonths.reduce((s, m) => s + m.workedMinutes, 0)}
