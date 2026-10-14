@@ -22,6 +22,9 @@ public interface IOrganizationService
     // ── Settings ──
     Task<ServiceResult<OrganizationSettingsResponse>> UpdateSettingsAsync(string slug, int callerUserId, UpdateOrganizationSettingsRequest request);
 
+    // ── Team overview (dashboard) ──
+    Task<ServiceResult<TeamOverviewResponse>> GetTeamOverviewAsync(string slug, int callerUserId);
+
     // ── Time overview (admin) ──
     Task<ServiceResult<List<MemberTimeOverviewResponse>>> GetTimeOverviewAsync(string slug, int callerUserId, DateTime? from, DateTime? to);
     Task<ServiceResult<PaginatedResponse<TimeEntryResponse>>> GetMemberEntriesAsync(string slug, int callerUserId, int userId, DateTime? from, DateTime? to, int limit, int offset);

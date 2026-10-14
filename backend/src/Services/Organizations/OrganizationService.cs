@@ -595,6 +595,77 @@ public class OrganizationService : IOrganizationService
     }
 
     // ────────────────────────────────────────────────────
+    //  Team overview (dashboard, issue #61)
+    // ────────────────────────────────────────────────────
+
+    public async Task<ServiceResult<TeamOverviewResponse>> GetTeamOverviewAsync(string slug, int callerUserId)
+    {
+        var org = await _context.FindOrgBySlugAsync(slug);
+        if (org == null)
+            return ServiceResult.NotFound<TeamOverviewResponse>("Organization not found");
+
+        // Org admins lead everyone, group admins the members of the groups they administer
+        // (#59 sub-groups: add the administered groups' sub-groups to AdministeredGroupIds' expansion here)
+        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
+        var led = visibility.AdministeredGroupIds;
+        if (!visibility.CallerIsOrgAdmin && led.Count == 0)
+            return ServiceResult.Forbidden<TeamOverviewResponse>();
+
+        var members = (await _context.UserOrganizations.AsNoTracking()
+                .Where(uo => uo.OrganizationId == org.Id && uo.UserId != callerUserId && uo.User.IsActive)
+                .Select(uo => new { uo.UserId, uo.User.FirstName, uo.User.LastName, uo.User.ProfileImageUrl, uo.InitialOvertimeHours })
+                .ToListAsync())
+            .Where(m => visibility.Can(m.UserId, MemberInfo.Member)
+                     && (visibility.CallerIsOrgAdmin || visibility.GroupsOf(m.UserId).Any(g => led.Contains(g.Id))))
+            .ToList();
+
+        var groups = members.SelectMany(m => visibility.GroupsOf(m.UserId))
+            .Where(g => visibility.CallerIsOrgAdmin || led.Contains(g.Id))
+            .DistinctBy(g => g.Id)
+            .OrderBy(g => g.Name)
+            .Select(g => new TeamGroupResponse(g.Id, g.Name))
+            .ToList();
+        var groupIds = groups.Select(g => g.Id).ToHashSet();
+
+        var timeIds = members.Where(m => visibility.Can(m.UserId, MemberInfo.TrackedTime)).Select(m => m.UserId).ToList();
+        var presenceIds = members.Where(m => visibility.Can(m.UserId, MemberInfo.Presence)).Select(m => m.UserId).ToHashSet();
+        var clock = OrgClock.For(org);
+        var today = clock.Today();
+        var entries = await DailyReportAggregator.LoadEntriesAsync(_context, org.Id,
+            timeIds.Union(presenceIds).ToList(), clock.StartOfDayUtc(today.AddDays(1)));
+        var running = entries.Where(e => e.IsRunning && !e.IsFailure)
+            .GroupBy(e => e.UserId).ToDictionary(g => g.Key, g => g.Min(e => e.StartTime));
+        var failures = entries.Where(e => e.IsFailure).GroupBy(e => e.UserId).ToDictionary(g => g.Key, g => g.Count());
+        var balances = await DailyReportAggregator.BalancesAsync(_context, org,
+            members.Where(m => timeIds.Contains(m.UserId)).ToDictionary(m => m.UserId, m => m.InitialOvertimeHours),
+            entries.Where(e => timeIds.Contains(e.UserId)));
+        var violations = await CoreHours.OpenViolationsAsync(_context, timeIds, org.Id, today, today);
+
+        return ServiceResult.Ok(new TeamOverviewResponse
+        {
+            Groups = groups,
+            Members = members.Select(m =>
+            {
+                var times = balances.TryGetValue(m.UserId, out var balance);
+                var present = presenceIds.Contains(m.UserId) ? running.ContainsKey(m.UserId) : (bool?)null;
+                return new TeamMemberResponse
+                {
+                    UserId = m.UserId,
+                    FirstName = m.FirstName,
+                    LastName = m.LastName,
+                    ProfileImageUrl = m.ProfileImageUrl,
+                    GroupIds = visibility.GroupsOf(m.UserId).Select(g => g.Id).Where(groupIds.Contains).ToList(),
+                    BalanceHours = times ? Math.Round(balance, 2) : null,
+                    Present = present,
+                    PresentSince = present == true ? running[m.UserId] : null,
+                    FailureCount = times ? failures.GetValueOrDefault(m.UserId) : null,
+                    CoreHoursViolationToday = times ? violations.ContainsKey(m.UserId) : null
+                };
+            }).ToList()
+        });
+    }
+
+    // ────────────────────────────────────────────────────
     //  Time overview (admin)
     // ────────────────────────────────────────────────────
 

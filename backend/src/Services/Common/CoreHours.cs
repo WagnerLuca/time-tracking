@@ -102,10 +102,15 @@ public static class CoreHours
     /// (a day the member has corrected since is left out), keyed by local day.
     /// </summary>
     public static async Task<Dictionary<DateOnly, Result>> OpenViolationsAsync(
-        TimeTrackingDbContext context, int userId, int orgId, DateOnly from, DateOnly to, DateTime? nowUtc = null)
+        TimeTrackingDbContext context, int userId, int orgId, DateOnly from, DateOnly to, DateTime? nowUtc = null) =>
+        (await OpenViolationsAsync(context, [userId], orgId, from, to, nowUtc)).GetValueOrDefault(userId) ?? [];
+
+    /// <summary><see cref="OpenViolationsAsync(TimeTrackingDbContext, int, int, DateOnly, DateOnly, DateTime?)"/> for several members at once (one query when nobody has a stored violation, three otherwise).</summary>
+    public static async Task<Dictionary<int, Dictionary<DateOnly, Result>>> OpenViolationsAsync(
+        TimeTrackingDbContext context, IReadOnlyCollection<int> userIds, int orgId, DateOnly from, DateOnly to, DateTime? nowUtc = null)
     {
         var checks = await context.CoreHoursChecks.AsNoTracking()
-            .Where(c => c.UserId == userId && c.OrganizationId == orgId && c.Date >= from && c.Date <= to
+            .Where(c => userIds.Contains(c.UserId) && c.OrganizationId == orgId && c.Date >= from && c.Date <= to
                      && c.Issues != CoreHoursIssue.None)
             .ToListAsync();
         if (checks.Count == 0) return [];
@@ -113,15 +118,18 @@ public static class CoreHours
         var timeZone = await context.Organizations.AsNoTracking()
             .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
         var clock = OrgClock.For(timeZone);
-        var covered = await CoveredAsync(context, userId, orgId,
+        var checkedUsers = checks.Select(c => c.UserId).Distinct().ToList();
+        var covered = await CoveredAsync(context, checkedUsers, orgId,
             clock.StartOfDayUtc(from), clock.StartOfDayUtc(to.AddDays(1)), nowUtc ?? DateTime.UtcNow);
 
-        var open = new Dictionary<DateOnly, Result>();
+        var open = new Dictionary<int, Dictionary<DateOnly, Result>>();
         foreach (var check in checks)
         {
-            var result = EvaluateDay(covered, check.Date, new CoreWindow(check.WindowStart, check.WindowEnd),
+            var result = EvaluateDay(covered[check.UserId].ToList(), check.Date, new CoreWindow(check.WindowStart, check.WindowEnd),
                 check.HalfDay, check.ToleranceMinutes, clock);
-            if (result.Issues != CoreHoursIssue.None) open[check.Date] = result;
+            if (result.Issues == CoreHoursIssue.None) continue;
+            if (!open.TryGetValue(check.UserId, out var days)) open[check.UserId] = days = [];
+            days[check.Date] = result;
         }
         return open;
     }
@@ -186,9 +194,9 @@ public static class CoreHours
                 if (halves < 2)
                 {
                     check.HalfDay = halves == 1;
-                    var covered = await CoveredAsync(context, userId, org.Id,
+                    var covered = await CoveredAsync(context, [userId], org.Id,
                         clock.ToUtc(day.ToDateTime(window.Start)), clock.ToUtc(day.ToDateTime(window.End)), nowUtc);
-                    var result = EvaluateDay(covered, day, window, check.HalfDay, check.ToleranceMinutes, clock);
+                    var result = EvaluateDay(covered[userId].ToList(), day, window, check.HalfDay, check.ToleranceMinutes, clock);
                     check.Issues = result.Issues;
                     check.MissingMinutes = result.MissingMinutes;
                 }
@@ -280,15 +288,15 @@ public static class CoreHours
         return Math.Min(halves, 2);
     }
 
-    /// <summary>The member's covering intervals overlapping [fromUtc, toUtc): finished non-failure entries, running ones up to now.</summary>
-    private static async Task<List<(DateTime Start, DateTime End)>> CoveredAsync(TimeTrackingDbContext context,
-        int userId, int orgId, DateTime fromUtc, DateTime toUtc, DateTime nowUtc)
+    /// <summary>The members' covering intervals overlapping [fromUtc, toUtc): finished non-failure entries, running ones up to now.</summary>
+    private static async Task<ILookup<int, (DateTime Start, DateTime End)>> CoveredAsync(TimeTrackingDbContext context,
+        IReadOnlyCollection<int> userIds, int orgId, DateTime fromUtc, DateTime toUtc, DateTime nowUtc)
     {
         var entries = await context.TimeEntries.AsNoTracking()
-            .Where(e => e.UserId == userId && e.OrganizationId == orgId && !e.IsFailure
+            .Where(e => userIds.Contains(e.UserId) && e.OrganizationId == orgId && !e.IsFailure
                      && e.StartTime < toUtc && (e.IsRunning || e.EndTime > fromUtc))
-            .Select(e => new { e.StartTime, e.EndTime, e.IsRunning })
+            .Select(e => new { e.UserId, e.StartTime, e.EndTime, e.IsRunning })
             .ToListAsync();
-        return entries.Select(e => (e.StartTime, e.IsRunning ? nowUtc : e.EndTime ?? e.StartTime)).ToList();
+        return entries.ToLookup(e => e.UserId, e => (e.StartTime, e.IsRunning ? nowUtc : e.EndTime ?? e.StartTime));
     }
 }

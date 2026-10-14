@@ -80,7 +80,21 @@ public static class DailyReportAggregator
                      && a.Date >= dateFrom && a.Date <= dateTo)
             .ToListAsync();
 
+        var coreHoursMissed = await CoreHours.OpenViolationsAsync(context, userId, orgId, dateFrom, dateTo);
+        return BuildRows(clock, dateFrom, dateTo, initialOvertimeHours, timeEntries, workSchedules, holidays, absences, coreHoursMissed);
+    }
+
+    /// <summary>
+    /// The day loop of <see cref="BuildAsync"/> over already loaded data (entries: the member's finished
+    /// entries in the range; schedules, holidays and absences: theirs/the org's). Shared with
+    /// <see cref="BalancesAsync"/>, which loads the data of a whole team at once.
+    /// </summary>
+    private static List<DailyReportRow> BuildRows(OrgClock clock, DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours,
+        IEnumerable<TimeEntry> timeEntries, List<WorkSchedule> workSchedules, IEnumerable<Holiday> holidays,
+        IEnumerable<AbsenceDay> absences, IReadOnlyDictionary<DateOnly, CoreHours.Result> coreHoursMissed)
+    {
         var entriesByDate = timeEntries
+            .OrderBy(e => e.StartTime)
             .GroupBy(e => clock.LocalDate(e.StartTime))
             .ToDictionary(g => g.Key, g => g.ToList());
 
@@ -95,7 +109,6 @@ public static class DailyReportAggregator
         }
 
         var absencesByDate = absences.ToDictionary(a => a.Date, a => a);
-        var coreHoursMissed = await CoreHours.OpenViolationsAsync(context, userId, orgId, dateFrom, dateTo);
 
         var rows = new List<DailyReportRow>();
         var cumulativeOvertime = initialOvertimeHours;
@@ -194,6 +207,63 @@ public static class DailyReportAggregator
 
         return (displayRows, overallCumulative);
     }
+
+    /// <summary>
+    /// <see cref="BuildWithRunningTotalAsync"/>'s overall balance (as of today) for several members at once —
+    /// the same number the balance endpoint shows — in four queries for the whole team (entries, schedules,
+    /// holidays, absences) instead of six per member. <paramref name="entries"/> may pass the members' entries
+    /// in the organization when the caller has loaded them anyway (running ones are ignored).
+    /// </summary>
+    public static async Task<Dictionary<int, double>> BalancesAsync(TimeTrackingDbContext context, Organization org,
+        IReadOnlyDictionary<int, double> initialOvertimeByUser, IEnumerable<TimeEntry>? entries = null)
+    {
+        var userIds = initialOvertimeByUser.Keys.ToList();
+        var clock = OrgClock.For(org);
+        var today = clock.Today();
+        var toUtc = clock.StartOfDayUtc(today.AddDays(1));
+
+        entries ??= await LoadEntriesAsync(context, org.Id, userIds, toUtc);
+        var finished = entries.Where(e => !e.IsRunning && e.StartTime < toUtc).ToLookup(e => e.UserId);
+        var firstDay = finished.ToDictionary(g => g.Key, g => clock.LocalDate(g.Min(e => e.StartTime)));
+        var result = userIds.ToDictionary(id => id, id => initialOvertimeByUser[id]);
+        if (firstDay.Count == 0) return result;
+        var from = firstDay.Values.Min();
+
+        var schedules = (await context.WorkSchedules.AsNoTracking()
+                .Where(ws => ws.OrganizationId == org.Id && userIds.Contains(ws.UserId))
+                .OrderBy(ws => ws.ValidFrom)
+                .ToListAsync())
+            .ToLookup(ws => ws.UserId);
+        var holidays = await context.Holidays.AsNoTracking()
+            .Where(h => h.OrganizationId == org.Id && ((h.Date >= from && h.Date <= today) || h.IsRecurring))
+            .ToListAsync();
+        var absences = (await context.AbsenceDays.AsNoTracking()
+                .Include(a => a.CustomType)
+                .Where(a => a.OrganizationId == org.Id && userIds.Contains(a.UserId) && a.Date >= from && a.Date <= today)
+                .ToListAsync())
+            .ToLookup(a => a.UserId);
+
+        foreach (var (userId, start) in firstDay)
+        {
+            if (start > today) continue;
+            var rows = BuildRows(clock, start, today, initialOvertimeByUser[userId], finished[userId],
+                schedules[userId].ToList(), holidays, absences[userId].Where(a => a.Date >= start),
+                new Dictionary<DateOnly, CoreHours.Result>());
+            if (rows.Count > 0) result[userId] = rows[^1].CumulativeOvertime;
+        }
+        return result;
+    }
+
+    /// <summary>The members' entries in the organization starting before <paramref name="beforeUtc"/>, running ones included — only the columns the balance needs.</summary>
+    public static Task<List<TimeEntry>> LoadEntriesAsync(TimeTrackingDbContext context, int orgId, IReadOnlyCollection<int> userIds, DateTime beforeUtc) =>
+        context.TimeEntries.AsNoTracking()
+            .Where(e => e.OrganizationId == orgId && userIds.Contains(e.UserId) && e.StartTime < beforeUtc)
+            .Select(e => new TimeEntry
+            {
+                Id = e.Id, UserId = e.UserId, OrganizationId = e.OrganizationId, StartTime = e.StartTime, EndTime = e.EndTime,
+                IsRunning = e.IsRunning, IsFailure = e.IsFailure, PauseDurationMinutes = e.PauseDurationMinutes
+            })
+            .ToListAsync();
 
     /// <summary>
     /// Hours an absence takes off the day's target. Vacation, sick days and plain "other"

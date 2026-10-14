@@ -129,6 +129,21 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.UpdateSettingsAsync(slug, userId.Value, request));
     }
 
+    /// <summary>
+    /// The dashboard's team overview: one card per member the caller leads (org admins: everyone, group admins:
+    /// their groups' members) with balance, presence, failure entries and today's core hours violation —
+    /// each only where the member visibility matrix shows it. 403 for callers who lead nobody.
+    /// </summary>
+    [HttpGet("{slug}/team-overview")]
+    [RequireOrgRole]
+    [ProducesResponseType(typeof(TeamOverviewResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetTeamOverview(string slug)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.GetTeamOverviewAsync(slug, userId.Value));
+    }
+
     /// <summary>Get time tracking overview for visible members (admin or group admin).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="from">Start of date range filter.</param>

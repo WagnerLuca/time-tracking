@@ -40,15 +40,26 @@ public sealed class MemberVisibility
 
     private readonly Dictionary<int, MemberInfo> _visible;
 
-    private MemberVisibility(Dictionary<int, MemberInfo> visible, int callerUserId, bool callerIsOrgAdmin)
+    private MemberVisibility(Dictionary<int, MemberInfo> visible, int callerUserId, bool callerIsOrgAdmin,
+        ILookup<int, (int Id, string Name)>? groups = null, IReadOnlySet<int>? administeredGroupIds = null)
     {
         _visible = visible;
         CallerUserId = callerUserId;
         CallerIsOrgAdmin = callerIsOrgAdmin;
+        _groups = groups ?? Enumerable.Empty<(int, (int, string))>().ToLookup(x => x.Item1, x => x.Item2);
+        AdministeredGroupIds = administeredGroupIds ?? new HashSet<int>();
     }
+
+    private readonly ILookup<int, (int Id, string Name)> _groups;
 
     public int CallerUserId { get; }
     public bool CallerIsOrgAdmin { get; }
+
+    /// <summary>The active groups the caller is a group admin of.</summary>
+    public IReadOnlySet<int> AdministeredGroupIds { get; }
+
+    /// <summary>The person's active groups (as loaded for the matrix; not filtered by what the caller may see).</summary>
+    public IEnumerable<(int Id, string Name)> GroupsOf(int personId) => _groups[personId];
 
     /// <summary>Everything the caller may see about the person (None for hidden people and non-members).</summary>
     public MemberInfo Of(int personId) => _visible.GetValueOrDefault(personId);
@@ -110,7 +121,7 @@ public sealed class MemberVisibility
             .Where(gm => gm.Group.OrganizationId == org.Id && gm.Group.IsActive)
             .Select(gm => new
             {
-                gm.UserId, gm.GroupId, gm.Role,
+                gm.UserId, gm.GroupId, gm.Role, gm.Group.Name,
                 gm.Group.VisibilityAllowInGroups, gm.Group.VisibilityDenyInGroups,
                 gm.Group.VisibilityAllowOutsideGroups, gm.Group.VisibilityDenyOutsideGroups,
                 gm.Group.GroupAdminCanApproveAbsences, gm.Group.GroupAdminCanViewAllTimeEntries,
@@ -147,7 +158,8 @@ public sealed class MemberVisibility
             if (managesMembers) flags |= MemberInfo.Member;
             if (flags != MemberInfo.None) visible[m.UserId] = flags;
         }
-        return new MemberVisibility(visible, callerUserId, isOrgAdmin);
+        return new MemberVisibility(visible, callerUserId, isOrgAdmin,
+            memberships.ToLookup(m => m.UserId, m => (m.GroupId, m.Name)), administered.Keys.ToHashSet());
     }
 
     // ── Matrix <-> DTOs ──

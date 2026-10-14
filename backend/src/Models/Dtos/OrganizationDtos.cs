@@ -264,3 +264,34 @@ public record MemberVacationDaysResponse
     public int UserId { get; init; }
     public double VacationDaysPerYear { get; init; }
 }
+
+/// <summary>The dashboard's team overview (issue #61): the members the caller leads, with balance and presence.</summary>
+public record TeamOverviewResponse
+{
+    /// <summary>Groups to filter by: every active group for org admins, the administered ones for group admins.</summary>
+    public List<TeamGroupResponse> Groups { get; init; } = new();
+    public List<TeamMemberResponse> Members { get; init; } = new();
+}
+
+public record TeamGroupResponse(int Id, string Name);
+
+/// <summary>One team card. Every nullable value is null where the member visibility matrix hides it from the caller.</summary>
+public record TeamMemberResponse
+{
+    public int UserId { get; init; }
+    public required string FirstName { get; init; }
+    public required string LastName { get; init; }
+    public string? ProfileImageUrl { get; init; }
+    /// <summary>The member's groups among <see cref="TeamOverviewResponse.Groups"/>.</summary>
+    public List<int> GroupIds { get; init; } = new();
+    /// <summary>"Saldo gesamt" — the same number as GET members/{id}/balance (cumulativeOvertimeHours); needs TrackedTime.</summary>
+    public double? BalanceHours { get; init; }
+    /// <summary>A timer runs in this organization right now (failure entries never count); needs Presence.</summary>
+    public bool? Present { get; init; }
+    /// <summary>Start of the running timer (UTC) when present.</summary>
+    public DateTime? PresentSince { get; init; }
+    /// <summary>Unresolved failure entries; needs TrackedTime.</summary>
+    public int? FailureCount { get; init; }
+    /// <summary>Today's core working hours check found a violation that still holds; needs TrackedTime.</summary>
+    public bool? CoreHoursViolationToday { get; init; }
+}
