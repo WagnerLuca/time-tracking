@@ -30,7 +30,8 @@ public static class EffectiveRuleResolver
     /// org has core hours off); a group set to Off wins over every window; otherwise the
     /// shortest window wins, i.e. the latest start and the earliest end of the groups' own
     /// windows (which may come from different groups). An empty result counts as off.
-    /// Inheriting groups (null) have no say once another group overrides.
+    /// Inheriting groups (null) have no say once another group overrides. Pass effective groups
+    /// (<see cref="GroupTree.EffectiveGroupsOf"/>) so sub-groups inherit their parent's window.
     /// </summary>
     public static CoreWindow? CombineCoreHours(Organization org, IEnumerable<Group> groups)
     {
@@ -44,26 +45,19 @@ public static class EffectiveRuleResolver
         return start < end ? new CoreWindow(start, end) : null;
     }
 
+    /// <summary>The user's effective rule for the action: the org default combined with the effective
+    /// values (sub-groups inherit along <see cref="GroupTree"/>) of the user's groups.</summary>
     public static async Task<RuleMode> ResolveAsync(
         TimeTrackingDbContext context, Organization org, int userId, RequestType action)
     {
-        var orgMode = OrgRuleHelper.GetRuleMode(org, action);
-
-        var userGroups = await context.GroupMembers
-            .AsNoTracking()
-            .Include(gm => gm.Group)
-            .Where(gm => gm.UserId == userId
-                      && gm.Group.OrganizationId == org.Id
-                      && gm.Group.IsActive)
-            .Select(gm => gm.Group)
-            .ToListAsync();
-
-        return Combine(orgMode, userGroups.Select(g => OrgRuleHelper.GetGroupRuleMode(g, action)));
+        var tree = await GroupTree.LoadAsync(context, org.Id);
+        return Combine(OrgRuleHelper.GetRuleMode(org, action),
+            tree.EffectiveGroupsOf(userId).Select(g => OrgRuleHelper.GetGroupRuleMode(g, action)));
     }
 
     /// <summary>
     /// True when the user can approve absence requests in this org:
-    /// org Admin/Owner, or Group Admin of a group with the approve-absences capability.
+    /// org Admin/Owner, or Group Admin of a group whose effective capabilities approve absences.
     /// </summary>
     public static async Task<bool> CanApproveAbsencesAsync(
         TimeTrackingDbContext context, int orgId, int userId)
@@ -76,13 +70,8 @@ public static class EffectiveRuleResolver
 
         if (role >= OrganizationRole.Admin) return true;
 
-        return await context.GroupMembers
-            .AsNoTracking()
-            .AnyAsync(gm => gm.UserId == userId
-                         && gm.Role == GroupRole.Admin
-                         && gm.Group.OrganizationId == orgId
-                         && gm.Group.IsActive
-                         && gm.Group.GroupAdminCanApproveAbsences == true);
+        var tree = await GroupTree.LoadAsync(context, orgId);
+        return tree.AdministeredBy(userId).Any(id => tree.Effective(id).GroupAdminCanApproveAbsences == true);
     }
 
     /// <summary>

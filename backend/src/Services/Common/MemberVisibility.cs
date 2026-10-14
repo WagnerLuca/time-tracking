@@ -15,13 +15,15 @@ namespace TimeTracking.Api.Services;
 /// <item>Org admins/owners see everything about everyone, except tracked times, which follow the
 /// organization's <see cref="Organization.MemberTimeEntryVisibility"/> ("admins may see members' hours").</item>
 /// <item>A normal member sees person P per the matrix: column "in own groups" when they share at
-/// least one active group with P, else "outside own groups". <b>The data owner's groups decide</b>:
-/// P's effective column is P's groups' overrides combined with <see cref="Combine"/> — the rule of
+/// least one active group with P — counting ancestors of both sides' groups (sub-groups, <see cref="GroupTree"/>),
+/// so a department and its teams are one "own group" — else "outside own groups". <b>The data owner's groups decide</b>:
+/// P's effective column is P's groups' effective (inherited along the parent chain) overrides combined with <see cref="Combine"/> — the rule of
 /// <see cref="EffectiveRuleResolver.Combine{T}"/> per kind: a group override replaces the org default
 /// in either direction, the most permissive overriding group wins, no override = org default.</item>
 /// <item>Nothing is visible about a person whose <see cref="MemberInfo.Member"/> is hidden.</item>
 /// <item>Group admins (org admins too, which matters for tracked times) keep their capability-based
-/// rights over the members of the groups they administer, on top of the matrix: they always see them (name, email, groups);
+/// rights over the members of the groups they administer and of all their sub-groups (per the administered
+/// group's effective capabilities), on top of the matrix: they always see them (name, email, groups);
 /// <c>GroupAdminCanApproveAbsences</c> adds all absence kinds, notes and the vacation balance;
 /// <c>GroupAdminCanViewAllTimeEntries</c> adds tracked times, work schedule and presence;
 /// <c>GroupAdminCanExportData</c> adds tracked times and work schedule; and
@@ -41,25 +43,27 @@ public sealed class MemberVisibility
     private readonly Dictionary<int, MemberInfo> _visible;
 
     private MemberVisibility(Dictionary<int, MemberInfo> visible, int callerUserId, bool callerIsOrgAdmin,
-        ILookup<int, (int Id, string Name)>? groups = null, IReadOnlySet<int>? administeredGroupIds = null)
+        GroupTree tree, IReadOnlySet<int>? administeredGroupIds = null)
     {
         _visible = visible;
         CallerUserId = callerUserId;
         CallerIsOrgAdmin = callerIsOrgAdmin;
-        _groups = groups ?? Enumerable.Empty<(int, (int, string))>().ToLookup(x => x.Item1, x => x.Item2);
+        Tree = tree;
         AdministeredGroupIds = administeredGroupIds ?? new HashSet<int>();
     }
 
-    private readonly ILookup<int, (int Id, string Name)> _groups;
+    /// <summary>The organization's groups as loaded for the matrix (reuse it instead of loading groups again).</summary>
+    public GroupTree Tree { get; }
 
     public int CallerUserId { get; }
     public bool CallerIsOrgAdmin { get; }
 
-    /// <summary>The active groups the caller is a group admin of.</summary>
+    /// <summary>The active groups the caller is a group admin of, including all their sub-groups (whose members they lead).</summary>
     public IReadOnlySet<int> AdministeredGroupIds { get; }
 
-    /// <summary>The person's active groups (as loaded for the matrix; not filtered by what the caller may see).</summary>
-    public IEnumerable<(int Id, string Name)> GroupsOf(int personId) => _groups[personId];
+    /// <summary>The person's direct active groups (as loaded for the matrix; not filtered by what the caller may see).</summary>
+    public IEnumerable<(int Id, string Name)> GroupsOf(int personId) =>
+        Tree.MembershipsOf(personId).Select(m => (m.GroupId, Tree.Find(m.GroupId)!.Name));
 
     /// <summary>Everything the caller may see about the person (None for hidden people and non-members).</summary>
     public MemberInfo Of(int personId) => _visible.GetValueOrDefault(personId);
@@ -96,7 +100,7 @@ public sealed class MemberVisibility
         return result.HasFlag(MemberInfo.Member) ? result : MemberInfo.None;
     }
 
-    /// <summary>What normal members see about a person with these (active) groups: (in their groups, outside).</summary>
+    /// <summary>What normal members see about a person with these (active, effective — see <see cref="GroupTree.EffectiveGroupsOf"/>) groups: (in their groups, outside).</summary>
     public static (MemberInfo InGroups, MemberInfo OutsideGroups) EffectiveFor(Organization org, IEnumerable<Group> ownerGroups)
     {
         var groups = ownerGroups.ToList();
@@ -112,25 +116,16 @@ public sealed class MemberVisibility
             .ToListAsync();
         var visible = new Dictionary<int, MemberInfo>();
         var caller = members.FirstOrDefault(m => m.UserId == callerUserId);
-        if (caller == null) return new MemberVisibility(visible, callerUserId, false);
+        if (caller == null) return new MemberVisibility(visible, callerUserId, false, new GroupTree([]));
 
         var isOrgAdmin = caller.Role >= OrganizationRole.Admin;
         var adminView = org.MemberTimeEntryVisibility ? AllKinds : AllKinds & ~MemberInfo.TrackedTime;
 
-        var memberships = await context.GroupMembers.AsNoTracking()
-            .Where(gm => gm.Group.OrganizationId == org.Id && gm.Group.IsActive)
-            .Select(gm => new
-            {
-                gm.UserId, gm.GroupId, gm.Role, gm.Group.Name,
-                gm.Group.VisibilityAllowInGroups, gm.Group.VisibilityDenyInGroups,
-                gm.Group.VisibilityAllowOutsideGroups, gm.Group.VisibilityDenyOutsideGroups,
-                gm.Group.GroupAdminCanApproveAbsences, gm.Group.GroupAdminCanViewAllTimeEntries,
-                gm.Group.GroupAdminCanExportData, gm.Group.GroupAdminCanManageMembers
-            })
-            .ToListAsync();
-        var byUser = memberships.ToLookup(m => m.UserId);
-        var callerGroupIds = byUser[callerUserId].Select(m => m.GroupId).ToHashSet();
-        var administered = byUser[callerUserId].Where(m => m.Role == GroupRole.Admin).ToDictionary(m => m.GroupId);
+        // Sub-groups: shared membership counts ancestors on both sides, overrides and admin
+        // capabilities are the groups' effective (inherited) values, see GroupTree
+        var tree = await GroupTree.LoadAsync(context, org.Id);
+        var callerGroupIds = tree.ChainGroupsOf(callerUserId);
+        var administered = tree.AdministeredBy(callerUserId).ToDictionary(id => id, tree.Effective);
         var managesMembers = administered.Values.Any(g => g.GroupAdminCanManageMembers == true);
 
         foreach (var m in members)
@@ -140,16 +135,16 @@ public sealed class MemberVisibility
                 visible[m.UserId] = AllKinds;
                 continue;
             }
-            var groups = byUser[m.UserId].ToList();
-            var shared = groups.Any(g => callerGroupIds.Contains(g.GroupId));
+            var groups = tree.EffectiveGroupsOf(m.UserId).ToList();
+            var chain = tree.ChainGroupsOf(m.UserId);
             var flags = isOrgAdmin ? adminView
-                : shared
+                : chain.Overlaps(callerGroupIds)
                 ? Combine(org.VisibleInGroups, groups.Select(g => (g.VisibilityAllowInGroups, g.VisibilityDenyInGroups)))
                 : Combine(org.VisibleOutsideGroups, groups.Select(g => (g.VisibilityAllowOutsideGroups, g.VisibilityDenyOutsideGroups)));
 
-            foreach (var g in groups)
+            foreach (var id in chain)
             {
-                if (!administered.TryGetValue(g.GroupId, out var admin)) continue;
+                if (!administered.TryGetValue(id, out var admin)) continue;
                 flags |= MemberInfo.Member | MemberInfo.Email | MemberInfo.Groups;
                 if (admin.GroupAdminCanApproveAbsences == true) flags |= Absences;
                 if (admin.GroupAdminCanViewAllTimeEntries == true) flags |= MemberInfo.TrackedTime | MemberInfo.WorkSchedule | MemberInfo.Presence;
@@ -158,8 +153,8 @@ public sealed class MemberVisibility
             if (managesMembers) flags |= MemberInfo.Member;
             if (flags != MemberInfo.None) visible[m.UserId] = flags;
         }
-        return new MemberVisibility(visible, callerUserId, isOrgAdmin,
-            memberships.ToLookup(m => m.UserId, m => (m.GroupId, m.Name)), administered.Keys.ToHashSet());
+        return new MemberVisibility(visible, callerUserId, isOrgAdmin, tree,
+            administered.Keys.SelectMany(tree.Subtree).ToHashSet());
     }
 
     // ── Matrix <-> DTOs ──

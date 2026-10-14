@@ -151,7 +151,12 @@ export const de = {
 	group: {
 		notFound: 'Gruppe nicht gefunden.',
 		alreadyMember: 'Diese Person ist bereits in der Gruppe.',
-		memberNotFound: 'Mitglied nicht in der Gruppe gefunden.'
+		memberNotFound: 'Mitglied nicht in der Gruppe gefunden.',
+		parentNotFound: 'Übergeordnete Gruppe nicht gefunden.',
+		cycle: 'Eine Gruppe kann nicht in sich selbst oder eine ihrer Untergruppen verschoben werden.',
+		tooDeep: 'Gruppen können höchstens 3 Ebenen tief verschachtelt werden.',
+		hasSubGroups: 'Diese Gruppe hat Untergruppen. Wähle, ob sie eine Ebene nach oben rücken oder mit gelöscht werden.',
+		unknownCapability: 'Unbekannte Gruppenadmin-Berechtigung.'
 	},
 	visibility: {
 		unknownKind: 'Unbekannte Art von Information.'
@@ -320,7 +325,12 @@ export const en: typeof de = {
 	group: {
 		notFound: 'Group not found.',
 		alreadyMember: 'This person is already in the group.',
-		memberNotFound: 'Member not found in the group.'
+		memberNotFound: 'Member not found in the group.',
+		parentNotFound: 'Parent group not found.',
+		cycle: 'A group cannot be moved into itself or one of its sub-groups.',
+		tooDeep: 'Groups can be nested at most 3 levels deep.',
+		hasSubGroups: 'This group has sub-groups. Choose whether to move them up one level or delete them with it.',
+		unknownCapability: 'Unknown group admin capability.'
 	},
 	visibility: {
 		unknownKind: 'Unknown kind of information.'

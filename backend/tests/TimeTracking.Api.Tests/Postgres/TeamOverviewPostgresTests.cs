@@ -15,7 +15,8 @@ namespace TimeTracking.Api.Tests.Postgres;
 
 /// <summary>
 /// The team overview on real Postgres with 50 members and half a year of entries each: a fixed, single-digit
-/// number of queries however large the team is, and every balance equal to the per-member computation.
+/// number of queries however large the team is (and however deep its sub-groups), and every balance equal to
+/// the per-member computation.
 /// </summary>
 [Collection(PostgresCollection.Name)]
 public class TeamOverviewPostgresTests
@@ -53,7 +54,7 @@ public class TeamOverviewPostgresTests
         _ = _factory.Server;   // starts the app: migrations + seed
         var clock = OrgClock.For("Europe/Berlin");
         var today = clock.Today();
-        int orgId, ownerId;
+        int orgId, ownerId, leadId;
         await using (var db = Db())
         {
             var org = new Organization { Name = "Team perf", Slug = "pg-team-perf", MemberTimeEntryVisibility = true };
@@ -61,8 +62,14 @@ public class TeamOverviewPostgresTests
             db.AddRange(org, owner);
             db.UserOrganizations.Add(new UserOrganization { User = owner, Organization = org, Role = OrganizationRole.Owner });
             db.Holidays.Add(new Holiday { Organization = org, Name = "Fixed", Date = today.AddDays(-40) });
-            var group = new Group { Organization = org, Name = "Half" };
-            db.Groups.Add(group);
+            // Half the team sits two levels below the department its lead administers (#59 sub-groups)
+            var lead = new User { Email = "pg-team-lead@pg.test", FirstName = "Lea", LastName = "Lead" };
+            db.UserOrganizations.Add(new UserOrganization { User = lead, Organization = org });
+            var top = new Group { Organization = org, Name = "Department", GroupAdminCanViewAllTimeEntries = true };
+            var mid = new Group { Organization = org, Name = "Area", ParentGroup = top };
+            var group = new Group { Organization = org, Name = "Half", ParentGroup = mid };
+            db.Groups.AddRange(top, mid, group);
+            db.GroupMembers.Add(new GroupMember { Group = top, User = lead, Role = GroupRole.Admin });
             for (var i = 0; i < 50; i++)
             {
                 var user = new User { Email = $"pg-team-{i}@pg.test", FirstName = $"M{i:00}", LastName = "Test" };
@@ -96,6 +103,7 @@ public class TeamOverviewPostgresTests
             await db.SaveChangesAsync();
             orgId = org.Id;
             ownerId = owner.Id;
+            leadId = lead.Id;
         }
 
         var counter = new CountingInterceptor();
@@ -111,9 +119,18 @@ public class TeamOverviewPostgresTests
             _output.WriteLine($"team overview, 50 members: {counter.Count} queries, {watch.ElapsedMilliseconds} ms");
             counter.Count.Should().BeLessThan(10);
             watch.ElapsedMilliseconds.Should().BeLessThan(2000);
+
+            // The department lead: the 25 members two levels down, in the same number of queries
+            (await service.GetTeamOverviewAsync("pg-team-perf", leadId)).Data.Should().NotBeNull();
+            counter.Count = 0;
+            var led = (await service.GetTeamOverviewAsync("pg-team-perf", leadId)).Data!;
+            _output.WriteLine($"team overview, department lead over 3 levels: {counter.Count} queries");
+            counter.Count.Should().BeLessThan(10);
+            led.Members.Should().HaveCount(25).And.OnlyContain(m => m.BalanceHours != null);
         }
 
-        overview.Members.Should().HaveCount(50);
+        overview.Members.Should().HaveCount(51);   // + the lead (no entries)
+        overview.Members.RemoveAll(m => m.UserId == leadId);
         overview.Members.Count(m => m.Present == true).Should().Be(13);
         overview.Members.Sum(m => m.FailureCount).Should().Be(5);
         await using (var db = Db())

@@ -59,6 +59,8 @@ public record MemberGroupResponse
     public required string Name { get; init; }
     public string? Color { get; init; }
     public bool IsGroupAdmin { get; init; }
+    /// <summary>Set for an inherited membership (an ancestor of a direct group): the direct group it comes through.</summary>
+    public string? ViaGroupName { get; init; }
 }
 
 /// <summary>Organization member profile and role.</summary>

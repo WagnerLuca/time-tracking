@@ -27,32 +27,43 @@ public class GroupService : IGroupService
         return (org, membership);
     }
 
-    private static bool CanGroupAdminManage(Group group, int userId) =>
-        group.GroupAdminCanManageMembers == true
-        && group.Members.Any(m => m.UserId == userId && m.Role == GroupRole.Admin);
+    public const string ParentNotFoundMessage = "Parent group not found.";
+    public const string HasSubGroupsMessage = "This group has sub-groups. Choose whether to move them up one level or delete them with it.";
+    public const string UnknownCapabilityMessage = "Unknown group admin capability.";
 
-    private static GroupMemberResponse ToMemberResponse(GroupMember gm, MemberVisibility? visibility = null) => new(
+    /// <summary>The member-management capability (an <see cref="GroupTree.Effective"/> group's value).</summary>
+    private static bool ManagesMembers(Group g) => g.GroupAdminCanManageMembers == true;
+
+    /// <summary>Group admins of this group or of an ancestor whose effective settings allow member management.</summary>
+    private async Task<bool> CanGroupAdminManageAsync(int orgId, int groupId, int userId) =>
+        (await GroupTree.LoadAsync(_context, orgId)).AdministersWith(userId, groupId, ManagesMembers);
+
+    private static GroupMemberResponse ToMemberResponse(GroupMember gm, MemberVisibility? visibility = null, string? via = null) => new(
         gm.UserId,
         gm.User.FirstName,
         gm.User.LastName,
         visibility == null || visibility.Can(gm.UserId, MemberInfo.Email) ? gm.User.Email : null,
         gm.User.ProfileImageUrl,
         gm.Role.ToString(),
-        gm.JoinedAt
+        gm.JoinedAt,
+        via
     );
 
     /// <summary>Being listed in a group reveals the membership: only people whose groups the caller may see.</summary>
     private static bool Listed(MemberVisibility visibility, int userId) =>
         visibility.Can(userId, MemberInfo.Member | MemberInfo.Groups);
 
-    private static GroupDetailResponse ToDetailResponse(Group g, IList<GroupMember> members, MemberVisibility? visibility = null) => new(
+    private static GroupDetailResponse ToDetailResponse(Group g, IList<GroupMember> members, MemberVisibility? visibility = null,
+        IEnumerable<GroupMemberResponse>? inherited = null) => new(
         g.Id,
         g.OrganizationId,
         g.Name,
         g.Description,
         g.Color,
         g.CreatedAt,
-        members.Where(m => visibility == null || Listed(visibility, m.UserId)).Select(m => ToMemberResponse(m, visibility)).ToList()
+        members.Where(m => visibility == null || Listed(visibility, m.UserId)).Select(m => ToMemberResponse(m, visibility))
+            .Concat(inherited ?? []).ToList(),
+        g.ParentGroupId
     );
 
     // ── Queries ─────────────────────────────────────────────────────────────
@@ -64,14 +75,10 @@ public class GroupService : IGroupService
         if (membership is null) return ServiceResult.Forbidden<List<GroupResponse>>("You are not a member of this organization.");
 
         var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
+        var tree = visibility.Tree;
+        var isOrgAdmin = membership.Role >= OrganizationRole.Admin;
 
-        var groups = await _context.Groups
-            .Where(g => g.OrganizationId == org.Id)
-            .Include(g => g.Members)
-            .OrderBy(g => g.Name)
-            .ToListAsync();
-
-        var result = groups.Select(g =>
+        var result = tree.Groups.OrderBy(g => g.Name).Select(g =>
         {
             var myMembership = g.Members.FirstOrDefault(m => m.UserId == callerUserId);
             return new GroupResponse(
@@ -83,7 +90,9 @@ public class GroupService : IGroupService
                 g.CreatedAt,
                 g.Members.Count(m => Listed(visibility, m.UserId)),
                 IsGroupAdmin: myMembership?.Role == GroupRole.Admin,
-                GroupAdminCanManageMembers: g.GroupAdminCanManageMembers == true
+                GroupAdminCanManageMembers: ManagesMembers(tree.Effective(g.Id)),
+                ParentGroupId: tree.ParentOf(g.Id),
+                CanManageMembers: isOrgAdmin || tree.AdministersWith(callerUserId, g.Id, ManagesMembers)
             );
         }).ToList();
 
@@ -96,25 +105,47 @@ public class GroupService : IGroupService
         if (org is null) return ServiceResult.NotFound<GroupDetailResponse>("Organization not found.");
         if (membership is null) return ServiceResult.Forbidden<GroupDetailResponse>("You are not a member of this organization.");
 
-        var group = await _context.Groups
-            .Include(g => g.Members)
-            .ThenInclude(gm => gm.User)
-            .FirstOrDefaultAsync(g => g.Id == groupId && g.OrganizationId == org.Id);
-
+        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
+        var group = visibility.Tree.Find(groupId);
         if (group is null) return ServiceResult.NotFound<GroupDetailResponse>("Group not found.");
 
-        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
-        return ServiceResult.Ok(ToDetailResponse(group, group.Members.ToList(), visibility));
+        // Direct members, then the members of the sub-groups (inherited membership, once each)
+        var subtree = visibility.Tree.Subtree(groupId).ToList();
+        var rows = await _context.GroupMembers.AsNoTracking()
+            .Include(gm => gm.User)
+            .Where(gm => subtree.Contains(gm.GroupId))
+            .ToListAsync();
+        var direct = rows.Where(r => r.GroupId == groupId).ToList();
+        var seen = direct.Select(r => r.UserId).ToHashSet();
+        var inherited = subtree.Skip(1)
+            .SelectMany(id => rows.Where(r => r.GroupId == id).OrderBy(r => r.User.LastName))
+            .Where(r => Listed(visibility, r.UserId) && seen.Add(r.UserId))
+            .Select(r => ToMemberResponse(r, visibility, visibility.Tree.Find(r.GroupId)!.Name) with { Role = nameof(GroupRole.Member) })
+            .ToList();
+        return ServiceResult.Ok(ToDetailResponse(group, direct, visibility, inherited));
     }
 
     // ── Commands ─────────────────────────────────────────────────────────────
 
+    /// <summary>Org admins create any group; a group admin may create sub-groups below a group they lead with member management.</summary>
     public async Task<ServiceResult<GroupDetailResponse>> CreateGroupAsync(string slug, int callerUserId, CreateGroupRequest request)
     {
         var (org, membership) = await ResolveOrgMemberAsync(slug, callerUserId);
         if (org is null) return ServiceResult.NotFound<GroupDetailResponse>("Organization not found.");
-        if (membership is null || membership.Role < OrganizationRole.Admin)
+        var isOrgAdmin = membership is { Role: >= OrganizationRole.Admin };
+        if (membership is null || (!isOrgAdmin && request.ParentGroupId is null))
             return ServiceResult.Forbidden<GroupDetailResponse>("Only admins can create groups.");
+
+        if (request.ParentGroupId is { } parentId)
+        {
+            var tree = await GroupTree.LoadAsync(_context, org.Id);
+            if (tree.Find(parentId) is null)
+                return ServiceResult.BadRequest<GroupDetailResponse>(ParentNotFoundMessage);
+            if (!isOrgAdmin && !tree.AdministersWith(callerUserId, parentId, ManagesMembers))
+                return ServiceResult.Forbidden<GroupDetailResponse>("Only admins can create groups.");
+            if (tree.CheckPlacement(null, parentId) is { } placementError)
+                return ServiceResult.BadRequest<GroupDetailResponse>(placementError);
+        }
 
         var group = new Group
         {
@@ -122,13 +153,14 @@ public class GroupService : IGroupService
             Name = request.Name.Trim(),
             Description = request.Description?.Trim(),
             Color = request.Color?.Trim(),
+            ParentGroupId = request.ParentGroupId,
         };
 
         _context.Groups.Add(group);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Group {GroupId} '{Name}' created in org {Slug} by user {UserId}",
-            group.Id, group.Name, slug, callerUserId);
+        _logger.LogInformation("Group {GroupId} '{Name}' created in org {Slug} (parent {ParentId}) by user {UserId}",
+            group.Id, group.Name, slug, group.ParentGroupId, callerUserId);
 
         return ServiceResult.Ok(ToDetailResponse(group, new List<GroupMember>()));
     }
@@ -147,9 +179,19 @@ public class GroupService : IGroupService
 
         if (group is null) return ServiceResult.NotFound<GroupDetailResponse>("Group not found.");
 
+        if (request.ParentGroupId != group.ParentGroupId && request.ParentGroupId is { } parentId)
+        {
+            var tree = await GroupTree.LoadAsync(_context, org.Id);
+            if (tree.Find(parentId) is null)
+                return ServiceResult.BadRequest<GroupDetailResponse>(ParentNotFoundMessage);
+            if (tree.CheckPlacement(groupId, parentId) is { } placementError)
+                return ServiceResult.BadRequest<GroupDetailResponse>(placementError);
+        }
+
         group.Name = request.Name.Trim();
         group.Description = request.Description?.Trim();
         group.Color = request.Color?.Trim();
+        group.ParentGroupId = request.ParentGroupId;
         group.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
@@ -157,23 +199,41 @@ public class GroupService : IGroupService
         return ServiceResult.Ok(ToDetailResponse(group, group.Members.ToList()));
     }
 
-    public async Task<ServiceResult> DeleteGroupAsync(string slug, int groupId, int callerUserId)
+    /// <summary>
+    /// Deactivates the group. Its sub-groups are never left orphaned: with
+    /// <see cref="SubGroupAction.MoveUp"/> they move to the group's parent, with
+    /// <see cref="SubGroupAction.Delete"/> the whole subtree goes; without a choice a group with
+    /// sub-groups is not deleted.
+    /// </summary>
+    public async Task<ServiceResult> DeleteGroupAsync(string slug, int groupId, int callerUserId, SubGroupAction? subGroups = null)
     {
         var (org, membership) = await ResolveOrgMemberAsync(slug, callerUserId);
         if (org is null) return ServiceResult.NotFound("Organization not found.");
         if (membership is null || membership.Role < OrganizationRole.Admin)
             return ServiceResult.Forbidden("Only admins can delete groups.");
 
-        var group = await _context.Groups
-            .FirstOrDefaultAsync(g => g.Id == groupId && g.OrganizationId == org.Id);
-
+        var groups = await _context.Groups.Where(g => g.OrganizationId == org.Id && g.IsActive).ToListAsync();
+        var group = groups.FirstOrDefault(g => g.Id == groupId);
         if (group is null) return ServiceResult.NotFound("Group not found.");
 
-        group.IsActive = false;
-        group.UpdatedAt = DateTime.UtcNow;
+        var tree = new GroupTree(groups);
+        var children = tree.ChildrenOf(groupId).ToList();
+        if (children.Count > 0 && subGroups is null)
+            return ServiceResult.BadRequest(HasSubGroupsMessage);
+
+        var now = DateTime.UtcNow;
+        var removed = subGroups == SubGroupAction.Delete ? tree.Subtree(groupId).ToHashSet() : [groupId];
+        var newParent = tree.ParentOf(groupId);
+        foreach (var g in groups)
+        {
+            if (removed.Contains(g.Id)) g.IsActive = false;
+            else if (children.Contains(g.Id)) g.ParentGroupId = newParent;
+            else continue;
+            g.UpdatedAt = now;
+        }
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Group {GroupId} deleted in org {Slug} by user {UserId}", groupId, slug, callerUserId);
+        _logger.LogInformation("Group {GroupId} deleted in org {Slug} by user {UserId} (sub-groups: {SubGroups})", groupId, slug, callerUserId, subGroups);
 
         return ServiceResult.Ok();
     }
@@ -193,7 +253,7 @@ public class GroupService : IGroupService
 
         // Org admins, or group admins when the group allows them to manage members
         var isOrgAdmin = callerMembership?.Role >= OrganizationRole.Admin;
-        if (!isOrgAdmin && !CanGroupAdminManage(group, callerUserId))
+        if (!isOrgAdmin && !await CanGroupAdminManageAsync(org.Id, groupId, callerUserId))
             return ServiceResult.Forbidden<GroupMemberResponse>("Only org admins, or group admins with member management rights, can add members.");
 
         // Target user must be an org member
@@ -272,7 +332,7 @@ public class GroupService : IGroupService
         var isSelf = callerUserId == targetUserId;
         // Group admins may remove regular members only, and only with member management rights
         var targetIsGroupAdmin = group.Members.Any(m => m.UserId == targetUserId && m.Role == GroupRole.Admin);
-        var groupAdminMayRemove = CanGroupAdminManage(group, callerUserId) && !targetIsGroupAdmin;
+        var groupAdminMayRemove = !targetIsGroupAdmin && await CanGroupAdminManageAsync(org.Id, groupId, callerUserId);
 
         if (!isOrgAdmin && !groupAdminMayRemove && !isSelf)
             return ServiceResult.Forbidden("Only org admins, group admins with member management rights, or the member themselves can remove a member.");
@@ -306,8 +366,20 @@ public class GroupService : IGroupService
         group.GroupAdminCanExportData,
         group.CoreHoursMode?.ToString(),
         group.CoreHoursStart?.ToString("HH:mm"),
-        group.CoreHoursEnd?.ToString("HH:mm")
+        group.CoreHoursEnd?.ToString("HH:mm"),
+        group.ParentGroupId
     );
+
+    /// <summary>Resets a capability flag to "inherit", by its request/response property name.</summary>
+    private static readonly Dictionary<string, Action<Group>> CapabilityResets = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [nameof(Group.GroupAdminCanApproveAbsences)] = g => g.GroupAdminCanApproveAbsences = null,
+        [nameof(Group.GroupAdminCanApproveTimeEdits)] = g => g.GroupAdminCanApproveTimeEdits = null,
+        [nameof(Group.GroupAdminCanApproveScheduleChanges)] = g => g.GroupAdminCanApproveScheduleChanges = null,
+        [nameof(Group.GroupAdminCanManageMembers)] = g => g.GroupAdminCanManageMembers = null,
+        [nameof(Group.GroupAdminCanViewAllTimeEntries)] = g => g.GroupAdminCanViewAllTimeEntries = null,
+        [nameof(Group.GroupAdminCanExportData)] = g => g.GroupAdminCanExportData = null,
+    };
 
     public async Task<ServiceResult<GroupPermissionsResponse>> GetPermissionsAsync(string slug, int groupId, int callerUserId)
     {
@@ -362,6 +434,12 @@ public class GroupService : IGroupService
         if (request.GroupAdminCanManageMembers.HasValue) group.GroupAdminCanManageMembers = request.GroupAdminCanManageMembers;
         if (request.GroupAdminCanViewAllTimeEntries.HasValue) group.GroupAdminCanViewAllTimeEntries = request.GroupAdminCanViewAllTimeEntries;
         if (request.GroupAdminCanExportData.HasValue) group.GroupAdminCanExportData = request.GroupAdminCanExportData;
+        foreach (var name in request.InheritCapabilities ?? [])
+        {
+            if (!CapabilityResets.TryGetValue(name, out var reset))
+                return ServiceResult.BadRequest<GroupPermissionsResponse>(UnknownCapabilityMessage);
+            reset(group);
+        }
         if (request.CoreHoursMode.HasValue)
         {
             group.CoreHoursMode = NormalizeOverride(request.CoreHoursMode);
@@ -404,14 +482,9 @@ public class GroupService : IGroupService
 
         var isOrgAdmin = targetMembership.Role >= OrganizationRole.Admin;
 
-        // Get all groups the target user belongs to
-        var userGroups = await _context.Groups
-            .Where(g => g.OrganizationId == org.Id && g.IsActive && g.Members.Any(m => m.UserId == userId))
-            .ToListAsync();
-
-        var userGroupIds = userGroups.Select(g => g.Id).ToList();
-        var isGroupAdmin = await _context.GroupMembers
-            .AnyAsync(gm => userGroupIds.Contains(gm.GroupId) && gm.UserId == userId && gm.Role == GroupRole.Admin);
+        // The target's groups with their effective (inherited along the parent chain) settings
+        var tree = await GroupTree.LoadAsync(_context, org.Id);
+        var userGroups = tree.EffectiveGroupsOf(userId).ToList();
 
         // Resolve permissions: most permissive group override wins
         var editPastEntries = ResolveRuleMode(org.EditPastEntriesMode, userGroups, g => g.EditPastEntriesMode);
@@ -422,13 +495,15 @@ public class GroupService : IGroupService
         var absenceSelfService = ResolveRuleMode(org.AbsenceSelfServiceMode, userGroups, g => g.AbsenceSelfServiceMode);
         var (visibleInGroups, visibleOutside) = MemberVisibility.EffectiveFor(org, userGroups);
 
-        // Group Admin capabilities (only apply if user is a group admin in any group)
-        bool canApproveAbsences = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanApproveAbsences == true));
-        bool canApproveTimeEdits = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanApproveTimeEdits == true));
-        bool canApproveScheduleChanges = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanApproveScheduleChanges == true));
-        bool canManageGroupMembers = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanManageMembers == true));
-        bool canViewAllTimeEntries = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanViewAllTimeEntries == true));
-        bool canExportData = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanExportData == true));
+        // Group Admin capabilities: the effective capabilities of the groups the user administers
+        // (they apply to those groups' members and all their sub-groups)
+        bool Can(Func<Group, bool> capability) => isOrgAdmin || tree.AdministeredBy(userId).Any(id => capability(tree.Effective(id)));
+        bool canApproveAbsences = Can(g => g.GroupAdminCanApproveAbsences == true);
+        bool canApproveTimeEdits = Can(g => g.GroupAdminCanApproveTimeEdits == true);
+        bool canApproveScheduleChanges = Can(g => g.GroupAdminCanApproveScheduleChanges == true);
+        bool canManageGroupMembers = Can(ManagesMembers);
+        bool canViewAllTimeEntries = Can(g => g.GroupAdminCanViewAllTimeEntries == true);
+        bool canExportData = Can(g => g.GroupAdminCanExportData == true);
 
         return ServiceResult.Ok(new EffectivePermissionsResponse(
             editPastEntries.ToString(),

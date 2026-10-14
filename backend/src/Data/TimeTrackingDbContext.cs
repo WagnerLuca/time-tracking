@@ -445,6 +445,12 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Sub-groups (#59): same organization and no cycles are checked by GroupService
+            entity.HasOne(e => e.ParentGroup)
+                .WithMany()
+                .HasForeignKey(e => e.ParentGroupId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Configure GroupMember entity

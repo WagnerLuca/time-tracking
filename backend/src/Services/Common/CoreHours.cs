@@ -150,6 +150,7 @@ public static class CoreHours
 
         var added = 0;
         var violations = new List<(Organization Org, CoreHoursCheck Check)>();
+        var trees = new Dictionary<int, GroupTree>();
         foreach (var org in orgs)
         {
             var clock = OrgClock.For(org);
@@ -162,16 +163,13 @@ public static class CoreHours
                 .ToListAsync(ct);
             if (pending.Count == 0) continue;
 
-            var memberships = await context.GroupMembers.AsNoTracking()
-                .Where(gm => gm.Group.OrganizationId == org.Id && gm.Group.IsActive && pending.Contains(gm.UserId))
-                .Select(gm => new { gm.UserId, gm.Group })
-                .ToListAsync(ct);
+            var tree = trees[org.Id] = await GroupTree.LoadAsync(context, org.Id, ct);
             Holiday? holiday = null;
             var holidayLoaded = false;
 
             foreach (var userId in pending)
             {
-                var window = EffectiveRuleResolver.CombineCoreHours(org, memberships.Where(m => m.UserId == userId).Select(m => m.Group));
+                var window = EffectiveRuleResolver.CombineCoreHours(org, tree.EffectiveGroupsOf(userId));
                 if (window == null) continue;
                 if (nowUtc < clock.ToUtc(day.ToDateTime(window.End)).AddMinutes(org.CoreHoursToleranceMinutes)) continue;
 
@@ -218,10 +216,10 @@ public static class CoreHours
                 .Where(uo => uo.OrganizationId == org.Id && uo.IsActive && uo.Role >= OrganizationRole.Admin && uo.User.IsActive)
                 .Select(uo => uo.User)
                 .ToListAsync(ct);
-            var groupAdmins = await context.GroupMembers.AsNoTracking()
-                .Where(gm => gm.Role == GroupRole.Admin && gm.Group.OrganizationId == org.Id && gm.Group.IsActive
-                          && gm.User.IsActive && gm.Group.Members.Any(m => m.UserId == check.UserId))
-                .Select(gm => gm.User)
+            // The admins of the member's groups and of every ancestor group (sub-groups, GroupTree)
+            var groupAdminIds = trees[org.Id].ChainGroupsOf(check.UserId).SelectMany(trees[org.Id].AdminsOf).ToHashSet();
+            var groupAdmins = await context.Users.AsNoTracking()
+                .Where(u => u.IsActive && groupAdminIds.Contains(u.Id))
                 .ToListAsync(ct);
             var recipients = admins.Concat(groupAdmins).Prepend(member).DistinctBy(u => u.Id).ToList();
 

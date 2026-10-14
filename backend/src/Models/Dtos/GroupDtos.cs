@@ -12,8 +12,12 @@ public record GroupResponse(
     DateTime CreatedAt,
     int MemberCount,
     bool IsGroupAdmin,
-    /// <summary>Whether group admins of this group may add/remove regular members.</summary>
-    bool GroupAdminCanManageMembers
+    /// <summary>Whether group admins of this group may add/remove regular members (effective, inherited from the parent when not set).</summary>
+    bool GroupAdminCanManageMembers,
+    /// <summary>The parent group (sub-groups, at most 3 levels), null = top level.</summary>
+    int? ParentGroupId = null,
+    /// <summary>Whether the caller may add/remove members and create sub-groups here (org admin, or admin of this group or an ancestor with member management).</summary>
+    bool CanManageMembers = false
 );
 
 public record GroupDetailResponse(
@@ -23,7 +27,9 @@ public record GroupDetailResponse(
     string? Description,
     string? Color,
     DateTime CreatedAt,
-    IList<GroupMemberResponse> Members
+    // Direct members first, then the members of sub-groups (ViaGroupName set)
+    IList<GroupMemberResponse> Members,
+    int? ParentGroupId = null
 );
 
 public record GroupMemberResponse(
@@ -34,20 +40,35 @@ public record GroupMemberResponse(
     string? Email,
     string? ProfileImageUrl,
     string Role,
-    DateTime JoinedAt
+    DateTime JoinedAt,
+    // Set for a member of a sub-group (inherited membership): the sub-group they are in
+    string? ViaGroupName = null
 );
 
 public record CreateGroupRequest(
     string Name,
     string? Description,
-    string? Color
+    string? Color,
+    // Parent group (same organization), null = top level
+    int? ParentGroupId = null
 );
 
 public record UpdateGroupRequest(
     string Name,
     string? Description,
-    string? Color
+    string? Color,
+    // Parent group (same organization), null = top level; a group cannot move into its own subtree
+    int? ParentGroupId = null
 );
+
+/// <summary>What happens to the sub-groups of a group that is deleted.</summary>
+public enum SubGroupAction
+{
+    /// <summary>They move up one level (to the deleted group's parent).</summary>
+    MoveUp = 0,
+    /// <summary>They are deleted with it (the whole subtree).</summary>
+    Delete = 1
+}
 
 public record AddGroupMemberRequest(
     int UserId,
@@ -61,7 +82,7 @@ public record UpdateGroupMemberRoleRequest(
 public record GroupPermissionsResponse(
     int GroupId,
     string GroupName,
-    // Permission overrides (null = inherited from org)
+    // Permission overrides (null = inherited from the parent group, at the top from the org)
     string? EditPastEntriesMode,
     string? EditPauseMode,
     string? CsvImportMode,
@@ -80,7 +101,8 @@ public record GroupPermissionsResponse(
     // Core working hours override: null = inherit, "Off" or "Own" (with start/end as "HH:mm").
     string? CoreHoursMode = null,
     string? CoreHoursStart = null,
-    string? CoreHoursEnd = null
+    string? CoreHoursEnd = null,
+    int? ParentGroupId = null
 );
 
 public record UpdateGroupPermissionsRequest(
@@ -102,7 +124,10 @@ public record UpdateGroupPermissionsRequest(
     [property: JsonConverter(typeof(EnumOverrideConverter<CoreHoursMode>))] CoreHoursMode? CoreHoursMode = null,
     // "HH:mm"; only stored with CoreHoursMode Own.
     string? CoreHoursStart = null,
-    string? CoreHoursEnd = null
+    string? CoreHoursEnd = null,
+    // Capability flags to reset to "inherit" (from the parent group; at the top: disabled), by
+    // property name, e.g. ["groupAdminCanApproveAbsences"]
+    IList<string>? InheritCapabilities = null
 );
 
 // Resolved effective permissions for a user (combining org + group)

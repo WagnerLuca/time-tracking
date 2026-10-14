@@ -122,7 +122,7 @@ public class RequestService : IRequestService
             RelatedEntityId = request.RelatedEntityId,
             RequestData = request.RequestData,
             Status = RequestStatus.Pending,
-            GroupId = await ResolveRoutingGroupIdAsync(userId, org.Id, request.Type)
+            GroupId = (await GroupTree.LoadAsync(_context, org.Id)).RoutingGroupFor(userId, request.Type)
         };
 
         _context.OrgRequests.Add(orgRequest);
@@ -145,7 +145,7 @@ public class RequestService : IRequestService
 
         var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
         var isOrgAdmin = callerRole != null && callerRole >= OrganizationRole.Admin;
-        var adminGroupIds = !isOrgAdmin ? await GetAdminGroupIdsAsync(callerUserId, org.Id) : new List<int>();
+        var adminGroupIds = !isOrgAdmin ? await GetAdminGroupIdsAsync(callerUserId, org.Id) : new HashSet<int>();
 
         if (!isOrgAdmin && adminGroupIds.Count == 0)
             return ServiceResult.Forbidden<PaginatedResponse<OrgRequestResponse>>();
@@ -159,7 +159,7 @@ public class RequestService : IRequestService
             .Include(r => r.Group)
             .Where(r => r.OrganizationId == org.Id);
 
-        // Group Admins can only see requests routed to their groups
+        // Group Admins can only see requests routed to their groups (and their sub-groups)
         if (!isOrgAdmin)
             query = query.Where(r => r.GroupId.HasValue && adminGroupIds.Contains(r.GroupId.Value));
 
@@ -207,15 +207,11 @@ public class RequestService : IRequestService
             if (!orgRequest.GroupId.HasValue)
                 return ServiceResult.Forbidden<OrgRequestResponse>(code: "request.cannotRespond");
 
-            // Still a member, still admin of the (active) group, and the group still grants this approval
-            var group = callerRole == null ? null : await _context.GroupMembers
-                .Where(gm => gm.GroupId == orgRequest.GroupId.Value
-                          && gm.UserId == callerUserId
-                          && gm.Role == GroupRole.Admin
-                          && gm.Group.IsActive)
-                .Select(gm => gm.Group)
-                .FirstOrDefaultAsync();
-            if (group == null || !GroupCanApprove(group, orgRequest.Type))
+            // Still a member, still admin of the (active) group or one of its ancestors, and that
+            // group's effective capabilities still grant this approval
+            if (callerRole == null
+                || !(await GroupTree.LoadAsync(_context, org.Id)).AdministersWith(callerUserId, orgRequest.GroupId.Value,
+                       g => GroupTree.CanApprove(g, orgRequest.Type)))
                 return ServiceResult.Forbidden<OrgRequestResponse>(code: "request.cannotRespond");
         }
 
@@ -325,14 +321,21 @@ public class RequestService : IRequestService
             .Select(uo => uo.OrganizationId)
             .ToListAsync();
 
-        // Group-level admin: sees pending requests routed to their (active) groups, only while
-        // still a member of the organization and only for request types the group may approve
-        var adminGroups = await _context.GroupMembers
+        // Group-level admin: sees pending requests routed to their (active) groups and their
+        // sub-groups, only while still a member of the organization and only for request types
+        // the administered group may approve (effective capabilities, GroupTree)
+        var groupAdminOrgIds = await _context.GroupMembers
             .Where(gm => gm.UserId == userId && gm.Role == GroupRole.Admin && gm.Group.IsActive
                       && _context.UserOrganizations.Any(uo => uo.UserId == userId && uo.OrganizationId == gm.Group.OrganizationId))
-            .Select(gm => gm.Group)
+            .Select(gm => gm.Group.OrganizationId)
+            .Distinct()
             .ToListAsync();
-        var groupAdminGroupIds = adminGroups.Select(g => g.Id).ToList();
+        var trees = new Dictionary<int, GroupTree>();
+        foreach (var orgId in groupAdminOrgIds)
+            trees[orgId] = await GroupTree.LoadAsync(_context, orgId);
+        var groupAdminGroupIds = trees.Values
+            .SelectMany(t => t.AdministeredBy(userId).SelectMany(t.Subtree))
+            .ToList();
 
         // Organizations that require 2FA show nothing to callers without it
         var hasTwoFactor = await _context.Users.Where(u => u.Id == userId).Select(u => u.TwoFactorEnabled).FirstOrDefaultAsync();
@@ -359,7 +362,8 @@ public class RequestService : IRequestService
             .ToListAsync();
         pendingRequests = pendingRequests
             .Where(r => adminOrgIds.Contains(r.OrganizationId)
-                     || adminGroups.Any(g => g.Id == r.GroupId && GroupCanApprove(g, r.Type)))
+                     || (r.GroupId is { } groupId && trees.TryGetValue(r.OrganizationId, out var tree)
+                         && tree.AdministersWith(userId, groupId, g => GroupTree.CanApprove(g, r.Type))))
             .ToList();
 
         return ServiceResult.Ok(new AdminNotificationResponse
@@ -745,14 +749,18 @@ public class RequestService : IRequestService
         catch (JsonException) { return []; }
     }
 
-    /// <summary>Mails everyone who may decide the new request: org admins/owners and, for a group-routed one, that group's admins.</summary>
+    /// <summary>
+    /// Mails everyone who may decide the new request, once each: org admins/owners and, for a
+    /// group-routed one, the admins along the group's chain whose group approves the type.
+    /// </summary>
     private async Task MailApproversAsync(OrgRequest orgRequest, Organization org, User requester)
     {
+        var groupApprovers = orgRequest.GroupId is { } groupId
+            ? (await GroupTree.LoadAsync(_context, org.Id)).ApproversOf(groupId, orgRequest.Type)
+            : [];
         var approvers = await _context.UserOrganizations.AsNoTracking()
             .Where(uo => uo.OrganizationId == org.Id && uo.UserId != requester.Id && uo.User.IsActive
-                      && (uo.Role >= OrganizationRole.Admin
-                          || (orgRequest.GroupId != null && _context.GroupMembers.Any(gm =>
-                                 gm.GroupId == orgRequest.GroupId && gm.UserId == uo.UserId && gm.Role == GroupRole.Admin))))
+                      && (uo.Role >= OrganizationRole.Admin || groupApprovers.Contains(uo.UserId)))
             .Select(uo => uo.User.Email)
             .ToListAsync();
 
@@ -781,68 +789,15 @@ public class RequestService : IRequestService
     }
 
     /// <summary>
-    /// Determines which group (if any) a request should be routed to for approval.
-    /// Returns the first group where the user is a member AND a Group Admin has the
-    /// relevant approval capability enabled.
+    /// The groups whose routed requests a Group Admin sees in this org: the groups they administer
+    /// whose effective capabilities approve anything, with all their sub-groups.
     /// </summary>
-    private async Task<int?> ResolveRoutingGroupIdAsync(int userId, int orgId, RequestType requestType)
+    private async Task<HashSet<int>> GetAdminGroupIdsAsync(int userId, int orgId)
     {
-        // Join requests are always handled at the org level
-        if (requestType == RequestType.JoinOrganization)
-            return null;
-
-        // Find all groups the user belongs to in this org that have a Group Admin
-        // with the relevant approval capability
-        var userGroups = await _context.GroupMembers
-            .Include(gm => gm.Group)
-            .Where(gm => gm.UserId == userId
-                      && gm.Group.OrganizationId == orgId
-                      && gm.Group.IsActive)
-            .Select(gm => gm.Group)
-            .ToListAsync();
-
-        foreach (var group in userGroups)
-        {
-            if (GroupCanApprove(group, requestType))
-            {
-                // Verify the group actually has at least one Group Admin
-                var hasGroupAdmin = await _context.GroupMembers
-                    .AnyAsync(gm => gm.GroupId == group.Id && gm.Role == GroupRole.Admin);
-                if (hasGroupAdmin)
-                    return group.Id;
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>Whether a group's admins may approve this kind of request.</summary>
-    private static bool GroupCanApprove(Group group, RequestType type) => type switch
-    {
-        RequestType.EditPastEntry or RequestType.EditPause or RequestType.CsvImport or RequestType.SetInitialOvertime
-            or RequestType.AddManualEntry
-            => group.GroupAdminCanApproveTimeEdits == true,
-        RequestType.WorkScheduleChange => group.GroupAdminCanApproveScheduleChanges == true,
-        RequestType.RequestAbsence => group.GroupAdminCanApproveAbsences == true,
-        _ => false
-    };
-
-    /// <summary>
-    /// Returns the IDs of groups where the user is a Group Admin within the given org,
-    /// filtered to only groups that have at least one approval capability enabled.
-    /// </summary>
-    private async Task<List<int>> GetAdminGroupIdsAsync(int userId, int orgId)
-    {
-        return await _context.GroupMembers
-            .Include(gm => gm.Group)
-            .Where(gm => gm.UserId == userId
-                      && gm.Role == GroupRole.Admin
-                      && gm.Group.OrganizationId == orgId
-                      && gm.Group.IsActive
-                      && (gm.Group.GroupAdminCanApproveTimeEdits == true
-                       || gm.Group.GroupAdminCanApproveScheduleChanges == true
-                       || gm.Group.GroupAdminCanApproveAbsences == true))
-            .Select(gm => gm.GroupId)
-            .ToListAsync();
+        var tree = await GroupTree.LoadAsync(_context, orgId);
+        return tree.AdministeredBy(userId)
+            .Where(id => GroupTree.CanApproveAny(tree.Effective(id)))
+            .SelectMany(tree.Subtree)
+            .ToHashSet();
     }
 }

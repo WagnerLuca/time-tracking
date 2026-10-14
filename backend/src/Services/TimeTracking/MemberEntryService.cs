@@ -142,7 +142,7 @@ public class MemberEntryService(TimeTrackingDbContext context, ILogger<MemberEnt
     private Task<TimeEntry?> FindAsync(Organization org, int memberId, int entryId) =>
         context.TimeEntries.FirstOrDefaultAsync(e => e.Id == entryId && e.UserId == memberId && e.OrganizationId == org.Id);
 
-    /// <summary>Org Admin/Owner for any member; Group Admin (time-edit approval) for plain members of their group, not themselves.</summary>
+    /// <summary>Org Admin/Owner for any member; Group Admin (time-edit approval) for plain members of their group or its sub-groups, not themselves.</summary>
     private async Task<(Organization? Org, (ServiceErrorType Type, string Message)? Error)> AuthorizeAsync(string slug, int callerUserId, int memberId)
     {
         var org = await context.FindOrgBySlugAsync(slug);
@@ -155,11 +155,7 @@ public class MemberEntryService(TimeTrackingDbContext context, ILogger<MemberEnt
         if (callerRole >= OrganizationRole.Admin) return (org, null);
 
         var isGroupAdmin = memberId != callerUserId && memberRole == OrganizationRole.Member
-            && await context.GroupMembers.AsNoTracking().AnyAsync(gm =>
-                gm.UserId == callerUserId && gm.Role == GroupRole.Admin
-                && gm.Group.OrganizationId == org.Id && gm.Group.IsActive
-                && gm.Group.GroupAdminCanApproveTimeEdits == true
-                && gm.Group.Members.Any(m => m.UserId == memberId));
+            && (await GroupTree.LoadAsync(context, org.Id)).ActsFor(callerUserId, memberId, g => g.GroupAdminCanApproveTimeEdits == true);
         return isGroupAdmin
             ? (org, null)
             : (org, (ServiceErrorType.Forbidden, "Only admins can change other members' time entries."));

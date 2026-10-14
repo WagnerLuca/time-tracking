@@ -181,24 +181,25 @@ public class OrganizationService : IOrganizationService
                     Planned = g.Where(a => a.Date > today).Sum(a => a.IsHalfDay ? 0.5 : 1.0)
                 });
 
-        // Group memberships for tag display (e.g. "Frontend Admin")
-        var memberGroups = await _context.GroupMembers.AsNoTracking()
-            .Where(gm => gm.Group.OrganizationId == organization.Id && gm.Group.IsActive)
-            .Select(gm => new
+        // Group memberships for tag display (e.g. "Frontend Admin"): direct ones, then the
+        // ancestors of those groups as inherited memberships ("über Team Küche")
+        var tree = visibility.Tree;
+        var groupsByUser = visibleMembers.ToDictionary(m => m.Id, m =>
+        {
+            var direct = tree.MembershipsOf(m.Id).ToList();
+            var result = direct.Select(gm => tree.Find(gm.GroupId)!).Select((g, i) => new MemberGroupResponse
             {
-                gm.UserId,
-                Group = new MemberGroupResponse
+                GroupId = g.Id, Name = g.Name, Color = g.Color, IsGroupAdmin = direct[i].Role == GroupRole.Admin
+            }).OrderBy(x => x.Name).ToList();
+            var seen = result.Select(x => x.GroupId).ToHashSet();
+            foreach (var gm in direct.OrderBy(gm => tree.Find(gm.GroupId)!.Name))
+                foreach (var id in tree.Chain(gm.GroupId).Skip(1).Where(seen.Add))
                 {
-                    GroupId = gm.GroupId,
-                    Name = gm.Group.Name,
-                    Color = gm.Group.Color,
-                    IsGroupAdmin = gm.Role == GroupRole.Admin
+                    var g = tree.Find(id)!;
+                    result.Add(new MemberGroupResponse { GroupId = g.Id, Name = g.Name, Color = g.Color, ViaGroupName = tree.Find(gm.GroupId)!.Name });
                 }
-            })
-            .ToListAsync();
-        var groupsByUser = memberGroups
-            .GroupBy(g => g.UserId)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.Group).OrderBy(x => x.Name).ToList());
+            return result;
+        });
 
         // Presence: who has a timer running in this organization right now
         var presenceIds = visibility.Ids(MemberInfo.Presence).ToList();
@@ -604,8 +605,7 @@ public class OrganizationService : IOrganizationService
         if (org == null)
             return ServiceResult.NotFound<TeamOverviewResponse>("Organization not found");
 
-        // Org admins lead everyone, group admins the members of the groups they administer
-        // (#59 sub-groups: add the administered groups' sub-groups to AdministeredGroupIds' expansion here)
+        // Org admins lead everyone, group admins the members of the groups they administer and of their sub-groups
         var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
         var led = visibility.AdministeredGroupIds;
         if (!visibility.CallerIsOrgAdmin && led.Count == 0)

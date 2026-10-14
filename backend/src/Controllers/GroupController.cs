@@ -48,9 +48,9 @@ public class GroupController : OrganizationBaseController
         return ToResponse(await _service.GetGroupAsync(slug, groupId, userId.Value));
     }
 
-    /// <summary>Create a new group (admin only).</summary>
+    /// <summary>Create a new group (org admins; group admins with member management may create sub-groups below their group).</summary>
     [HttpPost("{slug}/groups")]
-    [RequireOrgRole(OrganizationRole.Admin)]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(GroupDetailResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateGroup(string slug, [FromBody] CreateGroupRequest request)
     {
@@ -71,14 +71,17 @@ public class GroupController : OrganizationBaseController
     }
 
     /// <summary>Delete a group (admin only).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="groupId">Group ID.</param>
+    /// <param name="subGroups">Required when the group has sub-groups: MoveUp (they move to its parent) or Delete (the whole subtree).</param>
     [HttpDelete("{slug}/groups/{groupId}")]
     [RequireOrgRole(OrganizationRole.Admin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> DeleteGroup(string slug, int groupId)
+    public async Task<IActionResult> DeleteGroup(string slug, int groupId, [FromQuery] SubGroupAction? subGroups = null)
     {
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
-        return ToResponse(await _service.DeleteGroupAsync(slug, groupId, userId.Value));
+        return ToResponse(await _service.DeleteGroupAsync(slug, groupId, userId.Value, subGroups));
     }
 
     /// <summary>Add a member to a group.</summary>

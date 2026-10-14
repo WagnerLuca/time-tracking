@@ -337,6 +337,9 @@ namespace TimeTracking.Api.Migrations
                     b.Property<int>("OrganizationId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("ParentGroupId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -360,6 +363,8 @@ namespace TimeTracking.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OrganizationId");
+
+                    b.HasIndex("ParentGroupId");
 
                     b.ToTable("Groups");
                 });
@@ -1291,7 +1296,14 @@ namespace TimeTracking.Api.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("TimeTracking.Api.Models.Group", "ParentGroup")
+                        .WithMany()
+                        .HasForeignKey("ParentGroupId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Organization");
+
+                    b.Navigation("ParentGroup");
                 });
 
             modelBuilder.Entity("TimeTracking.Api.Models.GroupMember", b =>

@@ -24,12 +24,15 @@ public class Group
     public required string Name { get; set; }
     public string? Description { get; set; }
     public string? Color { get; set; }
+    /// <summary>The parent group (same organization), null = top level. Every setting left on
+    /// "inherit" takes the parent's effective value, see <c>GroupTree</c>. At most 3 levels.</summary>
+    public int? ParentGroupId { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
 
-    // Permission overrides (null = inherit from organization)
+    // Permission overrides (null = inherit from the parent group, at the top from the organization)
     public RuleMode? EditPastEntriesMode { get; set; }
     public RuleMode? EditPauseMode { get; set; }
     public RuleMode? CsvImportMode { get; set; }
@@ -47,7 +50,7 @@ public class Group
     public TimeOnly? CoreHoursStart { get; set; }
     public TimeOnly? CoreHoursEnd { get; set; }
 
-    // Group Admin capability flags (null = false / disabled)
+    // Group Admin capability flags (null = inherit from the parent group; at the top level null = disabled)
     public bool? GroupAdminCanApproveAbsences { get; set; }
     public bool? GroupAdminCanApproveTimeEdits { get; set; }
     public bool? GroupAdminCanApproveScheduleChanges { get; set; }
@@ -58,6 +61,9 @@ public class Group
     // Navigation properties
     [JsonIgnore]
     public Organization Organization { get; set; } = null!;
+
+    [JsonIgnore]
+    public Group? ParentGroup { get; set; }
 
     [JsonIgnore]
     public ICollection<GroupMember> Members { get; set; } = new List<GroupMember>();
