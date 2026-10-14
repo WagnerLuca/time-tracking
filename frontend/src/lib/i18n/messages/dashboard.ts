@@ -34,7 +34,24 @@ export const de = {
 	openTimer: 'Timer öffnen',
 	openHistory: 'Verlauf öffnen',
 	total: 'Gesamt: {value}',
-	weekRange: '{from}.–{to}.'
+	weekRange: '{from}.–{to}.',
+	teamCalendar: 'Teamkalender',
+	team: {
+		title: 'Mein Team',
+		presentCount: '{present} von {total} anwesend',
+		since: 'seit {time}',
+		notPresent: 'nicht eingestempelt',
+		balance: 'Saldo gesamt',
+		failures: 'Offene Fehlbuchungen: {count}',
+		coreHours: 'Kernarbeitszeit heute nicht eingehalten',
+		allGroups: 'Alle Gruppen',
+		group: 'Gruppe',
+		search: 'Team durchsuchen',
+		searchPlaceholder: 'Name suchen …',
+		empty: 'Keine Teammitglieder.',
+		noMatch: 'Niemand passt zur Auswahl.',
+		loadFailed: 'Team-Übersicht konnte nicht geladen werden.'
+	}
 };
 
 export const en: typeof de = {
@@ -72,5 +89,22 @@ export const en: typeof de = {
 	openTimer: 'Open timer',
 	openHistory: 'Open history',
 	total: 'Total: {value}',
-	weekRange: '{from}–{to}'
+	weekRange: '{from}–{to}',
+	teamCalendar: 'Team calendar',
+	team: {
+		title: 'My team',
+		presentCount: '{present} of {total} present',
+		since: 'since {time}',
+		notPresent: 'not clocked in',
+		balance: 'Total balance',
+		failures: 'Unresolved failure entries: {count}',
+		coreHours: 'Core working hours missed today',
+		allGroups: 'All groups',
+		group: 'Group',
+		search: 'Search team',
+		searchPlaceholder: 'Search name …',
+		empty: 'No team members.',
+		noMatch: 'Nobody matches the selection.',
+		loadFailed: 'Could not load the team overview.'
+	}
 };

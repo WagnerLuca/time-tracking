@@ -17,6 +17,7 @@
 	import { loadDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
 	import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
 	import DayTypeLegend from '$lib/components/DayTypeLegend.svelte';
+	import TeamOverview from '$lib/components/TeamOverview.svelte';
 	import { t } from '$lib/i18n';
 
 	interface Stats {
@@ -195,7 +196,15 @@
 </svelte:head>
 
 <div class="max-w-3xl mx-auto">
-	<h1 class="text-2xl font-bold text-base-content mb-5">{t('dashboard.greeting', { name: auth.user?.firstName ?? '' })}</h1>
+	<div class="flex flex-wrap items-center justify-between gap-2 mb-5">
+		<h1 class="text-2xl font-bold text-base-content m-0">{t('dashboard.greeting', { name: auth.user?.firstName ?? '' })}</h1>
+		{#if selectedSlug}
+			<a href="/organizations/{selectedSlug}/absences" class="btn btn-outline btn-sm">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+				{t('dashboard.teamCalendar')}
+			</a>
+		{/if}
+	</div>
 
 	<!-- Timer: the primary action -->
 	<section class="card mb-6 border-2 p-5 sm:p-6 {timer.current ? 'border-success bg-success/5' : 'border-base-300 bg-base-100'}" aria-label={t('dashboard.timer')}>
@@ -239,6 +248,10 @@
 		</section>
 	{:else if !orgContext.loading && !orgContext.selectedOrg}
 		<div role="status" class="alert alert-info mb-6 text-sm">{t('dashboard.selectOrg')}</div>
+	{/if}
+
+	{#if selectedSlug}
+		<TeamOverview slug={selectedSlug} />
 	{/if}
 
 	{#if statsLoading && !stats}

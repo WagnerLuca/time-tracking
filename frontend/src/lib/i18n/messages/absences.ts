@@ -14,6 +14,7 @@ export const de = {
 		self: 'Kalenderübersicht der für dich sichtbaren Abwesenheiten. Rechtsklick auf einen Tag (oder lange drücken), um eine eigene Abwesenheit einzutragen.',
 		readOnly: 'Kalenderübersicht der für dich sichtbaren Abwesenheiten.'
 	},
+	noOthers: 'Deine Organisation zeigt dir keine Abwesenheiten anderer – du siehst hier nur deine eigenen.',
 	deleteTitle: 'Abwesenheit löschen?',
 	deleteLabel: 'Abwesenheit löschen',
 	deleted: 'Abwesenheit gelöscht.',
@@ -104,6 +105,7 @@ export const en: typeof de = {
 		self: 'Calendar overview of absences visible to you. Right-click (or long-press) a day to add your own absence.',
 		readOnly: 'Calendar overview of absences visible to you.'
 	},
+	noOthers: "Your organization doesn't show you other people's absences – you only see your own here.",
 	deleteTitle: 'Delete absence?',
 	deleteLabel: 'Delete absence',
 	deleted: 'Absence deleted.',

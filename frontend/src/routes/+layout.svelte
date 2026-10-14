@@ -234,9 +234,14 @@
 		detailReq = req;
 	}
 
-	function isActive(path: string) {
+	function matches(path: string) {
 		const current = page.url.pathname;
 		return path === '/' ? current === '/' : current === path || current.startsWith(`${path}/`);
+	}
+
+	/** Active link: the most specific match, so the team calendar does not also light up "Organisation". */
+	function isActive(path: string) {
+		return matches(path) && !navLinks.some((l) => l.href.length > path.length && l.href.startsWith(path) && matches(l.href));
 	}
 
 	function navLinkClass(path: string) {
@@ -247,7 +252,12 @@
 		{ href: '/time', label: t('nav.timer') },
 		{ href: '/history', label: t('nav.history') },
 		{ href: '/export', label: t('nav.export') },
-		...(orgContext.selectedOrgSlug ? [{ href: `/organizations/${orgContext.selectedOrgSlug}`, label: t('nav.organization') }] : [])
+		...(orgContext.selectedOrgSlug
+			? [
+					{ href: `/organizations/${orgContext.selectedOrgSlug}/absences`, label: t('nav.teamCalendar') },
+					{ href: `/organizations/${orgContext.selectedOrgSlug}`, label: t('nav.organization') }
+				]
+			: [])
 	]);
 
 	/** Switch org context; on an org page, stay on the same sub-page of the new org. */
@@ -310,7 +320,7 @@
 			<!-- Mobile menu button -->
 			<button
 				type="button"
-				class="btn btn-ghost btn-sm btn-square md:hidden"
+				class="btn btn-ghost btn-sm btn-square lg:hidden"
 				aria-label={t('nav.openMenu')}
 				aria-expanded={openMenu === 'mobile'}
 				aria-controls="mobile-menu"
@@ -325,7 +335,7 @@
 					<rect x="68" y="4" width="20" height="10" rx="5" style="fill: var(--accent-time)" />
 					<polyline points="6,26 24,88 42,30 60,88 78,26 78,88 96,88" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
 				</svg>
-				<span class="font-display text-lg font-bold tracking-tighter max-sm:hidden"><span class="opacity-60">WL</span> {t('nav.brand')}</span>
+				<span class="font-display text-lg font-bold tracking-tighter max-sm:hidden lg:max-xl:hidden"><span class="opacity-60">WL</span> {t('nav.brand')}</span>
 			</a>
 
 			<!-- Org switcher -->
@@ -357,7 +367,7 @@
 				{/if}
 			</div>
 
-			<div class="hidden flex-1 items-center gap-1 md:flex lg:gap-2">
+			<div class="hidden flex-1 items-center gap-1 lg:flex xl:gap-2">
 				{#each navLinks as link (link.href)}
 					<a href={link.href} class={navLinkClass(link.href)} aria-current={isActive(link.href) ? 'page' : undefined}>{link.label}</a>
 				{/each}
@@ -505,7 +515,7 @@
 
 		<!-- Mobile menu -->
 		{#if openMenu === 'mobile'}
-			<ul id="mobile-menu" class="menu relative z-50 w-full border-t border-base-300 bg-base-100 px-4 py-2 md:hidden">
+			<ul id="mobile-menu" class="menu relative z-50 w-full border-t border-base-300 bg-base-100 px-4 py-2 lg:hidden">
 				<li><a href="/" class={isActive('/') ? 'menu-active' : ''} aria-current={isActive('/') ? 'page' : undefined}>{t('nav.home')}</a></li>
 				{#each navLinks as link (link.href)}
 					<li><a href={link.href} class={isActive(link.href) ? 'menu-active' : ''} aria-current={isActive(link.href) ? 'page' : undefined}>{link.label}</a></li>

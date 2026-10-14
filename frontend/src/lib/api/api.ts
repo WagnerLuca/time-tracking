@@ -1286,6 +1286,53 @@ export interface StopTimeEntryRequest {
      */
     'description'?: string | null;
 }
+export interface TeamGroupResponse {
+    'id'?: number;
+    'name'?: string | null;
+}
+/**
+ * One team card. Every nullable value is null where the member visibility matrix hides it from the caller.
+ */
+export interface TeamMemberResponse {
+    'userId'?: number;
+    'firstName': string | null;
+    'lastName': string | null;
+    'profileImageUrl'?: string | null;
+    /**
+     * The member\'s groups among TimeTracking.Api.Models.Dtos.TeamOverviewResponse.Groups.
+     */
+    'groupIds'?: Array<number> | null;
+    /**
+     * \"Saldo gesamt\" — the same number as GET members/{id}/balance (cumulativeOvertimeHours); needs TrackedTime.
+     */
+    'balanceHours'?: number | null;
+    /**
+     * A timer runs in this organization right now (failure entries never count); needs Presence.
+     */
+    'present'?: boolean | null;
+    /**
+     * Start of the running timer (UTC) when present.
+     */
+    'presentSince'?: string | null;
+    /**
+     * Unresolved failure entries; needs TrackedTime.
+     */
+    'failureCount'?: number | null;
+    /**
+     * Today\'s core working hours check found a violation that still holds; needs TrackedTime.
+     */
+    'coreHoursViolationToday'?: boolean | null;
+}
+/**
+ * The dashboard\'s team overview (issue #61): the members the caller leads, with balance and presence.
+ */
+export interface TeamOverviewResponse {
+    /**
+     * Groups to filter by: every active group for org admins, the administered ones for group admins.
+     */
+    'groups'?: Array<TeamGroupResponse> | null;
+    'members'?: Array<TeamMemberResponse> | null;
+}
 /**
  * One row of the punch protocol.
  */
@@ -8303,6 +8350,44 @@ export const OrganizationsApiAxiosParamCreator = function (configuration?: Confi
         },
         /**
          * 
+         * @summary The dashboard\'s team overview: one card per member the caller leads (org admins: everyone, group admins:  their groups\' members) with balance, presence, failure entries and today\'s core hours violation —  each only where the member visibility matrix shows it. 403 for callers who lead nobody.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugTeamOverviewGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugTeamOverviewGet', 'slug', slug)
+            const localVarPath = `/api/v1/Organizations/{slug}/team-overview`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Get time tracking overview for visible members (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {string} [from] Start of date range filter.
@@ -8534,6 +8619,19 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary The dashboard\'s team overview: one card per member the caller leads (org admins: everyone, group admins:  their groups\' members) with balance, presence, failure entries and today\'s core hours violation —  each only where the member visibility matrix shows it. 403 for callers who lead nobody.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugTeamOverviewGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<TeamOverviewResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugTeamOverviewGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['OrganizationsApi.apiV1OrganizationsSlugTeamOverviewGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Get time tracking overview for visible members (admin or group admin).
          * @param {string} slug Organization URL slug.
          * @param {string} [from] Start of date range filter.
@@ -8689,6 +8787,16 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
          */
         apiV1OrganizationsSlugSettingsPut(slug: string, updateOrganizationSettingsRequest?: UpdateOrganizationSettingsRequest, options?: RawAxiosRequestConfig): AxiosPromise<OrganizationSettingsResponse> {
             return localVarFp.apiV1OrganizationsSlugSettingsPut(slug, updateOrganizationSettingsRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary The dashboard\'s team overview: one card per member the caller leads (org admins: everyone, group admins:  their groups\' members) with balance, presence, failure entries and today\'s core hours violation —  each only where the member visibility matrix shows it. 403 for callers who lead nobody.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugTeamOverviewGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<TeamOverviewResponse> {
+            return localVarFp.apiV1OrganizationsSlugTeamOverviewGet(slug, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -8853,6 +8961,17 @@ export class OrganizationsApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugSettingsPut(slug: string, updateOrganizationSettingsRequest?: UpdateOrganizationSettingsRequest, options?: RawAxiosRequestConfig) {
         return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugSettingsPut(slug, updateOrganizationSettingsRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary The dashboard\'s team overview: one card per member the caller leads (org admins: everyone, group admins:  their groups\' members) with balance, presence, failure entries and today\'s core hours violation —  each only where the member visibility matrix shows it. 403 for callers who lead nobody.
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugTeamOverviewGet(slug: string, options?: RawAxiosRequestConfig) {
+        return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugTeamOverviewGet(slug, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

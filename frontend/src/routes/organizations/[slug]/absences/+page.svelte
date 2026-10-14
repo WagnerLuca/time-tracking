@@ -13,6 +13,7 @@
 	import { fetchAllPages } from '$lib/utils/pagination';
 	import { DAY_TYPE_CLASSES, dayTypeClasses, personChipStyle, personDotStyle, tintStyle } from '$lib/utils/colors';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
+	import { canSee } from '$lib/utils/visibility';
 	import AbsenceDialog from '$lib/components/AbsenceDialog.svelte';
 	import AbsenceTypeBadge from '$lib/components/AbsenceTypeBadge.svelte';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
@@ -32,6 +33,10 @@
 		org?.members?.find((m) => m.id === auth.user?.id)?.role ?? null
 	);
 	let canEdit = $derived(isOrgAdmin(myRole));
+	// The matrix shows the viewer no absence kind of anyone else (the absences endpoint returns only their own)
+	let seesNoOthers = $derived(
+		!!org && !(org.members ?? []).some((m) => m.id !== auth.user?.id && (canSee(m, 'Vacation') || canSee(m, 'SickDays') || canSee(m, 'OtherAbsences')))
+	);
 
 	// Effective absence permissions for the current user (org + group overrides)
 	let effectivePerms = $state<EffectivePermissionsResponse | null>(null);
@@ -476,6 +481,9 @@
 				{t('absences.intro.readOnly')}
 			{/if}
 		</p>
+		{#if seesNoOthers}
+			<div role="status" class="alert alert-info text-sm mb-6">{t('absences.noOthers')}</div>
+		{/if}
 
 		{#if absencesError}
 			<div class="alert alert-error text-sm mb-4" role="alert">
