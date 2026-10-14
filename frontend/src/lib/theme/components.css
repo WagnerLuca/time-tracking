@@ -746,12 +746,14 @@
 			min-height: 2.75rem;
 		}
 		.btn-square,
-		.btn-circle {
+		.btn-circle,
+		.btn-xs {
 			min-width: 2.75rem;
 		}
 		.input,
 		.select,
-		.tab {
+		.tab,
+		button.badge {
 			min-height: 2.75rem;
 		}
 	}
@@ -1096,5 +1098,19 @@
 	to {
 		opacity: 1;
 		scale: 1;
+	}
+}
+
+/* Touch: bigger switches and checkboxes (after their base rules, same layer order) */
+@layer components {
+	@media (pointer: coarse) {
+		.toggle {
+			--size: 2rem;
+		}
+		.checkbox,
+		.checkbox-sm,
+		.checkbox-xs {
+			--size: 1.5rem;
+		}
 	}
 }

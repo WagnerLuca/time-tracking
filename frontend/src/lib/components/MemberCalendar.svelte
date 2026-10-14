@@ -690,7 +690,7 @@
 					<li>
 						<button
 							type="button"
-							class="w-full flex items-center gap-2 px-3 py-2 text-left {dt.soft} {day.isWeekend && !day.dayType ? 'bg-base-200/30' : ''} {day.key === selectedDayKey ? 'ring-2 ring-inset ring-primary/40 bg-primary/10' : ''}"
+							class="w-full flex items-center gap-2 px-3 py-2 min-h-11 text-left {dt.soft} {day.isWeekend && !day.dayType ? 'bg-base-200/30' : ''} {day.key === selectedDayKey ? 'ring-2 ring-inset ring-primary/40 bg-primary/10' : ''}"
 							aria-pressed={day.key === selectedDayKey}
 							use:dayPress={{ onselect: () => selectDay(day, 'start'), onopen: dayOpenHandler(day) }}
 						>

@@ -319,7 +319,7 @@
 		<section class="card bg-base-100 border border-base-300 p-4 sm:p-5 mb-6">
 			<div class="flex items-center justify-between mb-3">
 				<h2 class="text-base font-semibold m-0">{t('dashboard.thisWeek')}</h2>
-				<a href="/time" class="text-xs text-primary font-semibold">{t('dashboard.openTimer')}</a>
+				<a href="/time" class="inline-flex min-h-11 items-center text-xs text-primary font-semibold">{t('dashboard.openTimer')}</a>
 			</div>
 			<div class="flex flex-col gap-1.5">
 				{#each stats.weekDays as day (day.date.getTime())}
@@ -345,7 +345,7 @@
 		<section class="card bg-base-100 border border-base-300 p-4 sm:p-5 mb-6">
 			<div class="flex items-center justify-between mb-3">
 				<h2 class="text-base font-semibold m-0">{getMonthName()}</h2>
-				<a href="/history" class="text-xs text-primary font-semibold">{t('dashboard.openHistory')}</a>
+				<a href="/history" class="inline-flex min-h-11 items-center text-xs text-primary font-semibold">{t('dashboard.openHistory')}</a>
 			</div>
 			<div class="flex flex-col gap-1.5">
 				{#each stats.monthWeeks as wk (wk.label)}

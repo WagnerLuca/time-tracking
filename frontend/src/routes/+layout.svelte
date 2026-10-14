@@ -213,7 +213,7 @@
 	<nav class="sticky top-0 z-50 border-b border-base-300 bg-base-100/95 shadow-sm backdrop-blur" aria-label={t('nav.menu')}>
 		<div class="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-2 sm:gap-3">
 			<!-- Port of @wagnerluca/ui's LogoLockup (accent="time") -->
-			<a href="/" class="flex shrink-0 items-center gap-2.5 text-base-content no-underline min-h-11" aria-label={t('nav.brandHome')}>
+			<a href="/" class="flex shrink-0 items-center justify-center gap-2.5 text-base-content no-underline min-h-11 min-w-11" aria-label={t('nav.brandHome')}>
 				<svg width="28" height="28" viewBox="0 0 100 100" fill="none" aria-hidden="true">
 					<rect x="68" y="4" width="20" height="10" rx="5" style="fill: var(--accent-time)" />
 					<polyline points="6,26 24,88 42,30 60,88 78,26 78,88 96,88" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
