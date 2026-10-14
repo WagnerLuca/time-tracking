@@ -228,6 +228,8 @@ builder.Services.AddCors(options =>
 // noisy client cannot exhaust everybody else's budget
 // General permits per user and minute; appsettings.Development.json raises it so a full e2e run fits
 var generalPerMinute = builder.Configuration.GetValue("RateLimiting:GeneralPerMinute", 300);
+// Logins per IP and minute; only appsettings.Development.json raises it (e2e runs log in as several users)
+var authStrictPerMinute = builder.Configuration.GetValue("RateLimiting:AuthStrictPerMinute", Program.DefaultAuthStrictPerMinute);
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -252,7 +254,7 @@ builder.Services.AddRateLimiter(options =>
     };
 
     // Strict policy for login/register/2FA (brute-force & credential stuffing), per IP
-    options.AddPolicy("AuthStrict", ctx => RateLimitPartition.GetFixedWindowLimiter(ClientIp(ctx), _ => Window(10)));
+    options.AddPolicy("AuthStrict", ctx => RateLimitPartition.GetFixedWindowLimiter(ClientIp(ctx), _ => Window(authStrictPerMinute)));
 
     // Moderate policy for token refresh & other auth actions, per IP
     options.AddPolicy("AuthModerate", ctx => RateLimitPartition.GetFixedWindowLimiter(ClientIp(ctx), _ => Window(30)));
@@ -372,4 +374,8 @@ app.Run();
 /// <summary>
 /// Partial class declaration to make Program accessible for WebApplicationFactory in integration tests.
 /// </summary>
-public partial class Program { }
+public partial class Program
+{
+    /// <summary>Login/register/2FA attempts per IP and minute unless <c>RateLimiting:AuthStrictPerMinute</c> overrides it.</summary>
+    public const int DefaultAuthStrictPerMinute = 10;
+}
