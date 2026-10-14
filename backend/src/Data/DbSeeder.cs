@@ -533,6 +533,16 @@ public static class DbSeeder
         );
         await context.SaveChangesAsync();
 
+        // Sub-group (issue #59): "API" inherits Backend's settings; Felix leads it, Jonas works in it
+        var apiGroup = new Group { OrganizationId = org.Id, Name = "API", Description = "Public API and integrations (part of Backend)", Color = "#8b5cf6", ParentGroupId = backendGroup.Id };
+        context.Groups.Add(apiGroup);
+        await context.SaveChangesAsync();
+        context.GroupMembers.AddRange(
+            new GroupMember { GroupId = apiGroup.Id, UserId = extraUserEntities[1].Id, Role = GroupRole.Admin }, // Felix
+            new GroupMember { GroupId = apiGroup.Id, UserId = extraUserEntities[3].Id, Role = GroupRole.Member }  // Jonas
+        );
+        await context.SaveChangesAsync();
+
         // ── Custom absence types ──────────────────────────────────────
         context.AbsenceTypeDefinitions.AddRange(
             new AbsenceTypeDefinition
