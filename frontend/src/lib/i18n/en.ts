@@ -21,6 +21,8 @@ import * as exportPage from './messages/export';
 import * as errors from './messages/errors';
 import * as invitations from './messages/invitations';
 import * as visibility from './messages/visibility';
+import * as inbox from './messages/inbox';
+import * as onboarding from './messages/onboarding';
 import type { Dictionary } from './de';
 
 export const en: Dictionary = {
@@ -46,5 +48,7 @@ export const en: Dictionary = {
 	export: exportPage.en,
 	errors: errors.en,
 	invitations: invitations.en,
-	visibility: visibility.en
+	visibility: visibility.en,
+	inbox: inbox.en,
+	onboarding: onboarding.en
 };

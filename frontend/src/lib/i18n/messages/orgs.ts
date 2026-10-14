@@ -66,7 +66,10 @@ export const de = {
 		groups: 'Gruppen',
 		absences: 'Abwesenheiten',
 		holidays: 'Feiertage',
-		settings: 'Einstellungen'
+		settings: 'Regeln & Sichtbarkeit',
+		rules: 'Regeln',
+		terminal: 'Terminal',
+		export: 'Export'
 	}
 };
 
@@ -137,6 +140,9 @@ export const en: typeof de = {
 		groups: 'Groups',
 		absences: 'Absences',
 		holidays: 'Holidays',
-		settings: 'Settings'
+		settings: 'Rules & visibility',
+		rules: 'Rules',
+		terminal: 'Terminal',
+		export: 'Export'
 	}
 };

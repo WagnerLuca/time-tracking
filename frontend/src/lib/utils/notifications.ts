@@ -68,3 +68,16 @@ export function decisionNotificationIds(items: (NotificationLike & { id?: number
 		.map((n) => n.id!)
 		.filter((id) => id != null);
 }
+
+/**
+ * Notices for the inbox: unread, no request decisions (they show as requests), and no
+ * FailureEntry notice whose entry is still open — the inbox lists the open entry itself.
+ */
+export function inboxNotices<T extends NotificationLike & { isRead?: boolean }>(items: T[], openFailureIds: (number | undefined)[]): T[] {
+	return bellNotifications(items).filter((n) => !(n.type === 'FailureEntry' && n.relatedEntityId != null && openFailureIds.includes(n.relatedEntityId)));
+}
+
+/** The caller's own requests that still wait for a decision, newest first. */
+export function openOwnRequests<T extends { status?: string | null; createdAt?: string | null }>(items: T[]): T[] {
+	return items.filter((r) => r.status === 'Pending').sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+}

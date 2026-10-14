@@ -119,7 +119,7 @@
 	}
 </script>
 
-<section class="mt-8">
+<section class="mt-2">
 	<h2 class="text-xl font-bold text-base-content mb-1">{t('orgSettings.apiKeys.title')}</h2>
 	<p class="text-sm text-base-content/60 mb-1">{t('orgSettings.apiKeys.intro')}</p>
 	<p class="text-xs text-base-content/60 mb-4 flex flex-wrap gap-x-3 gap-y-1">

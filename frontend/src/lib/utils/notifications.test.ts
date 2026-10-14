@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bellNotifications, coreHoursNotice, decisionNotificationIds, notificationTarget } from './notifications';
+import { bellNotifications, coreHoursNotice, decisionNotificationIds, inboxNotices, notificationTarget, openOwnRequests } from './notifications';
 
 describe('notificationTarget', () => {
 	const message = 'Your timer started 30.09.2026 08:15 ran past the end of the business day and was stopped.';
@@ -62,5 +62,28 @@ describe('bell notifications', () => {
 
 	it('finds the decision notifications of dismissed requests', () => {
 		expect(decisionNotificationIds(items, [51, 99])).toEqual([3]);
+	});
+});
+
+describe('inbox helpers', () => {
+	it('drops decisions, read items and failure notices whose entry is listed as open', () => {
+		const items = [
+			{ id: 1, type: 'FailureEntry', relatedEntityId: 7, isRead: false },
+			{ id: 2, type: 'FailureEntry', relatedEntityId: 8, isRead: false },
+			{ id: 3, type: 'RequestAccepted', relatedEntityId: 5, isRead: false },
+			{ id: 4, type: 'CoreHoursViolation', isRead: false },
+			{ id: 5, type: 'SettingsChanged', isRead: true }
+		];
+		expect(inboxNotices(items, [7]).map((n) => n.id)).toEqual([2, 4]);
+	});
+
+	it('keeps only pending own requests, newest first', () => {
+		const reqs = [
+			{ id: 1, status: 'Pending', createdAt: '2026-10-01T08:00:00Z' },
+			{ id: 2, status: 'Accepted', createdAt: '2026-10-03T08:00:00Z' },
+			{ id: 3, status: 'Pending', createdAt: '2026-10-02T08:00:00Z' },
+			{ id: 4, status: 'Pending' }
+		];
+		expect(openOwnRequests(reqs).map((r) => r.id)).toEqual([3, 1, 4]);
 	});
 });
