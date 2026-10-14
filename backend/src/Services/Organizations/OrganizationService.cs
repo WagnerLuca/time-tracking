@@ -20,7 +20,7 @@ public class OrganizationService : IOrganizationService
     //  Organization CRUD
     // ────────────────────────────────────────────────────
 
-    public async Task<ServiceResult<PaginatedResponse<OrganizationResponse>>> GetOrganizationsAsync(int limit, int offset)
+    public async Task<ServiceResult<PaginatedResponse<OrganizationResponse>>> GetOrganizationsAsync(int limit, int offset, int? callerUserId = null)
     {
         (limit, offset) = PaginationDefaults.Normalize(limit, offset);
 
@@ -46,6 +46,13 @@ public class OrganizationService : IOrganizationService
                 JoinPolicy = o.JoinPolicy.ToString()
             })
             .ToListAsync();
+
+        // In the caller's own organizations the count follows the visibility matrix (no hidden people)
+        if (callerUserId is int caller)
+        {
+            var counts = await VisibleMemberCountsAsync(caller, organizations.Select(o => o.Id));
+            organizations = organizations.Select(o => counts.TryGetValue(o.Id, out var c) ? o with { MemberCount = c } : o).ToList();
+        }
 
         return ServiceResult.Ok(new PaginatedResponse<OrganizationResponse>
         {
@@ -78,8 +85,6 @@ public class OrganizationService : IOrganizationService
                 Require2fa = o.Require2fa,
                 CsvImportMode = o.CsvImportMode.ToString(),
                 AbsenceSelfServiceMode = o.AbsenceSelfServiceMode.ToString(),
-                VacationVisibility = o.VacationVisibility.ToString(),
-                SickDayVisibility = o.SickDayVisibility.ToString(),
                 DefaultVacationDays = o.DefaultVacationDays,
                 BusinessDayEnd = o.BusinessDayEnd.ToString("HH:mm"),
                 TimeZone = o.TimeZone,
@@ -130,12 +135,17 @@ public class OrganizationService : IOrganizationService
             return ServiceResult.Ok(organization with { Members = new List<OrganizationMemberResponse>() });
         }
 
+        // The member visibility matrix decides who is listed at all and which details are filled in
+        var org = await _context.Organizations.AsNoTracking().FirstAsync(o => o.Id == organization.Id);
+        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId!.Value);
+        var visibleMembers = organization.Members.Where(m => visibility.Can(m.Id, MemberInfo.Member)).ToList();
+
         // Compute vacation days used for each member (current year, in the org's time zone)
         var today = OrgClock.For(organization.TimeZone).Today();
         var currentYear = today.Year;
         var yearStart = new DateOnly(currentYear, 1, 1);
         var yearEnd = new DateOnly(currentYear, 12, 31);
-        var memberIds = organization.Members.Select(m => m.Id).ToList();
+        var memberIds = visibility.Ids(MemberInfo.VacationBalance).ToList();
 
         // Load holiday dates for this org (to exclude from vacation count)
         var orgHolidays = await _context.Holidays.AsNoTracking()
@@ -190,19 +200,28 @@ public class OrganizationService : IOrganizationService
             .GroupBy(g => g.UserId)
             .ToDictionary(g => g.Key, g => g.Select(x => x.Group).OrderBy(x => x.Name).ToList());
 
-        // Determine whose vacation balance the caller may see (self, admins, effective VacationVisibility)
-        var vacationVisibleIds = await GetVacationVisibleUserIdsAsync(callerUserId!.Value, organization.Id);
-        var callerIsAdmin = organization.Members.First(m => m.Id == callerUserId.Value).Role is nameof(OrganizationRole.Owner) or nameof(OrganizationRole.Admin);
+        // Presence: who has a timer running in this organization right now
+        var presenceIds = visibility.Ids(MemberInfo.Presence).ToList();
+        var present = (await _context.TimeEntries.AsNoTracking()
+                .Where(te => te.OrganizationId == organization.Id && te.IsRunning && presenceIds.Contains(te.UserId))
+                .Select(te => te.UserId)
+                .ToListAsync())
+            .ToHashSet();
 
-        var membersWithVacation = organization.Members.Select(m =>
+        var callerIsAdmin = visibility.CallerIsOrgAdmin;
+
+        var membersWithVacation = visibleMembers.Select(m =>
         {
-            var visible = vacationVisibleIds.Contains(m.Id);
+            var can = visibility.Of(m.Id);
+            var visible = can.HasFlag(MemberInfo.VacationBalance);
             var usage = usageByUser.GetValueOrDefault(m.Id);
             var taken = usage?.Taken ?? 0;
             var planned = usage?.Planned ?? 0;
             var used = taken + planned;
             return m with
             {
+                Email = can.HasFlag(MemberInfo.Email) ? m.Email : null,
+                Role = can.HasFlag(MemberInfo.Groups) ? m.Role : null,
                 VacationVisible = visible,
                 VacationDaysPerYear = visible ? m.VacationDaysPerYear : 0,
                 VacationDaysUsed = visible ? used : 0,
@@ -212,18 +231,30 @@ public class OrganizationService : IOrganizationService
                 CardCount = callerIsAdmin ? m.CardCount : 0,
                 // Starting overtime balance is payroll data: the person and admins only
                 InitialOvertimeHours = callerIsAdmin || m.Id == callerUserId.Value ? m.InitialOvertimeHours : 0,
-                Groups = groupsByUser.GetValueOrDefault(m.Id) ?? new List<MemberGroupResponse>()
+                Groups = can.HasFlag(MemberInfo.Groups) ? groupsByUser.GetValueOrDefault(m.Id) ?? new List<MemberGroupResponse>() : new List<MemberGroupResponse>(),
+                VisibleInfo = MemberVisibility.Kinds.Where(k => can.HasFlag(k)).Select(k => k.ToString()).ToList(),
+                IsPresent = can.HasFlag(MemberInfo.Presence) ? present.Contains(m.Id) : null
             };
         }).ToList();
 
-        return ServiceResult.Ok(organization with { Members = membersWithVacation });
+        return ServiceResult.Ok(organization with
+        {
+            Members = membersWithVacation,
+            Visibility = MemberVisibility.Rows(org.VisibleInGroups, org.VisibleOutsideGroups)
+        });
     }
 
-    /// <summary>User IDs whose vacation balance the caller may see (same rule as vacation days, see AbsenceVisibility).</summary>
-    private async Task<HashSet<int>> GetVacationVisibleUserIdsAsync(int callerUserId, int orgId)
+    /// <summary>Per organization (of the given ones the caller belongs to): how many members the caller can see.</summary>
+    private async Task<Dictionary<int, int>> VisibleMemberCountsAsync(int callerUserId, IEnumerable<int> orgIds)
     {
-        var org = await _context.Organizations.AsNoTracking().FirstAsync(o => o.Id == orgId);
-        return (await AbsenceVisibility.ForCallerAsync(_context, org, callerUserId)).Vacation;
+        var ids = orgIds.ToList();
+        var orgs = await _context.Organizations.AsNoTracking()
+            .Where(o => ids.Contains(o.Id) && o.UserOrganizations.Any(uo => uo.UserId == callerUserId))
+            .ToListAsync();
+        var counts = new Dictionary<int, int>();
+        foreach (var org in orgs)
+            counts[org.Id] = (await MemberVisibility.ForCallerAsync(_context, org, callerUserId)).Ids(MemberInfo.Member).Count;
+        return counts;
     }
 
     public async Task<ServiceResult<List<UserOrganizationResponse>>> GetUserOrganizationsAsync(int callerUserId)
@@ -243,7 +274,8 @@ public class OrganizationService : IOrganizationService
             })
             .ToListAsync();
 
-        return ServiceResult.Ok(organizations);
+        var counts = await VisibleMemberCountsAsync(callerUserId, organizations.Select(o => o.OrganizationId));
+        return ServiceResult.Ok(organizations.Select(o => o with { MemberCount = counts.GetValueOrDefault(o.OrganizationId, o.MemberCount) }).ToList());
     }
 
     public async Task<ServiceResult<OrganizationResponse>> CreateOrganizationAsync(
@@ -496,8 +528,8 @@ public class OrganizationService : IOrganizationService
         if (request.Require2fa.HasValue) org.Require2fa = request.Require2fa.Value;
         if (request.CsvImportMode.HasValue) org.CsvImportMode = request.CsvImportMode.Value;
         if (request.AbsenceSelfServiceMode.HasValue) org.AbsenceSelfServiceMode = request.AbsenceSelfServiceMode.Value;
-        if (request.VacationVisibility.HasValue) org.VacationVisibility = request.VacationVisibility.Value;
-        if (request.SickDayVisibility.HasValue) org.SickDayVisibility = request.SickDayVisibility.Value;
+        if (request.Visibility != null && MemberVisibility.Apply(org, request.Visibility) is { } visibilityError)
+            return ServiceResult.BadRequest<OrganizationSettingsResponse>(visibilityError);
         if (request.DefaultVacationDays.HasValue) org.DefaultVacationDays = request.DefaultVacationDays.Value;
         if (request.BusinessDayEnd != null) org.BusinessDayEnd = TimeOnly.ParseExact(request.BusinessDayEnd, "HH:mm");
         if (request.TimeZone != null)
@@ -552,6 +584,7 @@ public class OrganizationService : IOrganizationService
             Require2fa = org.Require2fa,
             CsvImportMode = org.CsvImportMode.ToString(),
             AbsenceSelfServiceMode = org.AbsenceSelfServiceMode.ToString(),
+            Visibility = MemberVisibility.Rows(org.VisibleInGroups, org.VisibleOutsideGroups),
             BusinessDayEnd = org.BusinessDayEnd.ToString("HH:mm"),
             TimeZone = org.TimeZone,
             CoreHoursEnabled = org.CoreHoursEnabled,
@@ -576,25 +609,14 @@ public class OrganizationService : IOrganizationService
         if (callerRole == null)
             return ServiceResult.Forbidden<List<MemberTimeOverviewResponse>>();
 
-        var isOrgAdmin = callerRole >= OrganizationRole.Admin;
-
-        // Determine which members the caller can see
-        List<int>? visibleMemberIds = null;
-        if (isOrgAdmin && org.MemberTimeEntryVisibility)
+        // Admins (while the org lets them see members' hours) see all; everyone else the people whose
+        // tracked times the visibility matrix or their group admin rights show them
+        HashSet<int>? visibleMemberIds = null;
+        if (!(callerRole >= OrganizationRole.Admin && org.MemberTimeEntryVisibility))
         {
-            // Org admin with visibility enabled → sees all
-            visibleMemberIds = null; // null = all
-        }
-        else
-        {
-            // Check Group Admin with CanViewAllTimeEntries
-            var groupAdminMemberIds = await GetGroupAdminVisibleMemberIdsAsync(callerUserId, org.Id);
-            // Check regular group members with group-level TimeEntryVisibility = AllMembers
-            var groupMemberIds = await GetGroupMemberTimeEntryVisibleUserIdsAsync(callerUserId, org.Id);
-            var combined = groupAdminMemberIds.Union(groupMemberIds).Distinct().ToList();
-            if (combined.Count == 0)
+            visibleMemberIds = (await MemberVisibility.ForCallerAsync(_context, org, callerUserId)).Ids(MemberInfo.TrackedTime);
+            if (!visibleMemberIds.Any(id => id != callerUserId))
                 return ServiceResult.Forbidden<List<MemberTimeOverviewResponse>>();
-            visibleMemberIds = combined;
         }
 
         // Default: the current week in the organization's time zone
@@ -676,27 +698,12 @@ public class OrganizationService : IOrganizationService
         if (callerRole == null)
             return ServiceResult.Forbidden<PaginatedResponse<TimeEntryResponse>>();
 
-        var isOrgAdmin = callerRole >= OrganizationRole.Admin;
-
-        if (isOrgAdmin && org.MemberTimeEntryVisibility)
-        {
-            // Org admin with visibility → allowed for any member
-        }
-        else
-        {
-            // Check Group Admin can view this specific member
-            var groupAdminMemberIds = await GetGroupAdminVisibleMemberIdsAsync(callerUserId, org.Id);
-            // Check regular group member with group-level TimeEntryVisibility = AllMembers
-            var groupMemberIds = await GetGroupMemberTimeEntryVisibleUserIdsAsync(callerUserId, org.Id);
-            if (!groupAdminMemberIds.Contains(userId) && !groupMemberIds.Contains(userId))
-                return ServiceResult.Forbidden<PaginatedResponse<TimeEntryResponse>>();
-        }
-
-        var memberExists = await _context.UserOrganizations
-            .AsNoTracking()
-            .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
-        if (!memberExists)
+        // A hidden person does not exist for the caller; a visible one's hours may still be hidden
+        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
+        if (!visibility.Can(userId, MemberInfo.Member))
             return ServiceResult.NotFound<PaginatedResponse<TimeEntryResponse>>("Member not found in this organization.");
+        if (!visibility.Can(userId, MemberInfo.TrackedTime))
+            return ServiceResult.Forbidden<PaginatedResponse<TimeEntryResponse>>();
 
         (limit, offset) = PaginationDefaults.Normalize(limit, offset);
 
@@ -801,61 +808,5 @@ public class OrganizationService : IOrganizationService
             request.Days, userId, org.Id, callerUserId);
 
         return ServiceResult.Ok(new MemberVacationDaysResponse { UserId = userId, VacationDaysPerYear = membership.VacationDaysPerYear });
-    }
-
-    // ────────────────────────────────────────────────────
-    //  Private helpers
-    // ────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Returns the set of user IDs that a Group Admin can view time entries for,
-    /// based on groups where they are Admin and CanViewAllTimeEntries is enabled.
-    /// </summary>
-    private async Task<List<int>> GetGroupAdminVisibleMemberIdsAsync(int callerUserId, int orgId)
-    {
-        // Find groups in this org where the caller is a Group Admin AND CanViewAllTimeEntries is true
-        var adminGroupIds = await _context.GroupMembers
-            .Include(gm => gm.Group)
-            .Where(gm => gm.UserId == callerUserId
-                      && gm.Role == GroupRole.Admin
-                      && gm.Group.OrganizationId == orgId
-                      && gm.Group.IsActive
-                      && gm.Group.GroupAdminCanViewAllTimeEntries == true)
-            .Select(gm => gm.GroupId)
-            .ToListAsync();
-
-        if (adminGroupIds.Count == 0)
-            return new List<int>();
-
-        // Get all member user IDs from those groups
-        return await _context.GroupMembers
-            .Where(gm => adminGroupIds.Contains(gm.GroupId))
-            .Select(gm => gm.UserId)
-            .Distinct()
-            .ToListAsync();
-    }
-
-    /// <summary>
-    /// Returns user IDs from groups where the caller is a member and group-level TimeEntryVisibility = AllMembers.
-    /// </summary>
-    private async Task<List<int>> GetGroupMemberTimeEntryVisibleUserIdsAsync(int callerUserId, int orgId)
-    {
-        var groupIds = await _context.GroupMembers
-            .Include(gm => gm.Group)
-            .Where(gm => gm.UserId == callerUserId
-                      && gm.Group.OrganizationId == orgId
-                      && gm.Group.IsActive
-                      && gm.Group.TimeEntryVisibility == VisibilityMode.AllMembers)
-            .Select(gm => gm.GroupId)
-            .ToListAsync();
-
-        if (groupIds.Count == 0)
-            return new List<int>();
-
-        return await _context.GroupMembers
-            .Where(gm => groupIds.Contains(gm.GroupId))
-            .Select(gm => gm.UserId)
-            .Distinct()
-            .ToListAsync();
     }
 }

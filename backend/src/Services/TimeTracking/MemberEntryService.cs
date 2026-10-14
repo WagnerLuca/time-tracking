@@ -107,10 +107,13 @@ public class MemberEntryService(TimeTrackingDbContext context, ILogger<MemberEnt
     {
         var org = await context.FindOrgBySlugAsync(slug);
         if (org == null) return ServiceResult.NotFound<List<ComplianceDayResponse>>("Organization not found");
-        if (await context.GetOrgRoleAsync(memberId, org.Id) == null)
-            return ServiceResult.NotFound<List<ComplianceDayResponse>>("Member not found in this organization.");
-        if (!await EffectiveRuleResolver.CanExportDataForMemberAsync(context, org.Id, callerUserId, memberId))
-            return ServiceResult.Forbidden<List<ComplianceDayResponse>>("You do not have permission to see this member's working times.");
+        switch ((await MemberVisibility.ForCallerAsync(context, org, callerUserId)).Check(memberId, MemberInfo.TrackedTime))
+        {
+            case ServiceErrorType.NotFound:
+                return ServiceResult.NotFound<List<ComplianceDayResponse>>("Member not found in this organization.");
+            case ServiceErrorType.Forbidden:
+                return ServiceResult.Forbidden<List<ComplianceDayResponse>>("You do not have permission to see this member's working times.");
+        }
 
         var today = OrgClock.For(org).Today();
         var first = from ?? new DateOnly(today.Year, today.Month, 1);

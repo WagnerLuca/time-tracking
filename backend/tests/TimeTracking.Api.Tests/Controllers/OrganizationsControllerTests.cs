@@ -421,7 +421,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         await TestHelpers.AuthenticateAsync(ownerClient, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(ownerClient, "Vac Vis Org", "vac-vis-org");
         // Give the org a vacation allowance so balances are non-zero
-        await ownerClient.PutAsJsonAsync("/api/v1/Organizations/vac-vis-org/settings", new { defaultVacationDays = 30, vacationVisibility = 0 /* Private */ });
+        await ownerClient.PutAsJsonAsync("/api/v1/Organizations/vac-vis-org/settings", new { defaultVacationDays = 30, visibility = TestHelpers.Matrix(("VacationBalance", false, false)) });
 
         // Add a regular member
         var memberClient = _factory.CreateClient();
@@ -436,7 +436,7 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
             "/api/v1/Organizations/vac-vis-org", TestHelpers.JsonOptions);
         ownerView!.Members.Should().OnlyContain(m => m.VacationVisible);
 
-        // Private: the member sees only their own balance
+        // Hidden: the member sees only their own balance
         var memberView = await memberClient.GetFromJsonAsync<OrganizationDetailResponseDto>(
             "/api/v1/Organizations/vac-vis-org", TestHelpers.JsonOptions);
         var self = memberView!.Members.First(m => m.Id == member.User.Id);
@@ -446,8 +446,8 @@ public class OrganizationsControllerTests : IClassFixture<TimeTrackingApiFactory
         others.Should().OnlyContain(m => !m.VacationVisible);
         others.Should().OnlyContain(m => m.VacationDaysPerYear == 0 && m.VacationDaysRemaining == 0);
 
-        // Switch to AllMembers: the member now sees everyone's balance
-        await ownerClient.PutAsJsonAsync("/api/v1/Organizations/vac-vis-org/settings", new { vacationVisibility = 2 /* AllMembers */ });
+        // Visible in and outside groups: the member now sees everyone's balance
+        await ownerClient.PutAsJsonAsync("/api/v1/Organizations/vac-vis-org/settings", new { visibility = TestHelpers.Matrix(("VacationBalance", true, true)) });
         var memberView2 = await memberClient.GetFromJsonAsync<OrganizationDetailResponseDto>(
             "/api/v1/Organizations/vac-vis-org", TestHelpers.JsonOptions);
         memberView2!.Members.Should().OnlyContain(m => m.VacationVisible);

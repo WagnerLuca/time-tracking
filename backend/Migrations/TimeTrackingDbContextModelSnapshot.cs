@@ -337,18 +337,21 @@ namespace TimeTracking.Api.Migrations
                     b.Property<int>("OrganizationId")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("SickDayVisibility")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("TimeEntryVisibility")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.Property<int?>("VacationVisibility")
+                    b.Property<int>("VisibilityAllowInGroups")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VisibilityAllowOutsideGroups")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VisibilityDenyInGroups")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VisibilityDenyOutsideGroups")
                         .HasColumnType("integer");
 
                     b.Property<int?>("WorkScheduleChangeMode")
@@ -679,9 +682,6 @@ namespace TimeTracking.Api.Migrations
                     b.Property<DateTime?>("SettingsUpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("SickDayVisibility")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -697,7 +697,10 @@ namespace TimeTracking.Api.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("VacationVisibility")
+                    b.Property<int>("VisibleInGroups")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VisibleOutsideGroups")
                         .HasColumnType("integer");
 
                     b.Property<string>("Website")

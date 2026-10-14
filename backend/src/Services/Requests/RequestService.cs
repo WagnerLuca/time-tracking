@@ -295,9 +295,16 @@ public class RequestService : IRequestService
         if (user == null)
             return ServiceResult.Fail<PaginatedResponse<OrgRequestResponse>>(ServiceErrorType.Unauthorized, "Unauthorized");
 
+        // The responder's name only where the visibility matrix shows that person to the requester
+        var visibilityByOrg = new Dictionary<int, MemberVisibility>();
+        foreach (var org in requests.Select(r => r.Organization).DistinctBy(o => o.Id))
+            visibilityByOrg[org.Id] = await MemberVisibility.ForCallerAsync(_context, org, userId);
+
         var items = requests.Select(r =>
         {
             r.User = user;
+            if (r.RespondedByUserId is int by && by != userId && !visibilityByOrg[r.OrganizationId].Can(by, MemberInfo.Member))
+                r.RespondedByUser = null;
             return MapToResponse(r, r.Organization.Name, r.Organization.Slug);
         }).ToList();
 

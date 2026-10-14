@@ -16,16 +16,34 @@ public enum RuleMode
 }
 
 /// <summary>
-/// Controls who can see certain data within an organization.
+/// The kinds of information about a person that the member visibility matrix governs
+/// (see <c>MemberVisibility</c>). Bit flags: the organization stores one set per column
+/// (in / outside the viewer's groups), a group one allow and one deny set per column.
+/// The numeric values are persisted — never renumber them.
 /// </summary>
-public enum VisibilityMode
+[Flags]
+public enum MemberInfo
 {
-    /// <summary>Members can only see their own data.</summary>
-    Private = 0,
-    /// <summary>Admins and owners can see all members' data.</summary>
-    AdminOnly = 1,
-    /// <summary>All members can see each other's data.</summary>
-    AllMembers = 2
+    None = 0,
+    /// <summary>The person appears at all (name, avatar, join date). Every other kind requires it.</summary>
+    Member = 1,
+    Email = 2,
+    /// <summary>Group memberships and roles (org role, group admin).</summary>
+    Groups = 4,
+    /// <summary>Whether a timer is running right now.</summary>
+    Presence = 8,
+    Vacation = 16,
+    SickDays = 32,
+    /// <summary>"Other" and custom absence types.</summary>
+    OtherAbsences = 64,
+    /// <summary>The note on an absence that is visible anyway.</summary>
+    AbsenceNotes = 128,
+    /// <summary>Vacation allowance, taken, planned and remaining days.</summary>
+    VacationBalance = 256,
+    /// <summary>Work schedule (target hours).</summary>
+    WorkSchedule = 512,
+    /// <summary>Tracked times and everything derived from them (balance, reports, compliance).</summary>
+    TrackedTime = 1024
 }
 
 public class Organization
@@ -120,11 +138,17 @@ public class Organization
     /// </summary>
     public RuleMode AbsenceSelfServiceMode { get; set; } = RuleMode.Allowed;
 
-    /// <summary>Controls who can see members' vacation days.</summary>
-    public VisibilityMode VacationVisibility { get; set; } = VisibilityMode.Private;
-    
-    /// <summary>Controls who can see members' sick days.</summary>
-    public VisibilityMode SickDayVisibility { get; set; } = VisibilityMode.Private;
+    /// <summary>
+    /// Member visibility matrix, column "in own groups": what a normal member sees about people
+    /// sharing at least one active group with them. Groups override it per cell (see MemberVisibility).
+    /// </summary>
+    public MemberInfo VisibleInGroups { get; set; } = DefaultVisibility;
+
+    /// <summary>Member visibility matrix, column "outside own groups".</summary>
+    public MemberInfo VisibleOutsideGroups { get; set; } = DefaultVisibility;
+
+    /// <summary>New organizations: colleagues appear with email and groups, absences and times stay private.</summary>
+    public const MemberInfo DefaultVisibility = MemberInfo.Member | MemberInfo.Email | MemberInfo.Groups | MemberInfo.AbsenceNotes;
     
     /// <summary>
     /// Default vacation days per year for new members.

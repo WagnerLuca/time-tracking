@@ -35,7 +35,7 @@ public class OrganizationsController : OrganizationBaseController
     [ProducesResponseType(typeof(PaginatedResponse<OrganizationResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOrganizations(
         [FromQuery] int limit = 50, [FromQuery] int offset = 0)
-        => ToResponse(await _service.GetOrganizationsAsync(limit, offset));
+        => ToResponse(await _service.GetOrganizationsAsync(limit, offset, GetCurrentUserId()));
 
     /// <summary>Get organization details by slug. Members see full details including member list; non-members see a limited view.</summary>
     /// <param name="slug">Organization URL slug.</param>

@@ -29,41 +29,25 @@ public class AbsenceDayService : IAbsenceDayService
 
         (limit, offset) = PaginationDefaults.Normalize(limit, offset);
 
-        var query = _context.AbsenceDays
-            .Include(a => a.User)
-            .Where(a => a.OrganizationId == org.Id);
-
-        // Admins always see all absences; visibility settings only restrict regular members
-        bool isAdmin = callerRole >= OrganizationRole.Admin;
-
-        if (isAdmin)
+        // Admins see every absence (also of former members); everyone else themselves, and the
+        // others per kind of absence as the member visibility matrix (and group admin rights) allow
+        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
+        var callerIsAdmin = visibility.CallerIsOrgAdmin;
+        var noteIds = visibility.Ids(MemberInfo.AbsenceNotes).ToList();
+        var query = _context.AbsenceDays.Where(a => a.OrganizationId == org.Id);
+        if (!visibility.CallerIsOrgAdmin)
         {
-            // Admin/Owner — full access, only filter by user if requested
-            if (filterUserId.HasValue)
-                query = query.Where(a => a.UserId == filterUserId.Value);
+            if (filterUserId.HasValue && !visibility.Can(filterUserId.Value, MemberInfo.Member))
+                return ServiceResult.NotFound<PaginatedResponse<AbsenceDayResponse>>("Member not found in this organization.");
+            var vacationIds = visibility.Ids(MemberInfo.Vacation).ToList();
+            var sickIds = visibility.Ids(MemberInfo.SickDays).ToList();
+            var otherIds = visibility.Ids(MemberInfo.OtherAbsences).ToList();
+            query = query.Where(a => (a.Type == AbsenceType.Vacation && vacationIds.Contains(a.UserId))
+                                  || (a.Type == AbsenceType.SickDay && sickIds.Contains(a.UserId))
+                                  || (a.Type == AbsenceType.Other && otherIds.Contains(a.UserId)));
         }
-        else if (filterUserId.HasValue && filterUserId.Value == callerUserId)
-        {
-            // Viewing own absences — always allowed
-            query = query.Where(a => a.UserId == callerUserId);
-        }
-        else
-        {
-            // Non-admin viewing others or all — one resolver for org default + group overrides
-            var visible = await AbsenceVisibility.ForCallerAsync(_context, org, callerUserId);
-            var vacationIds = visible.Vacation.ToList();
-            var sickIds = visible.SickDay.ToList();
-            var otherIds = visible.Other.ToList();
-
-            if (filterUserId.HasValue)
-                query = query.Where(a => a.UserId == filterUserId.Value);
-
-            query = query.Where(a =>
-                a.UserId == callerUserId
-                || (a.Type == AbsenceType.Vacation && vacationIds.Contains(a.UserId))
-                || (a.Type == AbsenceType.SickDay && sickIds.Contains(a.UserId))
-                || (a.Type == AbsenceType.Other && otherIds.Contains(a.UserId)));
-        }
+        if (filterUserId.HasValue)
+            query = query.Where(a => a.UserId == filterUserId.Value);
 
         if (from.HasValue) query = query.Where(a => a.Date >= from.Value);
         if (to.HasValue)   query = query.Where(a => a.Date <= to.Value);
@@ -82,7 +66,7 @@ public class AbsenceDayService : IAbsenceDayService
                 Date = a.Date,
                 Type = a.Type.ToString(),
                 IsHalfDay = a.IsHalfDay,
-                Note = a.Note,
+                Note = callerIsAdmin || noteIds.Contains(a.UserId) ? a.Note : null,
                 UserFirstName = a.User.FirstName,
                 UserLastName = a.User.LastName,
                 CustomTypeId = a.CustomTypeId,
@@ -98,6 +82,11 @@ public class AbsenceDayService : IAbsenceDayService
                 CreatedViaRequestId = a.CreatedViaRequestId
             })
             .ToListAsync();
+
+        // Who entered an absence names a person too
+        absences = absences
+            .Select(a => !callerIsAdmin && a.CreatedByUserId is int by && !visibility.Can(by, MemberInfo.Member) ? a with { CreatedByName = null } : a)
+            .ToList();
 
         return ServiceResult.Ok(new PaginatedResponse<AbsenceDayResponse>
         {

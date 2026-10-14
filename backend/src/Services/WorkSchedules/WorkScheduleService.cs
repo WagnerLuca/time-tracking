@@ -167,13 +167,22 @@ public class WorkScheduleService : IWorkScheduleService
         if (org == null)
             return ServiceResult.NotFound<WorkScheduleResponse>("Organization not found");
 
-        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
-        if (callerRole == null || callerRole < OrganizationRole.Admin)
-            return ServiceResult.Forbidden<WorkScheduleResponse>();
+        // Admins, the member, group admin rights and the visibility matrix (kind WorkSchedule)
+        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
+        switch (visibility.Check(memberId, MemberInfo.WorkSchedule))
+        {
+            case ServiceErrorType.NotFound:
+                return ServiceResult.NotFound<WorkScheduleResponse>("Member not found in this organization.");
+            case ServiceErrorType.Forbidden:
+                return ServiceResult.Forbidden<WorkScheduleResponse>();
+        }
 
         var membership = await GetMembershipAsync(memberId, org.Id);
         if (membership == null)
             return ServiceResult.NotFound<WorkScheduleResponse>("Member not found in this organization.");
+        // The starting overtime balance is payroll data: the person and admins only
+        if (!visibility.CallerIsOrgAdmin && memberId != callerUserId)
+            membership = null;
 
         var schedule = await GetCurrentScheduleAsync(memberId, org);
         return ServiceResult.Ok(MapToResponse(schedule, memberId, org, membership));
@@ -186,13 +195,22 @@ public class WorkScheduleService : IWorkScheduleService
         if (org == null)
             return ServiceResult.NotFound<List<WorkScheduleResponse>>("Organization not found");
 
-        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
-        if (callerRole == null || callerRole < OrganizationRole.Admin)
-            return ServiceResult.Forbidden<List<WorkScheduleResponse>>();
+        // Admins, the member, group admin rights and the visibility matrix (kind WorkSchedule)
+        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
+        switch (visibility.Check(memberId, MemberInfo.WorkSchedule))
+        {
+            case ServiceErrorType.NotFound:
+                return ServiceResult.NotFound<List<WorkScheduleResponse>>("Member not found in this organization.");
+            case ServiceErrorType.Forbidden:
+                return ServiceResult.Forbidden<List<WorkScheduleResponse>>();
+        }
 
         var membership = await GetMembershipAsync(memberId, org.Id);
         if (membership == null)
             return ServiceResult.NotFound<List<WorkScheduleResponse>>("Member not found in this organization.");
+        // The starting overtime balance is payroll data: the person and admins only
+        if (!visibility.CallerIsOrgAdmin && memberId != callerUserId)
+            membership = null;
 
         var schedules = await GetAllSchedulesAsync(memberId, org.Id);
         var result = schedules.Select(s => MapToResponse(s, memberId, org, membership)).ToList();

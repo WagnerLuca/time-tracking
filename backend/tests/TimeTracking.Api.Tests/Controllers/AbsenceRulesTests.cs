@@ -13,7 +13,6 @@ namespace TimeTracking.Api.Tests.Controllers;
 public class AbsenceRulesTests : IClassFixture<TimeTrackingApiFactory>
 {
     private const int Disabled = 0, RequiresApproval = 1, Allowed = 2;
-    private const int Private = 0, AllMembers = 2;
     private const int SickDay = 0, Vacation = 1;
     private const int RequestAbsence = 6;
 
@@ -102,7 +101,7 @@ public class AbsenceRulesTests : IClassFixture<TimeTrackingApiFactory>
     [Fact]
     public async Task Members_DeleteOnlyTheirOwnSelfEnteredAbsences()
     {
-        var (owner, member, slug, _, memberId) = await SetupAsync("abs-delete", new { absenceSelfServiceMode = Allowed, vacationVisibility = AllMembers });
+        var (owner, member, slug, _, memberId) = await SetupAsync("abs-delete", new { absenceSelfServiceMode = Allowed, visibility = TestHelpers.Matrix(("Vacation", true, true)) });
         var url = $"/api/v1/organizations/{slug}/absences";
 
         var own = (await (await member.PostAsJsonAsync(url, new { date = "2026-06-01", type = Vacation })).Content.ReadFromJsonAsync<AbsenceDayResponseDto>(TestHelpers.JsonOptions))!;
@@ -141,7 +140,7 @@ public class AbsenceRulesTests : IClassFixture<TimeTrackingApiFactory>
     [Fact]
     public async Task Visibility_OwnAlways_OthersPerSetting_AdminsEverything()
     {
-        var (owner, member, slug, _, memberId) = await SetupAsync("abs-vis", new { absenceSelfServiceMode = Allowed, vacationVisibility = AllMembers, sickDayVisibility = Private });
+        var (owner, member, slug, _, memberId) = await SetupAsync("abs-vis", new { absenceSelfServiceMode = Allowed, visibility = TestHelpers.Matrix(("Vacation", true, true), ("SickDays", false, false)) });
         var (colleague, c) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "abs-vis-c@abs.test");
         (await TestHelpers.AddMemberAsync(_factory, owner, slug, c)).EnsureSuccessStatusCode();
         var url = $"/api/v1/organizations/{slug}/absences";

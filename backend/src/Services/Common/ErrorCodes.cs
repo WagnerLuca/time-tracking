@@ -136,6 +136,7 @@ public static class ErrorCodes
         ["A pause rule with this threshold already exists."] = "pauseRule.exists",
         ["Pause rule not found."] = "pauseRule.notFound",
         ["Group not found."] = "group.notFound",
+        ["Unknown kind of information."] = "visibility.unknownKind",
         ["User is already in this group."] = "group.alreadyMember",
         ["Member not found in group."] = "group.memberNotFound",
         ["API key not found"] = "apiKey.notFound",

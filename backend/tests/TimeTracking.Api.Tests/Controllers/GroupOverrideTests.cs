@@ -13,7 +13,6 @@ namespace TimeTracking.Api.Tests.Controllers;
 public class GroupOverrideTests : IClassFixture<TimeTrackingApiFactory>
 {
     private const int Disabled = 0, Allowed = 2;
-    private const int Private = 0, AdminOnly = 1, AllMembers = 2;
 
     private readonly TimeTrackingApiFactory _factory;
 
@@ -96,17 +95,19 @@ public class GroupOverrideTests : IClassFixture<TimeTrackingApiFactory>
     [Fact]
     public async Task VacationVisibility_GroupCanOpenUpOrLockDown()
     {
-        // Org default: vacations visible to all members
-        var (owner, slug, _) = await OrgAsync("ovr-vis", new { vacationVisibility = AllMembers, sickDayVisibility = Private });
+        // Org default: vacations visible to all members, sick days to nobody
+        var (owner, slug, _) = await OrgAsync("ovr-vis", new { visibility = TestHelpers.Matrix(("Vacation", true, true), ("SickDays", false, false)) });
         var (viewer, viewerId) = await MemberAsync(owner, slug, "ovr-vis-viewer@ovr.test");
         var (open, openId) = await MemberAsync(owner, slug, "ovr-vis-open@ovr.test");
         var (hidden, hiddenId) = await MemberAsync(owner, slug, "ovr-vis-hidden@ovr.test");
         var (lead, leadId) = await MemberAsync(owner, slug, "ovr-vis-lead@ovr.test");
 
-        // "Board" hides its members' vacations from ordinary members; its group admin still sees them
-        await GroupAsync(owner, slug, "Board", new { vacationVisibility = AdminOnly }, (hiddenId, "Member"), (leadId, "Admin"));
+        // "Board" hides its members' vacations from ordinary members; its group admin (who approves
+        // absences) still sees them
+        await GroupAsync(owner, slug, "Board", new { visibility = TestHelpers.Matrix(("Vacation", false, false)), groupAdminCanApproveAbsences = true },
+            (hiddenId, "Member"), (leadId, "Admin"));
         // "Team" shares even sick days among its members
-        await GroupAsync(owner, slug, "Team", new { sickDayVisibility = AllMembers }, (openId, "Member"), (viewerId, "Member"));
+        await GroupAsync(owner, slug, "Team", new { visibility = TestHelpers.Matrix(("SickDays", true, null)) }, (openId, "Member"), (viewerId, "Member"));
 
         foreach (var (client, date) in new[] { (open, "2026-04-01"), (hidden, "2026-04-02") })
             (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/absences/admin",
@@ -127,6 +128,6 @@ public class GroupOverrideTests : IClassFixture<TimeTrackingApiFactory>
         viewerSees.Should().NotContain(a => a.UserId == hiddenId); // stricter group override
         viewerSees.Should().Contain((openId, 0));          // looser group override (shared group)
 
-        (await SeenBy(lead)).Should().Contain((hiddenId, 1)); // AdminOnly → the group's admin
+        (await SeenBy(lead)).Should().Contain((hiddenId, 1)); // group admin right (approves absences)
     }
 }

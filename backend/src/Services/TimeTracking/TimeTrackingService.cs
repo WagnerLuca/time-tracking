@@ -377,13 +377,22 @@ public class TimeTrackingService : ITimeTrackingService
                 return ServiceResult.NotFound<List<TimeEntryChangeResponse>>("Time entry not found.");
         }
 
+        // Who made a change names a person: only people the caller may see in that organization
+        var orgIds = changes.Select(c => c.Change.OrganizationId).OfType<int>().Distinct().ToList();
+        var visibilityByOrg = new Dictionary<int, MemberVisibility>();
+        foreach (var org in await _context.Organizations.AsNoTracking().Where(o => orgIds.Contains(o.Id)).ToListAsync())
+            visibilityByOrg[org.Id] = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
+        bool NameVisible(TimeEntryChange c) =>
+            c.ChangedByUserId is not int by || by == callerUserId || c.OrganizationId is not int o
+            || (visibilityByOrg.TryGetValue(o, out var v) && v.Can(by, MemberInfo.Member));
+
         return ServiceResult.Ok(changes.Select(c => new TimeEntryChangeResponse
         {
             Id = c.Change.Id,
             TimeEntryId = c.Change.TimeEntryId,
             OrganizationId = c.Change.OrganizationId,
-            ChangedByUserId = c.Change.ChangedByUserId,
-            ChangedByName = c.ChangedByName,
+            ChangedByUserId = NameVisible(c.Change) ? c.Change.ChangedByUserId : null,
+            ChangedByName = NameVisible(c.Change) ? c.ChangedByName : null,
             ChangedAt = c.Change.ChangedAt,
             Kind = c.Change.Kind.ToString(),
             Changes = TimeEntryHistory.Parse(c.Change.Changes)

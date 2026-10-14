@@ -30,7 +30,8 @@ public record GroupMemberResponse(
     int UserId,
     string FirstName,
     string LastName,
-    string Email,
+    // Null when the caller may not see it (member visibility matrix)
+    string? Email,
     string? ProfileImageUrl,
     string Role,
     DateTime JoinedAt
@@ -67,9 +68,8 @@ public record GroupPermissionsResponse(
     string? WorkScheduleChangeMode,
     string? InitialOvertimeMode,
     string? AbsenceSelfServiceMode,
-    string? VacationVisibility,
-    string? SickDayVisibility,
-    string? TimeEntryVisibility,
+    // Member visibility matrix overrides per kind: true = allow, false = deny, null = inherit
+    IList<GroupVisibilityRuleResponse> Visibility,
     // Group Admin capability flags
     bool? GroupAdminCanApproveAbsences,
     bool? GroupAdminCanApproveTimeEdits,
@@ -90,9 +90,8 @@ public record UpdateGroupPermissionsRequest(
     [property: JsonConverter(typeof(EnumOverrideConverter<RuleMode>))] RuleMode? WorkScheduleChangeMode,
     [property: JsonConverter(typeof(EnumOverrideConverter<RuleMode>))] RuleMode? InitialOvertimeMode,
     [property: JsonConverter(typeof(EnumOverrideConverter<RuleMode>))] RuleMode? AbsenceSelfServiceMode,
-    [property: JsonConverter(typeof(EnumOverrideConverter<VisibilityMode>))] VisibilityMode? VacationVisibility,
-    [property: JsonConverter(typeof(EnumOverrideConverter<VisibilityMode>))] VisibilityMode? SickDayVisibility,
-    [property: JsonConverter(typeof(EnumOverrideConverter<VisibilityMode>))] VisibilityMode? TimeEntryVisibility,
+    // Rows of the visibility matrix to change; per cell true = allow, false = deny, null = inherit
+    IList<GroupVisibilityRuleRequest>? Visibility,
     bool? GroupAdminCanApproveAbsences,
     bool? GroupAdminCanApproveTimeEdits,
     bool? GroupAdminCanApproveScheduleChanges,
@@ -114,9 +113,8 @@ public record EffectivePermissionsResponse(
     string WorkScheduleChangeMode,
     string InitialOvertimeMode,
     string AbsenceSelfServiceMode,
-    string VacationVisibility,
-    string SickDayVisibility,
-    string TimeEntryVisibility,
+    // What normal members see about this person (their groups' overrides applied)
+    IList<VisibilityRuleResponse> Visibility,
     bool CanApproveAbsences,
     bool CanApproveTimeEdits,
     bool CanApproveScheduleChanges,
@@ -124,3 +122,9 @@ public record EffectivePermissionsResponse(
     bool CanViewAllTimeEntries,
     bool CanExportData
 );
+
+/// <summary>A group's override of one matrix row: true = allow, false = deny, null = inherit from the organization.</summary>
+public record GroupVisibilityRuleResponse(string Kind, bool? InGroups, bool? OutsideGroups);
+
+/// <summary>Sets a group's override of one matrix row (both cells; null = inherit). Kind is a MemberInfo name.</summary>
+public record GroupVisibilityRuleRequest(string Kind, bool? InGroups, bool? OutsideGroups);

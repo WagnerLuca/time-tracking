@@ -110,11 +110,11 @@ public class WorkScheduleController : OrganizationBaseController
 
     // ── Admin endpoints ──
 
-    /// <summary>Get a specific member's active work schedule (admin only).</summary>
+    /// <summary>Get a specific member's active work schedule (admins, or per the member visibility matrix).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="memberId">Member ID.</param>
     [HttpGet("{slug}/members/{memberId}/work-schedule")]
-    [RequireOrgRole(OrganizationRole.Admin)]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMemberWorkSchedule(string slug, int memberId)
     {
@@ -123,11 +123,11 @@ public class WorkScheduleController : OrganizationBaseController
         return ToResponse(await _service.GetMemberWorkScheduleAsync(slug, userId.Value, memberId));
     }
 
-    /// <summary>List all work schedules for a specific member (admin only).</summary>
+    /// <summary>List all work schedules for a specific member (admins, or per the member visibility matrix).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="memberId">Member ID.</param>
     [HttpGet("{slug}/members/{memberId}/work-schedules")]
-    [RequireOrgRole(OrganizationRole.Admin)]
+    [RequireOrgRole]
     [ProducesResponseType(typeof(List<WorkScheduleResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMemberWorkSchedules(string slug, int memberId)
     {

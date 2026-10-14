@@ -8,7 +8,7 @@ namespace TimeTracking.Api.Services;
 public interface IOrganizationService
 {
     // ── Organization CRUD ──
-    Task<ServiceResult<PaginatedResponse<OrganizationResponse>>> GetOrganizationsAsync(int limit, int offset);
+    Task<ServiceResult<PaginatedResponse<OrganizationResponse>>> GetOrganizationsAsync(int limit, int offset, int? callerUserId = null);
     Task<ServiceResult<OrganizationDetailResponse>> GetOrganizationAsync(string slug, int? callerUserId);
     Task<ServiceResult<List<UserOrganizationResponse>>> GetUserOrganizationsAsync(int callerUserId);
     Task<ServiceResult<OrganizationResponse>> CreateOrganizationAsync(int callerUserId, CreateOrganizationRequest request);

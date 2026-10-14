@@ -63,12 +63,12 @@ public class StrictEnumConverterTests : IClassFixture<TimeTrackingApiFactory>
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
         // The UI's "inherit" sends -1: it clears just that override, fields not sent stay as they are
-        var groupId = await TestHelpers.CreateGroupAsync(owner, slug, "G", new { editPauseMode = 2, vacationVisibility = 1 });
+        var groupId = await TestHelpers.CreateGroupAsync(owner, slug, "G", new { editPauseMode = 2, csvImportMode = 1 });
         (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/permissions", new { editPauseMode = -1 })).EnsureSuccessStatusCode();
         var perms = await owner.GetFromJsonAsync<JsonElement>($"/api/v1/Organizations/{slug}/groups/{groupId}/permissions");
         perms.GetProperty("editPauseMode").ValueKind.Should().Be(JsonValueKind.Null);
-        perms.GetProperty("vacationVisibility").GetString().Should().Be("AdminOnly");
-        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/permissions", new { vacationVisibility = 9 }))
+        perms.GetProperty("csvImportMode").GetString().Should().Be("RequiresApproval");
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/permissions", new { csvImportMode = 9 }))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 

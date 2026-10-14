@@ -390,14 +390,13 @@ public class TimeEntryExportService : ITimeEntryExportService
         if (org == null)
             return (callerUserId, (ServiceErrorType.NotFound, "Organization not found."));
 
-        var isMember = await _context.UserOrganizations.AsNoTracking()
-            .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == request.TargetUserId.Value);
-        if (!isMember)
-            return (callerUserId, (ServiceErrorType.NotFound, "Member not found in this organization."));
-
-        var allowed = await EffectiveRuleResolver.CanExportDataForMemberAsync(_context, org.Id, callerUserId, request.TargetUserId.Value);
-        if (!allowed)
-            return (callerUserId, (ServiceErrorType.Forbidden, "You do not have permission to export this member's data."));
+        switch ((await MemberVisibility.ForCallerAsync(_context, org, callerUserId)).Check(request.TargetUserId.Value, MemberInfo.TrackedTime))
+        {
+            case ServiceErrorType.NotFound:
+                return (callerUserId, (ServiceErrorType.NotFound, "Member not found in this organization."));
+            case ServiceErrorType.Forbidden:
+                return (callerUserId, (ServiceErrorType.Forbidden, "You do not have permission to export this member's data."));
+        }
 
         return (request.TargetUserId.Value, null);
     }

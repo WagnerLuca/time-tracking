@@ -36,9 +36,12 @@ public class Group
     public RuleMode? WorkScheduleChangeMode { get; set; }
     public RuleMode? InitialOvertimeMode { get; set; }
     public RuleMode? AbsenceSelfServiceMode { get; set; }
-    public VisibilityMode? VacationVisibility { get; set; }
-    public VisibilityMode? SickDayVisibility { get; set; }
-    public VisibilityMode? TimeEntryVisibility { get; set; }
+    // Member visibility matrix overrides, one allow and one deny set per column (a kind in
+    // neither = inherit from the organization). See MemberVisibility.
+    public MemberInfo VisibilityAllowInGroups { get; set; }
+    public MemberInfo VisibilityDenyInGroups { get; set; }
+    public MemberInfo VisibilityAllowOutsideGroups { get; set; }
+    public MemberInfo VisibilityDenyOutsideGroups { get; set; }
     public CoreHoursMode? CoreHoursMode { get; set; }
     /// <summary>Only used with <see cref="Models.CoreHoursMode.Own"/>.</summary>
     public TimeOnly? CoreHoursStart { get; set; }

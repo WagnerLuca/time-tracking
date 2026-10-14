@@ -35,8 +35,8 @@ public record OrganizationDetailResponse
     public bool Require2fa { get; init; }
     public required string CsvImportMode { get; init; }
     public string AbsenceSelfServiceMode { get; init; } = "Allowed";
-    public required string VacationVisibility { get; init; }
-    public required string SickDayVisibility { get; init; }
+    /// <summary>The member visibility matrix (org defaults), one row per kind of information.</summary>
+    public List<VisibilityRuleResponse> Visibility { get; init; } = new();
     public double DefaultVacationDays { get; init; }
     /// <summary>Business day end as local "HH:mm" in <see cref="TimeZone"/>.</summary>
     public string BusinessDayEnd { get; init; } = "00:00";
@@ -65,11 +65,13 @@ public record MemberGroupResponse
 public record OrganizationMemberResponse
 {
     public int Id { get; init; }
-    public required string Email { get; init; }
+    /// <summary>Null when the caller may not see it (member visibility matrix).</summary>
+    public string? Email { get; init; }
     public required string FirstName { get; init; }
     public required string LastName { get; init; }
     public string? ProfileImageUrl { get; init; }
-    public required string Role { get; init; }
+    /// <summary>Org role; null when the caller may not see the member's groups and roles.</summary>
+    public string? Role { get; init; }
     public DateTime JoinedAt { get; init; }
     public double InitialOvertimeHours { get; init; }
     /// <summary>Groups this member belongs to within the organization.</summary>
@@ -83,12 +85,25 @@ public record OrganizationMemberResponse
     public double VacationDaysRemaining { get; init; }
     /// <summary>
     /// Whether the caller may see this member's vacation balance (self, admins, or
-    /// per the effective VacationVisibility). When false, the vacation figures are zeroed.
+    /// per the member visibility matrix, kind VacationBalance). When false, the vacation figures are zeroed.
     /// </summary>
     public bool VacationVisible { get; init; }
     /// <summary>Number of terminal cards; only filled in for org admins.</summary>
     public int CardCount { get; init; }
+    /// <summary>
+    /// The kinds of information (<see cref="MemberInfo"/> names) the caller may see about this member;
+    /// the UI shows only those sections. Hidden members are not in the list at all.
+    /// </summary>
+    public List<string> VisibleInfo { get; init; } = new();
+    /// <summary>Whether a timer is running right now; null when presence is not visible to the caller.</summary>
+    public bool? IsPresent { get; init; }
 }
+
+/// <summary>One row of the member visibility matrix: may members see this kind about people in / outside their groups.</summary>
+public record VisibilityRuleResponse(string Kind, bool InGroups, bool OutsideGroups);
+
+/// <summary>Sets one row of the organization's visibility matrix. Kind is a <see cref="MemberInfo"/> name, e.g. "Vacation".</summary>
+public record VisibilityRuleRequest(string Kind, bool InGroups, bool OutsideGroups);
 
 /// <summary>Lightweight org view from the user's perspective.</summary>
 public record UserOrganizationResponse
@@ -163,8 +178,8 @@ public record UpdateOrganizationSettingsRequest
     public bool? Require2fa { get; init; }
     public RuleMode? CsvImportMode { get; init; }
     public RuleMode? AbsenceSelfServiceMode { get; init; }
-    public VisibilityMode? VacationVisibility { get; init; }
-    public VisibilityMode? SickDayVisibility { get; init; }
+    /// <summary>Rows of the member visibility matrix to change (others stay as they are).</summary>
+    public List<VisibilityRuleRequest>? Visibility { get; init; }
     public double? DefaultVacationDays { get; init; }
     /// <summary>Business day end as local "HH:mm" (e.g. "04:00").</summary>
     [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$", ErrorMessage = "Use HH:mm, e.g. 04:00.")]
@@ -225,6 +240,7 @@ public record OrganizationSettingsResponse
     public bool Require2fa { get; init; }
     public required string CsvImportMode { get; init; }
     public required string AbsenceSelfServiceMode { get; init; }
+    public List<VisibilityRuleResponse> Visibility { get; init; } = new();
     public required string BusinessDayEnd { get; init; }
     public required string TimeZone { get; init; }
     /// <summary>Core working hours (see CoreHours); start/end as local "HH:mm".</summary>

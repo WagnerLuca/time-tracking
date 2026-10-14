@@ -31,24 +31,28 @@ public class GroupService : IGroupService
         group.GroupAdminCanManageMembers == true
         && group.Members.Any(m => m.UserId == userId && m.Role == GroupRole.Admin);
 
-    private static GroupMemberResponse ToMemberResponse(GroupMember gm) => new(
+    private static GroupMemberResponse ToMemberResponse(GroupMember gm, MemberVisibility? visibility = null) => new(
         gm.UserId,
         gm.User.FirstName,
         gm.User.LastName,
-        gm.User.Email,
+        visibility == null || visibility.Can(gm.UserId, MemberInfo.Email) ? gm.User.Email : null,
         gm.User.ProfileImageUrl,
         gm.Role.ToString(),
         gm.JoinedAt
     );
 
-    private static GroupDetailResponse ToDetailResponse(Group g, IList<GroupMember> members) => new(
+    /// <summary>Being listed in a group reveals the membership: only people whose groups the caller may see.</summary>
+    private static bool Listed(MemberVisibility visibility, int userId) =>
+        visibility.Can(userId, MemberInfo.Member | MemberInfo.Groups);
+
+    private static GroupDetailResponse ToDetailResponse(Group g, IList<GroupMember> members, MemberVisibility? visibility = null) => new(
         g.Id,
         g.OrganizationId,
         g.Name,
         g.Description,
         g.Color,
         g.CreatedAt,
-        members.Select(ToMemberResponse).ToList()
+        members.Where(m => visibility == null || Listed(visibility, m.UserId)).Select(m => ToMemberResponse(m, visibility)).ToList()
     );
 
     // ── Queries ─────────────────────────────────────────────────────────────
@@ -59,7 +63,7 @@ public class GroupService : IGroupService
         if (org is null) return ServiceResult.NotFound<List<GroupResponse>>("Organization not found.");
         if (membership is null) return ServiceResult.Forbidden<List<GroupResponse>>("You are not a member of this organization.");
 
-        var isOrgAdmin = membership.Role >= OrganizationRole.Admin;
+        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
 
         var groups = await _context.Groups
             .Where(g => g.OrganizationId == org.Id)
@@ -77,7 +81,7 @@ public class GroupService : IGroupService
                 g.Description,
                 g.Color,
                 g.CreatedAt,
-                g.Members.Count,
+                g.Members.Count(m => Listed(visibility, m.UserId)),
                 IsGroupAdmin: myMembership?.Role == GroupRole.Admin,
                 GroupAdminCanManageMembers: g.GroupAdminCanManageMembers == true
             );
@@ -99,7 +103,8 @@ public class GroupService : IGroupService
 
         if (group is null) return ServiceResult.NotFound<GroupDetailResponse>("Group not found.");
 
-        return ServiceResult.Ok(ToDetailResponse(group, group.Members.ToList()));
+        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
+        return ServiceResult.Ok(ToDetailResponse(group, group.Members.ToList(), visibility));
     }
 
     // ── Commands ─────────────────────────────────────────────────────────────
@@ -194,7 +199,8 @@ public class GroupService : IGroupService
         // Target user must be an org member
         var targetMembership = await _context.UserOrganizations
             .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == request.UserId);
-        if (targetMembership is null)
+        if (targetMembership is null
+            || (!isOrgAdmin && !(await MemberVisibility.ForCallerAsync(_context, org, callerUserId)).Can(request.UserId, MemberInfo.Member)))
             return ServiceResult.BadRequest<GroupMemberResponse>("User is not a member of this organization.");
 
         if (group.Members.Any(m => m.UserId == request.UserId))
@@ -291,9 +297,7 @@ public class GroupService : IGroupService
         group.WorkScheduleChangeMode?.ToString(),
         group.InitialOvertimeMode?.ToString(),
         group.AbsenceSelfServiceMode?.ToString(),
-        group.VacationVisibility?.ToString(),
-        group.SickDayVisibility?.ToString(),
-        group.TimeEntryVisibility?.ToString(),
+        MemberVisibility.Rows(group),
         group.GroupAdminCanApproveAbsences,
         group.GroupAdminCanApproveTimeEdits,
         group.GroupAdminCanApproveScheduleChanges,
@@ -350,9 +354,8 @@ public class GroupService : IGroupService
         if (request.WorkScheduleChangeMode.HasValue) group.WorkScheduleChangeMode = NormalizeOverride(request.WorkScheduleChangeMode);
         if (request.InitialOvertimeMode.HasValue) group.InitialOvertimeMode = NormalizeOverride(request.InitialOvertimeMode);
         if (request.AbsenceSelfServiceMode.HasValue) group.AbsenceSelfServiceMode = NormalizeOverride(request.AbsenceSelfServiceMode);
-        if (request.VacationVisibility.HasValue) group.VacationVisibility = NormalizeOverride(request.VacationVisibility);
-        if (request.SickDayVisibility.HasValue) group.SickDayVisibility = NormalizeOverride(request.SickDayVisibility);
-        if (request.TimeEntryVisibility.HasValue) group.TimeEntryVisibility = NormalizeOverride(request.TimeEntryVisibility);
+        if (request.Visibility != null && MemberVisibility.Apply(group, request.Visibility) is { } visibilityError)
+            return ServiceResult.BadRequest<GroupPermissionsResponse>(visibilityError);
         if (request.GroupAdminCanApproveAbsences.HasValue) group.GroupAdminCanApproveAbsences = request.GroupAdminCanApproveAbsences;
         if (request.GroupAdminCanApproveTimeEdits.HasValue) group.GroupAdminCanApproveTimeEdits = request.GroupAdminCanApproveTimeEdits;
         if (request.GroupAdminCanApproveScheduleChanges.HasValue) group.GroupAdminCanApproveScheduleChanges = request.GroupAdminCanApproveScheduleChanges;
@@ -403,7 +406,7 @@ public class GroupService : IGroupService
 
         // Get all groups the target user belongs to
         var userGroups = await _context.Groups
-            .Where(g => g.OrganizationId == org.Id && g.Members.Any(m => m.UserId == userId))
+            .Where(g => g.OrganizationId == org.Id && g.IsActive && g.Members.Any(m => m.UserId == userId))
             .ToListAsync();
 
         var userGroupIds = userGroups.Select(g => g.Id).ToList();
@@ -417,11 +420,7 @@ public class GroupService : IGroupService
         var workScheduleChange = ResolveRuleMode(org.WorkScheduleChangeMode, userGroups, g => g.WorkScheduleChangeMode);
         var initialOvertime = ResolveRuleMode(org.InitialOvertimeMode, userGroups, g => g.InitialOvertimeMode);
         var absenceSelfService = ResolveRuleMode(org.AbsenceSelfServiceMode, userGroups, g => g.AbsenceSelfServiceMode);
-        var vacationVis = ResolveVisibilityMode(org.VacationVisibility, userGroups, g => g.VacationVisibility);
-        var sickDayVis = ResolveVisibilityMode(org.SickDayVisibility, userGroups, g => g.SickDayVisibility);
-        var timeEntryVis = ResolveVisibilityMode(
-            org.MemberTimeEntryVisibility ? VisibilityMode.AdminOnly : VisibilityMode.Private,
-            userGroups, g => g.TimeEntryVisibility);
+        var (visibleInGroups, visibleOutside) = MemberVisibility.EffectiveFor(org, userGroups);
 
         // Group Admin capabilities (only apply if user is a group admin in any group)
         bool canApproveAbsences = isOrgAdmin || (isGroupAdmin && userGroups.Any(g => g.GroupAdminCanApproveAbsences == true));
@@ -438,9 +437,7 @@ public class GroupService : IGroupService
             workScheduleChange.ToString(),
             initialOvertime.ToString(),
             absenceSelfService.ToString(),
-            vacationVis.ToString(),
-            sickDayVis.ToString(),
-            timeEntryVis.ToString(),
+            MemberVisibility.Rows(visibleInGroups, visibleOutside),
             canApproveAbsences,
             canApproveTimeEdits,
             canApproveScheduleChanges,
@@ -456,8 +453,5 @@ public class GroupService : IGroupService
 
     // Same override rule as enforcement (EffectiveRuleResolver.Combine), so what the UI shows is what the API does
     private static RuleMode ResolveRuleMode(RuleMode orgDefault, List<Group> userGroups, Func<Group, RuleMode?> selector)
-        => EffectiveRuleResolver.Combine(orgDefault, userGroups.Select(selector));
-
-    private static VisibilityMode ResolveVisibilityMode(VisibilityMode orgDefault, List<Group> userGroups, Func<Group, VisibilityMode?> selector)
         => EffectiveRuleResolver.Combine(orgDefault, userGroups.Select(selector));
 }

@@ -116,6 +116,13 @@ public static class TestHelpers
         return (owner, member, org.Slug, org.Id, m.User.Id);
     }
 
+    /// <summary>
+    /// Settings / group-permission payload rows of the member visibility matrix, e.g.
+    /// <c>new { visibility = TestHelpers.Matrix(("Vacation", true, true)) }</c>.
+    /// </summary>
+    public static object[] Matrix(params (string Kind, bool? InGroups, bool? OutsideGroups)[] rows) =>
+        rows.Select(r => (object)new { kind = r.Kind, inGroups = r.InGroups, outsideGroups = r.OutsideGroups }).ToArray();
+
     /// <summary>Creates a group with the given members (role "Member"/"Admin") and permission overrides; returns its id.</summary>
     public static async Task<int> CreateGroupAsync(HttpClient admin, string slug, string name, object permissions, params (int UserId, string Role)[] members)
     {
@@ -208,17 +215,22 @@ public record OrganizationDetailResponseDto
 public record OrganizationMemberResponseDto
 {
     public int Id { get; init; }
-    public string Email { get; init; } = "";
+    public string? Email { get; init; }
     public string FirstName { get; init; } = "";
     public string LastName { get; init; } = "";
     public string? ProfileImageUrl { get; init; }
-    public string Role { get; init; } = "";
+    public string? Role { get; init; }
     public DateTime JoinedAt { get; init; }
     public double InitialOvertimeHours { get; init; }
     public double VacationDaysPerYear { get; init; }
     public double VacationDaysRemaining { get; init; }
     public bool VacationVisible { get; init; }
+    public List<string> VisibleInfo { get; init; } = [];
+    public bool? IsPresent { get; init; }
+    public List<MemberGroupDto> Groups { get; init; } = [];
 }
+
+public record MemberGroupDto(int GroupId, string Name, bool IsGroupAdmin);
 
 public record UserOrganizationResponseDto
 {

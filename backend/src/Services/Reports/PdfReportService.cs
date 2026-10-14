@@ -184,10 +184,14 @@ public class PdfReportService : IPdfReportService
         if (membership == null)
             return new ReportContext(null, null, null, ServiceErrorType.NotFound, "Member not found in this organization");
 
-        var allowed = await EffectiveRuleResolver.CanExportDataForMemberAsync(_context, org.Id, callerUserId, targetUserId);
-        if (!allowed)
-            return new ReportContext(null, null, null, ServiceErrorType.Forbidden,
-                "You do not have permission to export this member's report.");
+        switch ((await MemberVisibility.ForCallerAsync(_context, org, callerUserId)).Check(targetUserId, MemberInfo.TrackedTime))
+        {
+            case ServiceErrorType.NotFound:
+                return new ReportContext(null, null, null, ServiceErrorType.NotFound, "Member not found in this organization");
+            case ServiceErrorType.Forbidden:
+                return new ReportContext(null, null, null, ServiceErrorType.Forbidden,
+                    "You do not have permission to export this member's report.");
+        }
 
         return new ReportContext(org, membership, membership.User, null, null);
     }
