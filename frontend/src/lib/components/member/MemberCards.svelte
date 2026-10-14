@@ -104,7 +104,7 @@
 	{#if loading}
 		<span class="loading loading-spinner loading-sm" aria-label={t('common.loading')}></span>
 	{:else if cards.length === 0}
-		<p class="text-sm text-base-content/60 m-0">{t('memberDetail.cards.empty')}</p>
+		<p class="text-sm text-base-content/70 m-0">{t('memberDetail.cards.empty')}</p>
 	{:else}
 		<ul class="divide-y divide-base-300 m-0 p-0" data-testid="member-cards">
 			{#each cards as card (card.id)}
@@ -123,7 +123,7 @@
 								{#if card.label}<span class="text-base-content/80"> {card.label}</span>{/if}
 								{#if card.isBlocked}<span class="badge badge-error badge-sm ml-1">{t('memberDetail.cards.blocked')}</span>{/if}
 							</div>
-							<div class="text-xs text-base-content/60">
+							<div class="text-xs text-base-content/70">
 								{card.lastUsedAt ? t('memberDetail.cards.lastUsed', { time: formatTimeAgo(card.lastUsedAt) }) : t('memberDetail.cards.neverUsed')}
 							</div>
 						{/if}
@@ -154,5 +154,5 @@
 		</label>
 		<button type="submit" class="btn btn-primary btn-sm" disabled={adding || !newCardId.trim()}>{adding ? t('common.adding') : t('memberDetail.cards.add')}</button>
 	</form>
-	<p class="text-base-content/50 text-xs mt-2 mb-0">{t('memberDetail.cards.hint')}</p>
+	<p class="text-base-content/70 text-xs mt-2 mb-0">{t('memberDetail.cards.hint')}</p>
 </section>

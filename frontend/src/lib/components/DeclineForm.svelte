@@ -33,7 +33,7 @@
 		disabled={busy}
 		aria-describedby="{id}-hint"
 	></textarea>
-	<p id="{id}-hint" class="text-xs text-base-content/50 m-0">{t('common.declineReasonHint')}</p>
+	<p id="{id}-hint" class="text-xs text-base-content/70 m-0">{t('common.declineReasonHint')}</p>
 	<div class="flex gap-2 justify-end flex-wrap">
 		<button type="button" class="btn btn-ghost btn-sm" onclick={oncancel} disabled={busy}>{t('common.cancel')}</button>
 		<button type="submit" class="btn btn-error btn-sm" disabled={busy}>{t('common.declineConfirm')}</button>

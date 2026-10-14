@@ -31,7 +31,8 @@
   --color-success: var(--accent-time-strong);
   --color-success-content: var(--on-accent);
   --color-warning: var(--accent-mustard-strong);
-  --color-warning-content: var(--on-accent);
+  /* tokens.css sets --color-warning to the light mustard, which needs its dark --on-warning text (AA) */
+  --color-warning-content: var(--on-warning, var(--on-accent));
   --color-error: var(--accent-danger-strong);
   --color-error-content: var(--on-accent);
 

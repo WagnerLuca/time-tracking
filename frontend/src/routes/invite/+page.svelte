@@ -48,7 +48,7 @@
 		<div class="card-body gap-4">
 			<h1 class="text-xl font-bold">{t('invitations.accept.pageTitle')}</h1>
 			{#if !error}
-				<p class="text-base-content/60 flex items-center gap-2" role="status"><span class="loading loading-spinner loading-sm"></span> {t('invitations.accept.accepting')}</p>
+				<p class="text-base-content/70 flex items-center gap-2" role="status"><span class="loading loading-spinner loading-sm"></span> {t('invitations.accept.accepting')}</p>
 			{:else}
 				<div class="alert alert-error text-sm" role="alert">{error}</div>
 				{#if code === 'invitation.wrongEmail'}

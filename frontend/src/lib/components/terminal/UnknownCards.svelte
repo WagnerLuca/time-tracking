@@ -67,7 +67,7 @@
 
 <div class="mt-5">
 	<h3 class="text-base font-bold text-base-content mb-1">{t('orgSettings.terminal.unknownTitle')}</h3>
-	<p class="text-sm text-base-content/60 mb-2">{t('orgSettings.terminal.unknownIntro')}</p>
+	<p class="text-sm text-base-content/70 mb-2">{t('orgSettings.terminal.unknownIntro')}</p>
 	<div class="card bg-base-100 border border-base-300">
 		<div class="card-body p-4 gap-2">
 			{#if error}
@@ -76,7 +76,7 @@
 			{#if loading}
 				<span class="loading loading-spinner loading-sm" aria-label={t('common.loading')}></span>
 			{:else if cards.length === 0}
-				<p class="text-sm text-base-content/60 m-0">{t('orgSettings.terminal.unknownEmpty')}</p>
+				<p class="text-sm text-base-content/70 m-0">{t('orgSettings.terminal.unknownEmpty')}</p>
 			{:else}
 				<ul class="divide-y divide-base-300" data-testid="unknown-cards">
 					{#each cards as card (card.punchId)}
@@ -84,7 +84,7 @@
 							<div class="flex items-center justify-between gap-3 flex-wrap">
 								<div class="min-w-0">
 									<code class="text-sm font-medium">…{card.cardHint}</code>
-									<span class="text-xs text-base-content/60">
+									<span class="text-xs text-base-content/70">
 										· {tp('orgSettings.terminal.scans', card.count ?? 0)} · {t('orgSettings.terminal.lastSeen', { time: formatTimeAgo(card.lastSeenAt) })}
 										{#if card.terminalName}· {t('orgSettings.terminal.atTerminal', { terminal: card.terminalName })}{/if}
 									</span>

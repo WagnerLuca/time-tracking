@@ -258,7 +258,7 @@
 		{:else if orgContext.selectedOrg}
 			<div class="text-sm text-base-content/70 mb-5">{t('timer.trackingFor', { org: orgContext.selectedOrg.name ?? '' })}</div>
 		{:else}
-			<div class="text-sm text-base-content/50 mb-5">{t('timer.personal')}</div>
+			<div class="text-sm text-base-content/70 mb-5">{t('timer.personal')}</div>
 		{/if}
 
 		{#if runsElsewhere}
@@ -309,7 +309,7 @@
 				<button type="button" class="btn btn-ghost btn-sm btn-square text-xl" aria-label={t('timer.prevWeek')} title={t('timer.prevWeek')} onclick={() => changeWeek(-1)}>‹</button>
 				<div class="text-center">
 					<span class="block font-semibold text-base text-base-content">{formatWeekLabel(weekRange)}</span>
-					<span class="block text-sm text-base-content/60 mt-0.5">
+					<span class="block text-sm text-base-content/70 mt-0.5">
 						{formatHoursDecimal(weekTotal)}{#if weekTargetFull > 0} / {formatHoursDecimal(weekTargetFull)}{/if}
 						{#if weekTargetSoFar > 0}
 							{@const weekDelta = weekTotal - weekTargetSoFar}
@@ -338,9 +338,9 @@
 					{@const delta = day.isPastOrToday && day.targetMinutes > 0 ? day.minutes - day.targetMinutes : 0}
 					{@const dayType = getDayType(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays)}
 					{@const dt = dayTypeClasses(dayType)}
-					<div class="grid grid-cols-[2rem_1fr_auto] sm:grid-cols-[2.25rem_4.5rem_1fr_auto] items-center gap-2 py-1.5 px-2 rounded-md {dt.soft} {isToday(day.date) ? 'font-semibold' : ''} {!day.isPastOrToday ? 'opacity-50' : ''}">
+					<div class="grid grid-cols-[2rem_1fr_auto] sm:grid-cols-[2.25rem_4.5rem_1fr_auto] items-center gap-2 py-1.5 px-2 rounded-md {dt.soft} {isToday(day.date) ? 'font-semibold' : ''}">
 						<span class="text-sm text-base-content/70">{day.name}</span>
-						<span class="text-xs text-base-content/40 max-sm:hidden">
+						<span class="text-xs text-base-content/70 max-sm:hidden">
 							{formatDateShort(day.date)}
 							{#if dayType}<span class="w-2 h-2 rounded-full inline-block align-middle ml-1 {dt.dot}" title={getDayTypeLabel(day.date, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays, halfDayAbsences)}></span>{/if}
 						</span>
@@ -351,7 +351,7 @@
 							<div class="h-full {isToday(day.date) ? 'bg-success' : 'bg-primary'} rounded transition-all duration-300" style="width: {pct}%"></div>
 						</div>
 						<span class="text-right text-sm text-base-content/70 tabular-nums whitespace-nowrap">
-							{formatHoursDecimal(day.minutes)}{#if day.targetMinutes > 0}<span class="text-base-content/40 font-normal text-xs"> / {formatHoursDecimal(day.targetMinutes)}</span>{/if}
+							{formatHoursDecimal(day.minutes)}{#if day.targetMinutes > 0}<span class="text-base-content/70 font-normal text-xs"> / {formatHoursDecimal(day.targetMinutes)}</span>{/if}
 							{#if delta !== 0}
 								<span class="block sm:inline text-xs {deltaClass(delta)}">{formatDelta(delta)}</span>
 							{/if}
@@ -368,14 +368,14 @@
 			<div class="card bg-base-100 border-2 p-4 mb-8 {balance.cumulative > 0 ? 'border-success/50 bg-success/5' : balance.cumulative < 0 ? 'border-error/50 bg-error/5' : 'border-base-300'}">
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 					<div class="flex flex-col gap-1">
-						<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('timer.cumulativeBalance')}</span>
+						<span class="text-xs text-base-content/70 uppercase font-semibold tracking-wider">{t('timer.cumulativeBalance')}</span>
 						<span class="text-xl font-bold tabular-nums {deltaClass(balance.cumulative)}">{formatDelta(balance.cumulative)}</span>
-						<span class="text-xs text-base-content/50">{t('timer.asOfToday')}</span>
+						<span class="text-xs text-base-content/70">{t('timer.asOfToday')}</span>
 					</div>
 					<div class="flex flex-col gap-1 sm:border-l sm:border-base-300 sm:pl-4">
-						<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('timer.thisWeek')}</span>
+						<span class="text-xs text-base-content/70 uppercase font-semibold tracking-wider">{t('timer.thisWeek')}</span>
 						<span class="text-xl font-bold tabular-nums {deltaClass(balance.week.delta)}">{formatDelta(balance.week.delta)}</span>
-						<span class="text-xs text-base-content/50">{t('timer.weekOfTarget', { worked: formatHoursDecimal(balance.week.worked), target: formatHoursDecimal(balance.week.target) })}</span>
+						<span class="text-xs text-base-content/70">{t('timer.weekOfTarget', { worked: formatHoursDecimal(balance.week.worked), target: formatHoursDecimal(balance.week.target) })}</span>
 					</div>
 				</div>
 			</div>

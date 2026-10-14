@@ -53,7 +53,7 @@
 				<div class="alert alert-success text-sm my-4" role="status">{t('auth.reset.done')}</div>
 				<a href="/login" class="btn btn-primary w-full">{t('auth.reset.toLogin')}</a>
 			{:else}
-				<p class="text-base-content/60 mb-6">{t('auth.reset.subtitle')}</p>
+				<p class="text-base-content/70 mb-6">{t('auth.reset.subtitle')}</p>
 				{#if error}
 					<div class="alert alert-error text-sm mb-4" role="alert">
 						<span>{error} <a href="/forgot-password" class="link">{t('auth.reset.requestNew')}</a></span>
@@ -63,7 +63,7 @@
 					<div class="mb-5">
 						<label for="newPassword" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.reset.newPassword')}</label>
 						<input id="newPassword" type="password" autocomplete="new-password" class="input w-full" class:input-error={attempted && problem === 'tooShort'} bind:value={password} aria-describedby="newPasswordHint" disabled={submitting} />
-						<p id="newPasswordHint" class="text-xs mt-1 {problemText ? 'text-error' : 'text-base-content/50'}">{problemText || t('auth.register.passwordHint', { min: MIN_PASSWORD_LENGTH })}</p>
+						<p id="newPasswordHint" class="text-xs mt-1 {problemText ? 'text-error' : 'text-base-content/70'}">{problemText || t('auth.register.passwordHint', { min: MIN_PASSWORD_LENGTH })}</p>
 					</div>
 					<div class="mb-5">
 						<label for="confirmPassword" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('auth.register.confirmPassword')}</label>

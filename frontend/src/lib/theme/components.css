@@ -649,6 +649,10 @@
 		color: var(--badge-color);
 		border-color: currentColor;
 	}
+	/* The light mustard is a background colour; as text it needs the strong shade (AA) */
+	.badge-outline.badge-warning {
+		color: var(--accent-mustard-strong);
+	}
 	/* Variant prefixes used in the markup (EntryRow) */
 	@media (hover: hover) {
 		.hover\:badge-warning:hover {
@@ -895,7 +899,7 @@
 		font-size: 0.875rem;
 		font-weight: 600;
 		white-space: nowrap;
-		color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+		color: color-mix(in oklab, var(--color-base-content) 75%, transparent);
 	}
 	.table :where(thead tr :is(td, th), tbody tr:not(:last-child) :is(td, th)) {
 		border-bottom: var(--border) solid color-mix(in oklch, var(--color-base-content) 5%, #0000);

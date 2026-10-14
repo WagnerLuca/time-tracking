@@ -522,10 +522,10 @@
 						<div class="flex-1 min-w-0">
 							<div class="font-semibold text-base-content truncate">{group.name}</div>
 							{#if group.description}
-								<div class="text-sm text-base-content/50 truncate">{group.description}</div>
+								<div class="text-sm text-base-content/70 truncate">{group.description}</div>
 							{/if}
 						</div>
-						<div class="flex items-center gap-1 text-sm text-base-content/50">
+						<div class="flex items-center gap-1 text-sm text-base-content/70">
 							<svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
 							<span>{group.memberCount ?? 0}</span>
 						</div>
@@ -553,12 +553,12 @@
 
 {#snippet detail(group: GroupResponse)}
 	{#if selectedGroupLoading}
-		<div class="flex items-center gap-2 justify-center py-4 text-base-content/40">
+		<div class="flex items-center gap-2 justify-center py-4 text-base-content/70">
 			<span class="loading loading-spinner loading-xs"></span><span class="text-sm">{t('common.loading')}</span>
 		</div>
 	{:else if selectedGroup}
 		{#if group.parentGroupId}
-			<p class="text-xs text-base-content/60 mb-3">{t('groups.subGroupOf', { name: groupName(group.parentGroupId) })}</p>
+			<p class="text-xs text-base-content/70 mb-3">{t('groups.subGroupOf', { name: groupName(group.parentGroupId) })}</p>
 		{/if}
 		<!-- Edit form or group info + actions -->
 		{#if editingGroup}
@@ -646,7 +646,7 @@
 
 			<!-- Member list: direct members, then the sub-groups' members ("über Team Küche") -->
 			{#if (selectedGroup.members?.length ?? 0) === 0}
-				<p class="text-base-content/40 text-sm">{t('groups.members.empty')}</p>
+				<p class="text-base-content/70 text-sm">{t('groups.members.empty')}</p>
 			{:else}
 				<div class="space-y-1">
 					{#each selectedGroup.members ?? [] as member (member.userId)}
@@ -654,7 +654,7 @@
 							{#if member.profileImageUrl}
 								<img src={member.profileImageUrl} alt="" class="w-8 h-8 rounded-full object-cover" />
 							{:else}
-								<div class="w-8 h-8 rounded-full bg-base-300 flex items-center justify-center text-xs font-medium text-base-content/60">
+								<div class="w-8 h-8 rounded-full bg-base-300 flex items-center justify-center text-xs font-medium text-base-content/70">
 									{getInitials(member.firstName, member.lastName)}
 								</div>
 							{/if}
@@ -664,7 +664,7 @@
 								{:else}
 									<div class="text-sm font-medium text-base-content">{member.firstName} {member.lastName}</div>
 								{/if}
-								{#if member.email}<div class="text-xs text-base-content/60 truncate">{member.email}</div>{/if}
+								{#if member.email}<div class="text-xs text-base-content/70 truncate">{member.email}</div>{/if}
 							</div>
 							{#if member.viaGroupName}
 								<span class="badge badge-xs badge-ghost border-dashed" data-testid="member-via">{t('groups.via', { group: member.viaGroupName })}</span>
@@ -701,19 +701,19 @@
 			{#if permissionsError}
 				<div class="alert alert-error mb-3 text-sm">{permissionsError}</div>
 			{/if}
-			<p class="text-xs text-base-content/50 mb-4">{t('groups.perm.intro')}</p>
+			<p class="text-xs text-base-content/70 mb-4">{t('groups.perm.intro')}</p>
 
 			<div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
 				<!-- Rule mode overrides -->
 				<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">
-					<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">{t('groups.perm.rules')}</span>
+					<span class="text-xs font-semibold text-base-content/70 uppercase tracking-wide">{t('groups.perm.rules')}</span>
 				</div>
 				{#each permRuleSettings as rs (rs.key)}
 					{@const value = permissions[rs.key]}
 					<div class="flex items-center justify-between gap-3 p-3 border-b border-base-200 last:border-b-0 flex-wrap">
 						<div>
 							<div class="text-sm font-medium text-base-content">{rs.label}</div>
-							<div class="text-xs text-base-content/50">{rs.description}</div>
+							<div class="text-xs text-base-content/70">{rs.description}</div>
 							{#if value == null}{@render hint(ruleHint(rs.key))}{/if}
 						</div>
 						<ModeSelector
@@ -728,10 +728,10 @@
 
 				<!-- Member visibility matrix overrides -->
 				<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">
-					<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">{t('groups.perm.visibility')}</span>
+					<span class="text-xs font-semibold text-base-content/70 uppercase tracking-wide">{t('groups.perm.visibility')}</span>
 				</div>
 				<div class="p-3 border-b border-base-200" data-testid="group-visibility">
-					<p class="text-xs text-base-content/50 mb-2">{t('visibility.groupIntro')}</p>
+					<p class="text-xs text-base-content/70 mb-2">{t('visibility.groupIntro')}</p>
 					<VisibilityMatrix mode="group" org={inheritedVisibility.rows} group={permissions.visibility} disabled={permissionsSaving}
 						ongroupchange={setVisibility} inheritedSource={inheritedVisibility.source} />
 					<p class="text-sm mt-2 mb-0" aria-live="polite">{previewSentence(orgDetail?.visibility, { name: group.name, visibility: resolvedVisibility })}</p>
@@ -739,12 +739,12 @@
 
 				<!-- Core working hours override -->
 				<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">
-					<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">{t('groups.perm.coreHours.title')}</span>
+					<span class="text-xs font-semibold text-base-content/70 uppercase tracking-wide">{t('groups.perm.coreHours.title')}</span>
 				</div>
 				<div class="flex items-center justify-between gap-3 p-3 border-b border-base-200 flex-wrap" data-testid="group-core-hours">
 					<div>
 						<div class="text-sm font-medium text-base-content">{t('groups.perm.coreHours.label')}</div>
-						<div class="text-xs text-base-content/50">{t('groups.perm.coreHours.description')}</div>
+						<div class="text-xs text-base-content/70">{t('groups.perm.coreHours.description')}</div>
 						{#if !permissions.coreHoursMode}{@render hint(coreHoursHint())}{/if}
 					</div>
 					<ModeSelector
@@ -761,7 +761,7 @@
 						<div class="flex items-center gap-2 text-sm w-full justify-end">
 							<input type="time" class="input input-xs w-24" aria-label={t('groups.perm.coreHours.start')} value={permissions.coreHoursStart ?? '09:00'}
 								onchange={(e) => setCoreHours(1, e.currentTarget.value, undefined)} disabled={permissionsSaving} />
-							<span class="text-base-content/60">–</span>
+							<span class="text-base-content/70">–</span>
 							<input type="time" class="input input-xs w-24" aria-label={t('groups.perm.coreHours.end')} value={permissions.coreHoursEnd ?? '15:00'}
 								onchange={(e) => setCoreHours(1, undefined, e.currentTarget.value)} disabled={permissionsSaving} />
 						</div>
@@ -770,14 +770,14 @@
 
 				<!-- Group Admin capability flags -->
 				<div class="px-3 py-2 bg-base-200/50 border-b border-base-300">
-					<span class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">{t('groups.perm.capabilities')}</span>
+					<span class="text-xs font-semibold text-base-content/70 uppercase tracking-wide">{t('groups.perm.capabilities')}</span>
 				</div>
 				{#each permAdminFlags as flag (flag.key)}
 					{@const value = permissions[flag.key]}
 					<div class="flex items-center justify-between gap-3 p-3 border-b border-base-200 last:border-b-0 flex-wrap">
 						<div>
 							<div class="text-sm font-medium text-base-content">{flag.label}</div>
-							<div class="text-xs text-base-content/50">{flag.description}</div>
+							<div class="text-xs text-base-content/70">{flag.description}</div>
 							{#if value == null}{@render hint(flagHint(flag.key))}{/if}
 						</div>
 						<ModeSelector
@@ -799,7 +799,7 @@
 				<button class="btn btn-sm" onclick={() => loadPermissions()}>{t('common.retry')}</button>
 			</div>
 		{:else if detailTab === 'permissions' && isAdmin && !permissions}
-			<div class="flex items-center gap-2 justify-center py-4 text-base-content/40">
+			<div class="flex items-center gap-2 justify-center py-4 text-base-content/70">
 				<span class="loading loading-spinner loading-xs"></span><span class="text-sm">{t('groups.perm.loading')}</span>
 			</div>
 		{/if}
@@ -861,7 +861,7 @@
 			{/if}
 
 			{#if groups.length === 0}
-				<p class="text-base-content/40 text-sm">{t('groups.empty')}{#if isAdmin} {t('groups.emptyAdminHint')}{/if}</p>
+				<p class="text-base-content/70 text-sm">{t('groups.empty')}{#if isAdmin} {t('groups.emptyAdminHint')}{/if}</p>
 			{:else}
 				<ul class="grid grid-cols-[minmax(0,1fr)] gap-2" role="list" aria-label={t('groups.treeLabel')}>
 					{@render groupTree(tree)}
@@ -880,18 +880,18 @@
 			<input type="radio" class="radio radio-sm mt-0.5" name="subGroups" value="MoveUp" bind:group={deleteChoice} />
 			<span>
 				<span class="text-sm font-medium block">{t('groups.deleteSub.moveUp')}</span>
-				<span class="text-xs text-base-content/60">{parentName ? t('groups.deleteSub.moveUpHint', { parent: parentName }) : t('groups.deleteSub.moveUpTopHint')}</span>
+				<span class="text-xs text-base-content/70">{parentName ? t('groups.deleteSub.moveUpHint', { parent: parentName }) : t('groups.deleteSub.moveUpTopHint')}</span>
 			</span>
 		</label>
 		<label class="flex gap-3 items-start cursor-pointer">
 			<input type="radio" class="radio radio-sm mt-0.5" name="subGroups" value="Delete" bind:group={deleteChoice} />
 			<span>
 				<span class="text-sm font-medium block">{t('groups.deleteSub.delete')}</span>
-				<span class="text-xs text-base-content/60">{t('groups.deleteSub.deleteHint')}</span>
+				<span class="text-xs text-base-content/70">{t('groups.deleteSub.deleteHint')}</span>
 			</span>
 		</label>
 	</fieldset>
-	<p class="text-xs text-base-content/60 mt-3 mb-0">{t('groups.deleteMessage')}</p>
+	<p class="text-xs text-base-content/70 mt-3 mb-0">{t('groups.deleteMessage')}</p>
 	{#snippet actions()}
 		<button class="btn btn-ghost btn-sm" onclick={() => (deleteChoiceOpen = false)} disabled={deleting}>{t('common.cancel')}</button>
 		<button class="btn btn-error btn-sm" onclick={performDelete} disabled={deleting}>{t('common.delete')}</button>

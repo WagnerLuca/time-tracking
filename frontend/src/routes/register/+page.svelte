@@ -57,7 +57,7 @@
 	<div class="card bg-base-100 shadow-lg w-full max-w-[420px]">
 		<div class="card-body p-6 sm:p-10">
 			<h1 class="text-2xl font-bold mb-1">{t('auth.register.title')}</h1>
-			<p class="text-base-content/60 mb-6">{t('auth.register.subtitle')}</p>
+			<p class="text-base-content/70 mb-6">{t('auth.register.subtitle')}</p>
 			{#if next?.startsWith('/invite')}
 				<div class="alert alert-info text-sm mb-4" role="status">{t('auth.inviteHint')}</div>
 			{/if}
@@ -129,7 +129,7 @@
 						aria-describedby="passwordHint"
 						disabled={submitting}
 					/>
-					<p id="passwordHint" class="text-xs mt-1 {attempted && passwordTooShort ? 'text-error' : 'text-base-content/60'}">
+					<p id="passwordHint" class="text-xs mt-1 {attempted && passwordTooShort ? 'text-error' : 'text-base-content/70'}">
 						{t('auth.register.passwordHint', { min: MIN_PASSWORD })}
 					</p>
 				</div>
@@ -159,7 +159,7 @@
 				</button>
 			</form>
 
-			<p class="text-center mt-6 text-sm text-base-content/60">
+			<p class="text-center mt-6 text-sm text-base-content/70">
 				{t('auth.register.haveAccount')} <a href={withNext('/login', next)} class="link link-primary">{t('auth.register.login')}</a>
 			</p>
 		</div>

@@ -177,9 +177,9 @@
 	</div>
 
 	{#if !editable && mode === 'RequiresApproval'}
-		<p class="text-sm text-base-content/60 mb-3">{t('schedule.periods.approvalNote')}</p>
+		<p class="text-sm text-base-content/70 mb-3">{t('schedule.periods.approvalNote')}</p>
 	{:else if !editable && mode === 'Disabled'}
-		<p class="text-sm text-base-content/60 mb-3">{t('schedule.periods.disabledNote')}</p>
+		<p class="text-sm text-base-content/70 mb-3">{t('schedule.periods.disabledNote')}</p>
 	{/if}
 
 	{#if showForm && editable}
@@ -194,7 +194,7 @@
 					{#if fromError}<p class="text-error text-xs mt-1">{fromError}</p>{/if}
 				</div>
 				<div>
-					<label for="sp-to-{memberId ?? 'self'}" class="block text-sm font-medium text-base-content/80 mb-1">{t('schedule.periods.validTo')} <span class="text-base-content/40">({t('common.optional')})</span></label>
+					<label for="sp-to-{memberId ?? 'self'}" class="block text-sm font-medium text-base-content/80 mb-1">{t('schedule.periods.validTo')} <span class="text-base-content/70">({t('common.optional')})</span></label>
 					<input id="sp-to-{memberId ?? 'self'}" type="date" class="input input-sm w-full" class:input-error={toError} aria-invalid={!!toError} min={from || undefined} bind:value={to} disabled={saving} />
 					{#if toError}<p class="text-error text-xs mt-1">{toError}</p>{/if}
 				</div>
@@ -214,7 +214,7 @@
 					<div class="grid grid-cols-4 sm:grid-cols-7 gap-2 max-w-md">
 						{#each dayNamesShort() as dayName, i}
 							<div class="flex flex-col items-center gap-1">
-								<label for="sp-day{i}-{memberId ?? 'self'}" class="text-xs font-semibold text-base-content/60">{dayName}</label>
+								<label for="sp-day{i}-{memberId ?? 'self'}" class="text-xs font-semibold text-base-content/70">{dayName}</label>
 								<input id="sp-day{i}-{memberId ?? 'self'}" type="number" step="0.5" min="0" max={MAX_DAILY} class="input input-xs w-full text-center" bind:value={days[i]} disabled={saving} />
 							</div>
 						{/each}
@@ -234,21 +234,21 @@
 	{/if}
 
 	{#if loading}
-		<p class="text-sm text-base-content/50 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
+		<p class="text-sm text-base-content/70 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
 	{:else if loadError}
 		<div class="alert alert-error text-sm py-2">
 			<span>{loadError}</span>
 			<button type="button" class="btn btn-ghost btn-xs" onclick={load}>{t('common.retry')}</button>
 		</div>
 	{:else if periods.length === 0}
-		<p class="text-sm text-base-content/50">{t('schedule.periods.empty')}</p>
+		<p class="text-sm text-base-content/70">{t('schedule.periods.empty')}</p>
 	{:else}
 		<ul class="flex flex-col gap-1.5 list-none p-0 m-0">
 			{#each periods as p (p.id)}
 				{@const active = isActive(p)}
 				<li class="flex items-center gap-x-3 gap-y-1 flex-wrap py-2 px-3 rounded-md border text-sm {active ? 'border-success/40 bg-success/5' : 'border-base-200 bg-base-200/30'}">
 					<span class="font-medium text-base-content/70">
-						{formatDateFull(p.validFrom!)} <span class="text-base-content/40" aria-hidden="true">→</span>
+						{formatDateFull(p.validFrom!)} <span class="text-base-content/70" aria-hidden="true">→</span>
 						{p.validTo ? formatDateFull(p.validTo) : t('common.ongoing')}
 					</span>
 					{#if active}<span class="badge badge-success badge-xs font-semibold">{t('schedule.periods.active')}</span>{/if}
@@ -256,7 +256,7 @@
 						{p.weeklyWorkHours != null ? t('common.perWeek', { value: formatNumber(p.weeklyWorkHours) }) : '—'}
 					</span>
 					{#if editable}
-						<button type="button" class="btn btn-ghost btn-xs text-base-content/40 hover:text-error" aria-label={t('schedule.periods.delete')} title={t('schedule.periods.delete')} onclick={() => remove(p)} disabled={deletingId === p.id}>
+						<button type="button" class="btn btn-ghost btn-xs text-base-content/70 hover:text-error" aria-label={t('schedule.periods.delete')} title={t('schedule.periods.delete')} onclick={() => remove(p)} disabled={deletingId === p.id}>
 							{#if deletingId === p.id}<span class="loading loading-spinner loading-xs"></span>{:else}✕{/if}
 						</button>
 					{/if}

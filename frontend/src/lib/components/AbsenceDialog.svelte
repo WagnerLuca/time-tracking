@@ -144,7 +144,7 @@
 	<!-- Existing absences on this day -->
 	{#if dayAbsences.length > 0}
 		<div class="mb-4">
-			<h4 class="text-sm font-semibold text-base-content/60 mb-2">{t('absences.dialog.existing')}</h4>
+			<h4 class="text-sm font-semibold text-base-content/70 mb-2">{t('absences.dialog.existing')}</h4>
 			<ul class="flex flex-col gap-1">
 				{#each dayAbsences as ab (ab.id)}
 					<li class="flex items-center gap-2 p-2 bg-base-200/50 rounded-lg text-sm flex-wrap">
@@ -154,12 +154,12 @@
 						<span class="font-medium">{ab.userFirstName} {ab.userLastName}</span>
 						<AbsenceTypeBadge type={ab.type} customTypeName={ab.customTypeName} customTypeColor={ab.customTypeColor} size="xs" />
 						{#if ab.isHalfDay}<span class="badge badge-xs badge-outline" title={t('absences.dialog.halfDay')}>½</span>{/if}
-						{#if ab.note}<span class="text-base-content/50 text-xs truncate">{ab.note}</span>{/if}
+						{#if ab.note}<span class="text-base-content/70 text-xs truncate">{ab.note}</span>{/if}
 					</li>
 				{/each}
 			</ul>
 		</div>
-		<div class="divider my-2 text-xs text-base-content/50">{willRequest ? t('absences.dialog.requestDivider') : t('absences.dialog.addDivider')}</div>
+		<div class="divider my-2 text-xs text-base-content/70">{willRequest ? t('absences.dialog.requestDivider') : t('absences.dialog.addDivider')}</div>
 	{/if}
 
 	{#if willRequest}
@@ -207,7 +207,7 @@
 				{/each}
 			</select>
 			{#if selectedCustomType}
-				<span class="text-xs text-base-content/50">
+				<span class="text-xs text-base-content/70">
 					{selectedCustomType.creditMode === 'FillToTarget' ? t('absences.dialog.credit.FillToTarget')
 					: selectedCustomType.creditMode === 'FullCredit' ? t('absences.dialog.credit.FullCredit')
 					: t('absences.dialog.credit.None')}
@@ -222,7 +222,7 @@
 			<input type="checkbox" class="checkbox checkbox-sm" bind:checked={halfDay} disabled={saving} />
 			{t('absences.dialog.halfDay')}
 		</label>
-		<p class="text-xs text-base-content/50 m-0">{t('absences.dialog.workdaysHint')}</p>
+		<p class="text-xs text-base-content/70 m-0">{t('absences.dialog.workdaysHint')}</p>
 		<div class="flex justify-end gap-2 mt-2">
 			<button type="button" class="btn btn-ghost btn-sm" onclick={onclose}>{t('common.cancel')}</button>
 			<button type="submit" class="btn btn-primary btn-sm" disabled={saving}>

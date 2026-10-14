@@ -79,20 +79,20 @@
 		</form>
 	{:else if allowed > 0}
 		<div class="flex gap-x-6 gap-y-2 mb-3 flex-wrap">
-			<div><span class="text-2xl font-bold text-base-content">{formatNumber(remaining)}</span> <span class="text-sm text-base-content/50">{t('memberDetail.vacation.remaining')}</span></div>
-			<div><span class="text-lg font-semibold text-base-content/70">{formatNumber(taken)}</span> <span class="text-sm text-base-content/50">{t('memberDetail.vacation.taken')}</span></div>
-			<div><span class="text-lg font-semibold text-base-content/70">{formatNumber(planned)}</span> <span class="text-sm text-base-content/50">{t('memberDetail.vacation.planned')}</span></div>
-			<div><span class="text-lg font-semibold text-base-content/70">{formatNumber(allowed)}</span> <span class="text-sm text-base-content/50">{t('memberDetail.vacation.total')}</span></div>
+			<div><span class="text-2xl font-bold text-base-content">{formatNumber(remaining)}</span> <span class="text-sm text-base-content/70">{t('memberDetail.vacation.remaining')}</span></div>
+			<div><span class="text-lg font-semibold text-base-content/70">{formatNumber(taken)}</span> <span class="text-sm text-base-content/70">{t('memberDetail.vacation.taken')}</span></div>
+			<div><span class="text-lg font-semibold text-base-content/70">{formatNumber(planned)}</span> <span class="text-sm text-base-content/70">{t('memberDetail.vacation.planned')}</span></div>
+			<div><span class="text-lg font-semibold text-base-content/70">{formatNumber(allowed)}</span> <span class="text-sm text-base-content/70">{t('memberDetail.vacation.total')}</span></div>
 		</div>
 		<div class="w-full bg-base-200 rounded-full h-2.5 overflow-hidden flex" role="img" aria-label={t('memberDetail.vacation.barLabel', { taken: formatNumber(taken), planned: formatNumber(planned), total: formatNumber(allowed) })}>
 			<div class="h-2.5 transition-all {barClass}" style="width: {takenPct}%"></div>
 			<div class="h-2.5 transition-all {barClass} opacity-40" style="width: {plannedPct}%"></div>
 		</div>
-		<div class="flex gap-x-4 gap-y-1 mt-2 text-xs text-base-content/50 flex-wrap">
+		<div class="flex gap-x-4 gap-y-1 mt-2 text-xs text-base-content/70 flex-wrap">
 			<span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm {barClass}"></span> {t('memberDetail.vacation.legendTaken')}</span>
 			<span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm {barClass} opacity-40"></span> {t('memberDetail.vacation.legendPlanned')}</span>
 		</div>
 	{:else}
-		<p class="text-sm text-base-content/50 m-0">{t('memberDetail.vacation.none')}{canEdit ? '' : ` ${t('memberDetail.vacation.askAdmin')}`}</p>
+		<p class="text-sm text-base-content/70 m-0">{t('memberDetail.vacation.none')}{canEdit ? '' : ` ${t('memberDetail.vacation.askAdmin')}`}</p>
 	{/if}
 </section>

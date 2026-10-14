@@ -84,7 +84,7 @@
 </svelte:head>
 
 <div class="page">
-	<a href="/organizations" class="text-base-content/60 text-sm inline-block mb-3 no-underline hover:text-primary">{t('orgs.create.back')}</a>
+	<a href="/organizations" class="text-base-content/70 text-sm inline-block mb-3 no-underline hover:text-primary">{t('orgs.create.back')}</a>
 	<h1 class="text-2xl font-bold mb-6">{t('orgs.create.title')}</h1>
 
 	{#if error}
@@ -131,13 +131,13 @@
 					aria-describedby="slugHint"
 					disabled={submitting}
 				/>
-				<span id="slugHint" class="block text-xs mt-1 {slugError || slugMissing ? 'text-error' : 'text-base-content/60'}">
+				<span id="slugHint" class="block text-xs mt-1 {slugError || slugMissing ? 'text-error' : 'text-base-content/70'}">
 					{slugMissing ? t('orgs.create.slugMissing') : t('orgs.create.slugHint')}
 				</span>
 			</div>
 
 			<div class="mb-5">
-				<label for="description" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('orgs.create.description')} <span class="text-base-content/50 font-normal">({t('common.optional')})</span></label>
+				<label for="description" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('orgs.create.description')} <span class="text-base-content/70 font-normal">({t('common.optional')})</span></label>
 				<textarea
 					id="description"
 					class="textarea w-full"
@@ -149,7 +149,7 @@
 			</div>
 
 			<div class="mb-5">
-				<label for="website" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('orgs.create.website')} <span class="text-base-content/50 font-normal">({t('common.optional')})</span></label>
+				<label for="website" class="block font-medium mb-1.5 text-base-content/80 text-sm">{t('orgs.create.website')} <span class="text-base-content/70 font-normal">({t('common.optional')})</span></label>
 				<input
 					id="website"
 					type="url"

@@ -101,10 +101,10 @@
 </svelte:head>
 
 <div class="max-w-5xl mx-auto px-4 sm:px-6 pb-6">
-	<a href="/organizations/{orgSlug}" class="text-base-content/60 text-sm inline-block mb-3 no-underline hover:text-primary">&larr; {t('timeOverview.back', { org: orgName || t('timeOverview.fallbackOrg') })}</a>
+	<a href="/organizations/{orgSlug}" class="text-base-content/70 text-sm inline-block mb-3 no-underline hover:text-primary">&larr; {t('timeOverview.back', { org: orgName || t('timeOverview.fallbackOrg') })}</a>
 
 	<h1 class="text-xl font-bold mb-1">{t('timeOverview.title')}</h1>
-	{#if orgName}<p class="text-base-content/60 text-sm mb-6">{orgName}</p>{/if}
+	{#if orgName}<p class="text-base-content/70 text-sm mb-6">{orgName}</p>{/if}
 
 	{#if error}
 		<div class="alert alert-error">{error}</div>
@@ -117,13 +117,13 @@
 		</div>
 
 		{#if loading}
-			<p class="text-base-content/50 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
+			<p class="text-base-content/70 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
 		{:else if members.length === 0}
-			<p class="text-base-content/50">{t('timeOverview.noMembers')}</p>
+			<p class="text-base-content/70">{t('timeOverview.noMembers')}</p>
 		{:else}
 			<div class="bg-base-100 border border-base-300 rounded-xl overflow-x-auto">
 				<div class="min-w-[40rem]">
-				<div class="grid grid-cols-[2fr_0.7fr_0.7fr_0.8fr_0.8fr_0.6fr_0.8fr] gap-2 px-4 py-3 bg-base-200/50 text-[0.6875rem] font-bold text-base-content/60 uppercase tracking-wider border-b border-base-300">
+				<div class="grid grid-cols-[2fr_0.7fr_0.7fr_0.8fr_0.8fr_0.6fr_0.8fr] gap-2 px-4 py-3 bg-base-200/50 text-[0.6875rem] font-bold text-base-content/70 uppercase tracking-wider border-b border-base-300">
 					<span class="overflow-hidden">{t('timeOverview.cols.member')}</span>
 					<span class="text-center">{t('timeOverview.cols.role')}</span>
 					<span class="text-center">{t('timeOverview.cols.target')}</span>
@@ -139,7 +139,7 @@
 					<button type="button" class="grid grid-cols-[2fr_0.7fr_0.7fr_0.8fr_0.8fr_0.6fr_0.8fr] gap-2 px-4 py-3 border-b border-base-200 bg-base-100 w-full text-left cursor-pointer transition-colors text-sm items-center hover:bg-base-200/50" aria-expanded={expandedUserId === member.userId} onclick={() => toggleMemberDetail(member.userId!)}>
 						<span class="overflow-hidden">
 							<span class="block font-semibold text-sm">{member.firstName} {member.lastName}</span>
-							{#if member.email}<span class="block text-[0.6875rem] text-base-content/50 overflow-hidden text-ellipsis whitespace-nowrap">{member.email}</span>{/if}
+							{#if member.email}<span class="block text-[0.6875rem] text-base-content/70 overflow-hidden text-ellipsis whitespace-nowrap">{member.email}</span>{/if}
 						</span>
 						<span class="text-center">
 							{#if member.role}<span class="badge badge-sm {member.role === 'Owner' ? 'badge-warning' : member.role === 'Admin' ? 'badge-info' : 'badge-ghost'}">{roleLabel(member.role)}</span>{/if}
@@ -167,7 +167,7 @@
 									<span class="badge badge-error badge-sm">{pct}%</span>
 								{/if}
 							{:else}
-								<span class="text-base-content/50">-</span>
+								<span class="text-base-content/70">-</span>
 							{/if}
 						</span>
 					</button>
@@ -175,20 +175,20 @@
 					{#if expandedUserId === member.userId}
 						<div class="px-5 py-3 bg-base-200/50 border-b border-base-300">
 							{#if entriesLoading}
-								<p class="text-base-content/50 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
+								<p class="text-base-content/70 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
 							{:else if entriesError}
 								<div class="alert alert-error text-sm py-2">{entriesError}</div>
 							{:else if memberEntries.length === 0}
-								<p class="text-base-content/50">{t('timeOverview.noEntries')}</p>
+								<p class="text-base-content/70">{t('timeOverview.noEntries')}</p>
 							{:else}
 								<div class="flex flex-col gap-1.5">
 									{#each memberEntries as entry}
 										<div class="flex items-center gap-3 text-sm px-2 py-1.5 bg-base-100 rounded-md border border-base-300">
-											<span class="text-base-content/60 min-w-[56px] text-xs whitespace-nowrap">{formatDateShort(entry.startTime!)}</span>
+											<span class="text-base-content/70 min-w-[56px] text-xs whitespace-nowrap">{formatDateShort(entry.startTime!)}</span>
 											<span class="text-base-content min-w-[100px] whitespace-nowrap">
 												{formatTime(entry.startTime!)}{entry.endTime ? ` – ${formatTime(entry.endTime!)}` : ''}
 											</span>
-											<span class="text-base-content/50 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{entry.description || ''}</span>
+											<span class="text-base-content/70 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{entry.description || ''}</span>
 											<span class="font-semibold min-w-[56px] text-right">
 												{entry.isRunning ? t('timeOverview.running') : formatDuration(entry.netDurationMinutes ?? entry.durationMinutes ?? 0)}
 											</span>

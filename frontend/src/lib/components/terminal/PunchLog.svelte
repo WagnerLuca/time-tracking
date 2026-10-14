@@ -35,7 +35,7 @@
 		<h3 class="text-base font-bold text-base-content m-0">{t('orgSettings.terminal.punchesTitle')}</h3>
 		<button type="button" class="btn btn-ghost btn-xs" onclick={load} disabled={loading}>{t('orgSettings.terminal.refresh')}</button>
 	</div>
-	<p class="text-sm text-base-content/60 mb-2">{t('orgSettings.terminal.punchesIntro')}</p>
+	<p class="text-sm text-base-content/70 mb-2">{t('orgSettings.terminal.punchesIntro')}</p>
 	<div class="card bg-base-100 border border-base-300">
 		<div class="card-body p-0">
 			{#if error}
@@ -44,7 +44,7 @@
 			{#if loading && punches.length === 0}
 				<span class="loading loading-spinner loading-sm m-4" aria-label={t('common.loading')}></span>
 			{:else if punches.length === 0}
-				<p class="text-sm text-base-content/60 m-4">{t('orgSettings.terminal.punchesEmpty')}</p>
+				<p class="text-sm text-base-content/70 m-4">{t('orgSettings.terminal.punchesEmpty')}</p>
 			{:else}
 				<div class="overflow-x-auto max-h-96">
 					<table class="table table-sm table-pin-rows" data-testid="punch-log">
@@ -62,10 +62,10 @@
 								<tr>
 									<td class="whitespace-nowrap tabular-nums">
 										{formatDateTime(p.scannedAt!)}
-										{#if isQueuedPunch(p)}<span class="block text-xs text-base-content/50">{t('orgSettings.terminal.queued', { time: formatTimeAgo(p.receivedAt) })}</span>{/if}
+										{#if isQueuedPunch(p)}<span class="block text-xs text-base-content/70">{t('orgSettings.terminal.queued', { time: formatTimeAgo(p.receivedAt) })}</span>{/if}
 									</td>
 									<td>{p.terminalName ?? t('orgSettings.terminal.deletedTerminal')}</td>
-									<td><code>…{p.cardHint}</code>{#if p.cardLabel}<span class="text-xs text-base-content/60"> {p.cardLabel}</span>{/if}</td>
+									<td><code>…{p.cardHint}</code>{#if p.cardLabel}<span class="text-xs text-base-content/70"> {p.cardLabel}</span>{/if}</td>
 									<td>{p.memberName ?? '—'}</td>
 									<td><span class="badge badge-sm {punchResultClass(p.result)}">{punchResultLabel(p.result)}</span></td>
 								</tr>

@@ -255,7 +255,7 @@
 			<div class="flex items-start justify-between gap-3 mb-2 flex-wrap">
 				<div class="min-w-0">
 					<h1 class="text-2xl font-bold text-base-content break-words">{org.name}</h1>
-					<span class="text-base-content/50 text-sm">/{org.slug}</span>
+					<span class="text-base-content/70 text-sm">/{org.slug}</span>
 				</div>
 				{#if isAdmin}
 					<div class="flex gap-2">
@@ -279,7 +279,7 @@
 			{#if settingsNotificationIds.length > 0}
 				<div class="alert alert-info mb-4 text-sm">
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-					<span>{t('orgHome.rulesChangedBefore')} <a href="/organizations/{orgSlug}/settings" class="link link-primary font-semibold" onclick={dismissSettingsNotifications}>{t('orgHome.rulesChangedLink')}</a>{t('orgHome.rulesChangedAfter')}</span>
+					<span>{t('orgHome.rulesChangedBefore')} <a href="/organizations/{orgSlug}/settings" class="link font-semibold" onclick={dismissSettingsNotifications}>{t('orgHome.rulesChangedLink')}</a>{t('orgHome.rulesChangedAfter')}</span>
 					<button type="button" class="btn btn-ghost btn-xs btn-circle ml-auto" aria-label={t('common.dismiss')} title={t('common.dismiss')} onclick={dismissSettingsNotifications}>✕</button>
 				</div>
 			{/if}
@@ -292,7 +292,7 @@
 				<a href={org.website} target="_blank" rel="noopener noreferrer" class="link link-primary text-sm inline-block mb-4 break-all">{org.website}</a>
 			{/if}
 
-			<p class="text-base-content/60 text-sm mt-2 mb-5">{t('orgHome.intro')}</p>
+			<p class="text-base-content/70 text-sm mt-2 mb-5">{t('orgHome.intro')}</p>
 
 			{#if myMember}
 				<div class="flex flex-col gap-4">

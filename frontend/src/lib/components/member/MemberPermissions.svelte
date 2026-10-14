@@ -49,18 +49,18 @@
 			<a href="/organizations/{orgSlug}/groups" class="btn btn-ghost btn-xs">{t('memberDetail.permissions.manage')}</a>
 		{/if}
 	</div>
-	<p class="text-xs text-base-content/50 mb-4">{t('memberDetail.permissions.intro')}</p>
+	<p class="text-xs text-base-content/70 mb-4">{t('memberDetail.permissions.intro')}</p>
 
 	<div class="grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
 		<div>
-			<h3 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2">{t('memberDetail.permissions.actions')}</h3>
+			<h3 class="text-xs font-semibold uppercase tracking-wide text-base-content/70 mb-2">{t('memberDetail.permissions.actions')}</h3>
 			{#each rules as r}
 				<div class="flex items-center justify-between gap-2 py-1 text-sm">
 					<span class="text-base-content/70">{r.label}</span>
 					<span class="badge badge-sm shrink-0 {modeBadge(r.mode)}">{ruleModeLabel(r.mode)}</span>
 				</div>
 			{/each}
-			<h3 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2 mt-4">{isSelf ? t('visibility.self.title') : t('visibility.self.titleOther')}</h3>
+			<h3 class="text-xs font-semibold uppercase tracking-wide text-base-content/70 mb-2 mt-4">{isSelf ? t('visibility.self.title') : t('visibility.self.titleOther')}</h3>
 			{#each visibility as v}
 				<div class="py-1 text-sm">
 					<span class="text-base-content/70">{v.label}:</span>
@@ -69,7 +69,7 @@
 			{/each}
 		</div>
 		<div>
-			<h3 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2">{t('memberDetail.permissions.capabilities')}</h3>
+			<h3 class="text-xs font-semibold uppercase tracking-wide text-base-content/70 mb-2">{t('memberDetail.permissions.capabilities')}</h3>
 			<ul class="list-none p-0 m-0">
 				{#each capabilities as c}
 					<li class="flex items-center gap-2 py-1 text-sm">
@@ -78,7 +78,7 @@
 						{:else}
 							<svg class="text-base-content/20 shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
 						{/if}
-						<span class={c.on ? 'text-base-content/80' : 'text-base-content/40'}>{c.label}</span>
+						<span class={c.on ? 'text-base-content/80' : 'text-base-content/70'}>{c.label}</span>
 						<span class="sr-only">{c.on ? t('common.yes') : t('common.no')}</span>
 					</li>
 				{/each}

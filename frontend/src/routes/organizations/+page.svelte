@@ -125,12 +125,12 @@
 				<div class="card-body gap-4">
 					<div>
 						<h2 id="welcomeHeading" class="text-lg font-semibold">{t('orgs.welcome.title')}</h2>
-						<p class="text-sm text-base-content/60 mt-1">{t('orgs.welcome.text')}</p>
+						<p class="text-sm text-base-content/70 mt-1">{t('orgs.welcome.text')}</p>
 					</div>
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<div class="rounded-xl border border-base-300 p-4 flex flex-col gap-3">
 							<h3 class="font-semibold">{t('orgs.welcome.createTitle')}</h3>
-							<p class="text-sm text-base-content/60 flex-1">{t('orgs.welcome.createText')}</p>
+							<p class="text-sm text-base-content/70 flex-1">{t('orgs.welcome.createText')}</p>
 							<a href="/organizations/new" class="btn btn-primary btn-sm self-start">{t('orgs.welcome.create')}</a>
 						</div>
 						{@render joinForm()}
@@ -150,14 +150,14 @@
 							<div class="flex items-start justify-between gap-2">
 								<div class="min-w-0">
 									<div class="font-semibold text-base truncate">{org.name}</div>
-									<div class="text-base-content/60 text-xs truncate">/{org.slug}</div>
+									<div class="text-base-content/70 text-xs truncate">/{org.slug}</div>
 								</div>
 								<span class="badge badge-sm badge-ghost shrink-0">{roleLabel(org.role)}</span>
 							</div>
 							{#if org.description}
-								<div class="text-base-content/60 text-sm mt-2 line-clamp-2">{org.description}</div>
+								<div class="text-base-content/70 text-sm mt-2 line-clamp-2">{org.description}</div>
 							{/if}
-							<div class="text-xs text-base-content/60 mt-3 pt-2 border-t border-base-200">
+							<div class="text-xs text-base-content/70 mt-3 pt-2 border-t border-base-200">
 								{tp('orgs.members', org.memberCount ?? 0)}
 								{#if org.organizationId === orgContext.selectedOrgId}
 									· <span class="text-primary font-medium">{t('orgs.selected')}</span>
@@ -180,12 +180,12 @@
 						<div class="flex flex-col bg-base-100 rounded-xl border border-base-300 p-5 gap-2">
 							<div class="min-w-0">
 								<div class="font-semibold text-base truncate">{org.name}</div>
-								<div class="text-base-content/60 text-xs truncate">/{org.slug}</div>
+								<div class="text-base-content/70 text-xs truncate">/{org.slug}</div>
 							</div>
 							{#if org.description}
-								<div class="text-base-content/60 text-sm line-clamp-2">{org.description}</div>
+								<div class="text-base-content/70 text-sm line-clamp-2">{org.description}</div>
 							{/if}
-							<div class="flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/60 mt-auto pt-2 border-t border-base-200">
+							<div class="flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/70 mt-auto pt-2 border-t border-base-200">
 								<span>{tp('orgs.members', org.memberCount ?? 0)}</span>
 								{#if pendingJoinSlugs.has(org.slug!)}
 									<span class="badge badge-warning badge-sm">{t('orgs.join.pending')}</span>
@@ -213,7 +213,7 @@
 {#snippet joinForm()}
 	<form class="rounded-xl border border-base-300 bg-base-100 p-4 flex flex-col gap-3" onsubmit={joinBySlug} novalidate>
 		<h3 class="font-semibold">{t('orgs.join.title')}</h3>
-		<p class="text-sm text-base-content/60">{t('orgs.join.text')}</p>
+		<p class="text-sm text-base-content/70">{t('orgs.join.text')}</p>
 		<div class="flex flex-col sm:flex-row gap-2">
 			<label for="joinSlug" class="sr-only">{t('orgs.join.label')}</label>
 			<input

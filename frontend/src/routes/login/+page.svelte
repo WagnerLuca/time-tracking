@@ -86,7 +86,7 @@
 		<div class="card-body p-6 sm:p-10">
 			{#if auth.twoFactorRequired}
 				<h1 class="text-2xl font-bold mb-1">{t('auth.twoFactor.title')}</h1>
-				<p class="text-base-content/60 mb-6">{t('auth.twoFactor.subtitle')}</p>
+				<p class="text-base-content/70 mb-6">{t('auth.twoFactor.subtitle')}</p>
 
 				{#if error}
 					<div id="loginError" class="alert alert-error text-sm mb-4" role="alert">{error}</div>
@@ -110,7 +110,7 @@
 							aria-describedby="twoFactorHint{error ? ' loginError' : ''}"
 							disabled={submitting}
 						/>
-						<p id="twoFactorHint" class="text-xs text-base-content/60 mt-2">{t('auth.twoFactor.backupHint')}</p>
+						<p id="twoFactorHint" class="text-xs text-base-content/70 mt-2">{t('auth.twoFactor.backupHint')}</p>
 					</div>
 
 					<button type="submit" class="btn btn-primary w-full" disabled={submitting || !twoFactorCode}>
@@ -123,7 +123,7 @@
 				</button>
 			{:else}
 				<h1 class="text-2xl font-bold mb-1">{t('auth.login.title')}</h1>
-				<p class="text-base-content/60 mb-6">{t('auth.login.subtitle')}</p>
+				<p class="text-base-content/70 mb-6">{t('auth.login.subtitle')}</p>
 				{#if next?.startsWith('/invite')}
 					<div class="alert alert-info text-sm mb-4" role="status">{t('auth.inviteHint')}</div>
 				{/if}
@@ -169,7 +169,7 @@
 					</button>
 				</form>
 
-				<p class="text-center mt-6 text-sm text-base-content/60">
+				<p class="text-center mt-6 text-sm text-base-content/70">
 					{t('auth.login.noAccount')} <a href={withNext('/register', next)} class="link link-primary">{t('auth.login.register')}</a>
 				</p>
 			{/if}

@@ -214,11 +214,11 @@
 						{t('dashboard.running')}
 					</div>
 					<div class="text-4xl sm:text-5xl font-bold tabular-nums text-base-content tracking-wide mt-1" role="timer" aria-live="off">{formatClock(timer.elapsedSeconds)}</div>
-					<div class="text-sm text-base-content/60 mt-1 truncate">{t('dashboard.forOrg', { org: timer.current.organizationName ?? t('timer.personal') })}</div>
+					<div class="text-sm text-base-content/70 mt-1 truncate">{t('dashboard.forOrg', { org: timer.current.organizationName ?? t('timer.personal') })}</div>
 				{:else}
-					<div class="text-sm font-semibold text-base-content/50">{t('dashboard.notRunning')}</div>
-					<div class="text-4xl sm:text-5xl font-bold tabular-nums text-base-content/30 tracking-wide mt-1">{formatClock(0)}</div>
-					<div class="text-sm text-base-content/60 mt-1 truncate">
+					<div class="text-sm font-semibold text-base-content/70">{t('dashboard.notRunning')}</div>
+					<div class="text-4xl sm:text-5xl font-bold tabular-nums text-base-content/60 tracking-wide mt-1">{formatClock(0)}</div>
+					<div class="text-sm text-base-content/70 mt-1 truncate">
 						{orgContext.selectedOrg ? t('dashboard.startsFor', { org: orgContext.selectedOrg.name ?? '' }) : t('dashboard.startsWithoutOrg')}
 					</div>
 				{/if}
@@ -247,7 +247,7 @@
 	{#if noOrganizations}
 		<section class="card bg-base-100 border border-base-300 p-5 mb-6">
 			<h2 class="text-base font-semibold m-0">{t('dashboard.noOrg.title')}</h2>
-			<p class="text-sm text-base-content/60 mt-1 mb-4">{t('dashboard.noOrg.text')}</p>
+			<p class="text-sm text-base-content/70 mt-1 mb-4">{t('dashboard.noOrg.text')}</p>
 			<div class="flex flex-wrap gap-2">
 				<a href="/organizations/new" class="btn btn-primary btn-sm">{t('dashboard.noOrg.create')}</a>
 				<a href="/organizations" class="btn btn-outline btn-sm">{t('dashboard.noOrg.join')}</a>
@@ -284,9 +284,9 @@
 		<!-- Key figures -->
 		<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
 			<div class="card bg-base-100 border border-base-300 p-4">
-				<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('dashboard.today')}</span>
+				<span class="text-xs text-base-content/70 uppercase font-semibold tracking-wider">{t('dashboard.today')}</span>
 				<span class="text-2xl font-bold tabular-nums mt-1">
-					{formatHours(today)}{#if stats.todayTarget > 0}<span class="text-sm font-normal text-base-content/50"> / {formatHours(stats.todayTarget)}</span>{/if}
+					{formatHours(today)}{#if stats.todayTarget > 0}<span class="text-sm font-normal text-base-content/70"> / {formatHours(stats.todayTarget)}</span>{/if}
 				</span>
 				{#if stats.todayTarget > 0}
 					<progress class="progress {today >= stats.todayTarget ? 'progress-success' : 'progress-primary'} mt-2" value={Math.min(today, stats.todayTarget)} max={stats.todayTarget} aria-label={t('dashboard.todayProgress')}></progress>
@@ -294,23 +294,23 @@
 				{/if}
 			</div>
 			<div class="card bg-base-100 border border-base-300 p-4">
-				<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('dashboard.weekBalance')}</span>
+				<span class="text-xs text-base-content/70 uppercase font-semibold tracking-wider">{t('dashboard.weekBalance')}</span>
 				{#if stats.weekTarget > 0}
 					<span class="text-2xl font-bold tabular-nums mt-1 {deltaClass(week - stats.weekTarget)}">{formatDelta(week - stats.weekTarget)}</span>
-					<span class="text-xs text-base-content/50 mt-1">{t('dashboard.weekOfTarget', { worked: formatHours(week), target: formatHours(stats.weekTarget) })}</span>
+					<span class="text-xs text-base-content/70 mt-1">{t('dashboard.weekOfTarget', { worked: formatHours(week), target: formatHours(stats.weekTarget) })}</span>
 				{:else}
 					<span class="text-2xl font-bold tabular-nums mt-1">{formatHours(week)}</span>
-					<span class="text-xs text-base-content/50 mt-1">{t('dashboard.workedThisWeek')}</span>
+					<span class="text-xs text-base-content/70 mt-1">{t('dashboard.workedThisWeek')}</span>
 				{/if}
 			</div>
 			<div class="card border p-4 {cumulative == null ? 'bg-base-100 border-base-300' : cumulative > 0 ? 'border-success/50 bg-success/5' : cumulative < 0 ? 'border-error/50 bg-error/5' : 'bg-base-100 border-base-300'}">
-				<span class="text-xs text-base-content/50 uppercase font-semibold tracking-wider">{t('dashboard.cumulativeBalance')}</span>
+				<span class="text-xs text-base-content/70 uppercase font-semibold tracking-wider">{t('dashboard.cumulativeBalance')}</span>
 				{#if cumulative != null}
 					<span class="text-2xl font-bold tabular-nums mt-1 {deltaClass(cumulative)}">{formatDelta(cumulative)}</span>
-					<span class="text-xs text-base-content/50 mt-1">{t('dashboard.asOfToday')}</span>
+					<span class="text-xs text-base-content/70 mt-1">{t('dashboard.asOfToday')}</span>
 				{:else}
-					<span class="text-2xl font-bold tabular-nums mt-1 text-base-content/30">–</span>
-					<span class="text-xs text-base-content/50 mt-1">{t('dashboard.needsSchedule')}</span>
+					<span class="text-2xl font-bold tabular-nums mt-1 text-base-content/60">–</span>
+					<span class="text-xs text-base-content/70 mt-1">{t('dashboard.needsSchedule')}</span>
 				{/if}
 			</div>
 		</div>
@@ -326,14 +326,14 @@
 					{@const dayType = getDayType(day.date, daysOff.holidayDates, daysOff.sickDayDates, daysOff.vacationDates, daysOff.otherAbsenceDates, daysOff.halfDayHolidays)}
 					{@const dt = dayTypeClasses(dayType)}
 					{@const worked = isToday(day.date) ? day.worked + runningMinutes : day.worked}
-					<div class="grid grid-cols-[2rem_0.5rem_1fr_auto] items-center gap-2 rounded px-1 -mx-1 {dt.soft} {isToday(day.date) ? 'font-semibold' : ''} {isFuture(day.date) ? 'opacity-40' : ''}">
-						<span class="text-sm text-base-content/60">{day.label}</span>
+					<div class="grid grid-cols-[2rem_0.5rem_1fr_auto] items-center gap-2 rounded px-1 -mx-1 {dt.soft} {isToday(day.date) ? 'font-semibold' : ''}">
+						<span class="text-sm text-base-content/70">{day.label}</span>
 						<span class="w-2 h-2 rounded-full {dt.dot}" title={dayType ? getDayTypeLabel(day.date, daysOff.holidayDates, daysOff.sickDayDates, daysOff.vacationDates, daysOff.otherAbsenceDates, daysOff.halfDayHolidays, daysOff.halfDayAbsences) : undefined}></span>
 						<div class="h-2 bg-base-200 rounded-full overflow-hidden">
 							<div class="h-full rounded-full transition-all duration-300 {worked > day.target && day.target > 0 ? 'bg-success' : 'bg-primary'}" style="width: {barWidth(worked, day.target)}%"></div>
 						</div>
 						<span class="text-sm tabular-nums text-right whitespace-nowrap">
-							{formatHours(worked)}{#if day.target > 0}<span class="text-xs text-base-content/40"> / {formatHours(day.target)}</span>{/if}
+							{formatHours(worked)}{#if day.target > 0}<span class="text-xs text-base-content/70"> / {formatHours(day.target)}</span>{/if}
 						</span>
 					</div>
 				{/each}
@@ -350,12 +350,12 @@
 			<div class="flex flex-col gap-1.5">
 				{#each stats.monthWeeks as wk (wk.label)}
 					<div class="grid grid-cols-[3.5rem_1fr_auto] items-center gap-2">
-						<span class="text-sm text-base-content/60 tabular-nums">{wk.label}</span>
+						<span class="text-sm text-base-content/70 tabular-nums">{wk.label}</span>
 						<div class="h-2 bg-base-200 rounded-full overflow-hidden">
 							<div class="h-full rounded-full transition-all duration-300 {wk.worked > wk.target && wk.target > 0 ? 'bg-success' : 'bg-secondary'}" style="width: {barWidth(wk.worked, wk.target)}%"></div>
 						</div>
 						<span class="text-sm tabular-nums text-right whitespace-nowrap">
-							{formatHours(wk.worked)}{#if wk.target > 0}<span class="text-xs text-base-content/40"> / {formatHours(wk.target)}</span>{/if}
+							{formatHours(wk.worked)}{#if wk.target > 0}<span class="text-xs text-base-content/70"> / {formatHours(wk.target)}</span>{/if}
 						</span>
 					</div>
 				{/each}

@@ -115,32 +115,32 @@
 	</div>
 
 	{#if loading}
-		<p class="text-sm text-base-content/50 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
+		<p class="text-sm text-base-content/70 flex items-center gap-2"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
 	{:else if loadError}
 		<div class="alert alert-error text-sm py-2">
 			<span>{loadError}</span>
 			<button type="button" class="btn btn-ghost btn-xs" onclick={load}>{t('common.retry')}</button>
 		</div>
 	{:else if absences.length === 0}
-		<p class="text-sm text-base-content/50">{t('memberDetail.absences.empty')}</p>
+		<p class="text-sm text-base-content/70">{t('memberDetail.absences.empty')}</p>
 	{:else}
 		{#each byYear as [year, items] (year)}
 			<div class="mb-4 last:mb-0">
-				<h3 class="text-sm font-semibold text-base-content/50 mb-2">{year}</h3>
+				<h3 class="text-sm font-semibold text-base-content/70 mb-2">{year}</h3>
 				<ul class="flex flex-col gap-1.5 list-none p-0 m-0">
 					{#each items as a (a.id)}
 						<li class="flex items-center gap-x-3 gap-y-1 flex-wrap py-2 px-3 bg-base-200/30 rounded-md border border-base-200 text-sm">
 							<span class="font-medium text-base-content/70 min-w-[6.5rem]">{formatDateFull(a.date!)}</span>
 							<span class="badge badge-sm {absenceTypeClasses(a.type).badge}">{a.customTypeName ?? absenceTypeLabel(a.type)}</span>
 							{#if a.isHalfDay}<span class="badge badge-outline badge-xs">{t('memberDetail.absences.halfDay')}</span>{/if}
-							{#if a.note}<span class="text-base-content/50 text-xs italic flex-1 min-w-0 truncate">{a.note}</span>{/if}
+							{#if a.note}<span class="text-base-content/70 text-xs italic flex-1 min-w-0 truncate">{a.note}</span>{/if}
 							{#if showAudit && (a.createdByName || a.createdViaRequestId)}
-								<span class="text-[10px] text-base-content/40 whitespace-nowrap">
+								<span class="text-[10px] text-base-content/70 whitespace-nowrap">
 									{a.createdByName ? t('memberDetail.absences.by', { name: a.createdByName }) : ''}{a.createdViaRequestId ? ` ${t('memberDetail.absences.viaRequest', { id: a.createdViaRequestId })}` : ''}
 								</span>
 							{/if}
 							{#if canDelete}
-								<button type="button" class="btn btn-ghost btn-xs ml-auto text-base-content/40 hover:text-error" aria-label={t('memberDetail.absences.delete')} title={t('memberDetail.absences.delete')} onclick={() => remove(a)} disabled={deletingId === a.id}>
+								<button type="button" class="btn btn-ghost btn-xs ml-auto text-base-content/70 hover:text-error" aria-label={t('memberDetail.absences.delete')} title={t('memberDetail.absences.delete')} onclick={() => remove(a)} disabled={deletingId === a.id}>
 									{#if deletingId === a.id}<span class="loading loading-spinner loading-xs"></span>{:else}✕{/if}
 								</button>
 							{/if}

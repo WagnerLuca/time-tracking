@@ -39,7 +39,7 @@
 		<div class="card-body p-6 sm:p-10">
 			<h1 class="text-2xl font-bold mb-4">{t('auth.verify.pageTitle')}</h1>
 			{#if status === 'verifying'}
-				<p class="text-base-content/60 flex items-center gap-2" role="status"><span class="loading loading-spinner loading-sm"></span> {t('auth.verify.verifying')}</p>
+				<p class="text-base-content/70 flex items-center gap-2" role="status"><span class="loading loading-spinner loading-sm"></span> {t('auth.verify.verifying')}</p>
 			{:else if status === 'success'}
 				<div class="alert alert-success text-sm mb-4" role="status">{t('auth.verify.success')}</div>
 			{:else}

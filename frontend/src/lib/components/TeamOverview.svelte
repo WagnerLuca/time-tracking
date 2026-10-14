@@ -74,7 +74,7 @@
 		<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
 			<h2 id="team-heading" class="text-base font-semibold m-0">{t('dashboard.team.title')}</h2>
 			{#if members.length > 0}
-				<span class="text-xs text-base-content/60">{t('dashboard.team.presentCount', { present: presentCount, total: members.length })}</span>
+				<span class="text-xs text-base-content/70">{t('dashboard.team.presentCount', { present: presentCount, total: members.length })}</span>
 			{/if}
 		</div>
 
@@ -95,9 +95,9 @@
 		{/if}
 
 		{#if members.length === 0}
-			<p class="text-sm text-base-content/60 m-0">{t('dashboard.team.empty')}</p>
+			<p class="text-sm text-base-content/70 m-0">{t('dashboard.team.empty')}</p>
 		{:else if shown.length === 0}
-			<p class="text-sm text-base-content/60 m-0">{t('dashboard.team.noMatch')}</p>
+			<p class="text-sm text-base-content/70 m-0">{t('dashboard.team.noMatch')}</p>
 		{:else}
 			<ul class="grid grid-cols-1 sm:grid-cols-2 gap-2 list-none p-0 m-0">
 				{#each shown as m (m.userId)}
@@ -129,7 +129,7 @@
 									{/if}
 								</div>
 								{#if m.present != null}
-									<div class="text-xs text-base-content/60 truncate">
+									<div class="text-xs text-base-content/70 truncate">
 										{m.present && m.presentSince ? t('dashboard.team.since', { time: formatTime(m.presentSince) }) : t('dashboard.team.notPresent')}
 									</div>
 								{/if}
@@ -137,7 +137,7 @@
 							{#if balance != null}
 								<div class="shrink-0 text-right">
 									<div class="text-sm font-bold tabular-nums {balance > 0 ? 'text-success' : balance < 0 ? 'text-error' : ''}" data-testid="team-balance">{formatDelta(balance)}</div>
-									<div class="text-[0.6875rem] text-base-content/50">{t('dashboard.team.balance')}</div>
+									<div class="text-[0.6875rem] text-base-content/70">{t('dashboard.team.balance')}</div>
 								</div>
 							{/if}
 						</a>

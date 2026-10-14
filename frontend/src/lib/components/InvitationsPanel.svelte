@@ -79,7 +79,7 @@
 <section class="card bg-base-100 border border-base-300 shadow-sm mb-6">
 	<div class="card-body p-5 gap-4">
 		<h2 class="text-base font-semibold m-0">{t('invitations.title')}</h2>
-		<p class="text-sm text-base-content/60 m-0">{t('invitations.intro')}</p>
+		<p class="text-sm text-base-content/70 m-0">{t('invitations.intro')}</p>
 		<form class="flex flex-col sm:flex-row gap-2 sm:items-end" onsubmit={invite} novalidate>
 			<div class="flex-1 min-w-0">
 				<label for="inviteEmail" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('invitations.email')}</label>
@@ -119,7 +119,7 @@
 						<li class="flex items-center gap-3 flex-wrap p-2.5 rounded-lg bg-base-200/50 border border-base-300">
 							<div class="flex-1 min-w-0">
 								<div class="text-sm font-medium break-all">{inv.email}</div>
-								<div class="text-xs text-base-content/60">
+								<div class="text-xs text-base-content/70">
 									{roleLabel(inv.role)} · {t('invitations.expires', { date: inv.expiresAt ? formatDate(inv.expiresAt) : '–' })}
 								</div>
 							</div>

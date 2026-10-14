@@ -97,7 +97,7 @@
 	{:else if error}
 		<div class="alert alert-error">{error}</div>
 	{:else if org}
-		<p class="text-base-content/60 text-sm mt-2 mb-5">
+		<p class="text-base-content/70 text-sm mt-2 mb-5">
 			{isAdmin ? t('memberList.introAdmin') : t('memberList.introMember')}
 		</p>
 
@@ -146,8 +146,8 @@
 									{/if}
 									<GroupTags groups={member.groups} />
 								</div>
-								{#if member.email}<div class="text-sm text-base-content/50 mt-0.5 truncate">{member.email}</div>{/if}
-								<div class="flex gap-x-3 gap-y-1 mt-1.5 flex-wrap items-center text-xs text-base-content/60">
+								{#if member.email}<div class="text-sm text-base-content/70 mt-0.5 truncate">{member.email}</div>{/if}
+								<div class="flex gap-x-3 gap-y-1 mt-1.5 flex-wrap items-center text-xs text-base-content/70">
 									{#if member.role}<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>{/if}
 									{#if member.vacationVisible !== false && (member.vacationDaysPerYear ?? 0) > 0}
 										{@const left = member.vacationDaysRemaining ?? member.vacationDaysPerYear ?? 0}

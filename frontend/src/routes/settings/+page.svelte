@@ -337,13 +337,13 @@
 					<label for="profileEmail" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.profile.email')}</label>
 					<input id="profileEmail" type="email" autocomplete="email" bind:value={profileEmail} class="input w-full max-w-md" class:input-error={emailError} aria-invalid={!!emailError} disabled={profileSaving} />
 					{#if emailError}<p class="text-error text-xs mt-1">{emailError}</p>{/if}
-					{#if auth.user?.pendingEmail}<p class="text-xs text-base-content/60 mt-1">{t('settings.profile.pendingEmail', { email: auth.user.pendingEmail })}</p>{/if}
+					{#if auth.user?.pendingEmail}<p class="text-xs text-base-content/70 mt-1">{t('settings.profile.pendingEmail', { email: auth.user.pendingEmail })}</p>{/if}
 				</div>
 				{#if emailChanged}
 					<div>
 						<label for="profileCurrentPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.profile.currentPassword')}</label>
 						<input id="profileCurrentPw" type="password" autocomplete="current-password" bind:value={profileCurrentPassword} class="input w-full max-w-xs" class:input-error={profileCurrentPasswordError} aria-invalid={!!profileCurrentPasswordError} aria-describedby="profileCurrentPwHint" disabled={profileSaving} />
-						<p id="profileCurrentPwHint" class="text-xs mt-1 {profileCurrentPasswordError ? 'text-error' : 'text-base-content/50'}">{profileCurrentPasswordError || t('settings.profile.currentPasswordHint')}</p>
+						<p id="profileCurrentPwHint" class="text-xs mt-1 {profileCurrentPasswordError ? 'text-error' : 'text-base-content/70'}">{profileCurrentPasswordError || t('settings.profile.currentPasswordHint')}</p>
 					</div>
 				{/if}
 				<div>
@@ -368,7 +368,7 @@
 				<div>
 					<label for="newPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.password.new')}</label>
 					<input id="newPw" type="password" autocomplete="new-password" minlength={MIN_PASSWORD_LENGTH} bind:value={newPassword} class="input w-full max-w-xs" class:input-error={newPasswordError} aria-invalid={!!newPasswordError} aria-describedby="newPwHint" disabled={passwordSaving} />
-					<p id="newPwHint" class="text-xs mt-1 {newPasswordError ? 'text-error' : 'text-base-content/50'}">{newPasswordError || t('settings.password.minLength', { min: MIN_PASSWORD_LENGTH })}</p>
+					<p id="newPwHint" class="text-xs mt-1 {newPasswordError ? 'text-error' : 'text-base-content/70'}">{newPasswordError || t('settings.password.minLength', { min: MIN_PASSWORD_LENGTH })}</p>
 				</div>
 				<div>
 					<label for="confirmPw" class="block text-sm font-medium text-base-content/80 mb-1.5">{t('settings.password.repeat')}</label>
@@ -395,7 +395,7 @@
 					{#if auth.user?.twoFactorEnabled}
 						<div class="flex items-center gap-2 flex-wrap">
 							<span class="badge badge-success badge-sm">{t('settings.twoFactor.on')}</span>
-							<span class="text-sm text-base-content/60">{t('settings.twoFactor.activeText')}</span>
+							<span class="text-sm text-base-content/70">{t('settings.twoFactor.activeText')}</span>
 						</div>
 						<form class="flex gap-2 items-end flex-wrap" onsubmit={handleDisable2FA}>
 							<div>
@@ -426,9 +426,9 @@
 								{twoFactorSaving ? t('settings.twoFactor.disabling') : t('settings.twoFactor.disable')}
 							</button>
 						</form>
-						<p id="disable2faCodeHint" class="text-xs text-base-content/50">{t('settings.twoFactor.disableCodeHint')}</p>
+						<p id="disable2faCodeHint" class="text-xs text-base-content/70">{t('settings.twoFactor.disableCodeHint')}</p>
 					{:else}
-						<p class="text-sm text-base-content/60">{t('settings.twoFactor.intro')}</p>
+						<p class="text-sm text-base-content/70">{t('settings.twoFactor.intro')}</p>
 						<div>
 							<button type="button" class="btn btn-primary btn-sm" onclick={handleSetup2FA} disabled={twoFactorSaving}>
 								{twoFactorSaving ? t('settings.twoFactor.settingUp') : t('settings.twoFactor.setup')}
@@ -436,7 +436,7 @@
 						</div>
 					{/if}
 				{:else if twoFactorStep === 'setup'}
-					<p class="text-sm text-base-content/60">{t('settings.twoFactor.scan')}</p>
+					<p class="text-sm text-base-content/70">{t('settings.twoFactor.scan')}</p>
 
 					{#if twoFactorSetup}
 						<div class="flex flex-col items-center gap-4 p-4 bg-base-200/50 rounded-lg border border-base-300">
@@ -450,7 +450,7 @@
 								/>
 							</div>
 							<div class="text-center max-w-full">
-								<p class="text-xs text-base-content/50 mb-1">{t('settings.twoFactor.manualKey')}</p>
+								<p class="text-xs text-base-content/70 mb-1">{t('settings.twoFactor.manualKey')}</p>
 								<code class="text-sm font-mono bg-base-300 px-3 py-1.5 rounded select-all break-all">{twoFactorSetup.sharedKey}</code>
 							</div>
 						</div>
@@ -498,7 +498,7 @@
 		<section class="card bg-base-100 border border-error/30 shadow-sm mb-5">
 			<div class="card-body gap-4">
 				<h2 class="card-title text-base">{t('settings.account.title')}</h2>
-				<p class="text-sm text-base-content/60 m-0">{t('settings.account.intro')}</p>
+				<p class="text-sm text-base-content/70 m-0">{t('settings.account.intro')}</p>
 				<div class="flex flex-wrap gap-3">
 					<button type="button" class="btn btn-outline btn-sm" onclick={handleLogout}>{t('settings.account.signOut')}</button>
 					<button type="button" class="btn btn-outline btn-sm" onclick={handleExportData} disabled={exportingData}>
@@ -528,7 +528,7 @@
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
 				<h2 class="card-title text-base">{t('settings.org.title')}</h2>
-				<p class="text-sm text-base-content/60 mb-2">{t('settings.org.intro')}</p>
+				<p class="text-sm text-base-content/70 mb-2">{t('settings.org.intro')}</p>
 
 				<div class="flex flex-col gap-2" role="radiogroup" aria-label={t('settings.org.title')}>
 					<button
@@ -553,13 +553,13 @@
 							<input type="radio" class="radio radio-primary radio-sm pointer-events-none" checked={orgContext.selectedOrgId === org.organizationId} tabindex="-1" aria-hidden="true" />
 							<span class="flex gap-2 items-center flex-wrap min-w-0">
 								<span class="text-sm font-medium break-words">{org.name}</span>
-								<span class="text-[0.6875rem] text-base-content/60 uppercase font-semibold tracking-wide">{roleLabel(org.role)}</span>
+								<span class="text-[0.6875rem] text-base-content/70 uppercase font-semibold tracking-wide">{roleLabel(org.role)}</span>
 							</span>
 						</button>
 					{/each}
 
 					{#if orgContext.organizations.length === 0 && !orgContext.loading}
-						<p class="text-sm text-base-content/50">{t('settings.org.none')} <a href="/organizations/new" class="link link-primary">{t('settings.org.createOne')}</a></p>
+						<p class="text-sm text-base-content/70">{t('settings.org.none')} <a href="/organizations/new" class="link link-primary">{t('settings.org.createOne')}</a></p>
 					{/if}
 				</div>
 
@@ -571,9 +571,9 @@
 		</section>
 
 		{#if orgContext.selectedOrgSlug}
-			<p class="text-sm text-base-content/60 mb-3">{t('settings.org.scheduleIn')} <strong>{orgContext.selectedOrg?.name}</strong>:</p>
+			<p class="text-sm text-base-content/70 mb-3">{t('settings.org.scheduleIn')} <strong>{orgContext.selectedOrg?.name}</strong>:</p>
 			{#if scheduleLoading && !currentSchedule}
-				<p class="text-sm text-base-content/50 flex items-center gap-2 mb-5"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
+				<p class="text-sm text-base-content/70 flex items-center gap-2 mb-5"><span class="loading loading-spinner loading-xs"></span> {t('common.loading')}</p>
 			{:else if scheduleError}
 				<div class="alert alert-error text-sm mb-5">{scheduleError}</div>
 			{:else if currentSchedule}
@@ -600,7 +600,7 @@
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
 				<h2 class="card-title text-base">{t('settings.appearance.theme')}</h2>
-				<p class="text-sm text-base-content/60 mb-2">{t('settings.appearance.themeIntro')}</p>
+				<p class="text-sm text-base-content/70 mb-2">{t('settings.appearance.themeIntro')}</p>
 				<div class="join">
 					{#each [{ dark: false, label: t('settings.appearance.light') }, { dark: true, label: t('settings.appearance.dark') }] as opt}
 						<button
@@ -617,7 +617,7 @@
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
 				<h2 class="card-title text-base">{t('settings.appearance.language')}</h2>
-				<p class="text-sm text-base-content/60 mb-2">{t('settings.appearance.languageIntro')}</p>
+				<p class="text-sm text-base-content/70 mb-2">{t('settings.appearance.languageIntro')}</p>
 				<div class="join">
 					{#each LOCALES as l}
 						<button

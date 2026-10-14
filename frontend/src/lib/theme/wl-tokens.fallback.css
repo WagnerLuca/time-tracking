@@ -1,5 +1,5 @@
 /*
-  Fallback copy of @wagnerluca/ui 0.0.2 tokens.css (src/styles/tokens.css).
+  Fallback copy of @wagnerluca/ui 0.1.0 tokens.css (src/styles/tokens.css).
   vite.config.ts uses it only when @wagnerluca/ui is not installed (no
   GitHub Packages token at install time); otherwise the package wins.
   Refresh it with `npm run tokens:sync` after upgrading the package.
@@ -8,25 +8,36 @@
   Design-Tokens des Baukasten-Systems.
   Tailwind-Farben in tailwind.config.js zeigen auf diese Variablen –
   so schaltet eine einzige .dark-Klasse auf <html> das gesamte System um.
+
+  Kontrast (WCAG AA, geprüft in test/contrast.test.js):
+  - Text (--color-text-muted, --accent-*-strong, --on-*) ≥ 4.5:1 auf seinen
+    Flächen, auch --accent-*-strong auf --accent-*-soft (Badges).
+  - --color-border-strong ≥ 3:1 gegen die Oberflächen — für Formularfelder
+    und Schalter. --color-border bleibt bewusst zart: das sind Trennlinien,
+    keine Bedienelemente.
 */
 :root {
+  color-scheme: light;
+
   --color-bg: #FAFAF8;
   --color-bg-alt: #F1EFE9;
   --color-surface: #FFFFFF;
   --color-surface-raised: #FFFFFF;
   --color-text: #2A2B2E;
-  --color-text-muted: #75757C;
+  --color-text-muted: #6B6B71;
   --color-border: #E6E3DB;
+  --color-border-strong: #898782;
   --shadow: 0 1px 2px rgba(30,30,32,0.04), 0 8px 24px rgba(30,30,32,0.06);
+  --shadow-lg: 0 2px 4px rgba(30,30,32,0.06), 0 16px 40px rgba(30,30,32,0.12);
   --on-accent: #FFFFFF;
 
-  --accent-time: #7FA98E;       --accent-time-strong: #4F7C64;
+  --accent-time: #7FA98E;       --accent-time-strong: #49725C;
   --accent-school: #6B8CAE;     --accent-school-strong: #3F5F7D;
-  --accent-game: #C98A3F;       --accent-game-strong: #96631F;
+  --accent-game: #C98A3F;       --accent-game-strong: #8E5E1D;
   --accent-future: #9B8AA6;     --accent-future-strong: #6E5F7A;
   --accent-teal: #5A9188;       --accent-teal-strong: #3A6961;
   --accent-berry: #B87373;      --accent-berry-strong: #8A4A4A;
-  --accent-mustard: #C4A44A;    --accent-mustard-strong: #937A2E;
+  --accent-mustard: #C4A44A;    --accent-mustard-strong: #7E6827;
   --accent-slate: #7B8B9E;      --accent-slate-strong: #52616F;
   --accent-danger: #C05C5C;     --accent-danger-strong: #8F3D3D;
 
@@ -41,9 +52,49 @@
   --accent-mustard-soft: color-mix(in srgb, var(--accent-mustard) 20%, var(--color-surface));
   --accent-slate-soft: color-mix(in srgb, var(--accent-slate) 20%, var(--color-surface));
   --accent-danger-soft: color-mix(in srgb, var(--accent-danger) 20%, var(--color-surface));
+
+  /* Modul-Akzent: die EINE Farbe, die eine App für ihre eigene Chrome nutzt
+     (Sidebar, MobileNav, ToggleSwitch, Fokus-Ring, DaisyUI-primary).
+     Standard ist Petrol = die persönliche Marke. Eine App setzt ihn einmal,
+     entweder per <html data-accent="time"> (Hilfsregeln unten) oder mit
+     drei Zeilen in ihrer eigenen CSS:
+       :root { --accent: var(--accent-time); --accent-soft: var(--accent-time-soft); --accent-strong: var(--accent-time-strong); } */
+  --accent: var(--accent-teal);
+  --accent-soft: var(--accent-teal-soft);
+  --accent-strong: var(--accent-teal-strong);
+  --focus-ring: var(--accent-strong);
+
+  /* Semantische Farben: Fläche + passende Textfarbe (--on-*). Hell = die
+     -strong-Stufe (weiße Schrift), Dunkel = die Basis (dunkle Schrift).
+     Warnung (Senf) ist auch hell zu hell für weiße Schrift -> dunkler Text. */
+  --color-success: var(--accent-time-strong);   --on-success: var(--on-accent);
+  --color-info: var(--accent-school-strong);    --on-info: var(--on-accent);
+  --color-warning: var(--accent-mustard);       --on-warning: #2A2B2E;
+  --color-danger: var(--accent-danger-strong);  --on-danger: var(--on-accent);
+
+  /* sm/md/lg = exakt die Tailwind-v4-Standardwerte: v4 liest dieselben
+     Variablennamen (rounded-sm/md/lg), eine Abweichung hier würde das Layout
+     jeder v4-App still verschieben (time-tracking nutzt sie ~95-mal). */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-btn: 10px;
+  --radius-card: 22px;
 }
 
+/* Explizite Akzentwahl ohne eigene CSS: <html data-accent="time"> */
+[data-accent="time"]    { --accent: var(--accent-time);    --accent-soft: var(--accent-time-soft);    --accent-strong: var(--accent-time-strong); }
+[data-accent="school"]  { --accent: var(--accent-school);  --accent-soft: var(--accent-school-soft);  --accent-strong: var(--accent-school-strong); }
+[data-accent="game"]    { --accent: var(--accent-game);    --accent-soft: var(--accent-game-soft);    --accent-strong: var(--accent-game-strong); }
+[data-accent="future"]  { --accent: var(--accent-future);  --accent-soft: var(--accent-future-soft);  --accent-strong: var(--accent-future-strong); }
+[data-accent="teal"]    { --accent: var(--accent-teal);    --accent-soft: var(--accent-teal-soft);    --accent-strong: var(--accent-teal-strong); }
+[data-accent="berry"]   { --accent: var(--accent-berry);   --accent-soft: var(--accent-berry-soft);   --accent-strong: var(--accent-berry-strong); }
+[data-accent="mustard"] { --accent: var(--accent-mustard); --accent-soft: var(--accent-mustard-soft); --accent-strong: var(--accent-mustard-strong); }
+[data-accent="slate"]   { --accent: var(--accent-slate);   --accent-soft: var(--accent-slate-soft);   --accent-strong: var(--accent-slate-strong); }
+
 .dark {
+  color-scheme: dark;
+
   --color-bg: #17181A;
   --color-bg-alt: #1D1E21;
   --color-surface: #201F23;
@@ -51,7 +102,9 @@
   --color-text: #F2F1ED;
   --color-text-muted: #96969E;
   --color-border: #303136;
+  --color-border-strong: #717275;
   --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 10px 28px rgba(0,0,0,0.5);
+  --shadow-lg: 0 2px 6px rgba(0,0,0,0.4), 0 18px 44px rgba(0,0,0,0.6);
   --on-accent: #14151A;
 
   --accent-time: #8FBFA0;       --accent-time-strong: #B7DAC4;
@@ -63,4 +116,48 @@
   --accent-mustard: #D9BB63;    --accent-mustard-strong: #EAD394;
   --accent-slate: #93A5BA;      --accent-slate-strong: #BFCBD8;
   --accent-danger: #E08080;     --accent-danger-strong: #F0AFAF;
+
+  --color-success: var(--accent-time);
+  --color-info: var(--accent-school);
+  --color-danger: var(--accent-danger);
+  --on-warning: var(--on-accent);
+}
+
+/*
+  Fallback ohne JavaScript (oder bevor theme-init.js/useTheme gelaufen ist):
+  folgt dem Betriebssystem, solange die App nicht ausdrücklich .light gesetzt
+  hat. useTheme/theme-init setzen deshalb IMMER .dark oder .light.
+  Muss 1:1 dem .dark-Block oben entsprechen — test/contrast.test.js prüft das.
+*/
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+
+    --color-bg: #17181A;
+    --color-bg-alt: #1D1E21;
+    --color-surface: #201F23;
+    --color-surface-raised: #26262B;
+    --color-text: #F2F1ED;
+    --color-text-muted: #96969E;
+    --color-border: #303136;
+    --color-border-strong: #717275;
+    --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 10px 28px rgba(0,0,0,0.5);
+    --shadow-lg: 0 2px 6px rgba(0,0,0,0.4), 0 18px 44px rgba(0,0,0,0.6);
+    --on-accent: #14151A;
+
+    --accent-time: #8FBFA0;       --accent-time-strong: #B7DAC4;
+    --accent-school: #82A6CC;     --accent-school-strong: #AECBE5;
+    --accent-game: #E0A05A;       --accent-game-strong: #F0C489;
+    --accent-future: #B29FC0;     --accent-future-strong: #D3C3DE;
+    --accent-teal: #6FADA0;       --accent-teal-strong: #9BCCC1;
+    --accent-berry: #CF8B8B;      --accent-berry-strong: #E5B3B3;
+    --accent-mustard: #D9BB63;    --accent-mustard-strong: #EAD394;
+    --accent-slate: #93A5BA;      --accent-slate-strong: #BFCBD8;
+    --accent-danger: #E08080;     --accent-danger-strong: #F0AFAF;
+
+    --color-success: var(--accent-time);
+    --color-info: var(--accent-school);
+    --color-danger: var(--accent-danger);
+    --on-warning: var(--on-accent);
+  }
 }

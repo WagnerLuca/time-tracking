@@ -37,7 +37,7 @@
 			{#if sent}
 				<div class="alert alert-success text-sm my-4" role="status">{t('auth.forgot.sent')}</div>
 			{:else}
-				<p class="text-base-content/60 mb-6">{t('auth.forgot.subtitle')}</p>
+				<p class="text-base-content/70 mb-6">{t('auth.forgot.subtitle')}</p>
 				{#if error}
 					<div class="alert alert-error text-sm mb-4" role="alert">{error}</div>
 				{/if}

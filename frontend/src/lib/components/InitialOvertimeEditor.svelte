@@ -87,11 +87,11 @@
 		</form>
 	{:else}
 		<p class="text-2xl font-bold m-0 {hours > 0 ? 'text-success' : hours < 0 ? 'text-error' : 'text-base-content'}">{signedHours(hours)}</p>
-		<p class="text-xs text-base-content/50 mt-1 mb-0">{t('schedule.overtime.description')}</p>
+		<p class="text-xs text-base-content/70 mt-1 mb-0">{t('schedule.overtime.description')}</p>
 		{#if !editable && mode === 'RequiresApproval'}
-			<p class="text-sm text-base-content/60 mt-2 mb-0">{t('schedule.overtime.approvalNote')}</p>
+			<p class="text-sm text-base-content/70 mt-2 mb-0">{t('schedule.overtime.approvalNote')}</p>
 		{:else if !editable && mode === 'Disabled'}
-			<p class="text-sm text-base-content/60 mt-2 mb-0">{t('schedule.overtime.disabledNote')}</p>
+			<p class="text-sm text-base-content/70 mt-2 mb-0">{t('schedule.overtime.disabledNote')}</p>
 		{/if}
 	{/if}
 </section>

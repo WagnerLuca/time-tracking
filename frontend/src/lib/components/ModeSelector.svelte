@@ -26,7 +26,7 @@
 		{@const active = value === o.value}
 		<button
 			type="button"
-			class="join-item btn {size === 'xs' ? 'btn-xs' : 'btn-sm'} font-semibold whitespace-nowrap {active ? (o.activeClass ?? 'btn-primary') : 'btn-ghost border border-base-300 text-base-content/50'}"
+			class="join-item btn {size === 'xs' ? 'btn-xs' : 'btn-sm'} font-semibold whitespace-nowrap {active ? (o.activeClass ?? 'btn-primary') : 'btn-ghost border border-base-300 text-base-content/70'}"
 			onclick={() => { if (!active) onselect(o.value); }}
 			title={o.hint ?? ''}
 			{disabled}

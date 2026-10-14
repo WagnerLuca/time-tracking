@@ -121,8 +121,8 @@
 
 <section class="mt-2">
 	<h2 class="text-xl font-bold text-base-content mb-1">{t('orgSettings.apiKeys.title')}</h2>
-	<p class="text-sm text-base-content/60 mb-1">{t('orgSettings.apiKeys.intro')}</p>
-	<p class="text-xs text-base-content/60 mb-4 flex flex-wrap gap-x-3 gap-y-1">
+	<p class="text-sm text-base-content/70 mb-1">{t('orgSettings.apiKeys.intro')}</p>
+	<p class="text-xs text-base-content/70 mb-4 flex flex-wrap gap-x-3 gap-y-1">
 		<span>{t('orgSettings.apiKeys.endpoint')}: <code class="break-all">POST /api/v1/terminal/punch</code></span>
 		<span>{t('orgSettings.apiKeys.header')}: <code>X-Api-Key</code></span>
 		<span>{t('orgSettings.apiKeys.field')}: <code>badgeId</code></span>
@@ -154,7 +154,7 @@
 			{#if loading}
 				<span class="loading loading-spinner loading-sm" aria-label={t('common.loading')}></span>
 			{:else if keys.length === 0}
-				<p class="text-sm text-base-content/60">{t('orgSettings.apiKeys.empty')}</p>
+				<p class="text-sm text-base-content/70">{t('orgSettings.apiKeys.empty')}</p>
 			{:else}
 				<ul class="divide-y divide-base-300">
 					{#each keys as key (key.id)}
@@ -170,7 +170,7 @@
 								{:else}
 									<div class="text-sm font-medium break-words">{key.name}</div>
 								{/if}
-								<div class="text-xs text-base-content/60">
+								<div class="text-xs text-base-content/70">
 									<code>{key.keyPrefix}…</code> · {t('orgSettings.apiKeys.createdAgo', { time: formatTimeAgo(key.createdAt) })} ·
 									{key.lastUsedAt ? t('orgSettings.apiKeys.lastUsed', { time: formatTimeAgo(key.lastUsedAt) }) : t('orgSettings.apiKeys.neverUsed')}
 								</div>

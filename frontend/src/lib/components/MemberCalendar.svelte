@@ -584,7 +584,7 @@
 {#snippet stat(value: string, label: string, valueClass = 'text-base-content', extra = '')}
 	<div class="bg-base-100 border border-base-300 rounded-lg p-3 text-center {extra}">
 		<span class="block text-lg sm:text-xl font-bold tabular-nums {valueClass}">{value}</span>
-		<span class="text-xs text-base-content/60">{label}</span>
+		<span class="text-xs text-base-content/70">{label}</span>
 	</div>
 {/snippet}
 
@@ -642,7 +642,7 @@
 			<div class="hidden sm:block bg-base-100 border border-base-300 rounded-xl overflow-hidden mb-5">
 				<div class="grid grid-cols-7 bg-base-200/50 border-b border-base-300">
 					{#each weekdayNames as dow (dow)}
-						<span class="text-center text-xs font-semibold text-base-content/60 py-2">{dow}</span>
+						<span class="text-center text-xs font-semibold text-base-content/70 py-2">{dow}</span>
 					{/each}
 				</div>
 				<div class="grid grid-cols-7">
@@ -694,9 +694,9 @@
 							aria-pressed={day.key === selectedDayKey}
 							use:dayPress={{ onselect: () => selectDay(day, 'start'), onopen: dayOpenHandler(day) }}
 						>
-							<span class="w-8 text-xs text-base-content/60 shrink-0">{formatDate(day.date, { weekday: 'short' })}</span>
+							<span class="w-8 text-xs text-base-content/70 shrink-0">{formatDate(day.date, { weekday: 'short' })}</span>
 							<span class="w-6 text-sm tabular-nums shrink-0 {day.isToday ? 'text-primary font-bold' : 'font-medium'}">{day.dayOfMonth}</span>
-							<span class="min-w-0 flex-1 truncate text-xs text-base-content/60">
+							<span class="min-w-0 flex-1 truncate text-xs text-base-content/70">
 								{#if day.dayType}<span class="inline-block w-2 h-2 rounded-full mr-1 {dt.dot}" aria-hidden="true"></span>{day.dayTypeLabel}{/if}
 							</span>
 							{#if day.hasFailure}
@@ -711,14 +711,14 @@
 								{:else}
 									<span class="text-base-content/30">–</span>
 								{/if}
-								{#if day.targetMinutes > 0}<span class="text-xs text-base-content/40"> / {formatHours(day.targetMinutes)}</span>{/if}
+								{#if day.targetMinutes > 0}<span class="text-xs text-base-content/70"> / {formatHours(day.targetMinutes)}</span>{/if}
 							</span>
 						</button>
 					</li>
 				{/each}
 			</ul>
 
-			<p class="text-xs text-base-content/50 -mt-3 mb-4">
+			<p class="text-xs text-base-content/70 -mt-3 mb-4">
 				{t('calendar.hintSelect')}{#if canAddAbsence}{' · '}{t('calendar.hintOpen')}{/if}
 			</p>
 
@@ -793,7 +793,7 @@
 			{/if}
 
 			<!-- Legend -->
-			<div class="flex gap-4 flex-wrap text-xs text-base-content/60 mb-6">
+			<div class="flex gap-4 flex-wrap text-xs text-base-content/70 mb-6">
 				{#if holidayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.holiday.dot}"></span> {t('format.dayType.holiday')}</span>{/if}
 				{#if sickDayDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.sick.dot}"></span> {t('format.dayType.sick')}</span>{/if}
 				{#if vacationDates.size > 0}<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0 {DAY_TYPE_CLASSES.vacation.dot}"></span> {t('format.dayType.vacation')}</span>{/if}
@@ -815,15 +815,15 @@
 							aria-pressed={day.key === selectedDayKey}
 							use:dayPress={{ onselect: () => selectDay(day, 'start'), onopen: dayOpenHandler(day) }}
 						>
-							<span class="w-7 text-xs text-base-content/60 shrink-0">{formatDate(day.date, { weekday: 'short' })}</span>
-							<span class="w-5 text-xs text-base-content/40 shrink-0 text-right">{day.dayOfMonth}</span>
+							<span class="w-7 text-xs text-base-content/70 shrink-0">{formatDate(day.date, { weekday: 'short' })}</span>
+							<span class="w-5 text-xs text-base-content/70 shrink-0 text-right">{day.dayOfMonth}</span>
 							<span class="w-2 h-2 rounded-full shrink-0 {dt.dot}" title={day.dayTypeLabel || undefined}></span>
 							<div class="flex-1 h-1.5 bg-base-200 rounded-full overflow-hidden">
 								<div class="h-full {day.workedMinutes > day.targetMinutes && day.targetMinutes > 0 ? 'bg-success' : 'bg-primary'} rounded-full transition-all duration-300" style="width: {barWidth(day.workedMinutes, day.targetMinutes)}%"></div>
 							</div>
 							<span class="text-xs text-base-content/70 min-w-[36px] text-right">{formatHours(day.workedMinutes)}</span>
 							{#if day.targetMinutes > 0}
-								<span class="text-xs text-base-content/40">/ {formatHours(day.targetMinutes)}</span>
+								<span class="text-xs text-base-content/70">/ {formatHours(day.targetMinutes)}</span>
 							{/if}
 						</button>
 					{/each}
@@ -911,11 +911,11 @@
 							<div class="text-sm text-base-content/70 mb-1.5">
 								<span class="font-semibold">{formatHours(mo.workedMinutes)}</span>
 								{#if mo.targetMinutes > 0}
-									<span class="text-base-content/40">/ {formatHours(mo.targetMinutes)}</span>
+									<span class="text-base-content/70">/ {formatHours(mo.targetMinutes)}</span>
 								{/if}
 							</div>
 							{#if mo.creditedMinutes > 0}
-								<div class="text-xs text-base-content/60 mb-1">{t('calendar.creditsSuffix', { value: formatHours(mo.creditedMinutes) })}</div>
+								<div class="text-xs text-base-content/70 mb-1">{t('calendar.creditsSuffix', { value: formatHours(mo.creditedMinutes) })}</div>
 							{/if}
 							<div class="flex gap-1.5 flex-wrap">
 								{#if mo.holidays > 0}<span class="text-xs">{mo.holidays}{DAY_TYPE_CLASSES.holiday.icon}</span>{/if}

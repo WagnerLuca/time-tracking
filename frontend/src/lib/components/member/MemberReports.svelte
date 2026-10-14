@@ -58,7 +58,7 @@
 
 <section class="card bg-base-100 border border-base-300 p-5 mb-5">
 	<h2 class="text-base font-bold text-base-content m-0 mb-1">{t('memberDetail.reports.title')}</h2>
-	<p class="text-xs text-base-content/50 mb-4">{t('memberDetail.reports.intro', { subject })}</p>
+	<p class="text-xs text-base-content/70 mb-4">{t('memberDetail.reports.intro', { subject })}</p>
 
 	<div class="grid gap-4 sm:grid-cols-2">
 		<div class="bg-base-200/40 border border-base-300 rounded-lg p-3.5">

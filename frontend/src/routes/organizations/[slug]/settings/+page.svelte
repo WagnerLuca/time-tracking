@@ -453,7 +453,7 @@
 {#snippet settingInfo(label: string, description: string)}
 	<div class="min-w-0 flex-1 basis-60">
 		<div class="font-semibold text-base-content mb-0.5">{label}</div>
-		<div class="text-sm text-base-content/60 max-w-[400px]">{description}</div>
+		<div class="text-sm text-base-content/70 max-w-[400px]">{description}</div>
 	</div>
 {/snippet}
 
@@ -543,12 +543,12 @@
 									<div class="flex items-center gap-1.5">
 										<label for="new-rule-hours" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.whenTracked')}</label>
 										<input id="new-rule-hours" type="number" class="input input-xs w-[70px] text-center" step="0.5" min="0.5" max="24" bind:value={newRuleMinHours} required disabled={addingRule} />
-										<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.hours')}</span>
+										<span class="text-sm text-base-content/70 whitespace-nowrap">{t('orgSettings.pause.hours')}</span>
 									</div>
 									<div class="flex items-center gap-1.5">
 										<label for="new-rule-pause" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.deduct')}</label>
 										<input id="new-rule-pause" type="number" class="input input-xs w-[70px] text-center" min="1" step="1" bind:value={newRulePauseMinutes} required disabled={addingRule} />
-										<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.minPause')}</span>
+										<span class="text-sm text-base-content/70 whitespace-nowrap">{t('orgSettings.pause.minPause')}</span>
 									</div>
 									<button type="submit" class="btn btn-primary btn-sm" disabled={addingRule}>
 										{addingRule ? t('common.adding') : t('orgSettings.pause.addSubmit')}
@@ -558,7 +558,7 @@
 						{/if}
 
 						{#if pauseRules.length === 0}
-							<p class="text-base-content/50">{t('orgSettings.pause.empty')}</p>
+							<p class="text-base-content/70">{t('orgSettings.pause.empty')}</p>
 						{:else}
 							<ul class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
 								{#each pauseRules as rule (rule.id)}
@@ -571,12 +571,12 @@
 												<div class="flex items-center gap-1.5">
 													<label for="edit-rule-hours" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.whenTracked')}</label>
 													<input id="edit-rule-hours" type="number" class="input input-xs w-[70px] text-center" step="0.5" min="0.5" max="24" bind:value={editRuleMinHours} disabled={editingRuleSaving} />
-													<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.hoursShort')}</span>
+													<span class="text-sm text-base-content/70 whitespace-nowrap">{t('orgSettings.pause.hoursShort')}</span>
 												</div>
 												<div class="flex items-center gap-1.5">
 													<label for="edit-rule-pause" class="text-sm text-base-content/70 font-medium whitespace-nowrap">{t('orgSettings.pause.deduct')}</label>
 													<input id="edit-rule-pause" type="number" class="input input-xs w-[70px] text-center" min="1" step="1" bind:value={editRulePauseMinutes} disabled={editingRuleSaving} />
-													<span class="text-sm text-base-content/60 whitespace-nowrap">{t('orgSettings.pause.min')}</span>
+													<span class="text-sm text-base-content/70 whitespace-nowrap">{t('orgSettings.pause.min')}</span>
 												</div>
 												<div class="flex items-center gap-1.5">
 													<button type="submit" class="btn btn-primary btn-sm" disabled={editingRuleSaving}>{editingRuleSaving ? t('common.saving') : t('common.save')}</button>
@@ -641,17 +641,17 @@
 					</div>
 					<div class="flex items-center gap-2 flex-wrap mt-3 text-sm">
 						<label class="flex items-center gap-2">
-							<span class="text-base-content/60">{t('orgSettings.coreHours.from')}</span>
+							<span class="text-base-content/70">{t('orgSettings.coreHours.from')}</span>
 							<input id="core-hours-start" type="time" class="input input-sm w-28" value={org.coreHoursStart ?? '09:00'} onchange={saveCoreHoursWindow} disabled={settingsSaving} />
 						</label>
 						<label class="flex items-center gap-2">
-							<span class="text-base-content/60">{t('orgSettings.coreHours.to')}</span>
+							<span class="text-base-content/70">{t('orgSettings.coreHours.to')}</span>
 							<input id="core-hours-end" type="time" class="input input-sm w-28" value={org.coreHoursEnd ?? '15:00'} onchange={saveCoreHoursWindow} disabled={settingsSaving} />
 						</label>
 						<label class="flex items-center gap-2">
-							<span class="text-base-content/60">{t('orgSettings.coreHours.tolerance')}</span>
+							<span class="text-base-content/70">{t('orgSettings.coreHours.tolerance')}</span>
 							<input id="core-hours-tolerance" type="number" class="input input-sm w-20 text-center" min="0" max="120" step="1" value={org.coreHoursToleranceMinutes ?? 5} onchange={saveCoreHoursTolerance} disabled={settingsSaving} />
-							<span class="text-base-content/60">{t('orgSettings.coreHours.minutes')}</span>
+							<span class="text-base-content/70">{t('orgSettings.coreHours.minutes')}</span>
 						</label>
 					</div>
 				</div>
@@ -675,7 +675,7 @@
 								onchange={saveDefaultVacationDays}
 								disabled={settingsSaving}
 							/>
-							<span class="text-sm text-base-content/60">{t('orgSettings.vacationDays.unit')}</span>
+							<span class="text-sm text-base-content/70">{t('orgSettings.vacationDays.unit')}</span>
 						</div>
 					</div>
 				</div>
@@ -685,7 +685,7 @@
 					<div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
 						<div class="min-w-0 flex-1 basis-60">
 							<h3 class="text-base font-bold text-base-content/70 m-0">{t('orgSettings.absenceTypes.title')}</h3>
-							<p class="text-sm text-base-content/60 m-0">{t('orgSettings.absenceTypes.intro')}</p>
+							<p class="text-sm text-base-content/70 m-0">{t('orgSettings.absenceTypes.intro')}</p>
 						</div>
 						<button class="btn btn-primary btn-sm" onclick={toggleAddType} aria-expanded={showAddType}>
 							{showAddType ? t('common.cancel') : t('orgSettings.absenceTypes.add')}
@@ -705,12 +705,12 @@
 								<div class="alert alert-error text-sm w-full" role="alert">{addTypeError}</div>
 							{/if}
 							<div class="flex flex-col gap-1 w-full sm:w-auto">
-								<label for="new-type-name" class="text-xs font-medium text-base-content/60">{t('orgSettings.absenceTypes.name')}</label>
+								<label for="new-type-name" class="text-xs font-medium text-base-content/70">{t('orgSettings.absenceTypes.name')}</label>
 								<input id="new-type-name" type="text" class="input input-sm w-full sm:w-44" class:input-error={newTypeSubmitted && !newTypeName.trim()} placeholder={t('orgSettings.absenceTypes.namePlaceholder')} bind:value={newTypeName} required disabled={typeSaving} />
 								{#if newTypeSubmitted && !newTypeName.trim()}<span class="text-xs text-error">{t('common.required')}</span>{/if}
 							</div>
 							<div class="flex flex-col gap-1 w-full sm:w-auto">
-								<label for="new-type-credit" class="text-xs font-medium text-base-content/60">{t('orgSettings.absenceTypes.creditMode')}</label>
+								<label for="new-type-credit" class="text-xs font-medium text-base-content/70">{t('orgSettings.absenceTypes.creditMode')}</label>
 								<select id="new-type-credit" class="select select-sm w-full" bind:value={newTypeCreditMode} disabled={typeSaving}>
 									{#each creditModeOptions as o (o.value)}
 										<option value={o.value}>{o.label}</option>
@@ -718,7 +718,7 @@
 								</select>
 							</div>
 							<div class="flex flex-col gap-1">
-								<span class="text-xs font-medium text-base-content/60">{t('orgSettings.absenceTypes.color')}</span>
+								<span class="text-xs font-medium text-base-content/70">{t('orgSettings.absenceTypes.color')}</span>
 								<div class="flex items-center gap-1.5 flex-wrap min-h-8">
 									{#each GROUP_COLOR_PRESETS as c (c)}
 										<button
@@ -741,13 +741,13 @@
 							<button type="submit" class="btn btn-primary btn-sm" disabled={typeSaving}>
 								{typeSaving ? t('common.adding') : t('orgSettings.absenceTypes.addSubmit')}
 							</button>
-							<p class="text-xs text-base-content/50 w-full m-0">{creditModeOptions.find((o) => o.value === newTypeCreditMode)?.hint}</p>
+							<p class="text-xs text-base-content/70 w-full m-0">{creditModeOptions.find((o) => o.value === newTypeCreditMode)?.hint}</p>
 						</form>
 					{/if}
 
 					{#if absenceTypes.length === 0}
 						{#if !absenceTypesError}
-							<p class="text-base-content/50">{t('orgSettings.absenceTypes.empty')}</p>
+							<p class="text-base-content/70">{t('orgSettings.absenceTypes.empty')}</p>
 						{/if}
 					{:else}
 						<ul class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
@@ -771,7 +771,7 @@
 												<option value={o.value}>{o.label}</option>
 											{/each}
 										</select>
-										<label class="flex items-center gap-1 text-xs text-base-content/60 cursor-pointer" title={t('orgSettings.absenceTypes.vacationBudgetTitle')}>
+										<label class="flex items-center gap-1 text-xs text-base-content/70 cursor-pointer" title={t('orgSettings.absenceTypes.vacationBudgetTitle')}>
 											<input type="checkbox" class="checkbox checkbox-xs" checked={at.countsAsVacation ?? false}
 												onchange={(e) => updateAbsenceType(at, { countsAsVacation: e.currentTarget.checked })}
 												disabled={typeSaving} />
@@ -794,12 +794,12 @@
 				{@render topicHeader('visibility')}
 				<!-- Member visibility matrix -->
 				<div data-testid="visibility-settings">
-										<p class="text-sm text-base-content/60 mb-3">{t('visibility.intro')}</p>
+										<p class="text-sm text-base-content/70 mb-3">{t('visibility.intro')}</p>
 					<VisibilityMatrix mode="org" org={org.visibility} disabled={settingsSaving} onorgchange={saveVisibility} />
 					<div class="mt-3 p-3 rounded-lg bg-base-200/50 border border-base-300 text-sm">
 						{#if permGroups.length > 0}
 							<label class="flex items-center gap-2 flex-wrap mb-2">
-								<span class="text-base-content/60">{t('visibility.previewGroup')}</span>
+								<span class="text-base-content/70">{t('visibility.previewGroup')}</span>
 								<select class="select select-sm max-w-full" bind:value={previewGroupId}>
 									<option value={null}>{t('visibility.previewNoGroup')}</option>
 									{#each permGroups as col (col.group.id)}
@@ -811,7 +811,7 @@
 						<p class="m-0" aria-live="polite" data-testid="visibility-preview">
 							{previewSentence(org.visibility, previewGroup ? { name: previewGroup.group.name, visibility: previewGroup.perms.visibility } : null)}
 						</p>
-						<p class="m-0 mt-1 text-xs text-base-content/50">{t('visibility.preview.othersNote')}</p>
+						<p class="m-0 mt-1 text-xs text-base-content/70">{t('visibility.preview.othersNote')}</p>
 					</div>
 				</div>
 
@@ -826,7 +826,7 @@
 						<span></span>
 						<a href="/organizations/{orgSlug}/groups" class="btn btn-ghost btn-xs">{t('orgSettings.matrix.openGroups')}</a>
 					</div>
-					<p class="text-sm text-base-content/60 mb-3">
+					<p class="text-sm text-base-content/70 mb-3">
 						{t('orgSettings.matrix.intro')} <span class="italic">{t('orgSettings.matrix.cycle')}</span>.
 					</p>
 					{#if permGroupsError}
@@ -836,7 +836,7 @@
 						</div>
 					{/if}
 					{#if permGroupsLoading}
-						<p class="text-base-content/50 text-sm">{t('orgSettings.matrix.loadingGroups')}</p>
+						<p class="text-base-content/70 text-sm">{t('orgSettings.matrix.loadingGroups')}</p>
 					{:else}
 						<div class="overflow-x-auto bg-base-100 border border-base-300 rounded-xl">
 							<table class="table table-sm">
@@ -855,7 +855,7 @@
 									</tr>
 								</thead>
 								<tbody>
-									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 bg-base-200/30 py-1">{t('orgSettings.matrix.rulesSection')}</td></tr>
+									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/70 bg-base-200/30 py-1">{t('orgSettings.matrix.rulesSection')}</td></tr>
 									{#each matrixRuleRows as row (row.key)}
 										{@const orgBadge = matrixBadge((org as Record<string, any>)[row.key])}
 										<tr>
@@ -869,7 +869,7 @@
 												{@const raw = (col.perms as Record<string, any>)[row.key]}
 												<td class="text-center">
 													{#if raw == null}
-														<button class="badge badge-sm badge-ghost opacity-60 cursor-pointer" title={t('orgSettings.matrix.inheritTitle')} onclick={() => cycleGroupMatrixCell(col, row.key)} disabled={permSaving}>
+														<button class="badge badge-sm badge-ghost cursor-pointer" title={t('orgSettings.matrix.inheritTitle')} onclick={() => cycleGroupMatrixCell(col, row.key)} disabled={permSaving}>
 															↳ {orgBadge.label}
 														</button>
 													{:else}
@@ -882,16 +882,16 @@
 										</tr>
 									{/each}
 
-									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/50 bg-base-200/30 py-1">{t('orgSettings.matrix.capabilitiesSection')}</td></tr>
+									<tr><td colspan={2 + permGroups.length} class="text-[10px] font-semibold uppercase tracking-wide text-base-content/70 bg-base-200/30 py-1">{t('orgSettings.matrix.capabilitiesSection')}</td></tr>
 									{#each matrixCapabilityRows as row (row.key)}
 										<tr>
 											<td class="font-medium text-sm whitespace-nowrap">{row.label}</td>
-											<td class="text-center text-xs text-base-content/50" title={t('orgSettings.matrix.alwaysTitle')}>{t('orgSettings.matrix.always')}</td>
+											<td class="text-center text-xs text-base-content/70" title={t('orgSettings.matrix.alwaysTitle')}>{t('orgSettings.matrix.always')}</td>
 											{#each permGroups as col (col.group.id)}
 												{@const enabled = (col.perms as Record<string, any>)[row.key] === true}
 												<td class="text-center">
 													<button
-														class="badge badge-sm cursor-pointer {enabled ? 'badge-success' : 'badge-ghost opacity-60'}"
+														class="badge badge-sm cursor-pointer {enabled ? 'badge-success' : 'badge-ghost'}"
 														title={t('orgSettings.matrix.capabilityTitle')}
 														aria-pressed={enabled}
 														onclick={() => toggleGroupCapability(col, row.key)}
@@ -907,7 +907,7 @@
 							</table>
 						</div>
 						{#if permGroups.length === 0 && !permGroupsError}
-							<p class="text-base-content/50 text-sm mt-2">{t('orgSettings.matrix.noGroups')}</p>
+							<p class="text-base-content/70 text-sm mt-2">{t('orgSettings.matrix.noGroups')}</p>
 						{/if}
 					{/if}
 				</div>

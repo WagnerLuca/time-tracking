@@ -185,7 +185,7 @@
 						<div class="min-w-0 flex-1">
 							<p class="m-0 font-semibold">{noticeTitle(n)}</p>
 							<p class="m-0 text-sm text-base-content/70 break-words">{noticeText(n, target.date)}</p>
-							<p class="m-0 text-xs text-base-content/60">{formatTimeAgo(n.createdAt)}</p>
+							<p class="m-0 text-xs text-base-content/70">{formatTimeAgo(n.createdAt)}</p>
 						</div>
 						<div class="flex gap-2 max-sm:w-full">
 							{#if target.href}<a class="btn btn-sm btn-outline max-sm:flex-1" href={target.href} onclick={() => markDone(n)}>{t('inbox.notices.open')}</a>{/if}

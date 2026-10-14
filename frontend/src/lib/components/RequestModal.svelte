@@ -41,7 +41,7 @@
 
 <Modal {open} onclose={oncancel} title={type === 'edit' ? t('entries.request.titleEdit') : t('entries.request.titlePause')}>
 	<form id="{id}-form" onsubmit={submit} novalidate>
-		<p class="text-sm text-base-content/60 mb-4">{t('entries.request.intro')}</p>
+		<p class="text-sm text-base-content/70 mb-4">{t('entries.request.intro')}</p>
 
 		{#if error}
 			<div role="alert" class="alert alert-error text-sm mb-3 py-2 px-3">{error}</div>

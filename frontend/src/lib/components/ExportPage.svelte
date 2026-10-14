@@ -492,7 +492,7 @@
 	<div class="card bg-base-100 border border-base-300 shadow-sm">
 		<div class="card-body p-5 items-start gap-3">
 			<h2 class="text-base font-semibold">{t('export.noOrg.title')}</h2>
-			<p class="text-sm text-base-content/60">{text}</p>
+			<p class="text-sm text-base-content/70">{text}</p>
 			<div class="flex flex-wrap gap-2">
 				{#if orgContext.organizations.length > 0}
 					<a href="/select-org" class="btn btn-primary btn-sm">{t('export.noOrg.select')}</a>
@@ -514,7 +514,7 @@
 				type="button"
 				class="rounded-md px-4 py-1.5 text-sm font-medium whitespace-nowrap transition-colors {activeTab === tab
 					? 'bg-base-100 text-base-content shadow-sm'
-					: 'text-base-content/60 hover:text-base-content'}"
+					: 'text-base-content/70 hover:text-base-content'}"
 				aria-pressed={activeTab === tab}
 				onclick={() => (activeTab = tab)}
 			>
@@ -545,7 +545,7 @@
 						{/each}
 					</select>
 					{#if targetUserId !== null}
-						<p class="text-xs text-base-content/60">{t('export.member.scopeHint', { org: orgContext.selectedOrg?.name ?? '' })}</p>
+						<p class="text-xs text-base-content/70">{t('export.member.scopeHint', { org: orgContext.selectedOrg?.name ?? '' })}</p>
 					{/if}
 				</div>
 			</div>
@@ -588,7 +588,7 @@
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<!-- Scope -->
 						<div>
-							<label class="label text-xs font-medium text-base-content/60" for="exportScope">{t('export.filters.scope')}</label>
+							<label class="label text-xs font-medium text-base-content/70" for="exportScope">{t('export.filters.scope')}</label>
 							<select
 								id="exportScope"
 								class="select select-sm w-full"
@@ -601,15 +601,15 @@
 								<option value="all">{t('export.filters.scopeAll')}</option>
 							</select>
 							{#if exportType === 'daily'}
-								<p class="text-xs text-base-content/60 mt-1">{t('export.filters.dailyHint')}</p>
+								<p class="text-xs text-base-content/70 mt-1">{t('export.filters.dailyHint')}</p>
 							{:else if targetUserId !== null}
-								<p class="text-xs text-base-content/60 mt-1">{t('export.filters.memberHint')}</p>
+								<p class="text-xs text-base-content/70 mt-1">{t('export.filters.memberHint')}</p>
 							{/if}
 						</div>
 
 						<!-- Time Range -->
 						<div>
-							<label class="label text-xs font-medium text-base-content/60" for="exportRange">{t('export.filters.range')}</label>
+							<label class="label text-xs font-medium text-base-content/70" for="exportRange">{t('export.filters.range')}</label>
 							<select id="exportRange" class="select select-sm w-full" bind:value={exportRange}>
 								{#each ['week', 'month', 'year', 'all', 'custom'] as const as r (r)}
 									<option value={r}>{t(`export.filters.ranges.${r}`)}</option>
@@ -621,7 +621,7 @@
 					{#if exportRange === 'custom'}
 						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 							<div>
-								<label class="label text-xs font-medium text-base-content/60" for="customFrom">{t('export.filters.from')}</label>
+								<label class="label text-xs font-medium text-base-content/70" for="customFrom">{t('export.filters.from')}</label>
 								<input
 									id="customFrom"
 									type="date"
@@ -632,7 +632,7 @@
 								/>
 							</div>
 							<div>
-								<label class="label text-xs font-medium text-base-content/60" for="customTo">{t('export.filters.to')}</label>
+								<label class="label text-xs font-medium text-base-content/70" for="customTo">{t('export.filters.to')}</label>
 								<input
 									id="customTo"
 									type="date"
@@ -681,7 +681,7 @@
 						{#each availableColumns as col (col.key)}
 							<label
 								class="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm cursor-pointer transition-colors
-								{activeColumnSet.has(col.key) ? 'border-primary bg-primary/10 text-primary' : 'border-base-300 text-base-content/60 hover:border-base-content/30'}"
+								{activeColumnSet.has(col.key) ? 'border-primary bg-primary/10 text-primary' : 'border-base-300 text-base-content/70 hover:border-base-content/30'}"
 							>
 								<input
 									type="checkbox"
@@ -731,7 +731,7 @@
 				<div class="card bg-base-100 border border-base-300 shadow-sm">
 					<div class="card-body p-5 space-y-3">
 						<h2 class="text-base font-semibold">{t('export.payroll.title')}</h2>
-						<p class="text-sm text-base-content/60">{t('export.payroll.text', { org: orgContext.selectedOrg?.name ?? '' })}</p>
+						<p class="text-sm text-base-content/70">{t('export.payroll.text', { org: orgContext.selectedOrg?.name ?? '' })}</p>
 						<div class="flex items-center gap-2 flex-wrap">
 							<select class="select select-sm" bind:value={payrollMonth} aria-label={t('export.payroll.month')}>
 								{#each Array.from({ length: 12 }, (_, i) => i + 1) as m (m)}
@@ -760,7 +760,7 @@
 			{#if !orgContext.selectedOrg}
 				{@render noOrgState(t('export.noOrg.importText'))}
 			{:else if orgLoading && !perms}
-				<div class="flex items-center gap-2 text-sm text-base-content/60">
+				<div class="flex items-center gap-2 text-sm text-base-content/70">
 					<span class="loading loading-spinner loading-sm"></span> {t('common.loading')}
 				</div>
 			{:else if !canImport}
@@ -771,7 +771,7 @@
 					<div class="card-body p-5 space-y-3">
 						<h2 class="text-base font-semibold">{t('export.import.title')}</h2>
 						<!-- Column names stay English: they are the CSV headers the backend parser matches -->
-						<p class="text-sm text-base-content/60">
+						<p class="text-sm text-base-content/70">
 							{t('export.import.description', { required: 'Date, Start Time, End Time', optional: 'Pause (min), Description' })}
 						</p>
 
@@ -784,12 +784,12 @@
 						<!-- File picker -->
 						<div class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
 							<label class="flex flex-col gap-1.5 cursor-pointer w-full sm:w-auto min-w-0">
-								<span class="text-xs font-medium text-base-content/60">{t('export.import.file')}</span>
+								<span class="text-xs font-medium text-base-content/70">{t('export.import.file')}</span>
 								<div class="flex items-center gap-3 rounded-lg border-2 border-dashed px-4 py-3 transition-colors focus-within:border-primary {fileError ? 'border-error' : importFile ? 'border-primary/40 bg-primary/5' : 'border-base-300 hover:border-primary/50'}">
-									<svg class="w-5 h-5 text-base-content/40 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+									<svg class="w-5 h-5 text-base-content/70 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
 									</svg>
-									<span class="text-sm truncate {importFile ? 'text-primary font-medium' : 'text-base-content/60'}">
+									<span class="text-sm truncate {importFile ? 'text-primary font-medium' : 'text-base-content/70'}">
 										{importFile ? importFile.name : t('export.import.choose')}
 									</span>
 									<input
@@ -836,7 +836,7 @@
 									{#if previewDuplicateCount > 0}
 										<span class="badge badge-warning badge-sm">{tp('export.import.duplicates', previewDuplicateCount)}</span>
 									{/if}
-									<span class="text-base-content/60">{t('export.import.selected', { count: selectedRows.size })}</span>
+									<span class="text-base-content/70">{t('export.import.selected', { count: selectedRows.size })}</span>
 									<button type="button" class="btn btn-ghost btn-xs" onclick={selectAll}>{t('export.import.all')}</button>
 									<button type="button" class="btn btn-ghost btn-xs" onclick={deselectAll}>{t('export.import.none')}</button>
 								</div>
@@ -930,7 +930,7 @@
 									>
 										{t('export.import.requestApproval')}
 									</button>
-									<span class="text-xs text-base-content/60">{t('export.import.approvalHint')}</span>
+									<span class="text-xs text-base-content/70">{t('export.import.approvalHint')}</span>
 								{/if}
 								<button type="button" class="btn btn-ghost btn-sm" onclick={resetPreview} disabled={importConfirming}>
 									{t('common.cancel')}
@@ -958,7 +958,7 @@
 				<div class="card bg-base-100 border border-base-300 shadow-sm">
 					<div class="card-body p-5 space-y-3">
 						<h2 class="text-base font-semibold">{t('export.report.monthlyTitle')}</h2>
-						<p class="text-sm text-base-content/60">{t('export.report.monthlyText')}</p>
+						<p class="text-sm text-base-content/70">{t('export.report.monthlyText')}</p>
 						<div class="flex items-center gap-2 flex-wrap">
 							<select class="select select-sm" bind:value={reportMonth} aria-label={t('export.report.month')}>
 								{#each Array.from({ length: 12 }, (_, i) => i + 1) as m (m)}
@@ -980,7 +980,7 @@
 				<div class="card bg-base-100 border border-base-300 shadow-sm">
 					<div class="card-body p-5 space-y-3">
 						<h2 class="text-base font-semibold">{t('export.report.yearlyTitle')}</h2>
-						<p class="text-sm text-base-content/60">{t('export.report.yearlyText')}</p>
+						<p class="text-sm text-base-content/70">{t('export.report.yearlyText')}</p>
 						<div class="flex items-center gap-2 flex-wrap">
 							<input type="number" class="input input-sm w-24" class:input-error={!validYear(reportYear)} bind:value={reportYear} min="2000" max="2100" aria-label={t('export.report.year')} aria-invalid={!validYear(reportYear)} />
 							<button type="button" class="btn btn-primary btn-sm" onclick={downloadYearlyReport} disabled={yearlyReportDownloading || !validYear(reportYear)}>

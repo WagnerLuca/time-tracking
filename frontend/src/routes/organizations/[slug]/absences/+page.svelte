@@ -464,7 +464,7 @@
 
 <div class="max-w-5xl mx-auto sm:px-6 pb-6">
 	<div class="flex items-center gap-2 mb-6">
-		<a href="/organizations/{orgSlug}" class="text-base-content/60 no-underline text-sm hover:text-primary">&larr; {org?.name ?? t('nav.organization')}</a>
+		<a href="/organizations/{orgSlug}" class="text-base-content/70 no-underline text-sm hover:text-primary">&larr; {org?.name ?? t('nav.organization')}</a>
 	</div>
 
 	{#if loading}
@@ -473,7 +473,7 @@
 		<div class="alert alert-error">{error}</div>
 	{:else if org}
 		<h1 class="text-2xl font-bold text-base-content mb-1">{t('absences.title')}</h1>
-		<p class="text-base-content/60 text-sm mb-6 leading-relaxed">
+		<p class="text-base-content/70 text-sm mb-6 leading-relaxed">
 			{#if canEdit}
 				{t('absences.intro.admin')}
 			{:else if mustRequest}
@@ -516,7 +516,7 @@
 			<!-- Calendar member filter + mobile add -->
 			<div class="flex items-center justify-end gap-2 mb-3 flex-wrap">
 				{#if calendarUserOptions.length > 1}
-					<label class="text-xs text-base-content/60" for="calendar-user-filter">{t('absences.show')}</label>
+					<label class="text-xs text-base-content/70" for="calendar-user-filter">{t('absences.show')}</label>
 					<select id="calendar-user-filter" bind:value={calendarUserFilter} class="select select-sm max-w-[14rem]">
 						<option value={null}>{t('absences.allMembers')}</option>
 						{#each calendarUserOptions as u (u.id)}
@@ -537,16 +537,16 @@
 			<!-- Mobile: agenda list for the visible month -->
 			<div class="sm:hidden">
 				{#if absencesLoading}
-					<p class="text-base-content/50 text-sm">{t('common.loading')}</p>
+					<p class="text-base-content/70 text-sm">{t('common.loading')}</p>
 				{:else if agenda.length === 0}
-					<p class="text-base-content/50 text-sm text-center py-6 bg-base-200/30 rounded-lg border border-base-300">{t('absences.emptyMonth')}</p>
+					<p class="text-base-content/70 text-sm text-center py-6 bg-base-200/30 rounded-lg border border-base-300">{t('absences.emptyMonth')}</p>
 				{:else}
 					<ul class="flex flex-col gap-1.5">
 						{#each agenda as item (item.kind === 'holiday' ? `h${item.holiday.id}-${item.date}` : `a${spanKey(item.span)}`)}
 							{#if item.kind === 'holiday'}
 								<li><button type="button" use:dayPress={dayHandlers(item.date)} aria-pressed={item.date === selectedDayKey} class="w-full text-left flex items-center gap-2 p-2.5 rounded-lg border border-base-300 text-sm {DAY_TYPE_CLASSES.holiday.soft} {item.date === selectedDayKey ? 'ring-2 ring-primary/40' : ''}">
 									<span class="w-2.5 h-2.5 rounded-full shrink-0 {DAY_TYPE_CLASSES.holiday.dot}" aria-hidden="true"></span>
-									<span class="text-base-content/60 shrink-0">{formatDate(item.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+									<span class="text-base-content/70 shrink-0">{formatDate(item.date, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
 									<span class="font-medium truncate">{item.holiday.name}</span>
 									{#if item.holiday.isHalfDay}<span class="badge badge-xs badge-outline" title={t('absences.halfDay')}>½</span>{/if}
 								</button></li>
@@ -557,7 +557,7 @@
 								<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 								<li class="flex flex-col gap-1 p-2.5 bg-base-100 rounded-lg border border-base-300 text-sm cursor-pointer {pressed ? 'ring-2 ring-primary/40' : ''}" use:dayPress={dayHandlers(span.startDate < monthStart ? monthStart : span.startDate)}>
 									<div class="flex items-center justify-between gap-2">
-										<span class="text-base-content/60">
+										<span class="text-base-content/70">
 											{span.days === 1
 												? formatDate(span.startDate, { weekday: 'short', day: 'numeric', month: 'short' })
 												: `${formatDateShort(span.startDate)} – ${formatDateShort(span.endDate)}`}
@@ -575,7 +575,7 @@
 											{@render personName(span)}
 										{/if}
 									</div>
-									{#if span.note}<span class="text-xs text-base-content/50 truncate">{span.note}</span>{/if}
+									{#if span.note}<span class="text-xs text-base-content/70 truncate">{span.note}</span>{/if}
 								</li>
 							{/if}
 						{/each}
@@ -587,7 +587,7 @@
 			<div class="hidden sm:block">
 				<div class="grid grid-cols-7 gap-px mb-px" aria-hidden="true">
 					{#each dayNames as dow, i}
-						<div class="text-center text-xs font-semibold py-2 {i >= 5 ? 'text-base-content/40' : 'text-base-content/60'}">{dow}</div>
+						<div class="text-center text-xs font-semibold py-2 {i >= 5 ? 'text-base-content/70' : 'text-base-content/70'}">{dow}</div>
 					{/each}
 				</div>
 
@@ -614,7 +614,7 @@
 									onkeydown={(e) => { if (inMonth && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); selectedDayKey = key; } }}
 								>
 									<div class="flex items-center justify-between mb-1.5">
-										<span class="text-[10px] font-medium leading-none {isToday ? 'bg-primary text-primary-content rounded-full w-5 h-5 flex items-center justify-center' : ''} {!inMonth ? 'text-base-content/30' : isWeekend ? 'text-base-content/50' : 'text-base-content'}">
+										<span class="text-[10px] font-medium leading-none {isToday ? 'bg-primary text-primary-content rounded-full w-5 h-5 flex items-center justify-center' : ''} {!inMonth ? 'text-base-content/70' : isWeekend ? 'text-base-content/70' : 'text-base-content'}">
 											{date.getDate()}
 										</span>
 									</div>
@@ -671,7 +671,7 @@
 				</div>
 			</div>
 
-			<p class="text-xs text-base-content/50 mt-2 mb-0">
+			<p class="text-xs text-base-content/70 mt-2 mb-0">
 				{t('calendar.hintSelect')}{#if canOpenDayDialog}{' · '}{t('calendar.hintOpen')}{/if}
 			</p>
 
@@ -694,7 +694,7 @@
 						</div>
 					{/if}
 					{#if selectedDay.absences.length === 0}
-						<p class="text-sm text-base-content/60 m-0">{t('absences.emptyDay')}</p>
+						<p class="text-sm text-base-content/70 m-0">{t('absences.emptyDay')}</p>
 					{:else}
 						<ul class="flex flex-col gap-1.5">
 							{#each selectedDay.absences as a (a.id)}
@@ -709,7 +709,7 @@
 									</span>
 									<AbsenceTypeBadge type={a.type ?? ''} customTypeName={a.customTypeName} customTypeColor={a.customTypeColor} size="xs" />
 									{#if a.isHalfDay}<span class="badge badge-xs badge-outline" title={t('absences.halfDay')}>½</span>{/if}
-									{#if a.note}<span class="text-xs text-base-content/50 truncate min-w-0 flex-1">{a.note}</span>{/if}
+									{#if a.note}<span class="text-xs text-base-content/70 truncate min-w-0 flex-1">{a.note}</span>{/if}
 								</li>
 							{/each}
 						</ul>
@@ -718,11 +718,11 @@
 			{/if}
 
 			<!-- Legend -->
-			<div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-base-content/60">
+			<div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-base-content/70">
 				<span class="flex items-center gap-1"><span class="w-3 h-3 rounded {DAY_TYPE_CLASSES.sick.dot}"></span> {t('format.dayType.sick')}</span>
 				<span class="flex items-center gap-1"><span class="w-3 h-3 rounded {DAY_TYPE_CLASSES['other-absence'].dot}"></span> {t('format.absenceType.Other')}</span>
 				<span class="flex items-center gap-1"><span class="w-3 h-3 rounded {DAY_TYPE_CLASSES.holiday.dot}"></span> {t('format.dayType.holiday')}</span>
-				<span class="text-base-content/50">{t('absences.legend.vacationHint')}</span>
+				<span class="text-base-content/70">{t('absences.legend.vacationHint')}</span>
 			</div>
 		</section>
 
@@ -746,19 +746,19 @@
 		<section class="mt-8 bg-base-200/30 rounded-lg p-4 sm:p-5 border border-base-300">
 			<div class="flex items-center justify-between flex-wrap gap-2 mb-4">
 				<h2 class="text-xl font-bold text-base-content m-0">{t('absences.balance.title')}</h2>
-				<div class="flex items-center gap-4 text-xs text-base-content/60">
+				<div class="flex items-center gap-4 text-xs text-base-content/70">
 					<span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-primary"></span> {t('absences.balance.taken')}</span>
 					<span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm bg-primary/40"></span> {t('absences.balance.planned')}</span>
 				</div>
 			</div>
 			{#if vacationVisibleMembers.length === 0}
-				<p class="text-base-content/50 text-sm">{t('absences.balance.none')}</p>
+				<p class="text-base-content/70 text-sm">{t('absences.balance.none')}</p>
 			{:else}
 				{@const membersWithVacation = vacationVisibleMembers
 					.filter((m) => calendarUserFilter === null || m.id === calendarUserFilter)
 					.sort((a, b) => ((a.vacationDaysRemaining ?? 0) - (b.vacationDaysRemaining ?? 0)))}
 				{#if membersWithVacation.length === 0}
-					<p class="text-base-content/50 text-sm">{t('absences.balance.noneSelected')}</p>
+					<p class="text-base-content/70 text-sm">{t('absences.balance.noneSelected')}</p>
 				{:else}
 				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 					{#each membersWithVacation as member (member.id)}
@@ -780,9 +780,9 @@
 										<div class="h-full {pct >= 90 ? 'bg-error' : pct >= 70 ? 'bg-warning' : 'bg-primary'}" style="width: {takenPct}%"></div>
 										<div class="h-full {pct >= 90 ? 'bg-error/40' : pct >= 70 ? 'bg-warning/40' : 'bg-primary/40'}" style="width: {plannedPct}%"></div>
 									</div>
-									<span class="text-xs text-base-content/60 shrink-0">{formatNumber(pct / 100, { style: 'percent' })}</span>
+									<span class="text-xs text-base-content/70 shrink-0">{formatNumber(pct / 100, { style: 'percent' })}</span>
 								</div>
-								<div class="flex justify-between gap-2 mt-1 text-xs text-base-content/60">
+								<div class="flex justify-between gap-2 mt-1 text-xs text-base-content/70">
 									<span>{t('absences.balance.used', { taken: formatNumber(taken), total: formatNumber(total) })}{planned > 0 ? t('absences.balance.plannedSuffix', { planned: formatNumber(planned) }) : ''}</span>
 									<span class="font-semibold shrink-0 {remaining <= 2 ? 'text-error' : remaining <= 5 ? 'text-warning' : 'text-success'}">{t('absences.balance.left', { remaining: formatNumber(remaining) })}</span>
 								</div>
@@ -820,7 +820,7 @@
 				</select>
 			</div>
 			{#if absencesLoading}
-				<p class="text-base-content/50 text-sm">{t('common.loading')}</p>
+				<p class="text-base-content/70 text-sm">{t('common.loading')}</p>
 			{:else}
 				{@const yearStr = String(selectedListYear)}
 				{@const filtered = absences
@@ -829,12 +829,12 @@
 					.filter((a) => panelTypeFilter === 'all' || a.type === panelTypeFilter)}
 				{@const spans = buildAbsenceSpans(filtered)}
 				{#if spans.length === 0}
-					<p class="text-base-content/50 text-sm text-center py-4">{t('absences.list.empty', { year: selectedListYear })}</p>
+					<p class="text-base-content/70 text-sm text-center py-4">{t('absences.list.empty', { year: selectedListYear })}</p>
 				{:else}
 					<ul class="flex flex-col gap-1.5">
 						{#each spans as span (spanKey(span))}
 							<li class="flex items-center gap-x-3 gap-y-1 p-2.5 bg-base-100 rounded-lg border border-base-300 text-sm flex-wrap">
-								<span class="text-base-content/60 shrink-0 sm:min-w-[190px]">{spanDateLabel(span)}</span>
+								<span class="text-base-content/70 shrink-0 sm:min-w-[190px]">{spanDateLabel(span)}</span>
 								{#if canEdit}
 								<a href="/organizations/{orgSlug}/members/{span.userId}" class="flex items-center gap-1.5 font-medium link link-hover sm:min-w-[130px]">
 									{@render personName(span)}
@@ -852,7 +852,7 @@
 									<span class="badge badge-sm badge-outline">{t('absences.list.halfDay')}</span>
 								{/if}
 								{#if span.note}
-									<span class="text-base-content/50 truncate min-w-0 flex-1">{span.note}</span>
+									<span class="text-base-content/70 truncate min-w-0 flex-1">{span.note}</span>
 								{/if}
 								{#if canDeleteSpan(span)}
 									<button
@@ -866,7 +866,7 @@
 							</li>
 						{/each}
 					</ul>
-					<p class="text-xs text-base-content/50 mt-2">{tp('absences.list.entries', spans.length)} {tp('absences.list.totalDays', filtered.length)}</p>
+					<p class="text-xs text-base-content/70 mt-2">{tp('absences.list.entries', spans.length)} {tp('absences.list.totalDays', filtered.length)}</p>
 				{/if}
 			{/if}
 		</section>

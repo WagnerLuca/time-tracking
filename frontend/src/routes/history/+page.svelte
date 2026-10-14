@@ -43,7 +43,7 @@
 	{:else}
 		<div class="card bg-base-100 border border-base-300 p-5">
 			<h2 class="text-base font-semibold m-0">{t('calendar.noOrgTitle')}</h2>
-			<p class="text-sm text-base-content/60 mt-1 mb-4">
+			<p class="text-sm text-base-content/70 mt-1 mb-4">
 				{orgContext.organizations.length > 0
 					? t('calendar.selectOrg')
 					: t('calendar.noOrgs')}

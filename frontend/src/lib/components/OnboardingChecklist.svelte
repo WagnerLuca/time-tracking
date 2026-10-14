@@ -65,7 +65,7 @@
 					<a href={step.href} class="flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5 no-underline text-base-content hover:bg-base-200">
 						<span class="grid size-6 shrink-0 place-items-center rounded-full border-2 text-xs {step.done ? 'border-primary bg-primary text-primary-content' : 'border-base-content/40'}" aria-hidden="true">{step.done ? '✓' : ''}</span>
 						<span class="min-w-0">
-							<span class="block text-sm font-medium {step.done ? 'line-through text-base-content/60' : ''}">{t(`onboarding.steps.${step.id}.label`)}{#if step.done}<span class="sr-only"> ({t('onboarding.done')})</span>{/if}</span>
+							<span class="block text-sm font-medium {step.done ? 'line-through text-base-content/70' : ''}">{t(`onboarding.steps.${step.id}.label`)}{#if step.done}<span class="sr-only"> ({t('onboarding.done')})</span>{/if}</span>
 							<span class="block text-xs text-base-content/70">{t(`onboarding.steps.${step.id}.hint`)}</span>
 						</span>
 					</a>

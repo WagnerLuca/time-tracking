@@ -64,9 +64,9 @@
 				{#each COLUMNS as c (c)}
 					{@const value = groupCell(group, kind, c)}
 					<div class="flex flex-col gap-0.5 min-w-0">
-						<span class="text-[11px] text-base-content/50 sm:hidden" aria-hidden="true">{columnLabel(c)}</span>
+						<span class="text-[11px] text-base-content/70 sm:hidden" aria-hidden="true">{columnLabel(c)}</span>
 						<select
-							class="select select-xs w-full {value === true ? 'text-success' : value === false ? 'text-error' : 'text-base-content/60'}"
+							class="select select-xs w-full {value === true ? 'text-success' : value === false ? 'text-error' : 'text-base-content/70'}"
 							aria-label={t('visibility.cellLabel', { kind: t(`visibility.kinds.${kind}`), column: columnLabel(c) })}
 							value={overrideValue(value)}
 							{disabled}

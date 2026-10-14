@@ -67,11 +67,11 @@
 					{formatTime(entry.startTime!)} – {entry.endTime ? formatTime(entry.endTime) : '…'}
 				</span>
 				{#if showDate}
-					<span class="text-xs text-base-content/50">{formatDateShort(entry.startTime!)}</span>
+					<span class="text-xs text-base-content/70">{formatDateShort(entry.startTime!)}</span>
 				{/if}
 			</div>
 			{#if entry.description}
-				<div class="text-sm text-base-content/60 break-words">{entry.description}</div>
+				<div class="text-sm text-base-content/70 break-words">{entry.description}</div>
 			{/if}
 			<div class="flex flex-wrap gap-1 mt-1 empty:hidden">
 				{#if showOrg && entry.organizationName}
@@ -109,10 +109,10 @@
 				{#if entry.isRunning}
 					<span class="text-success">{liveElapsed ?? '…'}</span>
 				{:else if entry.isFailure}
-					<span class="text-base-content/40">–</span>
+					<span class="text-base-content/70">–</span>
 				{:else if pause > 0}
 					<span class="block">{formatDuration(entry.netDurationMinutes)}</span>
-					<span class="block text-xs text-base-content/40 font-normal">({formatDuration(entry.durationMinutes)})</span>
+					<span class="block text-xs text-base-content/70 font-normal">({formatDuration(entry.durationMinutes)})</span>
 				{:else}
 					{formatDuration(entry.durationMinutes)}
 				{/if}

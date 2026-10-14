@@ -283,7 +283,7 @@
 
 				{#if showImport && canEdit}
 					<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
-						<p class="text-sm text-base-content/60 mb-3">{t('holidays.import.intro')}</p>
+						<p class="text-sm text-base-content/70 mb-3">{t('holidays.import.intro')}</p>
 						{#if importError}
 							<div class="alert alert-error mb-3 text-sm" role="alert">{importError}</div>
 						{/if}
@@ -344,7 +344,7 @@
 				{/if}
 
 				{#if filteredHolidays.length === 0}
-					<p class="text-base-content/50 text-sm">{t('holidays.empty', { year: selectedYear })}{#if !canEdit} {t('holidays.managedByAdmins')}{/if}</p>
+					<p class="text-base-content/70 text-sm">{t('holidays.empty', { year: selectedYear })}{#if !canEdit} {t('holidays.managedByAdmins')}{/if}</p>
 				{:else}
 					<ul class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
 						{#each filteredHolidays as h (h.id)}
@@ -380,7 +380,7 @@
 								{:else}
 									<div class="flex items-center gap-x-3 gap-y-1 flex-wrap min-w-0">
 										<span class="font-medium text-base-content">{h.name}</span>
-										<span class="text-base-content/60 text-sm tabular-nums">{formatHolidayDate(h)}</span>
+										<span class="text-base-content/70 text-sm tabular-nums">{formatHolidayDate(h)}</span>
 										{#if h.isRecurring}
 											<span class="badge badge-sm badge-outline">{t('holidays.recurring')}</span>
 										{/if}

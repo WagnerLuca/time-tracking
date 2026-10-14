@@ -76,12 +76,12 @@
 		</div>
 		<div class="min-w-0">
 			<h1 class="text-2xl font-bold text-base-content m-0 break-words">{name}</h1>
-			{#if member.email}<p class="text-base-content/60 text-sm mt-0.5 mb-2 break-all">{member.email}</p>{/if}
+			{#if member.email}<p class="text-base-content/70 text-sm mt-0.5 mb-2 break-all">{member.email}</p>{/if}
 			<div class="flex items-center gap-2 flex-wrap">
 				{#if member.role}<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>{/if}
 				<GroupTags groups={member.groups} size="sm" />
 				{#if member.joinedAt}
-					<span class="text-base-content/40 text-xs">{t('memberDetail.header.joined', { date: formatDateFull(member.joinedAt) })}</span>
+					<span class="text-base-content/70 text-xs">{t('memberDetail.header.joined', { date: formatDateFull(member.joinedAt) })}</span>
 				{/if}
 				{#if isSelf}<span class="badge badge-success badge-xs font-semibold">{t('memberDetail.header.you')}</span>{/if}
 			</div>

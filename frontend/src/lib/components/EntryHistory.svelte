@@ -29,13 +29,13 @@
 </script>
 
 <details class="px-3 pb-3 bg-base-200/50 text-sm" {ontoggle}>
-	<summary class="cursor-pointer text-xs font-semibold text-base-content/60 uppercase tracking-wide py-1">{t('entries.history.title')}</summary>
+	<summary class="cursor-pointer text-xs font-semibold text-base-content/70 uppercase tracking-wide py-1">{t('entries.history.title')}</summary>
 	{#if loading}
-		<p class="text-xs text-base-content/50 flex items-center gap-2 m-0 mt-1"><span class="loading loading-spinner loading-xs"></span>{t('entries.history.loading')}</p>
+		<p class="text-xs text-base-content/70 flex items-center gap-2 m-0 mt-1"><span class="loading loading-spinner loading-xs"></span>{t('entries.history.loading')}</p>
 	{:else if error}
 		<p class="text-xs text-error m-0 mt-1" role="alert">{error}</p>
 	{:else if changes && changes.length === 0}
-		<p class="text-xs text-base-content/50 m-0 mt-1">{t('entries.history.empty')}</p>
+		<p class="text-xs text-base-content/70 m-0 mt-1">{t('entries.history.empty')}</p>
 	{:else if changes}
 		<ol class="list-none p-0 m-0 mt-1 flex flex-col gap-2">
 			{#each changes as c (c.id)}
@@ -46,7 +46,7 @@
 						· {c.changedByName ?? t('entries.history.system')}
 					</div>
 					{#if c.changes && c.changes.length > 0}
-						<ul class="list-none p-0 m-0 text-xs text-base-content/60">
+						<ul class="list-none p-0 m-0 text-xs text-base-content/70">
 							{#each c.changes as f, i (i)}
 								<li class="break-words">
 									{historyFieldLabel(f.field)}:

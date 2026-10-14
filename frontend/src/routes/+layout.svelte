@@ -199,7 +199,7 @@
 {/snippet}
 
 {#if auth.loading}
-	<div class="min-h-screen flex items-center justify-center text-base-content/60">
+	<div class="min-h-screen flex items-center justify-center text-base-content/70">
 		<span class="loading loading-spinner loading-md" aria-label={t('common.loading')}></span>
 	</div>
 {:else if auth.isAuthenticated}
@@ -340,7 +340,7 @@
 					<div class="card-body text-center">
 						<div class="text-4xl mb-3" aria-hidden="true">🔐</div>
 						<h2 class="card-title justify-center text-lg">{t('nav.twoFactor.title')}</h2>
-						<p class="text-sm text-base-content/60 mt-2">{t('nav.twoFactor.text')}</p>
+						<p class="text-sm text-base-content/70 mt-2">{t('nav.twoFactor.text')}</p>
 						<div class="mt-4">
 							<a href="/settings" class="btn btn-primary">{t('nav.twoFactor.goToSettings')}</a>
 						</div>
@@ -375,7 +375,7 @@
 	{@render children?.()}
 {:else}
 	<!-- Protected page while signed out: render nothing (no API calls) until the redirect to /login lands -->
-	<div class="min-h-screen flex items-center justify-center text-base-content/60">
+	<div class="min-h-screen flex items-center justify-center text-base-content/70">
 		<span class="loading loading-spinner loading-md"></span>
 	</div>
 {/if}
