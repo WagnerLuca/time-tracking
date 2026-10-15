@@ -162,6 +162,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         await AddEntryAsync(memberId, orgId, day, "09:20", "15:10");
 
         // Not yet due at 15:04 (end + tolerance)
+        await BackdateAsync(orgId);
         await CheckAsync(Berlin.ToUtc(day.ToDateTime(new TimeOnly(15, 4))));
         (await CheckRowAsync(memberId, day)).Should().BeNull();
 
@@ -206,6 +207,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         await AddEntryAsync(lead.User.Id, orgId, day, "09:00", "15:00");
         await AddEntryAsync(viewer.User.Id, orgId, day, "09:00", "15:00");
 
+        await BackdateAsync(orgId, joinedAt: Berlin.ToUtc(At(day, 0)));   // only this day, not the catch-up days before it
         await CheckAsync(After(day));
         (await NoticesAboutAsync(memberId, day)).Select(n => n.UserId).Should().BeEquivalentTo([memberId, viewer.User.Id]);
         _factory.Mail.Sent.Should().Contain(m => m.To == "core-private-m@t.test" && m.Body.Contains("09:00-15:00"));
@@ -221,6 +223,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         await AddEntryAsync(memberId, orgId, day, "09:04", "12:00");
         await AddEntryAsync(memberId, orgId, day, "12:05", "14:56");   // 5 min gap, 4 min early: within tolerance
 
+        await BackdateAsync(orgId);
         await CheckAsync(After(day));
         (await CheckRowAsync(memberId, day))!.Issues.Should().Be(CoreHoursIssue.None);
         (await NoticesAboutAsync(memberId, day)).Should().BeEmpty();
@@ -234,6 +237,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         await AddEntryAsync(memberId, orgId, day, "08:00", "11:00");
         await AddEntryAsync(memberId, orgId, day, "11:30", "14:00");
 
+        await BackdateAsync(orgId);
         await CheckAsync(After(day));
         var row = await CheckRowAsync(memberId, day);
         row!.Issues.Should().Be(CoreHoursIssue.Early | CoreHoursIssue.Gap);
@@ -249,6 +253,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         await AddEntryAsync(memberId, orgId, day, "08:55", null);                    // still running at check time
         await AddEntryAsync(ownerId, orgId, day, "08:55", "16:00", failure: true);  // auto-stopped, uncorrected
 
+        await BackdateAsync(orgId);
         await CheckAsync(After(day));
         (await CheckRowAsync(memberId, day))!.Issues.Should().Be(CoreHoursIssue.None);
         (await CheckRowAsync(ownerId, day))!.Issues.Should().Be(CoreHoursIssue.Missing);
@@ -273,6 +278,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         });
         await AddEntryAsync(memberId, orgId, halfMorningWorked, "09:00", "12:00");
 
+        await BackdateAsync(orgId);
         foreach (var day in new[] { holiday, absent, halfMorningWorked, halfNothing, saturday })
             await CheckAsync(After(day));
 
@@ -295,6 +301,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
             await db.SaveChangesAsync();
         });
 
+        await BackdateAsync(orgId);
         await CheckAsync(After(saturday));
         (await CheckRowAsync(memberId, saturday))!.Issues.Should().Be(CoreHoursIssue.Missing);
         // Tuesday has no target in that schedule → day off
@@ -322,6 +329,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         await AddEntryAsync(memberId, orgId, day, "10:00", "12:00");
         await AddEntryAsync(lead.User.Id, orgId, day, "10:00", "14:00");   // the group admin covers the group window
 
+        await BackdateAsync(orgId);
         await CheckAsync(Berlin.ToUtc(day.ToDateTime(new TimeOnly(14, 10))));   // after the group window, before the org's
         var row = await CheckRowAsync(memberId, day);
         row!.WindowStart.Should().Be(new TimeOnly(10, 0));
@@ -335,6 +343,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         // Back to inherit: the org window applies again
         var groupId = perms.EnumerateArray().First(g => g.GetProperty("coreHoursMode").GetString() == "Off").GetProperty("groupId").GetInt32();
         (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/permissions", new { coreHoursMode = -1 })).EnsureSuccessStatusCode();
+        await BackdateAsync(orgId);
         await CheckAsync(After(day.AddDays(1)));
         (await CheckRowAsync(off.User.Id, day.AddDays(1)))!.Issues.Should().Be(CoreHoursIssue.Missing);
     }
@@ -348,6 +357,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         await AddEntryAsync(memberId, orgId, day, "09:00", "15:00", zone: "America/New_York");
 
         var ny = OrgClock.For("America/New_York");
+        await BackdateAsync(orgId);
         await CheckAsync(After(day));   // 15:30 Berlin = morning in New York: not due
         (await CheckRowAsync(memberId, day)).Should().BeNull();
         await CheckAsync(ny.ToUtc(day.ToDateTime(new TimeOnly(15, 6))));
@@ -393,6 +403,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         var (owner, member, slug, orgId, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, "core-view",
             new { coreHoursEnabled = true, coreHoursStart = "09:00", coreHoursEnd = "15:00", timeZone = "Europe/Berlin", memberTimeEntryVisibility = true });
         await AddEntryAsync(memberId, orgId, day, "10:00", "15:00");
+        await BackdateAsync(orgId, joinedAt: Berlin.ToUtc(At(day, 0)));
         await CheckAsync(After(day));
 
         var url = $"/api/v1/organizations/{slug}/members/{memberId}/compliance?from=2026-03-01&to=2026-03-31";
@@ -513,6 +524,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
             await db.SaveChangesAsync();
         });
 
+        await BackdateAsync(orgId, joinedAt: Berlin.ToUtc(At(day, 0)));
         await CheckAsync(Berlin.ToUtc(At(day, 23, 30)));
         (await CheckRowAsync(memberId, day)).Should().BeNull("the night has not ended yet");
         await CheckAsync(Berlin.ToUtc(At(day.AddDays(1), 2, 10)));
@@ -550,6 +562,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         });
         await AddSpanAsync(worker.User.Id, orgId, At(day, 22), At(day.AddDays(1), 6));
 
+        await BackdateAsync(orgId);
         await CheckAsync(Berlin.ToUtc(At(day.AddDays(1), 6, 10)));
         var nothing = await CheckRowAsync(memberId, day);
         nothing!.Issues.Should().Be(CoreHoursIssue.Missing);
@@ -621,6 +634,26 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         (await CheckRowAsync(memberId, wednesday.AddDays(1))).Should().BeNull("the member joined the day after");
     }
 
+    [Theory]
+    [InlineData(true)]    // core hours switched on at 15:20, after the 09:00-15:00 window
+    [InlineData(false)]   // the member joined at 14:00, during the window
+    public async Task OnTime_SkipsTheWindowThatStartedBeforeTheChangeOrJoining(bool switchedOn)
+    {
+        var day = new DateOnly(2026, 4, 28);   // Tuesday
+        var prefix = switchedOn ? "core-switch-late" : "core-join-late";
+        var (_, _, _, orgId, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, prefix, CoreSettings);
+        if (switchedOn) await BackdateAsync(orgId, changedAt: Berlin.ToUtc(At(day, 15, 20)));
+        else await BackdateAsync(orgId, joinedAt: Berlin.ToUtc(At(day, 14)));
+
+        await CheckAsync(After(day));   // on time, not late
+        (await CheckRowAsync(memberId, day)).Should().BeNull("the window started before the rule applied to the member");
+        (await NoticesAboutAsync(memberId, day)).Should().BeEmpty();
+
+        await CheckAsync(After(day.AddDays(1)));
+        (await CheckRowAsync(memberId, day.AddDays(1)))!.Issues.Should().Be(CoreHoursIssue.Missing, "the next day is checked");
+        (await CheckRowAsync(memberId, day)).Should().BeNull();
+    }
+
     // ── Tolerance per group ────────────────────────────────────────────
 
     [Fact]
@@ -645,6 +678,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
             await AddEntryAsync(id, orgId, day, "09:20", "15:00");
         await AddEntryAsync(strict, orgId, day, "09:02", "15:00");
 
+        await BackdateAsync(orgId);
         await CheckAsync(Berlin.ToUtc(At(day, 15, 31)));
         var relaxed = await CheckRowAsync(memberId, day);
         relaxed!.Issues.Should().Be(CoreHoursIssue.None);

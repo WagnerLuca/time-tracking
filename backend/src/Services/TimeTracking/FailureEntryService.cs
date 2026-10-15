@@ -40,14 +40,27 @@ public class FailureEntryService : BackgroundService
                 var closed = await CloseOverdueEntriesAsync(context, now, stoppingToken, email, frontend);
                 if (closed > 0)
                     _logger.LogInformation("Auto-stopped {Count} timer(s) at business day end.", closed);
-                // Same loop and RLS bypass (no HttpContext = system work) for the daily core hours check
-                var missed = await CoreHours.CheckDueAsync(context, now, email, frontend, stoppingToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Error while closing overdue timers.");
+            }
+
+            try
+            {
+                // Same loop and RLS bypass (no HttpContext = system work) for the daily core hours check;
+                // its own scope, so a failed timer pass leaves nothing tracked behind
+                using var scope = _scopeFactory.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<TimeTrackingDbContext>();
+                var email = scope.ServiceProvider.GetRequiredService<IEmailSender>();
+                var frontend = scope.ServiceProvider.GetRequiredService<EmailSettings>().FrontendBaseUrl;
+                var missed = await CoreHours.CheckDueAsync(context, DateTime.UtcNow, email, frontend, stoppingToken, _logger);
                 if (missed > 0)
                     _logger.LogInformation("Notified {Count} core working hours violation(s).", missed);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogError(ex, "Error while closing overdue timers.");
+                _logger.LogError(ex, "Error while checking core working hours.");
             }
 
             await Task.Delay(_interval, stoppingToken);

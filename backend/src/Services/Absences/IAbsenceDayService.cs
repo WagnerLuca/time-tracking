@@ -15,6 +15,7 @@ public interface IAbsenceDayService
     /// <summary>All weekdays of a range for a member, all or nothing (admins).</summary>
     Task<ServiceResult<List<AbsenceDayResponse>>> AdminCreateAbsenceRangeAsync(string slug, int callerUserId, CreateAbsenceRangeRequest request);
     Task<ServiceResult> DeleteAbsenceAsync(string slug, int callerUserId, int absenceId);
+    Task<ServiceResult> DeleteAbsencesAsync(string slug, int callerUserId, IReadOnlyCollection<int> absenceIds);
 
     // Custom absence type definitions
     Task<ServiceResult<List<AbsenceTypeDefinitionResponse>>> GetAbsenceTypesAsync(string slug, int callerUserId);

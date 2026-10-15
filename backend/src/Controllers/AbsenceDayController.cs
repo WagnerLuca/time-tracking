@@ -109,6 +109,17 @@ public class AbsenceDayController : OrganizationBaseController
         return ToResponse(await _service.DeleteAbsenceAsync(slug, callerId.Value, id));
     }
 
+    /// <summary>Delete several absence days (a span) together, all or nothing — same rules as a single delete.</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    [HttpPost("{slug}/absences/delete")]
+    [RequireOrgRole]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeleteAbsences(string slug, [FromBody] DeleteAbsencesRequest request)
+    {
+        if (GetCurrentUserId() is not int callerId) return Unauthorized();
+        return ToResponse(await _service.DeleteAbsencesAsync(slug, callerId, request.Ids));
+    }
+
     // ────────────────────────────────────────────────────
     //  Custom absence types
     // ────────────────────────────────────────────────────

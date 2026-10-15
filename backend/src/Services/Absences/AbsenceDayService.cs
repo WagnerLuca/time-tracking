@@ -243,7 +243,14 @@ public class AbsenceDayService : IAbsenceDayService
             ? ServiceResult.Ok(result.Data![0])
             : ServiceResult.Fail<AbsenceDayResponse>(result.ErrorType!.Value, result.ErrorMessage!);
 
-    public async Task<ServiceResult> DeleteAbsenceAsync(string slug, int callerUserId, int absenceId)
+    public Task<ServiceResult> DeleteAbsenceAsync(string slug, int callerUserId, int absenceId) =>
+        DeleteAbsencesAsync(slug, callerUserId, [absenceId]);
+
+    /// <summary>
+    /// Deletes several absence days (a span) in one save, all or nothing: one closed-month reason
+    /// prompt for the whole span, and a refused day leaves the others in place.
+    /// </summary>
+    public async Task<ServiceResult> DeleteAbsencesAsync(string slug, int callerUserId, IReadOnlyCollection<int> absenceIds)
     {
         var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
@@ -253,24 +260,26 @@ public class AbsenceDayService : IAbsenceDayService
         if (callerRole == null)
             return ServiceResult.Forbidden();
 
-        var absence = await _context.AbsenceDays
-            .FirstOrDefaultAsync(a => a.Id == absenceId && a.OrganizationId == org.Id);
-        if (absence == null)
+        var ids = absenceIds.Distinct().ToList();
+        var absences = await _context.AbsenceDays
+            .Where(a => ids.Contains(a.Id) && a.OrganizationId == org.Id)
+            .ToListAsync();
+        if (absences.Count != ids.Count)
             return ServiceResult.NotFound("Absence not found");
 
         // Members can only delete their own, self-entered absences: one an admin entered or that
         // came from an approved request is part of the approval trail
         if (callerRole < OrganizationRole.Admin)
         {
-            if (absence.UserId != callerUserId)
+            if (absences.Any(a => a.UserId != callerUserId))
                 return ServiceResult.Forbidden();
-            if (absence.CreatedViaRequestId != null || (absence.CreatedByUserId != null && absence.CreatedByUserId != callerUserId))
+            if (absences.Any(a => a.CreatedViaRequestId != null || (a.CreatedByUserId != null && a.CreatedByUserId != callerUserId)))
                 return ServiceResult.Forbidden("This absence was approved or entered by an admin. Ask an admin to remove it.");
         }
 
-        _context.AbsenceDays.Remove(absence);
+        _context.AbsenceDays.RemoveRange(absences);
         await _context.SaveChangesAsync();
-        _logger.LogInformation("Absence {AbsenceId} deleted from org {OrgSlug} by user {UserId}", absenceId, slug, callerUserId);
+        _logger.LogInformation("Absences {AbsenceIds} deleted from org {OrgSlug} by user {UserId}", ids, slug, callerUserId);
         return ServiceResult.Ok();
     }
 

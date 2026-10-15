@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { getOrgDetail, invalidateOrgDetail } from '$lib/stores/orgDetail';
+	import { getOrgDetail, invalidateOrgDetail, saveOrgGeneral } from '$lib/stores/orgDetail';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { organizationsApi } from '$lib/apiClient';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
@@ -79,16 +79,12 @@
 		saveError = '';
 		const newSlug = slug.trim();
 		try {
-			// Time settings under the current slug first; a slug change comes last
-			if (timeZone !== org.timeZone || businessDayEnd !== org.businessDayEnd)
-				await organizationsApi.apiV1OrganizationsSlugSettingsPut(orgSlug, { timeZone, businessDayEnd });
-			await organizationsApi.apiV1OrganizationsSlugPut(orgSlug, {
+			await saveOrgGeneral(orgSlug, org, { timeZone, businessDayEnd }, {
 				name: name.trim(),
 				description: description.trim(),
 				slug: newSlug,
 				website: website.trim() || undefined
 			});
-			invalidateOrgDetail(orgSlug);
 			toast.success(t('orgHome.edit.saved'));
 			// The org switcher and the section tabs look the org up by slug and name
 			if (auth.user?.id) await orgContext.loadOrganizations(auth.user.id);
@@ -181,7 +177,7 @@
 			</div>
 		</form>
 
-		<ClosedPeriodsPanel {orgSlug} />
+		<ClosedPeriodsPanel {orgSlug} timeZone={org.timeZone} />
 
 		<section class="card border border-error/50 bg-error/5 p-4 sm:p-5 mt-8 max-w-2xl" aria-labelledby="general-danger" data-testid="danger-zone">
 			<h2 id="general-danger" class="text-base font-semibold text-error m-0">{t('orgHome.general.danger')}</h2>

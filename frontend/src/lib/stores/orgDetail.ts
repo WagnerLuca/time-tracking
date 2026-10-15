@@ -1,6 +1,6 @@
 import { organizationsApi } from '$lib/apiClient';
 import { auth } from '$lib/stores/auth.svelte';
-import type { OrganizationDetailResponse } from '$lib/api';
+import type { OrganizationDetailResponse, UpdateOrganizationRequest } from '$lib/api';
 
 /**
  * Organization details cached per user + slug, so moving between the org pages
@@ -29,4 +29,23 @@ export function getOrgDetail(slug: string, { fresh = false } = {}): Promise<Orga
 export function invalidateOrgDetail(slug?: string | null) {
 	if (!slug) cache.clear();
 	else for (const key of cache.keys()) if (key.endsWith(`:${slug}`)) cache.delete(key);
+}
+
+/**
+ * Saves the "Allgemein" section: the time settings under the current slug first (only when changed),
+ * then the profile (a slug change last). The cached details are dropped as soon as the settings are
+ * saved, so a failing second call leaves no stale time zone or day end behind elsewhere.
+ */
+export async function saveOrgGeneral(
+	slug: string,
+	current: Pick<OrganizationDetailResponse, 'timeZone' | 'businessDayEnd'>,
+	time: { timeZone: string; businessDayEnd: string },
+	profile: UpdateOrganizationRequest
+) {
+	if (time.timeZone !== current.timeZone || time.businessDayEnd !== current.businessDayEnd) {
+		await organizationsApi.apiV1OrganizationsSlugSettingsPut(slug, time);
+		invalidateOrgDetail(slug);
+	}
+	await organizationsApi.apiV1OrganizationsSlugPut(slug, profile);
+	invalidateOrgDetail(slug);
 }

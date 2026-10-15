@@ -43,6 +43,7 @@ docs/CreatePauseRuleRequest.md
 docs/CreateWorkScheduleRequest.md
 docs/CreatedApiKeyResponse.md
 docs/DayBalance.md
+docs/DeleteAbsencesRequest.md
 docs/DeleteAccountRequest.md
 docs/DisableTwoFactorRequest.md
 docs/EffectivePermissionsResponse.md

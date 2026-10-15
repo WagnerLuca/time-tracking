@@ -1018,13 +1018,21 @@ public class OrganizationService : IOrganizationService
             return ServiceResult.NotFound<MemberPersonnelNumberResponse>("Member not found in this organization.");
 
         var number = string.IsNullOrWhiteSpace(request.PersonnelNumber) ? null : request.PersonnelNumber.Trim();
+        const string taken = "This personnel number is already used by another member.";
         // Inactive memberships keep theirs, and the unique index covers them too
         if (number != null && await _context.UserOrganizations.IgnoreQueryFilters()
                 .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId != userId && uo.PersonnelNumber == number))
-            return ServiceResult.Conflict<MemberPersonnelNumberResponse>("This personnel number is already used by another member.");
+            return ServiceResult.Conflict<MemberPersonnelNumberResponse>(taken);
 
         membership.PersonnelNumber = number;
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
+        {
+            return ServiceResult.Conflict<MemberPersonnelNumberResponse>(taken);   // another admin gave it away at the same time
+        }
         _logger.LogInformation("Personnel number of user {UserId} in org {OrgId} set by user {CallerId}", userId, org.Id, callerUserId);
         return ServiceResult.Ok(new MemberPersonnelNumberResponse { UserId = userId, PersonnelNumber = number });
     }

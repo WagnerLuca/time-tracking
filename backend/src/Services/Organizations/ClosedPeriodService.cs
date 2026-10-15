@@ -33,25 +33,30 @@ public class ClosedPeriodService(TimeTrackingDbContext context)
         if (to.AddMonths(1) > OrgClock.For(org).Today())
             return ServiceResult.BadRequest<ClosedPeriodsResponse>("Only months that have ended can be closed.", "period.notEnded");
 
-        var already = (await ClosedPeriods.MonthsAsync(context, org.Id)).ToHashSet();
         var now = DateTime.UtcNow;
         var reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
-        for (var month = from; month <= to; month = month.AddMonths(1))
+        for (var attempt = 1; ; attempt++)
         {
-            if (already.Contains(month)) continue;
-            context.ClosedPeriods.Add(new ClosedPeriod { OrganizationId = org.Id, Month = month, ClosedAt = now, ClosedByUserId = callerUserId });
-            context.ClosedPeriodEvents.Add(new ClosedPeriodEvent
+            var already = (await ClosedPeriods.MonthsAsync(context, org.Id)).ToHashSet();
+            for (var month = from; month <= to; month = month.AddMonths(1))
             {
-                OrganizationId = org.Id, Month = month, Kind = ClosedPeriodEventKind.Closed, UserId = callerUserId, At = now, Reason = reason
-            });
-        }
-        try
-        {
-            await context.SaveChangesAsync();
-        }
-        catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex))
-        {
-            // Another admin closed one of the months at the same time: that is the state wanted anyway
+                if (already.Contains(month)) continue;
+                context.ClosedPeriods.Add(new ClosedPeriod { OrganizationId = org.Id, Month = month, ClosedAt = now, ClosedByUserId = callerUserId });
+                context.ClosedPeriodEvents.Add(new ClosedPeriodEvent
+                {
+                    OrganizationId = org.Id, Month = month, Kind = ClosedPeriodEventKind.Closed, UserId = callerUserId, At = now, Reason = reason
+                });
+            }
+            try
+            {
+                await context.SaveChangesAsync();
+                break;
+            }
+            catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex) && attempt < 3)
+            {
+                // Another admin closed one of the months at the same time, failing the whole save: close the rest
+                context.ChangeTracker.Clear();
+            }
         }
         return ServiceResult.Ok(await StateAsync(org.Id, isAdmin: true));
     }

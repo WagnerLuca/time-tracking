@@ -393,6 +393,11 @@ public class SubGroupTests : IClassFixture<TimeTrackingApiFactory>
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TimeTrackingDbContext>();
+        // As if the core hours and memberships had been in place before the checked day (the API stamps "now")
+        (await db.Organizations.SingleAsync(o => o.Id == orgId)).CoreHoursChangedAt = null;
+        foreach (var m in await db.UserOrganizations.Where(uo => uo.OrganizationId == orgId).ToListAsync())
+            m.JoinedAt = new DateTime(2026, 3, 3, 0, 0, 0, DateTimeKind.Utc);   // that day, not the catch-up days before
+        await db.SaveChangesAsync();
         (await CoreHours.CheckDueAsync(db, new DateTime(2026, 3, 3, 15, 0, 0, DateTimeKind.Utc), _factory.Mail, "https://app.test"))
             .Should().BeGreaterThan(0);   // the window comes from Dept, inherited by Team
         var notices = await db.Notifications.AsNoTracking()
