@@ -14,10 +14,13 @@ public class RequestService : IRequestService
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<RequestService> _logger;
     private readonly RlsContext _rls;
+    private readonly PushQueue? _push;
 
-    public RequestService(TimeTrackingDbContext context, IEmailSender email, EmailSettings emailSettings, ILogger<RequestService> logger, RlsContext rls)
+    public RequestService(TimeTrackingDbContext context, IEmailSender email, EmailSettings emailSettings, ILogger<RequestService> logger, RlsContext rls,
+        PushQueue? push = null)
     {
         _context = context;
+        _push = push;
         _rls = rls;
         _email = email;
         _emailSettings = emailSettings;
@@ -812,7 +815,7 @@ public class RequestService : IRequestService
     }
 
     /// <summary>
-    /// Mails everyone who may decide the new request, once each: org admins/owners and, for a
+    /// Mails (and pushes) everyone who may decide the new request, once each: org admins/owners and, for a
     /// group-routed one, the admins along the group's chain whose group approves the type.
     /// </summary>
     private async Task MailApproversAsync(OrgRequest orgRequest, Organization org, User requester)
@@ -823,12 +826,13 @@ public class RequestService : IRequestService
         var approvers = await _context.UserOrganizations.AsNoTracking()
             .Where(uo => uo.OrganizationId == org.Id && uo.UserId != requester.Id && uo.User.IsActive
                       && (uo.Role >= OrganizationRole.Admin || groupApprovers.Contains(uo.UserId)))
-            .Select(uo => uo.User.Email)
+            .Select(uo => new { uo.UserId, uo.User.Email })
             .ToListAsync();
 
         var (de, en) = NotificationMails.Label(orgRequest.Type);
         var name = $"{requester.FirstName} {requester.LastName}";
-        foreach (var to in approvers)
+        _push?.Enqueue(approvers.Select(a => PushTexts.NewRequest(a.UserId, orgRequest.Id, name, orgRequest.Type)));
+        foreach (var to in approvers.Select(a => a.Email))
             await NotificationMails.TrySendAsync(_email, to,
                 $"Neue Anfrage in {org.Name} / New request in {org.Name}",
                 $"{name} hat eine Anfrage gestellt: {de}. / {name} submitted a request: {en}.\n\n" +

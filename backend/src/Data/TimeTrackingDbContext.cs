@@ -6,6 +6,7 @@ namespace TimeTracking.Api.Data;
 public class TimeTrackingDbContext : DbContext
 {
     private readonly RlsContext? _rls;
+    private readonly Services.PushQueue? _push;
 
     public TimeTrackingDbContext(DbContextOptions<TimeTrackingDbContext> options)
         : base(options)
@@ -13,10 +14,11 @@ public class TimeTrackingDbContext : DbContext
     }
 
     /// <summary>Used by DI: the acting user is recorded in the time entry history.</summary>
-    public TimeTrackingDbContext(DbContextOptions<TimeTrackingDbContext> options, RlsContext rls)
+    public TimeTrackingDbContext(DbContextOptions<TimeTrackingDbContext> options, RlsContext rls, Services.PushQueue? push = null)
         : base(options)
     {
         _rls = rls;
+        _push = push;
     }
 
     /// <summary>
@@ -48,6 +50,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<CoreHoursCheck> CoreHoursChecks { get; set; }
     public DbSet<ClosedPeriod> ClosedPeriods { get; set; }
     public DbSet<ClosedPeriodEvent> ClosedPeriodEvents { get; set; }
+    public DbSet<PushSubscription> PushSubscriptions { get; set; }
 
     /// <summary>
     /// Saves, and records every change a user made to a finished time entry in
@@ -56,6 +59,16 @@ public class TimeTrackingDbContext : DbContext
     /// they are a second save inside the same transaction.
     /// </summary>
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        // Every in-app notification is also a push (issue #67): this save is the one place they all pass
+        var notifications = _push == null ? [] : ChangeTracker.Entries<Notification>()
+            .Where(e => e.State == EntityState.Added).Select(e => e.Entity).ToList();
+        var saved = await SaveWithHistoryAsync(acceptAllChangesOnSuccess, cancellationToken);
+        if (notifications.Count > 0) _push!.Enqueue(notifications.Select(Services.PushTexts.From));
+        return saved;
+    }
+
+    private async Task<int> SaveWithHistoryAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
     {
         if (_rls is not { IsSystem: false }) return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
 
@@ -403,6 +416,18 @@ public class TimeTrackingDbContext : DbContext
         });
 
         // Configure Notification entity
+        modelBuilder.Entity<PushSubscription>(entity =>
+        {
+            entity.Property(e => e.Endpoint).IsRequired().HasMaxLength(1000);
+            entity.Property(e => e.P256dh).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Auth).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Locale).IsRequired().HasMaxLength(5);
+            entity.Property(e => e.UserAgent).HasMaxLength(300);
+            entity.HasIndex(e => e.Endpoint).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<Notification>(entity =>
         {
             entity.HasKey(e => e.Id);

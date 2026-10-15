@@ -242,6 +242,7 @@ public class AuthService : IAuthService
         _context.Notifications.RemoveRange(_context.Notifications.Where(n => n.UserId == userId));
         _context.GroupMembers.RemoveRange(_context.GroupMembers.Where(gm => gm.UserId == userId));
         _context.UserTokens.RemoveRange(_context.UserTokens.Where(t => t.UserId == userId));
+        _context.PushSubscriptions.RemoveRange(_context.PushSubscriptions.Where(s => s.UserId == userId));
         await RevokeAllSessionsAsync(user);
         await _context.SaveChangesAsync();
         _cache.Remove(Filters.ActiveUserFilter.CacheKey(userId));
@@ -351,7 +352,13 @@ public class AuthService : IAuthService
                 .Where(c => c.UserId == userId)
                 .OrderBy(c => c.ChangedAt)
                 .Select(c => new PersonalEntryChange(c.TimeEntryId, c.ChangedAt, c.Kind.ToString(), c.ChangedByUserId == userId, c.Changes, c.Reason))
-                .ToListAsync()
+                .ToListAsync(),
+            PushDevices = (await _context.PushSubscriptions.AsNoTracking()
+                    .Where(s => s.UserId == userId)
+                    .OrderBy(s => s.CreatedAt)
+                    .ToListAsync())
+                .Select(s => new PersonalPushDevice(new Uri(s.Endpoint).Host, s.UserAgent, s.Locale, s.CreatedAt, s.LastUsedAt))
+                .ToList()
         });
     }
 

@@ -27,6 +27,9 @@ public class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>Mails the app "sent" (verification, password reset, ...).</summary>
     public CapturingEmailSender Mail { get; } = new();
 
+    /// <summary>Web pushes the app "sent" (delivered in the background by PushDispatcher).</summary>
+    public FakePushSender Push { get; } = new();
+
     /// <summary>Connection string of the app role (subject to RLS).</summary>
     public string AppConnectionString { get; private set; } = "";
 
@@ -70,6 +73,8 @@ public class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         {
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(Mail);
+            services.RemoveAll<IPushSender>();
+            services.AddSingleton<IPushSender>(Push);
         });
     }
 

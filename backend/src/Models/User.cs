@@ -56,6 +56,10 @@ public class User
     [JsonIgnore]
     public long? TotpLastStep { get; set; }
 
+    /// <summary>Push categories this user switched off (all on by default, issue #67).</summary>
+    [JsonIgnore]
+    public PushCategory PushMutedCategories { get; set; }
+
     // Navigation properties
     [JsonIgnore]
     public ICollection<UserOrganization> UserOrganizations { get; set; } = new List<UserOrganization>();

@@ -16,6 +16,15 @@ using TimeTracking.Api.Middleware;
 using TimeTracking.Api.Models;
 using TimeTracking.Api.Services;
 
+// `dotnet TimeTracking.Api.dll generate-vapid-keys` prints a fresh VAPID key pair for Web Push
+if (args.Contains("generate-vapid-keys"))
+{
+    var (vapidPublic, vapidPrivate) = VapidKeys.Generate();
+    Console.WriteLine($"WebPush__PublicKey={vapidPublic}");
+    Console.WriteLine($"WebPush__PrivateKey={vapidPrivate}");
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // QuestPDF is used for generating monthly/yearly member PDF reports.
@@ -174,6 +183,25 @@ builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<IPdfReportService, PdfReportService>();
 builder.Services.AddHostedService<RefreshTokenCleanupService>();
 builder.Services.AddHostedService<FailureEntryService>();
+
+// Web Push (issue #67): keys from WebPush:* (env WebPush__PublicKey/PrivateKey/Subject); in
+// Development a key pair is created once in the gitignored vapid-keys.dev.json. Without keys
+// push stays off (the public key endpoint returns null).
+var webPush = builder.Configuration.GetSection("WebPush").Get<WebPushSettings>() ?? new WebPushSettings();
+if (!webPush.IsConfigured && builder.Environment.IsDevelopment())
+    (webPush.PublicKey, webPush.PrivateKey) = VapidKeys.LoadOrCreate(Path.Combine(builder.Environment.ContentRootPath, "vapid-keys.dev.json"));
+// The push services want a contact: the https site, else the sender address of the mails
+if (string.IsNullOrWhiteSpace(webPush.Subject))
+    webPush.Subject = emailSettings.FrontendBaseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+        ? emailSettings.FrontendBaseUrl
+        : "mailto:" + (System.Net.Mail.MailAddress.TryCreate(emailSettings.From, out var sender) ? sender.Address : "no-reply@localhost");
+if (!webPush.Subject.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase) && !webPush.Subject.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+    throw new InvalidOperationException("WebPush:Subject must be a mailto: or https: URI (env WebPush__Subject).");
+builder.Services.AddSingleton(webPush);
+builder.Services.AddSingleton<PushQueue>();
+builder.Services.AddHttpClient<IPushSender, WebPushSender>(c => c.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddScoped<PushService>();
+builder.Services.AddHostedService<PushDispatcher>();
 
 // Add Entity Framework - PostgreSQL or InMemory
 var useInMemory = builder.Configuration.GetValue<bool>("UseInMemoryDatabase");

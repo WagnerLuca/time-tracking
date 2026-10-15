@@ -17,6 +17,8 @@ public record PersonalDataExport
     public required List<PersonalRequest> Requests { get; init; }
     public required List<PersonalNotification> Notifications { get; init; }
     public required List<PersonalEntryChange> EntryChanges { get; init; }
+    /// <summary>Devices that receive push notifications (push service host only, never the keys).</summary>
+    public required List<PersonalPushDevice> PushDevices { get; init; }
 }
 
 public record PersonalMembership(string Organization, string Role, DateTime JoinedAt, bool Active, double VacationDaysPerYear, double InitialOvertimeHours,
@@ -30,3 +32,4 @@ public record PersonalRequest(string Organization, string Type, string Status, s
 /// <summary>Changes is the stored JSON array of {field, oldValue, newValue}.</summary>
 public record PersonalEntryChange(int TimeEntryId, DateTime ChangedAt, string Kind, bool ChangedByYou, string Changes, string? Reason = null);
 public record PersonalNotification(string Title, string Message, DateTime CreatedAt, bool IsRead);
+public record PersonalPushDevice(string PushService, string? UserAgent, string Locale, DateTime CreatedAt, DateTime LastUsedAt);

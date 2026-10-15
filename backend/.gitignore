@@ -2,3 +2,4 @@ bin/
 obj/
 
 logs/
+vapid-keys.dev.json

@@ -19,6 +19,9 @@ public class TimeTrackingApiFactory : WebApplicationFactory<Program>, IMailCaptu
     /// <summary>Mails the app "sent" (verification, password reset, ...).</summary>
     public CapturingEmailSender Mail { get; } = new();
 
+    /// <summary>Web pushes the app "sent" (delivered in the background by PushDispatcher).</summary>
+    public FakePushSender Push { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -43,6 +46,8 @@ public class TimeTrackingApiFactory : WebApplicationFactory<Program>, IMailCaptu
 
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(Mail);
+            services.RemoveAll<IPushSender>();
+            services.AddSingleton<IPushSender>(Push);
         });
     }
 }
