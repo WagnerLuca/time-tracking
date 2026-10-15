@@ -1,16 +1,12 @@
-# Weekly dependency PRs. npm installs of @wagnerluca/ui need GitHub Packages auth:
-# add a "GHP_READ_TOKEN" Dependabot secret (Settings > Secrets > Dependabot).
+# Weekly dependency PRs. @wagnerluca/ui (optional, GitHub Packages) is ignored and updated by hand,
+# so the npm updates need no registry secret.
 version: 2
-registries:
-  github-npm:
-    type: npm-registry
-    url: https://npm.pkg.github.com
-    token: ${{secrets.GHP_READ_TOKEN}}
 updates:
   - package-ecosystem: npm
     directory: /frontend
-    registries: [github-npm]
     schedule: { interval: weekly }
+    ignore:
+      - dependency-name: "@wagnerluca/ui"
     groups:
       npm-minor-patch: { update-types: [minor, patch] }
   - package-ecosystem: nuget
