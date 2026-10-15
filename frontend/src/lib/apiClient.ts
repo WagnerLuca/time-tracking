@@ -124,10 +124,3 @@ export const reportsApi = new ReportsApi(config, undefined, axiosInstance);
 export const apiKeysApi = new ApiKeysApi(config, undefined, axiosInstance);
 export const invitationsApi = new InvitationsApi(config, undefined, axiosInstance);
 export const memberEntriesApi = new MemberEntriesApi(config, undefined, axiosInstance);
-
-// Type for the polymorphic 2FA-required login response (not in generated types
-// because the login endpoint declares LoginResponse as its return type).
-export interface TwoFactorRequiredResponse {
-	twoFactorToken: string;
-	requiresTwoFactor: boolean;
-}

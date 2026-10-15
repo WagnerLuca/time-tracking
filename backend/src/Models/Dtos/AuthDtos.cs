@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace TimeTracking.Api.Models.Dtos;
 
@@ -163,13 +164,34 @@ public record VerifyEmailRequest
 
 // ── Two-Factor Authentication DTOs ──
 
-/// <summary>Response when login succeeds but 2FA verification is required.</summary>
-public record TwoFactorRequiredResponse
+/// <summary>Outcome of POST Auth/login: the tokens (same fields as <see cref="LoginResponse"/>), or only the 2FA challenge.</summary>
+public record LoginResult
 {
-    /// <summary>Temporary token to submit with the TOTP code.</summary>
-    public required string TwoFactorToken { get; init; }
-    /// <summary>Hint that 2FA verification is needed.</summary>
-    public bool RequiresTwoFactor { get; init; } = true;
+    /// <summary>JWT access token; absent while 2FA is pending.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? AccessToken { get; init; }
+    /// <summary>Opaque refresh token; absent while 2FA is pending.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RefreshToken { get; init; }
+    /// <summary>UTC expiry time of the access token; absent while 2FA is pending.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTime? ExpiresAt { get; init; }
+    /// <summary>Authenticated user's profile; absent while 2FA is pending.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UserInfo? User { get; init; }
+    /// <summary>True when the TOTP code has to follow (POST Auth/2fa/verify with <see cref="TwoFactorToken"/>).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool RequiresTwoFactor { get; init; }
+    /// <summary>Temporary token to submit with the TOTP code; only with <see cref="RequiresTwoFactor"/>.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TwoFactorToken { get; init; }
+
+    public static LoginResult Signed(LoginResponse tokens) => new()
+    {
+        AccessToken = tokens.AccessToken, RefreshToken = tokens.RefreshToken, ExpiresAt = tokens.ExpiresAt, User = tokens.User
+    };
+
+    public static LoginResult TwoFactor(string twoFactorToken) => new() { RequiresTwoFactor = true, TwoFactorToken = twoFactorToken };
 }
 
 /// <summary>Request to verify a TOTP code during login.</summary>

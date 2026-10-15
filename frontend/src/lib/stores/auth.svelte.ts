@@ -1,7 +1,6 @@
 import { authApi, setAuthHandlers } from '$lib/apiClient';
 import { orgContext } from '$lib/stores/orgContext.svelte';
-import type { TwoFactorRequiredResponse } from '$lib/apiClient';
-import type { LoginRequest, LoginResponse, RegisterRequest, UserInfo } from '$lib/api';
+import type { LoginRequest, LoginResponse, LoginResult, RegisterRequest, UserInfo } from '$lib/api';
 
 const TOKEN_KEY = 'authToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
@@ -64,7 +63,7 @@ function createAuthStore() {
 		user = next;
 	}
 
-	function setAuth(loginResponse: LoginResponse) {
+	function setAuth(loginResponse: LoginResponse | LoginResult) {
 		token = loginResponse.accessToken!;
 		user = loginResponse.user!;
 		localStorage.setItem(TOKEN_KEY, loginResponse.accessToken!);
@@ -89,11 +88,9 @@ function createAuthStore() {
 
 	async function login(request: LoginRequest): Promise<'success' | '2fa'> {
 		const { data } = await authApi.apiV1AuthLoginPost(request);
-		// Check if the response is a TwoFactorRequiredResponse
-		const maybeTwo = data as unknown as TwoFactorRequiredResponse;
-		if (maybeTwo.requiresTwoFactor && maybeTwo.twoFactorToken) {
+		if (data.requiresTwoFactor && data.twoFactorToken) {
 			twoFactorRequired = true;
-			twoFactorToken = maybeTwo.twoFactorToken;
+			twoFactorToken = data.twoFactorToken;
 			return '2fa';
 		}
 		setAuth(data);

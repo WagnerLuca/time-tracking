@@ -84,7 +84,7 @@ public class AuthService : IAuthService
         return ServiceResult.Ok(await IssueTokensAsync(user));
     }
 
-    public async Task<ServiceResult<object>> LoginAsync(LoginRequest request)
+    public async Task<ServiceResult<LoginResult>> LoginAsync(LoginRequest request)
     {
         var user = await _context.Users
             .FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
@@ -95,10 +95,10 @@ public class AuthService : IAuthService
                          && user?.PasswordHash != null;
 
         if (user == null || !passwordOk)
-            return ServiceResult.Unauthorized<object>("Invalid email or password");
+            return ServiceResult.Unauthorized<LoginResult>("Invalid email or password");
 
         if (!user.IsActive)
-            return ServiceResult.Unauthorized<object>("This account has been deactivated");
+            return ServiceResult.Unauthorized<LoginResult>("This account has been deactivated");
 
         user.LastLoginAt = DateTime.UtcNow;
 
@@ -107,15 +107,12 @@ public class AuthService : IAuthService
         {
             await _context.SaveChangesAsync();
             _logger.LogInformation("2FA verification required for user {UserId}", user.Id);
-            return ServiceResult.Ok<object>(new TwoFactorRequiredResponse
-            {
-                TwoFactorToken = _totpService.GenerateTwoFactorToken(user.Id)
-            });
+            return ServiceResult.Ok(LoginResult.TwoFactor(_totpService.GenerateTwoFactorToken(user.Id)));
         }
 
         _logger.LogInformation("User {UserId} logged in", user.Id);
 
-        return ServiceResult.Ok<object>(await IssueTokensAsync(user));
+        return ServiceResult.Ok(LoginResult.Signed(await IssueTokensAsync(user)));
     }
 
     public async Task<ServiceResult<RefreshTokenResponse>> RefreshTokenAsync(string refreshToken)

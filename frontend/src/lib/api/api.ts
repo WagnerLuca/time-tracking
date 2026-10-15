@@ -686,6 +686,32 @@ export interface LoginResponse {
     'user': UserInfo;
 }
 /**
+ * Outcome of POST Auth/login: the tokens (same fields as TimeTracking.Api.Models.Dtos.LoginResponse), or only the 2FA challenge.
+ */
+export interface LoginResult {
+    /**
+     * JWT access token; absent while 2FA is pending.
+     */
+    'accessToken'?: string | null;
+    /**
+     * Opaque refresh token; absent while 2FA is pending.
+     */
+    'refreshToken'?: string | null;
+    /**
+     * UTC expiry time of the access token; absent while 2FA is pending.
+     */
+    'expiresAt'?: string | null;
+    'user'?: UserInfo;
+    /**
+     * True when the TOTP code has to follow (POST Auth/2fa/verify with TimeTracking.Api.Models.Dtos.LoginResult.TwoFactorToken).
+     */
+    'requiresTwoFactor'?: boolean;
+    /**
+     * Temporary token to submit with the TOTP code; only with TimeTracking.Api.Models.Dtos.LoginResult.RequiresTwoFactor.
+     */
+    'twoFactorToken'?: string | null;
+}
+/**
  * Result of a manual entry: TimeTracking.Api.Models.Dtos.ManualEntryResponse.Entry when it was created directly, TimeTracking.Api.Models.Dtos.ManualEntryResponse.Request  when the organization requires approval (the entry is created once it is accepted).
  */
 export interface ManualEntryResponse {
@@ -3911,7 +3937,7 @@ export const AuthApiAxiosParamCreator = function (configuration?: Configuration)
         },
         /**
          * 
-         * @summary Login with email and password. Returns a TimeTracking.Api.Models.Dtos.TwoFactorRequiredResponse instead when 2FA is enabled.
+         * @summary Login with email and password. With 2FA enabled the result carries only `requiresTwoFactor` + `twoFactorToken`.
          * @param {LoginRequest} [loginRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -4378,12 +4404,12 @@ export const AuthApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Login with email and password. Returns a TimeTracking.Api.Models.Dtos.TwoFactorRequiredResponse instead when 2FA is enabled.
+         * @summary Login with email and password. With 2FA enabled the result carries only `requiresTwoFactor` + `twoFactorToken`.
          * @param {LoginRequest} [loginRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1AuthLoginPost(loginRequest?: LoginRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginResponse>> {
+        async apiV1AuthLoginPost(loginRequest?: LoginRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginResult>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1AuthLoginPost(loginRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['AuthApi.apiV1AuthLoginPost']?.[localVarOperationServerIndex]?.url;
@@ -4583,12 +4609,12 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
         },
         /**
          * 
-         * @summary Login with email and password. Returns a TimeTracking.Api.Models.Dtos.TwoFactorRequiredResponse instead when 2FA is enabled.
+         * @summary Login with email and password. With 2FA enabled the result carries only `requiresTwoFactor` + `twoFactorToken`.
          * @param {LoginRequest} [loginRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1AuthLoginPost(loginRequest?: LoginRequest, options?: RawAxiosRequestConfig): AxiosPromise<LoginResponse> {
+        apiV1AuthLoginPost(loginRequest?: LoginRequest, options?: RawAxiosRequestConfig): AxiosPromise<LoginResult> {
             return localVarFp.apiV1AuthLoginPost(loginRequest, options).then((request) => request(axios, basePath));
         },
         /**
@@ -4763,7 +4789,7 @@ export class AuthApi extends BaseAPI {
 
     /**
      * 
-     * @summary Login with email and password. Returns a TimeTracking.Api.Models.Dtos.TwoFactorRequiredResponse instead when 2FA is enabled.
+     * @summary Login with email and password. With 2FA enabled the result carries only `requiresTwoFactor` + `twoFactorToken`.
      * @param {LoginRequest} [loginRequest] 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}

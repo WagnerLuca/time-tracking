@@ -37,12 +37,12 @@ public class AuthController : OrganizationBaseController
         => ToResponse(await _authService.RegisterAsync(request));
 
     /// <summary>
-    /// Login with email and password. Returns a <see cref="TwoFactorRequiredResponse"/> instead when 2FA is enabled.
+    /// Login with email and password. With 2FA enabled the result carries only <c>requiresTwoFactor</c> + <c>twoFactorToken</c>.
     /// </summary>
     [HttpPost("login")]
     [AllowAnonymous]
     [EnableRateLimiting("AuthStrict")]
-    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(LoginResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
         => ToResponse(await _authService.LoginAsync(request));

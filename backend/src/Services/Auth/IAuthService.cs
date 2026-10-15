@@ -5,8 +5,8 @@ namespace TimeTracking.Api.Services;
 public interface IAuthService
 {
     Task<ServiceResult<LoginResponse>> RegisterAsync(RegisterRequest request);
-    /// <summary>Data is a <see cref="LoginResponse"/>, or a <see cref="TwoFactorRequiredResponse"/> when 2FA is enabled.</summary>
-    Task<ServiceResult<object>> LoginAsync(LoginRequest request);
+    /// <summary>The tokens, or only <see cref="LoginResult.RequiresTwoFactor"/> + token when 2FA is enabled.</summary>
+    Task<ServiceResult<LoginResult>> LoginAsync(LoginRequest request);
     Task<ServiceResult<RefreshTokenResponse>> RefreshTokenAsync(string refreshToken);
     Task<ServiceResult<AuthResponse>> LogoutAsync(int userId, string refreshToken);
     Task<ServiceResult<AuthResponse>> ChangePasswordAsync(int userId, ChangePasswordRequest request);

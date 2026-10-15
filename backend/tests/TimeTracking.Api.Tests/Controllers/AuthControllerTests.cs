@@ -99,6 +99,15 @@ public class AuthControllerTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     [Fact]
+    public async Task Login_WireFormat_HasNoTwoFactorFields_WithoutTwoFactor()
+    {
+        var response = await _factory.CreateClient().PostAsJsonAsync("/api/v1/Auth/login",
+            new { email = TestHelpers.SeedOwnerEmail, password = TestHelpers.SeedPassword });
+        var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        json.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(["accessToken", "refreshToken", "expiresAt", "user"]);
+    }
+
+    [Fact]
     public async Task Login_WrongPassword_Returns401()
     {
         var client = _factory.CreateClient();

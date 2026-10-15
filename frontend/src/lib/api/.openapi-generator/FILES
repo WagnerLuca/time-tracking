@@ -63,6 +63,7 @@ docs/InvitationResponse.md
 docs/InvitationsApi.md
 docs/LoginRequest.md
 docs/LoginResponse.md
+docs/LoginResult.md
 docs/ManualEntryResponse.md
 docs/MarkedSeenResponse.md
 docs/MemberEntriesApi.md
