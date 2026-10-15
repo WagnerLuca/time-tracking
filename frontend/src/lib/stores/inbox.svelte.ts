@@ -56,7 +56,7 @@ function createInbox() {
 	}
 
 	/** Takes back an own open request (only while pending; the server refuses a decided one). */
-	async function withdraw(req: OrgRequestResponse) {
+	async function withdraw(req: Pick<OrgRequestResponse, 'id' | 'organizationSlug'>) {
 		await requestsApi.apiV1OrganizationsSlugRequestsIdWithdrawPost(req.organizationSlug!, req.id!);
 		ownOpen = ownOpen.filter((r) => r.id !== req.id);
 	}
