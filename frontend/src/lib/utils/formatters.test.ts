@@ -183,7 +183,8 @@ describe('formatters: domain labels', () => {
 
 	it('request status labels and badge classes', () => {
 		expect(['Accepted', 'Declined', 'Pending'].map(formatRequestStatus)).toEqual(['Angenommen', 'Abgelehnt', 'Offen']);
-		expect(formatRequestStatus('Withdrawn')).toBe('Withdrawn');
+		expect(formatRequestStatus('Withdrawn')).toBe('Zurückgezogen');
+		expect(formatRequestStatus('Expired')).toBe('Expired');
 		expect(formatRequestStatus(null)).toBe('Unbekannt');
 		expect(['Accepted', 'Declined', 'Pending', 'Withdrawn', null].map(statusBadgeClass)).toEqual([
 			'badge-success',
