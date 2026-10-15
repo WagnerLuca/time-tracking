@@ -2,6 +2,12 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Npgsql;
+using TimeTracking.Api.Data;
+using TimeTracking.Api.Models;
+using TimeTracking.Api.Models.Dtos;
 using TimeTracking.Api.Services;
 using TimeTracking.Api.Tests.Infrastructure;
 
@@ -50,5 +56,49 @@ public class ClosedPeriodPostgresTests
         last.GetProperty("reason").GetString().Should().Be("Nachtrag für Lohnlauf");
         var events = (await owner.GetFromJsonAsync<JsonElement>($"/api/v1/organizations/{slug}/closed-periods")).GetProperty("events");
         events[0].GetProperty("kind").GetString().Should().Be("AdminChange");
+    }
+
+    private TimeTrackingDbContext Db(IInterceptor? interceptor = null)
+    {
+        var options = new DbContextOptionsBuilder<TimeTrackingDbContext>().UseNpgsql(
+            new NpgsqlConnectionStringBuilder(_factory.SuperuserConnectionString) { Database = "timetracking" }.ConnectionString);
+        if (interceptor != null) options.AddInterceptors(interceptor);
+        return new TimeTrackingDbContext(options.Options);
+    }
+
+    /// <summary>Lets another admin close <paramref name="month"/> just before the first save goes out.</summary>
+    private sealed class ConcurrentClose(Func<TimeTrackingDbContext> db, int orgId, DateOnly month) : SaveChangesInterceptor
+    {
+        private bool _done;
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_done)
+            {
+                _done = true;
+                await using var other = db();
+                other.ClosedPeriods.Add(new ClosedPeriod { OrganizationId = orgId, Month = month, ClosedAt = DateTime.UtcNow });
+                await other.SaveChangesAsync(cancellationToken);
+            }
+            return result;
+        }
+    }
+
+    [Fact]
+    public async Task OverlappingCloses_StillCloseEveryMonth()
+    {
+        var (_, _, slug, orgId, _) = await TestHelpers.OrgWithMemberAsync(_factory, "pg-closed-race", new { }, "pg.test");
+        int ownerId;
+        await using (var setup = Db())
+            ownerId = await setup.UserOrganizations.Where(uo => uo.OrganizationId == orgId && uo.Role == OrganizationRole.Owner)
+                .Select(uo => uo.UserId).SingleAsync();
+        var last = ClosedPeriods.MonthOf(OrgClock.For((string?)null).Today()).AddMonths(-1);
+
+        await using var db = Db(new ConcurrentClose(() => Db(), orgId, last.AddMonths(-1)));
+        var result = await new ClosedPeriodService(db).CloseAsync(slug, ownerId, new CloseMonthsRequest { From = last.AddMonths(-2), To = last });
+
+        result.Data!.Months.Should().Equal(last.AddMonths(-2), last.AddMonths(-1), last);
+        result.Data.Events.Where(e => e.Kind == "Closed").Select(e => e.Month).Should().BeEquivalentTo([last.AddMonths(-2), last],
+            "this close added only the months still open");
     }
 }
