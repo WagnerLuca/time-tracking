@@ -174,6 +174,15 @@ public class Organization
     public TimeOnly CoreHoursEnd { get; set; } = new(15, 0);
     /// <summary>Allowed late start, early leave and gap length before a day counts as a violation.</summary>
     public int CoreHoursToleranceMinutes { get; set; } = 5;
+    /// <summary>
+    /// When a core hours setting (org or group override) last changed. A day checked late (the
+    /// catch-up after downtime) is never one whose window started before this: those days were
+    /// not under the new rule, and only an explicit backfill marks them.
+    /// </summary>
+    public DateTime? CoreHoursChangedAt { get; set; }
+    /// <summary>A requested backfill ("also check the last N days"): the background check flags
+    /// the days from here up to the change silently, then clears it.</summary>
+    public DateOnly? CoreHoursBackfillFrom { get; set; }
 
     /// <summary>Terminal (docs/TERMINAL.md): a second scan of the same card within this many seconds toggles nothing.</summary>
     public int TerminalDoubleScanSeconds { get; set; } = TerminalLimits.DefaultDoubleScanSeconds;

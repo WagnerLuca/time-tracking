@@ -31,6 +31,7 @@ public class GroupService : IGroupService
     public const string ParentOrTopLevelMessage = "Choose either a parent group or the top level, not both.";
     public const string HasSubGroupsMessage = "This group has sub-groups. Choose whether to move them up one level or delete them with it.";
     public const string UnknownCapabilityMessage = "Unknown group admin capability.";
+    public const string CoreHoursToleranceMessage = "The core hours tolerance must be between 0 and 120 minutes.";
 
     /// <summary>The member-management capability (an <see cref="GroupTree.Effective"/> group's value).</summary>
     private static bool ManagesMembers(Group g) => g.GroupAdminCanManageMembers == true;
@@ -371,7 +372,8 @@ public class GroupService : IGroupService
         group.CoreHoursMode?.ToString(),
         group.CoreHoursStart?.ToString("HH:mm"),
         group.CoreHoursEnd?.ToString("HH:mm"),
-        group.ParentGroupId
+        group.ParentGroupId,
+        group.CoreHoursToleranceMinutes
     );
 
     /// <summary>Resets a capability flag to "inherit", by its request/response property name.</summary>
@@ -444,19 +446,30 @@ public class GroupService : IGroupService
                 return ServiceResult.BadRequest<GroupPermissionsResponse>(UnknownCapabilityMessage);
             reset(group);
         }
+        var coreBefore = (group.CoreHoursMode, group.CoreHoursStart, group.CoreHoursEnd, group.CoreHoursToleranceMinutes);
         if (request.CoreHoursMode.HasValue)
         {
             group.CoreHoursMode = NormalizeOverride(request.CoreHoursMode);
             TimeOnly? start = null, end = null;
             if (group.CoreHoursMode == CoreHoursMode.Own)
             {
-                if (!TimeOnly.TryParseExact(request.CoreHoursStart, "HH:mm", out var s) || !TimeOnly.TryParseExact(request.CoreHoursEnd, "HH:mm", out var e) || s >= e)
+                // End before start = past midnight (night shift); only an empty window is invalid
+                if (!TimeOnly.TryParseExact(request.CoreHoursStart, "HH:mm", out var s) || !TimeOnly.TryParseExact(request.CoreHoursEnd, "HH:mm", out var e) || s == e)
                     return ServiceResult.BadRequest<GroupPermissionsResponse>(OrganizationService.CoreHoursOrderMessage);
                 (start, end) = (s, e);
             }
             group.CoreHoursStart = start;
             group.CoreHoursEnd = end;
         }
+        if (request.CoreHoursToleranceMinutes is { } tolerance)
+        {
+            if (tolerance > 120) return ServiceResult.BadRequest<GroupPermissionsResponse>(CoreHoursToleranceMessage);
+            group.CoreHoursToleranceMinutes = tolerance < 0 ? null : tolerance;   // negative = inherit
+        }
+        if (request.CoreHoursBackfillDays is < 1 or > CoreHours.MaxBackfillDays)
+            return ServiceResult.BadRequest<GroupPermissionsResponse>(OrganizationService.CoreHoursBackfillMessage);
+        if (coreBefore != (group.CoreHoursMode, group.CoreHoursStart, group.CoreHoursEnd, group.CoreHoursToleranceMinutes) || request.CoreHoursBackfillDays != null)
+            OrganizationService.CoreHoursChanged(org, group.CoreHoursMode == CoreHoursMode.Own ? request.CoreHoursBackfillDays : null);
 
         group.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();

@@ -199,7 +199,7 @@ public record UpdateOrganizationSettingsRequest
     [MaxLength(64)]
     public string? TimeZone { get; init; }
     public bool? CoreHoursEnabled { get; init; }
-    /// <summary>Core hours start as local "HH:mm"; must be before <see cref="CoreHoursEnd"/>.</summary>
+    /// <summary>Core hours start as local "HH:mm"; an end before it means past midnight (night shift), an equal end is invalid.</summary>
     [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$", ErrorMessage = "Use HH:mm, e.g. 04:00.")]
     public string? CoreHoursStart { get; init; }
     [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$", ErrorMessage = "Use HH:mm, e.g. 04:00.")]
@@ -207,6 +207,8 @@ public record UpdateOrganizationSettingsRequest
     /// <summary>Allowed late start / early leave / gap in minutes.</summary>
     [Range(0, 120)]
     public int? CoreHoursToleranceMinutes { get; init; }
+    /// <summary>With core hours on: also flag the last N (1-31) days, silently (no notifications), in the background.</summary>
+    public int? CoreHoursBackfillDays { get; init; }
     /// <summary>Terminal double-scan window in seconds (5-600).</summary>
     public int? TerminalDoubleScanSeconds { get; init; }
     /// <summary>Terminal offline window in hours (1-168).</summary>

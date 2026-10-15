@@ -220,8 +220,14 @@ namespace TimeTracking.Api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("Backfilled")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("CheckedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("CheckedLate")
+                        .HasColumnType("boolean");
 
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
@@ -285,6 +291,9 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<TimeOnly?>("CoreHoursStart")
                         .HasColumnType("time without time zone");
+
+                    b.Property<int?>("CoreHoursToleranceMinutes")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -626,6 +635,12 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<TimeOnly>("BusinessDayEnd")
                         .HasColumnType("time without time zone");
+
+                    b.Property<DateOnly?>("CoreHoursBackfillFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("CoreHoursChangedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("CoreHoursEnabled")
                         .HasColumnType("boolean");

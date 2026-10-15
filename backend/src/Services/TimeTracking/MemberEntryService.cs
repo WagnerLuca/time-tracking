@@ -128,7 +128,8 @@ public class MemberEntryService(TimeTrackingDbContext context, ILogger<MemberEnt
                 CoreHours = true,
                 CoreHoursIssues = CoreHours.IssueNames(core.Issues),
                 CoreHoursMissingMinutes = core.MissingMinutes,
-                CoreHoursWindow = core.Window.ToString()
+                CoreHoursWindow = core.Window.ToString(),
+                CoreHoursBackfilled = core.Backfilled
             };
         return ServiceResult.Ok(days.Values.Where(d => d.DailyMax || d.RestPeriod || d.CoreHours).OrderBy(d => d.Date).ToList());
     }

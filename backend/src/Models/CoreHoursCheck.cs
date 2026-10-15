@@ -39,6 +39,10 @@ public class CoreHoursCheck
     public int MissingMinutes { get; set; }
     public DateTime CheckedAt { get; set; }
     public DateTime? NotifiedAt { get; set; }
+    /// <summary>Checked by the catch-up more than <c>CoreHours.LateAfter</c> after it was due (notified as "checked late").</summary>
+    public bool CheckedLate { get; set; }
+    /// <summary>Flagged by a backfill when core hours were switched on: never notified.</summary>
+    public bool Backfilled { get; set; }
 
     [JsonIgnore]
     public User User { get; set; } = null!;

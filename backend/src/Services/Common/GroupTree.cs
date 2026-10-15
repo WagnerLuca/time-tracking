@@ -164,6 +164,7 @@ public sealed class GroupTree
             CoreHoursMode = ownCore ? g.CoreHoursMode : p.CoreHoursMode,
             CoreHoursStart = ownCore ? g.CoreHoursStart : p.CoreHoursStart,
             CoreHoursEnd = ownCore ? g.CoreHoursEnd : p.CoreHoursEnd,
+            CoreHoursToleranceMinutes = g.CoreHoursToleranceMinutes ?? p.CoreHoursToleranceMinutes,
             GroupAdminCanApproveAbsences = g.GroupAdminCanApproveAbsences ?? p.GroupAdminCanApproveAbsences,
             GroupAdminCanApproveTimeEdits = g.GroupAdminCanApproveTimeEdits ?? p.GroupAdminCanApproveTimeEdits,
             GroupAdminCanApproveScheduleChanges = g.GroupAdminCanApproveScheduleChanges ?? p.GroupAdminCanApproveScheduleChanges,

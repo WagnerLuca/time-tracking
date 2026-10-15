@@ -104,7 +104,9 @@ public record GroupPermissionsResponse(
     string? CoreHoursMode = null,
     string? CoreHoursStart = null,
     string? CoreHoursEnd = null,
-    int? ParentGroupId = null
+    int? ParentGroupId = null,
+    // Own core hours tolerance in minutes; null = inherit
+    int? CoreHoursToleranceMinutes = null
 );
 
 public record UpdateGroupPermissionsRequest(
@@ -127,6 +129,10 @@ public record UpdateGroupPermissionsRequest(
     // "HH:mm"; only stored with CoreHoursMode Own.
     string? CoreHoursStart = null,
     string? CoreHoursEnd = null,
+    // Own core hours tolerance in minutes (0-120); -1 = inherit
+    int? CoreHoursToleranceMinutes = null,
+    // With an own window: also flag the last N (1-31) days, silently, in the background
+    int? CoreHoursBackfillDays = null,
     // Capability flags to reset to "inherit" (from the parent group; at the top: disabled), by
     // property name, e.g. ["groupAdminCanApproveAbsences"]
     IList<string>? InheritCapabilities = null

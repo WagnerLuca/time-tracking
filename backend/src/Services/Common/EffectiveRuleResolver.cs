@@ -30,6 +30,11 @@ public static class EffectiveRuleResolver
     /// org has core hours off); a group set to Off wins over every window; otherwise the
     /// shortest window wins, i.e. the latest start and the earliest end of the groups' own
     /// windows (which may come from different groups). An empty result counts as off.
+    /// Windows past midnight (end before start, night shifts) are compared on the timeline of the
+    /// day they start on, so 22:00–02:00 and 23:00–06:00 give 23:00–02:00, while a day window and
+    /// a night window do not overlap (→ off).
+    /// ponytail: a night window is not also shifted back a day, so 22:00–06:00 with 05:00–10:00 is
+    /// off rather than 05:00–06:00; shift by −24 h too if such mixes show up.
     /// Inheriting groups (null) have no say once another group overrides. Pass effective groups
     /// (<see cref="GroupTree.EffectiveGroupsOf"/>) so sub-groups inherit their parent's window.
     /// </summary>
@@ -40,10 +45,22 @@ public static class EffectiveRuleResolver
             return org.CoreHoursEnabled ? new CoreWindow(org.CoreHoursStart, org.CoreHoursEnd) : null;
         if (overrides.Any(g => g.CoreHoursMode == CoreHoursMode.Off || g.CoreHoursStart == null || g.CoreHoursEnd == null))
             return null;
-        var start = overrides.Max(g => g.CoreHoursStart!.Value);
-        var end = overrides.Min(g => g.CoreHoursEnd!.Value);
-        return start < end ? new CoreWindow(start, end) : null;
+        var spans = overrides.Select(g => new CoreWindow(g.CoreHoursStart!.Value, g.CoreHoursEnd!.Value).Minutes).ToList();
+        var start = spans.Max(s => s.Start);
+        var end = spans.Min(s => s.End);
+        return start < end ? new CoreWindow(TimeOnly.FromTimeSpan(TimeSpan.FromMinutes(start % 1440)),
+            TimeOnly.FromTimeSpan(TimeSpan.FromMinutes(end % 1440))) : null;
     }
+
+    /// <summary>
+    /// The core hours tolerance under <see cref="Combine{T}"/>'s rule: a group's own tolerance
+    /// (<see cref="Group.CoreHoursToleranceMinutes"/>, inherited down sub-groups by
+    /// <see cref="GroupTree.Effective"/>) replaces the organization's in either direction; with
+    /// several the most permissive, i.e. the largest, wins; without any the organization's.
+    /// Independent of which group the window comes from.
+    /// </summary>
+    public static int CombineCoreTolerance(Organization org, IEnumerable<Group> groups) =>
+        groups.Max(g => g.CoreHoursToleranceMinutes) ?? org.CoreHoursToleranceMinutes;
 
     /// <summary>The user's effective rule for the action: the org default combined with the effective
     /// values (sub-groups inherit along <see cref="GroupTree"/>) of the user's groups.</summary>

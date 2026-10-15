@@ -49,6 +49,8 @@ public class Group
     /// <summary>Only used with <see cref="Models.CoreHoursMode.Own"/>.</summary>
     public TimeOnly? CoreHoursStart { get; set; }
     public TimeOnly? CoreHoursEnd { get; set; }
+    /// <summary>Own core hours tolerance in minutes (null = inherit, independent of the window mode).</summary>
+    public int? CoreHoursToleranceMinutes { get; set; }
 
     // Group Admin capability flags (null = inherit from the parent group; at the top level null = disabled)
     public bool? GroupAdminCanApproveAbsences { get; set; }

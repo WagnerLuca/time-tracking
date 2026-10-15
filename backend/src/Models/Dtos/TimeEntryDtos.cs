@@ -184,4 +184,6 @@ public record ComplianceDayResponse
     public int CoreHoursMissingMinutes { get; init; }
     /// <summary>With <see cref="CoreHours"/>: the window that was checked, "HH:mm-HH:mm" (one half on a half day).</summary>
     public string? CoreHoursWindow { get; init; }
+    /// <summary>With <see cref="CoreHours"/>: flagged by a backfill when core hours were switched on (never notified).</summary>
+    public bool CoreHoursBackfilled { get; init; }
 }

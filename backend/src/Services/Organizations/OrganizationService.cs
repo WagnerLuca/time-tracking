@@ -508,7 +508,23 @@ public class OrganizationService : IOrganizationService
     //  Settings
     // ────────────────────────────────────────────────────
 
-    public const string CoreHoursOrderMessage = "Core working hours must start before they end.";
+    public const string CoreHoursOrderMessage = "Core working hours need a valid start and a different end.";
+    public const string CoreHoursBackfillMessage = "Past days to check must be between 1 and 31.";
+
+    /// <summary>
+    /// A core hours setting (org or group) changed: stamps <see cref="Organization.CoreHoursChangedAt"/> (late
+    /// catch-up checks never reach back past it) and, with <paramref name="backfillDays"/>, asks the background
+    /// check to flag the last N days silently (<see cref="CoreHours.CheckDueAsync"/>). Enqueued rather than run in
+    /// the request: the next minute's loop does it with the same batched evaluation, as system work (RLS).
+    /// </summary>
+    internal static void CoreHoursChanged(Organization org, int? backfillDays)
+    {
+        var now = DateTime.UtcNow;
+        org.CoreHoursChangedAt = now;
+        if (backfillDays is not { } days) return;
+        var from = OrgClock.For(org).Today(now).AddDays(-days);
+        if (org.CoreHoursBackfillFrom == null || from < org.CoreHoursBackfillFrom) org.CoreHoursBackfillFrom = from;
+    }
 
     public async Task<ServiceResult<OrganizationSettingsResponse>> UpdateSettingsAsync(
         string slug, int callerUserId, UpdateOrganizationSettingsRequest request)
@@ -548,12 +564,18 @@ public class OrganizationService : IOrganizationService
                 return ServiceResult.BadRequest<OrganizationSettingsResponse>($"Unknown time zone '{request.TimeZone}'.");
             org.TimeZone = request.TimeZone;
         }
+        var coreBefore = (org.CoreHoursEnabled, org.CoreHoursStart, org.CoreHoursEnd, org.CoreHoursToleranceMinutes);
         if (request.CoreHoursEnabled.HasValue) org.CoreHoursEnabled = request.CoreHoursEnabled.Value;
         if (request.CoreHoursStart != null) org.CoreHoursStart = TimeOnly.ParseExact(request.CoreHoursStart, "HH:mm");
         if (request.CoreHoursEnd != null) org.CoreHoursEnd = TimeOnly.ParseExact(request.CoreHoursEnd, "HH:mm");
         if (request.CoreHoursToleranceMinutes.HasValue) org.CoreHoursToleranceMinutes = request.CoreHoursToleranceMinutes.Value;
-        if (org.CoreHoursStart >= org.CoreHoursEnd)
+        // End before start = a night window past midnight; only an empty window is invalid
+        if (org.CoreHoursStart == org.CoreHoursEnd)
             return ServiceResult.BadRequest<OrganizationSettingsResponse>(CoreHoursOrderMessage);
+        if (request.CoreHoursBackfillDays is < 1 or > CoreHours.MaxBackfillDays)
+            return ServiceResult.BadRequest<OrganizationSettingsResponse>(CoreHoursBackfillMessage);
+        if (coreBefore != (org.CoreHoursEnabled, org.CoreHoursStart, org.CoreHoursEnd, org.CoreHoursToleranceMinutes) || request.CoreHoursBackfillDays != null)
+            CoreHoursChanged(org, org.CoreHoursEnabled ? request.CoreHoursBackfillDays : null);
         if (request.TerminalDoubleScanSeconds is { } doubleScan)
         {
             if (doubleScan is < TerminalLimits.MinDoubleScanSeconds or > TerminalLimits.MaxDoubleScanSeconds)
