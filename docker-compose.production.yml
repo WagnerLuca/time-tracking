@@ -137,6 +137,10 @@ services:
       Email__Smtp__Password: ${SMTP_PASSWORD:-}
       Email__From: ${EMAIL_FROM:-Zeiterfassung <no-reply@${DOMAIN}>}
       Email__FrontendBaseUrl: https://${DOMAIN}
+      # Web Push (issue #67); without keys the app simply offers no push. See .env.example.
+      WebPush__PublicKey: ${VAPID_PUBLIC_KEY:-}
+      WebPush__PrivateKey: ${VAPID_PRIVATE_KEY:-}
+      WebPush__Subject: ${VAPID_SUBJECT:-mailto:${ACME_EMAIL}}
     expose:
       - "7000"
     healthcheck:

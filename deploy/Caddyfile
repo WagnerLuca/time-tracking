@@ -14,6 +14,11 @@
 		-Server
 	}
 
+	# PWA (issue #67): the service worker and the manifest are always revalidated, so a deploy
+	# reaches installed apps at once (the hashed /_app/immutable/* files stay cached for a year)
+	@pwa path /service-worker.js /manifest.webmanifest
+	header @pwa Cache-Control "no-cache"
+
 	# Caddy replaces any client-sent X-Forwarded-For/-Proto, so the backend can trust
 	# them from this hop only (ReverseProxy__KnownNetworks = the compose subnet).
 	@api path /api/* /health

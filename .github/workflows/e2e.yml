@@ -75,6 +75,9 @@ jobs:
       - name: Playwright
         run: npx playwright test
         working-directory: frontend
+        env:
+          # The preview above is already a production build: pwa.spec.ts uses it (service worker active)
+          E2E_PWA_URL: http://localhost:5179
 
       - name: Upload traces and server logs
         uses: actions/upload-artifact@v4

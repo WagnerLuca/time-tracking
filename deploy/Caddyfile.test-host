@@ -2,6 +2,11 @@
 # Caddy is off). Ports match the defaults in docker-compose.test.yml. Reload: caddy reload
 
 time.desktop-tools.dzg {
+	# PWA (issue #67): the service worker and the manifest are always revalidated, so a deploy
+	# reaches installed apps at once (the hashed /_app/immutable/* files stay cached for a year)
+	@pwa path /service-worker.js /manifest.webmanifest
+	header @pwa Cache-Control "no-cache"
+
 	# One origin: the API under /api, everything else the SvelteKit server
 	@api path /api/* /health
 	handle @api {

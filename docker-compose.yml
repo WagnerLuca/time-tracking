@@ -8,6 +8,9 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:7000
       Serilog__WriteTo__1__Args__serverUrl: http://seq:5341
+      # Web Push: empty = a throwaway key pair per container (Development); set them to keep subscriptions
+      WebPush__PublicKey: ${VAPID_PUBLIC_KEY:-}
+      WebPush__PrivateKey: ${VAPID_PRIVATE_KEY:-}
     ports:
       - "7000:7000"
     depends_on:
