@@ -1,0 +1,48 @@
+import type { de } from './de';
+
+export const en: typeof de = {
+	title: 'Closed periods',
+	intro: 'Close months, e.g. after payroll. Members and group leads can then change nothing there any more — no entries, absences, imports, work schedules or terminal punches. Admins can still correct, but must give a reason; every such change shows in the history and the log.',
+	rules: 'Only months that have ended can be closed. The automatic stop of forgotten timers at business day end and the core-hours check keep running.',
+	closed: 'Closed',
+	none: 'No month closed yet.',
+	from: 'From',
+	to: 'To',
+	note: 'Note (optional)',
+	notePlaceholder: 'e.g. September payroll',
+	close: 'Close',
+	closeTitle: 'Close the period?',
+	closeMessage: '{months} will be closed. Only admins can change them afterwards — with a reason.',
+	closedOk: 'Period closed.',
+	reopen: 'Reopen',
+	reopenTitle: 'Reopen {month}?',
+	reopenMessage: 'Members and group leads can change it again afterwards. Reopening is logged with its reason.',
+	reopenLabel: 'Reason',
+	reopened: '{month} is open again.',
+	audit: 'Log',
+	auditEmpty: 'No entries yet.',
+	kind: {
+		Closed: 'closed',
+		Reopened: 'reopened',
+		AdminChange: 'admin change'
+	},
+	by: 'by {name}',
+	forMember: 'for {name}',
+	several: 'for several people',
+	summary: {
+		TimeEntry: 'Time entries: {count}',
+		AbsenceDay: 'Absences: {count}',
+		WorkSchedule: 'Work schedules: {count}'
+	},
+	reasonTitle: 'Closed period',
+	reasonMessage: '{month} is closed. As an admin you can still change it — with a reason that shows in the history and the log.',
+	reasonLabel: 'Reason for the change',
+	reasonConfirm: 'Save with reason',
+	locked: 'Closed ({month}) — only admins can change it',
+	lockedDay: 'This day lies in the closed period {month}. Only admins can change it.',
+	lockedDayAdmin: 'Closed period {month}: changes ask for a reason and are marked in the history.',
+	inHistory: 'in a closed period',
+	reason: 'Reason: {reason}',
+	requestHint: 'Touches the closed period {month}.',
+	requestHintLead: 'Touches the closed period {month} — only organization admins can accept it.'
+};

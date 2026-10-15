@@ -1,0 +1,86 @@
+/** Root layout: navigation, notifications, banners. */
+export const de = {
+	brand: 'Zeiterfassung',
+	brandHome: 'Zeiterfassung – zur Startseite',
+	home: 'Dashboard',
+	timer: 'Zeit',
+	requests: 'Anfragen',
+	more: 'Mehr',
+	bottom: 'Hauptnavigation',
+	skipToContent: 'Zum Inhalt springen',
+	history: 'Verlauf',
+	export: 'Export',
+	organization: 'Organisation',
+	teamCalendar: 'Teamkalender',
+	teamShort: 'Team',
+	settings: 'Einstellungen',
+	signOut: 'Abmelden',
+	menu: 'Menü',
+	openMenu: 'Menü öffnen',
+	userMenu: 'Benutzermenü',
+	language: 'Sprache',
+	switchLanguage: 'Sprache wechseln',
+	timerRunning: 'Timer läuft seit {elapsed} – zum Timer',
+	org: {
+		switch: 'Organisation wechseln',
+		current: 'Aktuelle Organisation: {name}',
+		none: 'Keine Organisation',
+		manage: 'Organisationen verwalten',
+		create: 'Organisation erstellen oder beitreten'
+	},
+	notifications: {
+		title: 'Benachrichtigungen',
+		open: 'Benachrichtigungen öffnen',
+		openCount: 'Benachrichtigungen öffnen ({count} neu)',
+		myUpdates: 'Meine Anträge',
+		failureTitle: 'Timer automatisch gestoppt',
+		failureStarted: 'Gestartet {date} – Endzeit korrigieren',
+		failureCorrect: 'Endzeit korrigieren',
+		alerts: 'Hinweise',
+		reminderTitle: 'Timer läuft noch',
+		reminderText: 'Dein Timer läuft noch und wird zum Ende des Geschäftstags automatisch gestoppt. Jetzt stoppen?',
+		settingsTitle: 'Einstellungen der Organisation geändert',
+		coreHoursTitle: 'Kernarbeitszeit nicht eingehalten',
+		coreHoursOwn: 'Deine erfassten Zeiten am {date} decken die Kernarbeitszeit nicht ab.',
+		coreHoursOther: '{name} hat am {date} die Kernarbeitszeit nicht eingehalten.',
+		coreHoursLate: '(nachträglich geprüft)',
+		dismissAll: 'Alle ausblenden',
+		pending: 'Offene Anträge',
+		empty: 'Keine Benachrichtigungen',
+		by: 'von {name}',
+		via: 'über {group}',
+		status: 'Status',
+		user: 'Person',
+		organization: 'Organisation',
+		routedVia: 'Weitergeleitet über Gruppe',
+		created: 'Gestellt',
+		responded: 'Beantwortet',
+		respondedBy: 'Beantwortet von',
+		message: 'Nachricht',
+		details: 'Details',
+		accept: 'Annehmen',
+		decline: 'Ablehnen',
+		dismiss: 'Benachrichtigung ausblenden',
+		accepted: 'Antrag angenommen.',
+		declined: 'Antrag abgelehnt.',
+		respondFailed: 'Antrag konnte nicht beantwortet werden.',
+		dismissFailed: 'Benachrichtigung konnte nicht ausgeblendet werden.',
+		loadFailed: 'Benachrichtigungen konnten nicht geladen werden.'
+	},
+	twoFactor: {
+		title: 'Zwei-Faktor-Authentifizierung erforderlich',
+		text: 'Diese Organisation verlangt Zwei-Faktor-Authentifizierung. Zum Fortfahren 2FA in den Kontoeinstellungen einrichten.',
+		goToSettings: 'Zu den Einstellungen'
+	},
+	failure: {
+		title: {
+			one: '1 Timer wurde nicht gestoppt',
+			other: '{count} Timer wurden nicht gestoppt'
+		},
+		text: {
+			one: 'und am Ende des Arbeitstags automatisch beendet. Er zählt erst, wenn die Endzeit korrigiert ist.',
+			other: 'und am Ende des Arbeitstags automatisch beendet. Sie zählen erst, wenn die Endzeiten korrigiert sind.'
+		},
+		correct: 'Jetzt korrigieren'
+	}
+};

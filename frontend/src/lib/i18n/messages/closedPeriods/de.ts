@@ -1,0 +1,47 @@
+/** Closed periods (issue #57): the Allgemein section, calendar locks, history and inbox hints, the reason prompt. */
+export const de = {
+	title: 'Abgeschlossene Zeiträume',
+	intro: 'Schließe Monate ab, z. B. nach der Lohnabrechnung. Danach können Mitglieder und Gruppenleitungen dort nichts mehr ändern – weder Einträge noch Abwesenheiten, Importe, Arbeitszeitmodelle oder Terminal-Stempel. Admins können weiter korrigieren, müssen aber einen Grund angeben; jede solche Änderung steht im Verlauf und im Protokoll.',
+	rules: 'Abschließen lassen sich nur Monate, die schon vorbei sind. Der automatische Stopp vergessener Timer zum Geschäftstagsende und die Kernzeit-Prüfung laufen weiter.',
+	closed: 'Abgeschlossen',
+	none: 'Noch kein Monat abgeschlossen.',
+	from: 'Von',
+	to: 'Bis',
+	note: 'Notiz (optional)',
+	notePlaceholder: 'z. B. Lohnabrechnung September',
+	close: 'Abschließen',
+	closeTitle: 'Zeitraum abschließen?',
+	closeMessage: '{months} werden abgeschlossen. Danach können dort nur noch Admins ändern – mit Grund.',
+	closedOk: 'Zeitraum abgeschlossen.',
+	reopen: 'Wieder öffnen',
+	reopenTitle: '{month} wieder öffnen?',
+	reopenMessage: 'Mitglieder und Gruppenleitungen können dort danach wieder ändern. Das Wiederöffnen wird mit Grund protokolliert.',
+	reopenLabel: 'Grund',
+	reopened: '{month} ist wieder offen.',
+	audit: 'Protokoll',
+	auditEmpty: 'Noch keine Einträge.',
+	kind: {
+		Closed: 'abgeschlossen',
+		Reopened: 'wieder geöffnet',
+		AdminChange: 'Admin-Änderung'
+	},
+	by: 'von {name}',
+	forMember: 'bei {name}',
+	several: 'bei mehreren Personen',
+	summary: {
+		TimeEntry: 'Zeiteinträge: {count}',
+		AbsenceDay: 'Abwesenheiten: {count}',
+		WorkSchedule: 'Arbeitszeitmodelle: {count}'
+	},
+	reasonTitle: 'Abgeschlossener Zeitraum',
+	reasonMessage: '{month} ist abgeschlossen. Als Admin kannst du trotzdem ändern – mit Grund, der im Verlauf und im Protokoll steht.',
+	reasonLabel: 'Grund der Änderung',
+	reasonConfirm: 'Mit Grund speichern',
+	locked: 'Abgeschlossen ({month}) – nur Admins können hier ändern',
+	lockedDay: 'Dieser Tag liegt im abgeschlossenen Zeitraum {month}. Änderungen sind nur noch durch Admins möglich.',
+	lockedDayAdmin: 'Abgeschlossener Zeitraum {month}: Änderungen fragen nach einem Grund und werden im Verlauf markiert.',
+	inHistory: 'im abgeschlossenen Zeitraum',
+	reason: 'Grund: {reason}',
+	requestHint: 'Betrifft den abgeschlossenen Zeitraum {month}.',
+	requestHintLead: 'Betrifft den abgeschlossenen Zeitraum {month} – nur Admins der Organisation können das annehmen.'
+};

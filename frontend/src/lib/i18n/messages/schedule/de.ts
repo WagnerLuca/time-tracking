@@ -1,0 +1,48 @@
+/** Strings for the shared schedule editors (SchedulePeriodEditor, InitialOvertimeEditor, active schedule). Add keys to both objects; `en` is typed against `de`. */
+export const de = {
+	periods: {
+		title: 'Arbeitszeit-Zeiträume',
+		add: '+ Zeitraum hinzufügen',
+		approvalNote: 'Arbeitszeit-Zeiträume zu ändern braucht eine Genehmigung. Wende dich an einen Admin deiner Organisation.',
+		disabledNote: 'Die Arbeitszeit-Zeiträume werden von den Admins dieser Organisation verwaltet.',
+		validFrom: 'Gültig ab',
+		validTo: 'Gültig bis',
+		weeklyHours: 'Wochenstunden',
+		distribute: 'Gleichmäßig verteilen (Mo–Fr)',
+		dailyTargets: 'Soll pro Tag (Stunden)',
+		fromRequired: 'Bitte ein Startdatum wählen.',
+		toBeforeFrom: 'Das Ende darf nicht vor dem Start liegen.',
+		weeklyRange: 'Bitte 0–{max} Stunden eingeben.',
+		dailyRange: 'Das Soll pro Tag muss zwischen 0 und {max} Stunden liegen.',
+		replaceHint: 'Ab diesem Datum gibt es schon einen Zeitraum – Speichern ersetzt ihn.',
+		submitAdd: 'Zeitraum hinzufügen',
+		submitReplace: 'Zeitraum ersetzen',
+		empty: 'Noch keine Arbeitszeit-Zeiträume.',
+		active: 'Aktiv',
+		delete: 'Zeitraum löschen',
+		deleteTitle: 'Arbeitszeit-Zeitraum löschen?',
+		added: 'Arbeitszeit-Zeitraum hinzugefügt.',
+		updated: 'Arbeitszeit-Zeitraum aktualisiert.',
+		deleted: 'Arbeitszeit-Zeitraum gelöscht.',
+		loadFailed: 'Die Arbeitszeit-Zeiträume konnten nicht geladen werden.',
+		saveFailed: 'Der Arbeitszeit-Zeitraum konnte nicht gespeichert werden.',
+		deleteFailed: 'Der Arbeitszeit-Zeitraum konnte nicht gelöscht werden.'
+	},
+	overtime: {
+		title: 'Anfangsüberstunden',
+		description: 'Überstunden-Übertrag aus der Zeit vor der Zeiterfassung.',
+		hoursLabel: 'Stunden (negativ bei Minusstunden)',
+		invalid: 'Bitte eine Stundenzahl eingeben.',
+		range: 'Bitte einen Wert zwischen -{max} und {max} eingeben.',
+		approvalNote: 'Diesen Wert zu ändern braucht eine Genehmigung. Wende dich an einen Admin deiner Organisation.',
+		disabledNote: 'Dieser Wert wird von den Admins dieser Organisation verwaltet.',
+		saved: 'Anfangsüberstunden gespeichert.',
+		saveFailed: 'Die Anfangsüberstunden konnten nicht gespeichert werden.'
+	},
+	active: {
+		title: 'Aktives Arbeitszeitmodell',
+		weeklyHours: 'Wochenstunden',
+		fromPeriods: 'Die Werte stammen aus den Arbeitszeit-Zeiträumen.',
+		none: 'Kein Arbeitszeitmodell hinterlegt.'
+	}
+};

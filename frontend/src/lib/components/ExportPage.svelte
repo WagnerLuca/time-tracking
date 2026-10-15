@@ -18,7 +18,7 @@
 	import { csvImportEnabled, canImportCsv, isOrgAdmin, isRequiresApproval, ruleMode } from '$lib/utils/orgRules';
 	import { formatDate, getMonthName } from '$lib/utils/formatters';
 	import { t, tp } from '$lib/i18n';
-	import type * as ExportMessages from '$lib/i18n/messages/export';
+	import type { de as exportMessages } from '$lib/i18n/messages/export/de';
 	import Modal from '$lib/components/Modal.svelte';
 	import { locale } from '$lib/stores/locale.svelte';
 	import { downloadBlob } from '$lib/utils/download';
@@ -84,7 +84,7 @@
 	let exportError = $state('');
 
 	// Column selection: `key` is what the backend expects, `label` the key under export.columns
-	type ColumnLabel = Exclude<keyof typeof ExportMessages.de.columns, 'title' | 'selectAll' | 'deselectAll' | 'none'>;
+	type ColumnLabel = Exclude<keyof typeof exportMessages.columns, 'title' | 'selectAll' | 'deselectAll' | 'none'>;
 	interface Column {
 		key: string;
 		label: ColumnLabel;
