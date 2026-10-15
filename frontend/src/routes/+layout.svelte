@@ -136,7 +136,7 @@
 	}
 
 	function navLinkClass(path: string) {
-		return `rounded-lg px-3 py-1.5 text-sm font-medium no-underline transition-colors ${isActive(path) ? 'bg-base-200 text-base-content' : 'text-base-content/70 hover:bg-base-200/60 hover:text-base-content'}`;
+		return `whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm xl:px-3 font-medium no-underline transition-colors ${isActive(path) ? 'bg-base-200 text-base-content' : 'text-base-content/70 hover:bg-base-200/60 hover:text-base-content'}`;
 	}
 
 	/** Everyday destinations first; administration sits behind the one "Organisation" entry. */
@@ -222,10 +222,11 @@
 			</a>
 
 			<!-- Org switcher -->
-			<div class="relative z-50 min-w-0">
+			<!-- May shrink (the name truncates) so it never runs into the links at lg -->
+			<div class="relative z-50 min-w-0 max-w-44">
 				<button
 					type="button"
-					class="flex min-h-11 max-w-44 items-center gap-1 truncate rounded-md bg-base-200 px-2.5 text-xs font-medium text-base-content/80 hover:bg-base-300 lg:min-h-8"
+					class="flex min-h-11 max-w-full items-center gap-1 truncate rounded-md bg-base-200 px-2.5 text-xs font-medium text-base-content/80 hover:bg-base-300 lg:min-h-8"
 					aria-haspopup="menu"
 					aria-expanded={openMenu === 'org'}
 					aria-label={orgContext.selectedOrg ? t('nav.org.current', { name: orgContext.selectedOrg.name ?? '' }) : t('nav.org.switch')}
@@ -279,8 +280,10 @@
 
 				<!-- User menu -->
 				<div class="relative z-50 max-lg:hidden">
-					<button type="button" class="btn btn-ghost btn-sm max-w-40 truncate font-medium" aria-haspopup="menu" aria-expanded={openMenu === 'user'} aria-label={t('nav.userMenu')} onclick={() => toggleMenu('user')}>
-						<span class="truncate">{auth.user?.firstName} {auth.user?.lastName}</span>
+					<button type="button" class="btn btn-ghost btn-sm max-w-40 truncate font-medium" aria-haspopup="menu" aria-expanded={openMenu === 'user'} aria-label={t('nav.userMenu')} title={`${auth.user?.firstName ?? ''} ${auth.user?.lastName ?? ''}`} onclick={() => toggleMenu('user')}>
+						<!-- The name from xl; an icon between lg and xl keeps room for the links -->
+						<span class="truncate max-xl:hidden">{auth.user?.firstName} {auth.user?.lastName}</span>
+						<span class="xl:hidden"><NavIcon name="user" /></span>
 					</button>
 					{#if openMenu === 'user'}
 						<ul class="menu absolute right-0 top-full mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl" role="menu">
@@ -365,7 +368,7 @@
 						<strong>{tp('nav.failure.title', failures.length)}</strong>
 						{tp('nav.failure.text', failures.length)}
 					</span>
-					<a href={failureLink} class="btn btn-sm">{t('nav.failure.correct')}</a>
+					<a href={failureLink} class="btn btn-sm shrink-0 whitespace-nowrap">{t('nav.failure.correct')}</a>
 				</div>
 			{/if}
 			{@render children?.()}
