@@ -65,13 +65,13 @@ public class WorkScheduleService : IWorkScheduleService
         if (ruleModeError != null)
             return ServiceResult.Fail<WorkScheduleResponse>(ruleModeError.Value.Type, ruleModeError.Value.Message);
 
-        var overlapError = await CheckOverlapAsync(userId, org.Id, request.ValidFrom, request.ValidTo);
+        var overlapError = await CheckOverlapAsync(_context, userId, org.Id, request.ValidFrom, request.ValidTo);
         if (overlapError != null)
             return ServiceResult.BadRequest<WorkScheduleResponse>(overlapError);
 
         var schedule = BuildSchedule(userId, org.Id, request);
         _context.WorkSchedules.Add(schedule);
-        await CloseOpenScheduleAsync(userId, org.Id, request.ValidFrom);
+        await CloseOpenScheduleAsync(_context, userId, org.Id, request.ValidFrom);
         await _context.SaveChangesAsync();
         _logger.LogInformation("Work schedule {ScheduleId} created by user {UserId} in org {OrgSlug}", schedule.Id, userId, slug);
 
@@ -236,13 +236,13 @@ public class WorkScheduleService : IWorkScheduleService
         if (membership == null)
             return ServiceResult.NotFound<WorkScheduleResponse>("Member not found");
 
-        var overlapError = await CheckOverlapAsync(memberId, org.Id, request.ValidFrom, request.ValidTo);
+        var overlapError = await CheckOverlapAsync(_context, memberId, org.Id, request.ValidFrom, request.ValidTo);
         if (overlapError != null)
             return ServiceResult.BadRequest<WorkScheduleResponse>(overlapError);
 
         var schedule = BuildSchedule(memberId, org.Id, request);
         _context.WorkSchedules.Add(schedule);
-        await CloseOpenScheduleAsync(memberId, org.Id, request.ValidFrom);
+        await CloseOpenScheduleAsync(_context, memberId, org.Id, request.ValidFrom);
         await _context.SaveChangesAsync();
         _logger.LogInformation("Work schedule set for member {MemberId} in org {OrgSlug} by admin {CallerId}", memberId, slug, callerUserId);
 
@@ -405,7 +405,7 @@ public class WorkScheduleService : IWorkScheduleService
         if (to < from)
             return "The end date must not be before the start date.";
         // An edit closes nothing automatically, so an open neighbour counts as an overlap too
-        return await CheckOverlapAsync(schedule.UserId, schedule.OrganizationId, from, to, schedule.Id, autoClose: false);
+        return await CheckOverlapAsync(_context, schedule.UserId, schedule.OrganizationId, from, to, schedule.Id, autoClose: false);
     }
 
     private static WorkScheduleResponse MapToResponse(
@@ -470,9 +470,10 @@ public class WorkScheduleService : IWorkScheduleService
             .ToListAsync();
     }
 
-    private async Task CloseOpenScheduleAsync(int userId, int orgId, DateOnly newFrom)
+    /// <summary>Closes the open-ended predecessor of a new period starting on <paramref name="newFrom"/> (no save). Shared with approved schedule-change requests.</summary>
+    internal static async Task CloseOpenScheduleAsync(TimeTrackingDbContext context, int userId, int orgId, DateOnly newFrom)
     {
-        var openSchedule = await _context.WorkSchedules
+        var openSchedule = await context.WorkSchedules
             .Where(s => s.UserId == userId && s.OrganizationId == orgId
                      && s.ValidTo == null && s.ValidFrom < newFrom)
             .OrderByDescending(s => s.ValidFrom)
@@ -482,10 +483,16 @@ public class WorkScheduleService : IWorkScheduleService
             openSchedule.ValidTo = newFrom.AddDays(-1);
     }
 
-    private async Task<string?> CheckOverlapAsync(
+    /// <summary>
+    /// Why a period [from, to] would overlap another of the member's periods, or null. Both ends are
+    /// inclusive (a shared boundary day overlaps); with <paramref name="autoClose"/> an open-ended
+    /// predecessor that <see cref="CloseOpenScheduleAsync"/> will close is no overlap.
+    /// Shared with approved schedule-change requests.
+    /// </summary>
+    internal static async Task<string?> CheckOverlapAsync(TimeTrackingDbContext context,
         int userId, int orgId, DateOnly from, DateOnly? to, int? excludeId = null, bool autoClose = true)
     {
-        var existing = await _context.WorkSchedules
+        var existing = await context.WorkSchedules
             .AsNoTracking()
             .Where(s => s.UserId == userId && s.OrganizationId == orgId
                      && (excludeId == null || s.Id != excludeId))

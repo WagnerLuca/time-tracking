@@ -302,6 +302,39 @@ public class WorkScheduleLifecycleTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     [Fact]
+    public async Task ApprovedScheduleChange_ThatOverlaps_IsNotApplied_AndStaysPending()
+    {
+        var (owner, member, slug, _, memberId) = await SetupAsync("wsl-approve-overlap", new { workScheduleChangeMode = RequiresApproval });
+        var adminUrl = $"/api/v1/organizations/{slug}/members/{memberId}/work-schedules";
+        await CreateAsync(owner, adminUrl, new { validFrom = "2026-01-01", validTo = "2026-03-31", weeklyWorkHours = 40, distributeEvenly = true });
+
+        async Task<int> AskAsync(object body)
+        {
+            var created = await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/requests",
+                new { type = WorkScheduleChange, requestData = JsonSerializer.Serialize(body) });
+            created.StatusCode.Should().Be(HttpStatusCode.Created);
+            return (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+        }
+
+        // Shares the boundary day 2026-03-31 with the closed period: same rule as a direct creation
+        var boundary = await AskAsync(new { validFrom = "2026-03-31", weeklyWorkHours = 20, distributeEvenly = true });
+        var refused = await owner.PutAsJsonAsync($"/api/v1/organizations/{slug}/requests/{boundary}", new { accept = true });
+        refused.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await refused.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("request.cannotApply");
+        var open = await owner.GetFromJsonAsync<JsonElement>($"/api/v1/organizations/{slug}/requests");
+        open.GetProperty("items").EnumerateArray().Single(r => r.GetProperty("id").GetInt32() == boundary)
+            .GetProperty("status").GetString().Should().Be("Pending");
+        (await ListAsync(owner, adminUrl)).Should().ContainSingle();
+
+        // An open-ended predecessor is still closed automatically
+        await CreateAsync(owner, adminUrl, new { validFrom = "2026-04-01", weeklyWorkHours = 30, distributeEvenly = true });
+        var later = await AskAsync(new { validFrom = "2026-09-01", weeklyWorkHours = 20, distributeEvenly = true });
+        (await owner.PutAsJsonAsync($"/api/v1/organizations/{slug}/requests/{later}", new { accept = true })).EnsureSuccessStatusCode();
+        (await ListAsync(owner, adminUrl)).Select(s => (s.ValidFrom, s.ValidTo))
+            .Should().Equal(("2026-01-01", "2026-03-31"), ("2026-04-01", "2026-08-31"), ("2026-09-01", (string?)null));
+    }
+
+    [Fact]
     public async Task InitialOvertimeRequest_IsSingleOpen_AndApprovalSetsTheHours()
     {
         var (owner, member, slug, _, _) = await SetupAsync("wsl-iot", new { initialOvertimeMode = RequiresApproval });

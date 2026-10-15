@@ -571,8 +571,9 @@ public class RequestService : IRequestService
                 if (orgRequest.RequestData != null)
                 {
                     var scheduleData = JsonSerializer.Deserialize<WorkScheduleChangeRequestData>(orgRequest.RequestData, RequestDataJson);
-                    if (scheduleData != null)
-                        await ApplyWorkScheduleChangeAsync(orgRequest.UserId, org.Id, scheduleData);
+                    if (scheduleData != null
+                        && await ApplyWorkScheduleChangeAsync(orgRequest.UserId, org.Id, scheduleData) is { } scheduleError)
+                        return scheduleError;
                 }
                 break;
 
@@ -649,9 +650,15 @@ public class RequestService : IRequestService
         }
     }
 
-    private async Task ApplyWorkScheduleChangeAsync(
+    /// <summary>Stages the new period like a direct creation (same overlap rule, open predecessor auto-closed); returns why it cannot be applied.</summary>
+    private async Task<string?> ApplyWorkScheduleChangeAsync(
         int userId, int orgId, WorkScheduleChangeRequestData data)
     {
+        if (data.ValidTo is { } validTo && validTo < data.ValidFrom)
+            return "Its data is invalid.";
+        if (await WorkScheduleService.CheckOverlapAsync(_context, userId, orgId, data.ValidFrom, data.ValidTo) is { } overlap)
+            return overlap;
+
         var schedule = new WorkSchedule
         {
             UserId = userId,
@@ -681,17 +688,9 @@ public class RequestService : IRequestService
             schedule.TargetSun = data.TargetSun ?? 0;
         }
 
-        // Close any open-ended predecessor schedule
-        var openSchedule = await _context.WorkSchedules
-            .Where(s => s.UserId == userId && s.OrganizationId == orgId
-                     && s.ValidTo == null && s.ValidFrom < data.ValidFrom)
-            .OrderByDescending(s => s.ValidFrom)
-            .FirstOrDefaultAsync();
-
-        if (openSchedule != null)
-            openSchedule.ValidTo = data.ValidFrom.AddDays(-1);
-
+        await WorkScheduleService.CloseOpenScheduleAsync(_context, userId, orgId, data.ValidFrom);
         _context.WorkSchedules.Add(schedule);
+        return null;
     }
 
     private async Task ApplyCsvImportAsync(int userId, Organization org, List<CsvImportEntry> entries)
