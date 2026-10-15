@@ -494,6 +494,12 @@ export interface DayBalance {
     'isCounted'?: boolean;
 }
 /**
+ * Absence days to delete together (a span), all or nothing.
+ */
+export interface DeleteAbsencesRequest {
+    'ids': Array<number>;
+}
+/**
  * Request payload for deleting (anonymizing) the current account.
  */
 export interface DeleteAccountRequest {
@@ -2252,6 +2258,48 @@ export const AbsenceDayApiAxiosParamCreator = function (configuration?: Configur
         },
         /**
          * 
+         * @summary Delete several absence days (a span) together, all or nothing — same rules as a single delete.
+         * @param {string} slug Organization URL slug.
+         * @param {DeleteAbsencesRequest} [deleteAbsencesRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsencesDeletePost: async (slug: string, deleteAbsencesRequest?: DeleteAbsencesRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAbsencesDeletePost', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/absences/delete`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(deleteAbsencesRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary List absences for the organization with optional filters (members only).
          * @param {string} slug Organization URL slug.
          * @param {number} [userId] Filter by user ID.
@@ -2538,6 +2586,20 @@ export const AbsenceDayApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Delete several absence days (a span) together, all or nothing — same rules as a single delete.
+         * @param {string} slug Organization URL slug.
+         * @param {DeleteAbsencesRequest} [deleteAbsencesRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAbsencesDeletePost(slug: string, deleteAbsencesRequest?: DeleteAbsencesRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAbsencesDeletePost(slug, deleteAbsencesRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiV1OrganizationsSlugAbsencesDeletePost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary List absences for the organization with optional filters (members only).
          * @param {string} slug Organization URL slug.
          * @param {number} [userId] Filter by user ID.
@@ -2673,6 +2735,17 @@ export const AbsenceDayApiFactory = function (configuration?: Configuration, bas
         },
         /**
          * 
+         * @summary Delete several absence days (a span) together, all or nothing — same rules as a single delete.
+         * @param {string} slug Organization URL slug.
+         * @param {DeleteAbsencesRequest} [deleteAbsencesRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAbsencesDeletePost(slug: string, deleteAbsencesRequest?: DeleteAbsencesRequest, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugAbsencesDeletePost(slug, deleteAbsencesRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary List absences for the organization with optional filters (members only).
          * @param {string} slug Organization URL slug.
          * @param {number} [userId] Filter by user ID.
@@ -2796,6 +2869,18 @@ export class AbsenceDayApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugAbsencesAdminRangePost(slug: string, createAbsenceRangeRequest?: CreateAbsenceRangeRequest, options?: RawAxiosRequestConfig) {
         return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsencesAdminRangePost(slug, createAbsenceRangeRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Delete several absence days (a span) together, all or nothing — same rules as a single delete.
+     * @param {string} slug Organization URL slug.
+     * @param {DeleteAbsencesRequest} [deleteAbsencesRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAbsencesDeletePost(slug: string, deleteAbsencesRequest?: DeleteAbsencesRequest, options?: RawAxiosRequestConfig) {
+        return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsencesDeletePost(slug, deleteAbsencesRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

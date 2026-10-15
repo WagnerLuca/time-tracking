@@ -60,6 +60,13 @@ public record CreateAbsenceRangeRequest
     public string? Note { get; init; }
 }
 
+/// <summary>Absence days to delete together (a span), all or nothing.</summary>
+public record DeleteAbsencesRequest
+{
+    [Required, MinLength(1), MaxLength(366)]
+    public required List<int> Ids { get; init; }
+}
+
 public record AdminCreateAbsenceDayRequest
 {
     public int UserId { get; init; }

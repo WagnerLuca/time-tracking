@@ -16,6 +16,7 @@
 	import { isOrgAdmin } from '$lib/utils/orgRules';
 	import { canSee } from '$lib/utils/visibility';
 	import { markSeen } from '$lib/utils/onboarding';
+	import { deleteAbsences } from '$lib/utils/absences';
 	import AbsenceDialog from '$lib/components/AbsenceDialog.svelte';
 	import LockIcon from '$lib/components/LockIcon.svelte';
 	import { closedMonthSet, isClosedDay, lockText } from '$lib/utils/closedPeriods';
@@ -193,7 +194,7 @@
 		if (!ok) return;
 		deletingSpan = spanKey(span);
 		try {
-			for (const id of span.ids) await absenceDayApi.apiV1OrganizationsSlugAbsencesIdDelete(orgSlug, id);
+			await deleteAbsences(orgSlug, span.ids);
 			toast.success(t('absences.deleted'));
 		} catch (err) {
 			toast.error(err, t('absences.deleteFailed'));

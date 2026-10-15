@@ -378,6 +378,37 @@ public class ClosedPeriodTests : IClassFixture<TimeTrackingApiFactory>
             new { startTime = nextStart, endTime = nextStart.AddMinutes(20), organizationId = orgId })).StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
+    [Fact]
+    public async Task AbsenceSpan_IsDeletedTogether_OneReasonForTheWholeSpan_AllOrNothing()
+    {
+        var (owner, member, slug, _, memberId) = await SetupAsync("cp-span");
+        var created = await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/absences/admin/range", new
+        {
+            userId = memberId, from = LastMonth.AddDays(9).ToString("yyyy-MM-dd"), to = LastMonth.AddDays(15).ToString("yyyy-MM-dd"), type = 1
+        });
+        created.EnsureSuccessStatusCode();
+        var ids = (await created.Content.ReadFromJsonAsync<List<JsonElement>>())!.Select(a => a.GetProperty("id").GetInt32()).ToList();
+        ids.Should().HaveCountGreaterThan(1);
+        (await CloseAsync(owner, slug, LastMonth, LastMonth)).EnsureSuccessStatusCode();
+        var url = $"/api/v1/organizations/{slug}/absences/delete";
+        async Task<int> CountAsync() =>
+            (await owner.GetFromJsonAsync<JsonElement>($"/api/v1/organizations/{slug}/absences?limit=100")).GetProperty("items").GetArrayLength();
+
+        // The same rules as one delete: the member may not remove what an admin entered, unknown ids are 404 — nothing goes
+        (await member.PostAsJsonAsync(url, new { ids })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await owner.PostAsJsonAsync(url, new { ids = ids.Append(int.MaxValue) })).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await owner.PostAsJsonAsync(url, new { ids = Array.Empty<int>() })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // One reason prompt for the span, not one per day
+        await ShouldBeClosedAsync(await owner.PostAsJsonAsync(url, new { ids }), "period.reasonRequired");
+        (await CountAsync()).Should().Be(ids.Count);
+
+        (await owner.SendAsync(WithReason(HttpMethod.Post, url, new { ids }, "Urlaub storniert"))).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await CountAsync()).Should().Be(0);
+        var events = (await owner.GetFromJsonAsync<JsonElement>($"/api/v1/organizations/{slug}/closed-periods")).GetProperty("events");
+        events[0].GetProperty("summary").GetString().Should().Be($"AbsenceDay:{ids.Count}");
+        events[1].GetProperty("kind").GetString().Should().Be("Closed");
+    }
+
     private static async Task ShouldBeClosedOrThisMonthAsync(HttpResponseMessage response, DateOnly month)
     {
         response.StatusCode.Should().Be(HttpStatusCode.Conflict, await response.Content.ReadAsStringAsync());
