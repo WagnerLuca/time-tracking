@@ -1,0 +1,49 @@
+# Test phase behind an existing host Caddy (internal ACME CA), e.g. time.desktop-tools.dzg.
+# Layered on top of the production file:
+#   docker compose -f docker-compose.production.yml -f docker-compose.test.yml up -d
+#
+# - The bundled Caddy stays off: the host's Caddy owns 80/443 and terminates TLS.
+#   It must route /api/* and /health to 127.0.0.1:7100 and everything else to
+#   127.0.0.1:3100 (one origin; the frontend's CSP is connect-src 'self').
+# - Mailpit stands in for SMTP: mails are caught, never delivered. Its web UI on
+#   127.0.0.1:8025 shows every reset/invitation link — put it behind basic_auth.
+# - SEED_DEMO_DATA=true adds the demo org "Mueller Software GmbH" (slug mueller-software)
+#   with 13 users (max.mueller@example.com Owner, anna.schmidt@example.com Admin, the rest
+#   Members; all Password123), groups, schedules, absences and time entries. It runs on
+#   backend start, next to any real data, and only once (skipped while the demo org exists).
+#
+# .env as for production, but with SMTP_HOST=mailpit, SMTP_PORT=1025, SMTP_ENABLE_SSL=false
+# (ACME_EMAIL is still required for the production file to parse, though unused here).
+
+services:
+  caddy:
+    profiles: ["disabled"] # never started
+
+  backend:
+    environment:
+      SeedDemoData: ${SEED_DEMO_DATA:-true}
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-7100}:7000"
+    depends_on:
+      mailpit:
+        condition: service_started
+
+  frontend:
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3100}:3000"
+
+  mailpit:
+    image: axllent/mailpit:${MAILPIT_VERSION:-latest}
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 5000
+    expose:
+      - "1025" # SMTP, compose network only
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+    deploy:
+      resources:
+        limits:
+          memory: 128m

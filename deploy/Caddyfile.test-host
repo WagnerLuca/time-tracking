@@ -1,0 +1,30 @@
+# Snippet for the HOST's Caddyfile when running docker-compose.test.yml (the bundled
+# Caddy is off). Ports match the defaults in docker-compose.test.yml. Reload: caddy reload
+
+time.desktop-tools.dzg {
+	# One origin: the API under /api, everything else the SvelteKit server
+	@api path /api/* /health
+	handle @api {
+		reverse_proxy 127.0.0.1:7100
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3100
+	}
+
+	tls {
+		ca https://pki.dzg:9000/acme/acme/directory
+	}
+}
+
+mail.desktop-tools.dzg {
+	# Mailpit shows every password-reset and invitation link — keep it behind a login.
+	# Hash: caddy hash-password  (Caddy < 2.8 spells it basicauth)
+	basic_auth {
+		admin <bcrypt-hash>
+	}
+	reverse_proxy 127.0.0.1:8025
+
+	tls {
+		ca https://pki.dzg:9000/acme/acme/directory
+	}
+}

@@ -1,0 +1,13 @@
+# Reverse proxy for the dev docker-compose.yml: plain HTTP on :80 (published as
+# localhost:3000), the API under the same origin as in production (deploy/Caddyfile),
+# because the frontend calls window.location.origin and its CSP is connect-src 'self'.
+:80 {
+	@api path /api/* /health
+	handle @api {
+		reverse_proxy backend:7000
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

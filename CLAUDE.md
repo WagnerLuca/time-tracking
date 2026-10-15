@@ -38,7 +38,7 @@ Full-stack multi-organization time tracking app. ASP.NET Core Web API backend (`
 
 ### Full launch
 - `start-app.bat` (Windows) opens backend + frontend in separate terminals.
-- `docker-compose up -d` runs backend (in-memory DB) + Seq log server (:5341). The dev compose file has no Postgres; `docker-compose.production.yml` (+ `.env.example`) is the Postgres setup.
+- `docker-compose up -d` runs backend (in-memory DB) + frontend behind Caddy (`deploy/Caddyfile.dev`, http://localhost:3000, routes `/api/*` to the backend like production) + Seq log server (:5341). The dev compose file has no Postgres; `docker-compose.production.yml` (+ `.env.example`) is the Postgres setup. `docker-compose.test.yml` layers on top of it for an internal test instance behind an existing host Caddy (`deploy/Caddyfile.test-host`, `.env.test.example`): bundled Caddy off, app on 127.0.0.1:7100/3100, Mailpit instead of SMTP, and `SeedDemoData` on — the seeder adds the demo org next to real data and skips while `mueller-software` or a demo user exists.
 
 ## Backend architecture
 

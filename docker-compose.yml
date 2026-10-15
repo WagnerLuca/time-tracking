@@ -12,16 +12,24 @@ services:
       - "7000:7000"
     depends_on:
       - seq
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     PORT: 3000
-  #     HOST: 0.0.0.0
-  #     NODE_ENV: production
-  #   ports:
-  #     - "3000:3000"
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      NODE_ENV: production
+  # Same-origin entry point like production: /api/* -> backend, everything else -> frontend
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./deploy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - backend
+      - frontend
   seq:
     image: datalust/seq:latest
     environment:
