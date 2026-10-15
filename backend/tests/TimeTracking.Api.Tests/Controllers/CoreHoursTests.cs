@@ -27,6 +27,13 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         coreHoursEnabled = true, coreHoursStart = "09:00", coreHoursEnd = "15:00", coreHoursToleranceMinutes = 5, timeZone = "Europe/Berlin"
     };
 
+    /// <summary>The same, with admins allowed to see members' hours — only then are org admins notified.</summary>
+    private static readonly object CoreSettingsAdminsSeeTimes = new
+    {
+        coreHoursEnabled = true, coreHoursStart = "09:00", coreHoursEnd = "15:00", coreHoursToleranceMinutes = 5, timeZone = "Europe/Berlin",
+        memberTimeEntryVisibility = true
+    };
+
     // ── Pure rules ──────────────────────────────────────────────────────
 
     private static readonly DateTime From = new(2026, 3, 3, 8, 0, 0, DateTimeKind.Utc);
@@ -151,7 +158,7 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
     public async Task LateStart_IsNotifiedOnce_ToMemberAndOwner_WithMail()
     {
         var day = new DateOnly(2026, 3, 3);   // Tuesday
-        var (_, _, _, orgId, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, "core-late", CoreSettings);
+        var (_, _, _, orgId, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, "core-late", CoreSettingsAdminsSeeTimes);
         await AddEntryAsync(memberId, orgId, day, "09:20", "15:10");
 
         // Not yet due at 15:04 (end + tolerance)
@@ -180,6 +187,30 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         var id = 0;
         await WithDbAsync(async db => id = await db.Users.Where(u => u.Email == email).Select(u => u.Id).SingleAsync());
         return id;
+    }
+
+    [Fact]
+    public async Task WithoutAdminTimeVisibility_OnlyTheMemberAndEntryViewingLeadsAreNotified()
+    {
+        var day = new DateOnly(2026, 3, 2);   // Monday
+        var (owner, _, slug, orgId, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, "core-private", CoreSettings);
+        var (_, lead) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "core-private-lead@t.test");
+        (await TestHelpers.AddMemberAsync(_factory, owner, slug, lead)).EnsureSuccessStatusCode();
+        var (_, viewer) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "core-private-viewer@t.test");
+        (await TestHelpers.AddMemberAsync(_factory, owner, slug, viewer)).EnsureSuccessStatusCode();
+        // The lead's team may not view entries (explicitly — it would inherit the department's right); the department's admin may
+        var dept = await TestHelpers.CreateGroupAsync(owner, slug, "Dept", new { groupAdminCanViewAllTimeEntries = true }, (viewer.User.Id, "Admin"));
+        var team = await TestHelpers.CreateGroupAsync(owner, slug, "Team", new { groupAdminCanViewAllTimeEntries = false }, (memberId, "Member"), (lead.User.Id, "Admin"));
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{team}", new { name = "Team", parentGroupId = dept })).EnsureSuccessStatusCode();
+        await AddEntryAsync(memberId, orgId, day, "09:30", "15:00");
+        await AddEntryAsync(lead.User.Id, orgId, day, "09:00", "15:00");
+        await AddEntryAsync(viewer.User.Id, orgId, day, "09:00", "15:00");
+
+        await CheckAsync(After(day));
+        (await NoticesAboutAsync(memberId, day)).Select(n => n.UserId).Should().BeEquivalentTo([memberId, viewer.User.Id]);
+        _factory.Mail.Sent.Should().Contain(m => m.To == "core-private-m@t.test" && m.Body.Contains("09:00-15:00"));
+        // Mails about the member go to exactly the notified colleagues
+        _factory.Mail.Sent.Where(m => m.Body.Contains($"/members/{memberId}")).Select(m => m.To).Should().BeEquivalentTo(["core-private-viewer@t.test"]);
     }
 
     [Fact]
@@ -281,7 +312,8 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         var (_, off) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "core-group-off@t.test");
         (await TestHelpers.AddMemberAsync(_factory, owner, slug, off)).EnsureSuccessStatusCode();
 
-        await TestHelpers.CreateGroupAsync(owner, slug, "Short core", new { coreHoursMode = 1, coreHoursStart = "10:00", coreHoursEnd = "14:00" },
+        await TestHelpers.CreateGroupAsync(owner, slug, "Short core",
+            new { coreHoursMode = 1, coreHoursStart = "10:00", coreHoursEnd = "14:00", groupAdminCanViewAllTimeEntries = true },
             (memberId, "Member"), (lead.User.Id, "Admin"));
         await TestHelpers.CreateGroupAsync(owner, slug, "No core", new { coreHoursMode = 0 }, (off.User.Id, "Member"));
         var perms = await owner.GetFromJsonAsync<JsonElement>($"/api/v1/Organizations/{slug}/groups/permissions");
@@ -297,8 +329,8 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         (await CheckRowAsync(lead.User.Id, day))!.Issues.Should().Be(CoreHoursIssue.None);
         (await CheckRowAsync(off.User.Id, day)).Should().BeNull("core hours are off for that group");
 
-        (await NoticesAboutAsync(memberId, day)).Select(n => n.UserId)
-            .Should().BeEquivalentTo([memberId, await UserIdAsync("core-group-owner@t.test"), lead.User.Id]);
+        // Admins may not see members' hours here: the member and the lead who may view entries, not the owner
+        (await NoticesAboutAsync(memberId, day)).Select(n => n.UserId).Should().BeEquivalentTo([memberId, lead.User.Id]);
 
         // Back to inherit: the org window applies again
         var groupId = perms.EnumerateArray().First(g => g.GetProperty("coreHoursMode").GetString() == "Off").GetProperty("groupId").GetInt32();

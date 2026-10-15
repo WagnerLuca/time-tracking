@@ -212,12 +212,19 @@ public static class CoreHours
         foreach (var (org, check) in violations)
         {
             var member = await context.Users.AsNoTracking().FirstAsync(u => u.Id == check.UserId, ct);
-            var admins = await context.UserOrganizations.AsNoTracking()
-                .Where(uo => uo.OrganizationId == org.Id && uo.IsActive && uo.Role >= OrganizationRole.Admin && uo.User.IsActive)
-                .Select(uo => uo.User)
-                .ToListAsync(ct);
-            // The admins of the member's groups and of every ancestor group (sub-groups, GroupTree)
-            var groupAdminIds = trees[org.Id].ChainGroupsOf(check.UserId).SelectMany(trees[org.Id].AdminsOf).ToHashSet();
+            // Org admins only while they may see members' hours (MemberTimeEntryVisibility, #63)
+            var admins = org.MemberTimeEntryVisibility
+                ? await context.UserOrganizations.AsNoTracking()
+                    .Where(uo => uo.OrganizationId == org.Id && uo.IsActive && uo.Role >= OrganizationRole.Admin && uo.User.IsActive)
+                    .Select(uo => uo.User)
+                    .ToListAsync(ct)
+                : [];
+            // The admins of the member's groups and of every ancestor group (sub-groups, GroupTree);
+            // with the org switch off only those of groups whose admins may view entries (effective value)
+            var tree = trees[org.Id];
+            var groupAdminIds = tree.ChainGroupsOf(check.UserId)
+                .Where(id => org.MemberTimeEntryVisibility || tree.Effective(id).GroupAdminCanViewAllTimeEntries == true)
+                .SelectMany(tree.AdminsOf).ToHashSet();
             var groupAdmins = await context.Users.AsNoTracking()
                 .Where(u => u.IsActive && groupAdminIds.Contains(u.Id))
                 .ToListAsync(ct);

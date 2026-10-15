@@ -380,7 +380,7 @@ public class SubGroupTests : IClassFixture<TimeTrackingApiFactory>
     [Fact]
     public async Task CoreHoursViolation_NotifiesTheAdminsAlongTheChain_Once()
     {
-        var (owner, slug, orgId) = await OrgAsync("sub-core", new { timeZone = "Europe/Berlin" });
+        var (owner, slug, orgId) = await OrgAsync("sub-core", new { timeZone = "Europe/Berlin", memberTimeEntryVisibility = true });
         var (_, leadId) = await MemberAsync(owner, slug, "sub-core-l@sub.test");
         var (_, memberId) = await MemberAsync(owner, slug, "sub-core-m@sub.test");
         var dept = await GroupAsync(owner, slug, "Dept", null, new { coreHoursMode = 1, coreHoursStart = "09:00", coreHoursEnd = "15:00" }, (leadId, "Admin"));
