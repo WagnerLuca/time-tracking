@@ -19,6 +19,8 @@
 	const members = $derived(sortTeam(data?.members ?? []));
 	const shown = $derived(filterTeam(members, groupId, query));
 	const presentCount = $derived(members.filter((m) => m.present === true).length);
+	/** Members whose presence the caller may see (the count leaves out the others). */
+	const presenceKnown = $derived(members.filter((m) => m.present != null).length);
 	// Lets the dashboard switch to its two-column layout only when there is a team to show
 	$effect(() => {
 		available = !!data;
@@ -78,7 +80,9 @@
 		<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
 			<h2 id="team-heading" class="text-base font-semibold m-0">{t('dashboard.team.title')}</h2>
 			{#if members.length > 0}
-				<span class="text-xs text-base-content/70">{t('dashboard.team.presentCount', { present: presentCount, total: members.length })}</span>
+				{#if presenceKnown > 0}
+					<span class="text-xs text-base-content/70">{t('dashboard.team.presentCount', { present: presentCount, total: presenceKnown })}</span>
+				{/if}
 			{/if}
 		</div>
 
@@ -136,6 +140,8 @@
 									<div class="text-xs text-base-content/70 truncate">
 										{m.present && m.presentSince ? t('dashboard.team.since', { time: formatTime(m.presentSince) }) : t('dashboard.team.notPresent')}
 									</div>
+								{:else if balance == null}
+									<div class="text-xs text-base-content/60 truncate" data-testid="team-no-details">{t('dashboard.team.noDetails')}</div>
 								{/if}
 							</div>
 							{#if balance != null}

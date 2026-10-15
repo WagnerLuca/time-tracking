@@ -252,7 +252,8 @@
 
 	<!-- Quick actions: the everyday tasks one tap away -->
 	{#if selectedSlug}
-		<nav class="grid grid-cols-1 gap-2 mb-6 sm:grid-cols-3" aria-label={t('dashboard.quick.label')}>
+		<!-- Three across while they have the full width; stacked in the narrow column beside the team (lg+) -->
+		<nav class="grid grid-cols-1 gap-2 mb-6 md:grid-cols-3 {teamShown ? 'lg:grid-cols-1' : ''}" aria-label={t('dashboard.quick.label')}>
 			<a href="/history?date={yesterday}&do=add" class="btn btn-outline justify-start">{t('dashboard.quick.addDay')}</a>
 			<a href="/history?date={dateKey(new Date())}&do=absence" class="btn btn-outline justify-start">{t('dashboard.quick.absence')}</a>
 			<a href="/organizations/{selectedSlug}/absences" class="btn btn-outline justify-start">{t('dashboard.quick.teamCalendar')}</a>
