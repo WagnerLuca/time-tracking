@@ -5,8 +5,9 @@
 	import { timer } from '$lib/stores/timer.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { timeTrackingApi, workScheduleApi, reportsApi } from '$lib/apiClient';
-	import type { WorkScheduleResponse } from '$lib/api';
-	import { formatHours, formatDelta, formatClock, barWidth, getMonthName, dayNamesShort } from '$lib/utils/formatters';
+	import type { OrganizationMemberResponse, WorkScheduleResponse } from '$lib/api';
+	import { getOrgDetail } from '$lib/stores/orgDetail';
+	import { formatHours, formatDelta, formatClock, formatNumber, barWidth, getMonthName, dayNamesShort } from '$lib/utils/formatters';
 	import { isToday, isFuture, sumMinutes, dateKey } from '$lib/utils/dateHelpers';
 	import { getDayType, getDayTypeLabel } from '$lib/utils/scheduleHelpers';
 	import { WEEKLY_ENTRY_LIMIT } from '$lib/utils/constants';
@@ -41,6 +42,12 @@
 	let workSchedule = $state<WorkScheduleResponse | null>(null);
 	let daysOff = $state<DaysOffData>(emptyDaysOff());
 	let pending = $state(false);
+	/** The caller's own row of the org detail: its vacation figures (allowance, taken, planned, remaining). */
+	let me = $state<OrganizationMemberResponse | null>(null);
+	/** True once TeamOverview has a team to show (org admins, group leads): own figures and team side by side from lg. */
+	let teamShown = $state(false);
+	const vacationTotal = $derived(me?.vacationDaysPerYear ?? 0);
+	const figureCount = $derived(vacationTotal > 0 ? 4 : 3);
 
 	const selectedSlug = $derived(orgContext.selectedOrgSlug);
 	/** The forgotten day is usually yesterday. */
@@ -102,6 +109,10 @@
 				]);
 				workSchedule = schedule;
 				daysOff = off;
+				// Optional fourth card; the org detail is cached and already carries the vacation figures
+				getOrgDetail(slug)
+					.then((d) => (me = d.members?.find((m) => m.id === userId) ?? null))
+					.catch(() => (me = null));
 				stats = {
 					todayMinutes: b.today.worked,
 					weekMinutes: b.week.worked,
@@ -118,6 +129,7 @@
 
 			// Without an org there is no schedule and no balance: just the tracked time
 			workSchedule = null;
+			me = null;
 			daysOff = emptyDaysOff();
 			const [weekRes, monthEntries] = await Promise.all([
 				timeTrackingApi.apiV1TimeTrackingGet(undefined, weekStart.toISOString(), weekEnd.toISOString(), WEEKLY_ENTRY_LIMIT),
@@ -199,10 +211,14 @@
 	<title>{t('common.pageTitle', { page: t('dashboard.pageTitle') })}</title>
 </svelte:head>
 
-<div class="max-w-3xl mx-auto">
+<div class="mx-auto {teamShown ? '' : 'max-w-3xl'}">
 	<div class="flex flex-wrap items-center justify-between gap-2 mb-5">
 		<h1 class="text-2xl font-bold text-base-content m-0">{t('dashboard.greeting', { name: auth.user?.firstName ?? '' })}</h1>
 	</div>
+
+	<!-- Leads: own figures left, team right from lg; stacked (own first) below -->
+	<div class={teamShown ? 'lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start' : ''}>
+	<div class="min-w-0">
 
 	<!-- Timer: the primary action -->
 	<section class="card mb-6 border-2 p-5 sm:p-6 {timer.current ? 'border-success bg-success/5' : 'border-base-300 bg-base-100'}" aria-label={t('dashboard.timer')}>
@@ -260,7 +276,6 @@
 	{#if selectedSlug}
 		{#if isOrgAdmin(orgContext.selectedOrg?.role)}<OnboardingChecklist slug={selectedSlug} list="admin" />{/if}
 		<OnboardingChecklist slug={selectedSlug} list="member" />
-		<TeamOverview slug={selectedSlug} />
 	{/if}
 
 	{#if statsLoading && !stats}
@@ -282,7 +297,7 @@
 		{/if}
 
 		<!-- Key figures -->
-		<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+		<div class="grid grid-cols-2 gap-3 mb-6 {teamShown ? '' : figureCount === 4 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}">
 			<div class="card bg-base-100 border border-base-300 p-4">
 				<span class="text-xs text-base-content/70 uppercase font-semibold tracking-wider">{t('dashboard.today')}</span>
 				<span class="text-2xl font-bold tabular-nums mt-1">
@@ -303,7 +318,7 @@
 					<span class="text-xs text-base-content/70 mt-1">{t('dashboard.workedThisWeek')}</span>
 				{/if}
 			</div>
-			<div class="card border p-4 {cumulative == null ? 'bg-base-100 border-base-300' : cumulative > 0 ? 'border-success/50 bg-success/5' : cumulative < 0 ? 'border-error/50 bg-error/5' : 'bg-base-100 border-base-300'}">
+			<div class="card border p-4 {figureCount === 3 ? (teamShown ? 'col-span-2' : 'col-span-2 sm:col-span-1') : ''} {cumulative == null ? 'bg-base-100 border-base-300' : cumulative > 0 ? 'border-success/50 bg-success/5' : cumulative < 0 ? 'border-error/50 bg-error/5' : 'bg-base-100 border-base-300'}">
 				<span class="text-xs text-base-content/70 uppercase font-semibold tracking-wider">{t('dashboard.cumulativeBalance')}</span>
 				{#if cumulative != null}
 					<span class="text-2xl font-bold tabular-nums mt-1 {deltaClass(cumulative)}">{formatDelta(cumulative)}</span>
@@ -313,6 +328,21 @@
 					<span class="text-xs text-base-content/70 mt-1">{t('dashboard.needsSchedule')}</span>
 				{/if}
 			</div>
+			{#if me && vacationTotal > 0}
+				{@const remaining = me.vacationDaysRemaining ?? 0}
+				<a
+					href="/organizations/{selectedSlug}/absences"
+					class="card bg-base-100 border p-4 no-underline text-base-content transition-colors hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {remaining < 0 ? 'border-error/50' : 'border-base-300'}"
+					aria-label={t('dashboard.vacation.open', { remaining: formatNumber(remaining), total: formatNumber(vacationTotal) })}
+					data-testid="vacation-card"
+				>
+					<span class="text-xs text-base-content/70 uppercase font-semibold tracking-wider">{t('dashboard.vacation.label')}</span>
+					<span class="text-2xl font-bold tabular-nums mt-1 {remaining < 0 ? 'text-error' : ''}">
+						{formatNumber(remaining)}&nbsp;<span class="text-sm font-normal text-base-content/70">{t('dashboard.vacation.ofTotal', { total: formatNumber(vacationTotal) })}</span>
+					</span>
+					<span class="text-xs text-base-content/70 mt-1">{t('dashboard.vacation.details', { taken: formatNumber(me.vacationDaysTaken ?? 0), planned: formatNumber(me.vacationDaysPlanned ?? 0) })}</span>
+				</a>
+			{/if}
 		</div>
 
 		<!-- This week -->
@@ -368,4 +398,12 @@
 			</div>
 		</section>
 	{/if}
+	</div>
+
+	{#if selectedSlug}
+		<div class="min-w-0">
+			<TeamOverview slug={selectedSlug} bind:available={teamShown} />
+		</div>
+	{/if}
+	</div>
 </div>

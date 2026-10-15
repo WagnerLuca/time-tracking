@@ -36,6 +36,12 @@ export const de = {
 	cumulativeBalance: 'Saldo gesamt',
 	asOfToday: 'Stand heute, inkl. übernommener Überstunden',
 	needsSchedule: 'Braucht ein Arbeitszeitmodell',
+	vacation: {
+		label: 'Resturlaub',
+		ofTotal: 'von {total} Tagen',
+		details: '{taken} genommen · {planned} geplant',
+		open: 'Resturlaub {remaining} von {total} Tagen – Abwesenheiten öffnen'
+	},
 	thisWeek: 'Diese Woche',
 	openTimer: 'Timer öffnen',
 	openHistory: 'Verlauf öffnen',
@@ -97,6 +103,12 @@ export const en: typeof de = {
 	cumulativeBalance: 'Cumulative balance',
 	asOfToday: 'As of today, incl. initial overtime',
 	needsSchedule: 'Needs a work schedule',
+	vacation: {
+		label: 'Vacation left',
+		ofTotal: 'of {total} days',
+		details: '{taken} taken · {planned} planned',
+		open: 'Vacation left: {remaining} of {total} days – open absences'
+	},
 	thisWeek: 'This week',
 	openTimer: 'Open timer',
 	openHistory: 'Open history',

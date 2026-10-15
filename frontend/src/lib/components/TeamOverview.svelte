@@ -9,7 +9,7 @@
 	import PresenceDot from '$lib/components/PresenceDot.svelte';
 
 	/** Team cards for org admins/owners and group admins (issue #61); renders nothing for everyone else (403). */
-	let { slug }: { slug: string } = $props();
+	let { slug, available = $bindable(false) }: { slug: string; available?: boolean } = $props();
 
 	let data = $state<TeamOverviewResponse | null>(null);
 	let error = $state('');
@@ -19,6 +19,10 @@
 	const members = $derived(sortTeam(data?.members ?? []));
 	const shown = $derived(filterTeam(members, groupId, query));
 	const presentCount = $derived(members.filter((m) => m.present === true).length);
+	// Lets the dashboard switch to its two-column layout only when there is a team to show
+	$effect(() => {
+		available = !!data;
+	});
 
 	// Presence follows without reload: every minute while the tab is visible (like the bell), and on returning to it
 	const POLL_MS = 60_000;
@@ -99,7 +103,7 @@
 		{:else if shown.length === 0}
 			<p class="text-sm text-base-content/70 m-0">{t('dashboard.team.noMatch')}</p>
 		{:else}
-			<ul class="grid grid-cols-1 sm:grid-cols-2 gap-2 list-none p-0 m-0">
+			<ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 list-none p-0 m-0">
 				{#each shown as m (m.userId)}
 					{@const balance = m.balanceHours != null ? Math.round(m.balanceHours * 60) : null}
 					<li>
