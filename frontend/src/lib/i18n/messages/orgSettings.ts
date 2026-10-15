@@ -34,9 +34,7 @@ export const de = {
 		label: 'Ende des Arbeitstags',
 		description: 'Ein Timer, der zu dieser Ortszeit noch läuft, wird automatisch gestoppt und als Fehleintrag markiert; er zählt als 0, bis das Mitglied ihn korrigiert. Standard ist Mitternacht (00:00), für Nachtschichten z. B. 04:00.',
 		timeRequired: 'Bitte eine Uhrzeit eingeben.',
-		failed: 'Ende des Arbeitstags konnte nicht gespeichert werden.',
-		timeZone: 'Zeitzone',
-		timeZoneFailed: 'Zeitzone konnte nicht gespeichert werden.'
+		timeZone: 'Zeitzone'
 	},
 	coreHours: {
 		label: 'Kernarbeitszeit',
@@ -262,9 +260,7 @@ export const en: typeof de = {
 		label: 'Business day end',
 		description: 'A timer still running at this local time is stopped automatically and marked as a failure entry, which counts as 0 until the member corrects it. Midnight (00:00) by default; set e.g. 04:00 for late-night shifts.',
 		timeRequired: 'Enter a time.',
-		failed: 'Could not save the business day end.',
-		timeZone: 'Time zone',
-		timeZoneFailed: 'Could not save the time zone.'
+		timeZone: 'Time zone'
 	},
 	coreHours: {
 		label: 'Core working hours',

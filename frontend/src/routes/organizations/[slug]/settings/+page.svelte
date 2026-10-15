@@ -333,15 +333,6 @@
 		saveSettings({ defaultVacationDays: val });
 	}
 
-	function saveBusinessDayEnd(e: Event) {
-		const val = (e.currentTarget as HTMLInputElement).value;
-		if (!val) {
-			toast.error(t('orgSettings.businessDayEnd.timeRequired'));
-			return;
-		}
-		saveSettings({ businessDayEnd: val }, t('orgSettings.businessDayEnd.failed'));
-	}
-
 	/** Saves start and end together, so moving the window never trips the start-before-end check halfway. */
 	function saveCoreHoursWindow() {
 		const start = (document.getElementById('core-hours-start') as HTMLInputElement | null)?.value;
@@ -360,10 +351,6 @@
 			return;
 		}
 		saveSettings({ coreHoursToleranceMinutes: val }, t('orgSettings.coreHours.failed'));
-	}
-
-	function saveTimeZone(e: Event) {
-		saveSettings({ timeZone: (e.currentTarget as HTMLSelectElement).value }, t('orgSettings.businessDayEnd.timeZoneFailed'));
 	}
 
 	let pauseRules = $derived(org?.pauseRules ? [...org.pauseRules].sort((a, b) => (a.minHours ?? 0) - (b.minHours ?? 0)) : []);
@@ -596,34 +583,6 @@
 						{/if}
 					</div>
 				{/if}
-				<!-- Business day end -->
-				<div class="bg-base-200/50 rounded-lg p-4 mt-4 border border-base-300">
-					<div class="flex items-center justify-between gap-4 flex-wrap">
-						{@render settingInfo(t('orgSettings.businessDayEnd.label'), t('orgSettings.businessDayEnd.description'))}
-						<div class="flex items-center gap-2 flex-wrap">
-							<input
-								type="time"
-								class="input input-sm w-28"
-								value={org.businessDayEnd ?? '00:00'}
-								aria-label={t('orgSettings.businessDayEnd.label')}
-								onchange={saveBusinessDayEnd}
-								disabled={settingsSaving}
-							/>
-							<select
-								class="select select-sm w-52 max-w-full"
-								value={org.timeZone ?? 'Europe/Berlin'}
-								onchange={saveTimeZone}
-								disabled={settingsSaving}
-								aria-label={t('orgSettings.businessDayEnd.timeZone')}
-							>
-								{#each Intl.supportedValuesOf('timeZone') as tz}
-									<option value={tz}>{tz}</option>
-								{/each}
-							</select>
-						</div>
-					</div>
-				</div>
-
 				<!-- Core working hours (Kernarbeitszeit) -->
 				<div class="bg-base-200/50 rounded-lg p-4 mt-4 border border-base-300" data-testid="core-hours-settings">
 					<div class="flex items-center justify-between gap-4 flex-wrap">

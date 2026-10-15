@@ -61,6 +61,7 @@ export const de = {
 	tabs: {
 		label: 'Organisation',
 		back: '← Zurück zu den Organisationen',
+		general: 'Allgemein',
 		schedule: 'Mein Arbeitszeitmodell',
 		members: 'Mitglieder',
 		groups: 'Gruppen',
@@ -135,6 +136,7 @@ export const en: typeof de = {
 	tabs: {
 		label: 'Organization',
 		back: '← Back to organizations',
+		general: 'General',
 		schedule: 'My schedule',
 		members: 'Members',
 		groups: 'Groups',

@@ -15,7 +15,6 @@ export const de = {
 	rulesChangedAfter: '.',
 	myAbsences: 'Meine Abwesenheiten',
 	edit: {
-		title: 'Organisation bearbeiten',
 		name: 'Name',
 		slug: 'Kürzel (URL)',
 		description: 'Beschreibung',
@@ -26,9 +25,18 @@ export const de = {
 		saved: 'Organisation gespeichert.',
 		saveFailed: 'Die Organisation konnte nicht gespeichert werden.'
 	},
+	general: {
+		title: 'Allgemein',
+		intro: 'Name, Kürzel, Beschreibung, Website und Zeitbezug der Organisation. Nur Admins sehen diesen Bereich.',
+		profile: 'Profil',
+		time: 'Zeit',
+		timeIntro: 'Zeitzone und Ende des Arbeitstags gelten für alle Tage, Berichte und den automatischen Timer-Stopp.',
+		danger: 'Gefahrenzone',
+		deleteIntro: 'Löscht die Organisation. Alle Mitglieder verlieren sofort den Zugang; das lässt sich nicht rückgängig machen.',
+		ownerOnly: 'Nur die Inhaberin oder der Inhaber kann die Organisation löschen.',
+		typeName: 'Zur Bestätigung den Namen „{name}“ eintippen'
+	},
 	delete: {
-		title: '{name} löschen?',
-		message: 'Alle Mitglieder verlieren den Zugang. Das lässt sich nicht rückgängig machen.',
 		confirm: 'Organisation löschen',
 		deleted: 'Organisation gelöscht.',
 		failed: 'Die Organisation konnte nicht gelöscht werden.'
@@ -51,7 +59,6 @@ export const en: typeof de = {
 	rulesChangedAfter: ' for details.',
 	myAbsences: 'My absences',
 	edit: {
-		title: 'Edit organization',
 		name: 'Name',
 		slug: 'Slug (URL)',
 		description: 'Description',
@@ -62,9 +69,18 @@ export const en: typeof de = {
 		saved: 'Organization saved.',
 		saveFailed: 'Could not save the organization.'
 	},
+	general: {
+		title: 'General',
+		intro: "The organization's name, slug, description, website and time reference. Only admins see this section.",
+		profile: 'Profile',
+		time: 'Time',
+		timeIntro: 'Time zone and business day end apply to every day, report and the automatic timer stop.',
+		danger: 'Danger zone',
+		deleteIntro: 'Deletes the organization. Every member loses access at once; this cannot be undone.',
+		ownerOnly: 'Only the owner can delete the organization.',
+		typeName: 'Type the name "{name}" to confirm'
+	},
 	delete: {
-		title: 'Delete {name}?',
-		message: 'All members lose access. This cannot be undone.',
 		confirm: 'Delete organization',
 		deleted: 'Organization deleted.',
 		failed: 'Could not delete the organization.'

@@ -1,14 +1,12 @@
 <script lang="ts">
 	import Skeleton from '$lib/components/Skeleton.svelte';
-	import { getOrgDetail, invalidateOrgDetail } from '$lib/stores/orgDetail';
+	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
-	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { t } from '$lib/i18n';
-	import { organizationsApi, workScheduleApi, absenceDayApi, notificationsApi, groupApi } from '$lib/apiClient';
+	import { workScheduleApi, absenceDayApi, notificationsApi, groupApi } from '$lib/apiClient';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import { isOrgAdmin, ruleMode } from '$lib/utils/orgRules';
 	import SchedulePeriodEditor from '$lib/components/SchedulePeriodEditor.svelte';
@@ -18,7 +16,6 @@
 	import MemberAbsences from '$lib/components/member/MemberAbsences.svelte';
 	import type {
 		OrganizationDetailResponse,
-		UpdateOrganizationRequest,
 		WorkScheduleResponse,
 		AbsenceTypeDefinitionResponse,
 		EffectivePermissionsResponse
@@ -38,25 +35,8 @@
 	let myMember = $derived(org?.members?.find((m) => m.id === auth.user?.id) ?? null);
 	let myRole = $derived(myMember?.role ?? null);
 	let isAdmin = $derived(isOrgAdmin(myRole));
-	let isOwner = $derived(myRole === 'Owner');
 	let absenceMode = $derived(ruleMode('absenceSelfServiceMode', perms, org));
 	let canAddAbsence = $derived(isAdmin || (absenceMode !== null && absenceMode !== 'Disabled'));
-
-	// Edit organization
-	let editing = $state(false);
-	let editName = $state('');
-	let editDescription = $state('');
-	let editSlug = $state('');
-	let editWebsite = $state('');
-	let editSubmitted = $state(false);
-	let editError = $state('');
-	let editSaving = $state(false);
-	let nameError = $derived(editSubmitted && !editName.trim() ? t('orgHome.edit.nameRequired') : '');
-	let slugError = $derived(
-		!editSubmitted ? '' : !editSlug.trim() ? t('orgHome.edit.slugRequired') : !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(editSlug.trim()) ? t('orgHome.edit.slugInvalid') : ''
-	);
-
-	let deleting = $state(false);
 
 	// Unread "organization rules changed" notifications
 	let settingsNotificationIds = $state<number[]>([]);
@@ -69,7 +49,6 @@
 	async function loadOrg() {
 		loading = true;
 		error = '';
-		editing = false;
 		perms = null;
 		settingsNotificationIds = [];
 		try {
@@ -149,63 +128,6 @@
 		if (failed) toast.error((failed as PromiseRejectedResult).reason, t('orgHome.markReadFailed'));
 	}
 
-	function startEdit() {
-		if (!org) return;
-		editName = org.name ?? '';
-		editDescription = org.description ?? '';
-		editSlug = org.slug ?? '';
-		editWebsite = org.website ?? '';
-		editSubmitted = false;
-		editError = '';
-		editing = true;
-	}
-
-	async function saveEdit(e: Event) {
-		e.preventDefault();
-		editSubmitted = true;
-		if (nameError || slugError) return;
-		editError = '';
-		editSaving = true;
-		const newSlug = editSlug.trim();
-		try {
-			const payload: UpdateOrganizationRequest = {
-				name: editName.trim(),
-				description: editDescription.trim() || undefined,
-				slug: newSlug,
-				website: editWebsite.trim() || undefined
-			};
-			await organizationsApi.apiV1OrganizationsSlugPut(orgSlug, payload);
-			toast.success(t('orgHome.edit.saved'));
-			editing = false;
-			if (newSlug !== orgSlug) invalidateOrgDetail(orgSlug);
-			if (newSlug !== orgSlug) await goto(`/organizations/${newSlug}`, { replaceState: true });
-			else await reloadOrg();
-		} catch (err) {
-			editError = extractErrorMessage(err, t('orgHome.edit.saveFailed'));
-		} finally {
-			editSaving = false;
-		}
-	}
-
-	async function deleteOrg() {
-		const ok = await confirmDialog({
-			title: t('orgHome.delete.title', { name: org?.name ?? t('orgHome.fallbackName') }),
-			message: t('orgHome.delete.message'),
-			confirmLabel: t('orgHome.delete.confirm'),
-			danger: true
-		});
-		if (!ok) return;
-		deleting = true;
-		try {
-			await organizationsApi.apiV1OrganizationsSlugDelete(orgSlug);
-			invalidateOrgDetail(orgSlug);
-			toast.success(t('orgHome.delete.deleted'));
-			goto('/organizations');
-		} catch (err) {
-			toast.error(err, t('orgHome.delete.failed'));
-			deleting = false;
-		}
-	}
 </script>
 
 <svelte:head>
@@ -218,55 +140,11 @@
 	{:else if error}
 		<div class="alert alert-error">{error}</div>
 	{:else if org}
-		{#if editing}
-			<div class="card bg-base-100 border border-base-300 p-5 sm:p-8 max-w-xl">
-				<h2 class="text-xl font-bold text-base-content mb-5">{t('orgHome.edit.title')}</h2>
-				{#if editError}
-					<div class="alert alert-error mb-4 text-sm">{editError}</div>
-				{/if}
-				<form onsubmit={saveEdit} novalidate class="flex flex-col gap-4">
-					<div>
-						<label for="editName" class="label text-sm font-medium text-base-content/70">{t('orgHome.edit.name')}</label>
-						<input id="editName" type="text" class="input w-full" class:input-error={nameError} aria-invalid={!!nameError} bind:value={editName} disabled={editSaving} />
-						{#if nameError}<p class="text-error text-xs mt-1">{nameError}</p>{/if}
-					</div>
-					<div>
-						<label for="editSlug" class="label text-sm font-medium text-base-content/70">{t('orgHome.edit.slug')}</label>
-						<input id="editSlug" type="text" class="input w-full" class:input-error={slugError} aria-invalid={!!slugError} bind:value={editSlug} disabled={editSaving} />
-						{#if slugError}<p class="text-error text-xs mt-1">{slugError}</p>{/if}
-					</div>
-					<div>
-						<label for="editDesc" class="label text-sm font-medium text-base-content/70">{t('orgHome.edit.description')}</label>
-						<textarea id="editDesc" class="textarea w-full" bind:value={editDescription} rows="3" disabled={editSaving}></textarea>
-					</div>
-					<div>
-						<label for="editWeb" class="label text-sm font-medium text-base-content/70">{t('orgHome.edit.website')}</label>
-						<input id="editWeb" type="url" class="input w-full" bind:value={editWebsite} disabled={editSaving} />
-					</div>
-					<div class="flex gap-3 justify-end mt-2">
-						<button type="button" class="btn btn-ghost btn-sm" onclick={() => (editing = false)} disabled={editSaving}>{t('common.cancel')}</button>
-						<button type="submit" class="btn btn-primary btn-sm" disabled={editSaving}>
-							{editSaving ? t('common.saving') : t('common.saveChanges')}
-						</button>
-					</div>
-				</form>
-			</div>
-		{:else}
 			<div class="flex items-start justify-between gap-3 mb-2 flex-wrap">
 				<div class="min-w-0">
 					<h1 class="text-2xl font-bold text-base-content break-words">{org.name}</h1>
 					<span class="text-base-content/70 text-sm">/{org.slug}</span>
 				</div>
-				{#if isAdmin}
-					<div class="flex gap-2">
-						<button type="button" class="btn btn-outline btn-sm" onclick={startEdit}>{t('common.edit')}</button>
-						{#if isOwner}
-							<button type="button" class="btn btn-outline btn-error btn-sm" onclick={deleteOrg} disabled={deleting}>
-								{deleting ? t('common.deleting') : t('common.delete')}
-							</button>
-						{/if}
-					</div>
-				{/if}
 			</div>
 
 			{#if !isAdmin && org.memberTimeEntryVisibility}
@@ -328,6 +206,5 @@
 					{/if}
 				</div>
 			{/if}
-		{/if}
 	{/if}
 </div>

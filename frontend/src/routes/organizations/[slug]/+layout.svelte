@@ -18,6 +18,7 @@
 
 	/** The "Organisation" area: one sub-section per job instead of one long page. */
 	const tabs = $derived([
+		...(isAdmin ? [{ path: 'general', label: t('orgs.tabs.general') }] : []),
 		{ path: '', label: t('orgs.tabs.schedule') },
 		{ path: 'members', label: t('orgs.tabs.members') },
 		{ path: 'groups', label: t('orgs.tabs.groups') },
