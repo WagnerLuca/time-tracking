@@ -230,7 +230,10 @@ public class AuthService : IAuthService
         user.UpdatedAt = DateTime.UtcNow;
 
         foreach (var membership in await _context.UserOrganizations.Where(uo => uo.UserId == userId).ToListAsync())
+        {
             membership.IsActive = false;
+            membership.PersonnelNumber = null;
+        }
         // Terminal cards go; the punch protocol keeps its rows (hash + hint only, no card value)
         _context.BadgeCards.RemoveRange(_context.BadgeCards.IgnoreQueryFilters().Where(c => c.UserId == userId));
         // Free-text the person wrote may name them; the request itself stays for the audit trail

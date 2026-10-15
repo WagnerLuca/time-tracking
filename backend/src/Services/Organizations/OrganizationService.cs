@@ -490,6 +490,9 @@ public class OrganizationService : IOrganizationService
         }
 
         membership.IsActive = false;
+        // The number goes free for the next hire; payroll exports list active members only, so no
+        // past period needs it (the unique index would otherwise keep holding it on the inactive row)
+        membership.PersonnelNumber = null;
         // Leaving ends group roles too (they must not come back on rejoining) and frees the cards
         _context.BadgeCards.RemoveRange(_context.BadgeCards.Where(c => c.UserId == userId && c.OrganizationId == org.Id));
         _context.GroupMembers.RemoveRange(_context.GroupMembers.Where(gm => gm.UserId == userId && gm.Group.OrganizationId == org.Id));

@@ -117,6 +117,20 @@ public class PostgresIntegrityTests
     }
 
     [Fact]
+    public async Task PersonnelNumber_IsFreedWhenTheMemberIsRemoved()
+    {
+        var (owner, _, slug, _, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, "pg-pn", new { }, "pg.test");
+        string Url(int id) => $"/api/v1/organizations/{slug}/members/{id}/personnel-number";
+        (await owner.PutAsJsonAsync(Url(memberId), new { personnelNumber = "P-7" })).EnsureSuccessStatusCode();
+        (await owner.DeleteAsync($"/api/v1/Organizations/{slug}/members/{memberId}")).EnsureSuccessStatusCode();
+
+        // The unique index (org, number) no longer holds it on the inactive membership row
+        var (_, next) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "pg-pn-next@pg.test");
+        (await TestHelpers.AddMemberAsync(_factory, owner, slug, next)).EnsureSuccessStatusCode();
+        (await owner.PutAsJsonAsync(Url(next.User.Id), new { personnelNumber = "P-7" })).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task WithdrawRacingApprovalAndDoubleClick_OnlyOneWins()
     {
         var (owner, member, slug, _, _) = await TestHelpers.OrgWithMemberAsync(_factory, "pg-withdraw", new { initialOvertimeMode = 1 }, "pg.test");
