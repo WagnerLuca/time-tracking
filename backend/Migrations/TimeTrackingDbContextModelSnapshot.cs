@@ -692,6 +692,15 @@ namespace TimeTracking.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int>("TerminalDoubleScanSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TerminalOfflineHours")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TerminalUnknownCardLimit")
+                        .HasColumnType("integer");
+
                     b.Property<string>("TimeZone")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

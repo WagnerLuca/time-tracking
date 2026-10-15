@@ -39,17 +39,13 @@ public class ApiKeyService : IApiKeyService
 {
     private const string KeyPrefix = "tt_";
 
-    // ponytail: fixed rules for every terminal; make them org settings once a site needs other values
-    /// <summary>A second scan of the same card within this time toggles nothing.</summary>
-    public static readonly TimeSpan RepeatWindow = TimeSpan.FromSeconds(60);
-    /// <summary>Oldest queued scan a terminal may still send.</summary>
-    public static readonly TimeSpan MaxQueueAge = TimeSpan.FromHours(72);
+    // The double-scan window, the offline window (oldest queued scan) and the unknown-card budget
+    // are organization settings (Organization.Terminal*, TerminalLimits)
     /// <summary>How far a terminal's clock may run ahead.</summary>
     public static readonly TimeSpan MaxClockSkew = TimeSpan.FromMinutes(2);
     /// <summary>A queued scan closes a failure entry that started at most this long before it.</summary>
     public static readonly TimeSpan FailureCloseWindow = TimeSpan.FromHours(24);
-    /// <summary>Unknown/blocked scans one key may send per <see cref="UnknownScanWindow"/> before it gets 429s.</summary>
-    public const int UnknownScanLimit = 20;
+    /// <summary>Window of the unknown-card budget (Organization.TerminalUnknownCardLimit scans per window).</summary>
     public static readonly TimeSpan UnknownScanWindow = TimeSpan.FromMinutes(10);
 
     private static readonly PunchResult[] Accepted = [PunchResult.Started, PunchResult.Stopped, PunchResult.ClosedFailure];
@@ -298,7 +294,7 @@ public class ApiKeyService : IApiKeyService
             return ServiceResult.Unauthorized<PunchResponse>("Missing API key.");
 
         var keyHash = Hash(apiKey.Trim());
-        var key = await _context.ApiKeys.FirstOrDefaultAsync(k => k.KeyHash == keyHash);
+        var key = await _context.ApiKeys.Include(k => k.Organization).FirstOrDefaultAsync(k => k.KeyHash == keyHash);
         if (key == null)
             return ServiceResult.Unauthorized<PunchResponse>("Invalid API key.");
 
@@ -315,8 +311,9 @@ public class ApiKeyService : IApiKeyService
         }
 
         DateTime? scannedAt = request.ScannedAt is { } raw ? ToUtc(raw) : null;
-        if (scannedAt is { } s && (s < now - MaxQueueAge || s > now + MaxClockSkew))
-            return ServiceResult.BadRequest<PunchResponse>("The scan time must lie between 72 hours ago and 2 minutes from now.");
+        var offlineHours = key.Organization.TerminalOfflineHours;
+        if (scannedAt is { } s && (s < now.AddHours(-offlineHours) || s > now + MaxClockSkew))
+            return ServiceResult.BadRequest<PunchResponse>($"The scan time must lie between {offlineHours} hours ago and 2 minutes from now.");
         var at = scannedAt ?? now;
 
         var normalized = CardIds.Normalize(request.BadgeId);
@@ -346,7 +343,7 @@ public class ApiKeyService : IApiKeyService
             var since = now - UnknownScanWindow;
             var misses = await _context.TerminalPunches.CountAsync(p => p.ApiKeyId == key.Id && p.ReceivedAt >= since
                 && (p.Result == PunchResult.UnknownCard || p.Result == PunchResult.Blocked));
-            if (misses >= UnknownScanLimit)
+            if (misses >= key.Organization.TerminalUnknownCardLimit)
             {
                 await _context.SaveChangesAsync();
                 _logger.LogWarning("Terminal key {KeyId} exceeded the unknown-card budget", key.Id);
@@ -375,7 +372,7 @@ public class ApiKeyService : IApiKeyService
             .FirstOrDefaultAsync();
         if (last != null)
         {
-            if (last.CardHash == punch.CardHash && (at - last.ScannedAt).Duration() < RepeatWindow)
+            if (last.CardHash == punch.CardHash && (at - last.ScannedAt).Duration() < TimeSpan.FromSeconds(key.Organization.TerminalDoubleScanSeconds))
             {
                 punch.Result = PunchResult.Repeated;
                 punch.TimeEntryId = last.TimeEntryId;

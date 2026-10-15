@@ -155,7 +155,9 @@ public static class ErrorCodes
         ["Unknown card."] = "terminal.unknownCard",
         ["This card is blocked."] = "terminal.cardBlocked",
         ["Too many unknown cards were scanned. Try again later."] = "terminal.tooManyUnknown",
-        ["The scan time must lie between 72 hours ago and 2 minutes from now."] = "terminal.scannedAtOutOfRange",
+        ["The double-scan window must be between 5 and 600 seconds."] = "terminal.doubleScanRange",
+        ["The offline window must be between 1 and 168 hours."] = "terminal.offlineRange",
+        ["The unknown-card budget must be between 5 and 200 scans per 10 minutes."] = "terminal.unknownLimitRange",
         ["This scan is older than the member's last punch. Send queued scans in order."] = "terminal.outOfOrder",
         ["A timer is running outside this organization. Stop it in the app first."] = "terminal.timerElsewhere",
         ["This card is already registered."] = "terminal.cardTaken",
@@ -177,6 +179,7 @@ public static class ErrorCodes
         if (message.StartsWith("You own ")) return "account.ownsOrganizations";
         if (message.EndsWith(" require two-factor authentication. Leave them first, or ask an admin to turn the requirement off.")) return "account.twoFactorRequiredByOrgs";
         if (message.StartsWith("Unknown time zone ")) return "org.unknownTimeZone";
+        if (message.StartsWith("The scan time must lie between ")) return "terminal.scannedAtOutOfRange";
         if (message.StartsWith("This schedule overlaps with an existing one ")) return "schedule.overlap";
         // OrgRuleHelper.EnforceAllowed / WorkScheduleService.CheckRuleMode ("<feature> is/are disabled…")
         if (message.EndsWith(" is disabled in this organization.") || message.EndsWith(" are disabled for this organization.")) return "org.featureDisabled";

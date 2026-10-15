@@ -47,6 +47,10 @@ public record OrganizationDetailResponse
     public string CoreHoursStart { get; init; } = "09:00";
     public string CoreHoursEnd { get; init; } = "15:00";
     public int CoreHoursToleranceMinutes { get; init; } = 5;
+    /// <summary>Terminal settings (docs/TERMINAL.md).</summary>
+    public int TerminalDoubleScanSeconds { get; init; } = TerminalLimits.DefaultDoubleScanSeconds;
+    public int TerminalOfflineHours { get; init; } = TerminalLimits.DefaultOfflineHours;
+    public int TerminalUnknownCardLimit { get; init; } = TerminalLimits.DefaultUnknownCardLimit;
     public DateTime? SettingsUpdatedAt { get; init; }
     public DateTime CreatedAt { get; init; }
     public required List<OrganizationMemberResponse> Members { get; init; }
@@ -203,6 +207,12 @@ public record UpdateOrganizationSettingsRequest
     /// <summary>Allowed late start / early leave / gap in minutes.</summary>
     [Range(0, 120)]
     public int? CoreHoursToleranceMinutes { get; init; }
+    /// <summary>Terminal double-scan window in seconds (5-600).</summary>
+    public int? TerminalDoubleScanSeconds { get; init; }
+    /// <summary>Terminal offline window in hours (1-168).</summary>
+    public int? TerminalOfflineHours { get; init; }
+    /// <summary>Unknown/blocked scans per key and 10 minutes (5-200).</summary>
+    public int? TerminalUnknownCardLimit { get; init; }
 }
 
 /// <summary>Per-member time tracking statistics for the admin overview.</summary>
@@ -269,6 +279,9 @@ public record OrganizationSettingsResponse
     public string CoreHoursStart { get; init; } = "09:00";
     public string CoreHoursEnd { get; init; } = "15:00";
     public int CoreHoursToleranceMinutes { get; init; } = 5;
+    public int TerminalDoubleScanSeconds { get; init; }
+    public int TerminalOfflineHours { get; init; }
+    public int TerminalUnknownCardLimit { get; init; }
 }
 
 /// <summary>A member's initial overtime after it was set.</summary>

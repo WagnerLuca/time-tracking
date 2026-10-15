@@ -174,6 +174,13 @@ public class Organization
     public TimeOnly CoreHoursEnd { get; set; } = new(15, 0);
     /// <summary>Allowed late start, early leave and gap length before a day counts as a violation.</summary>
     public int CoreHoursToleranceMinutes { get; set; } = 5;
+
+    /// <summary>Terminal (docs/TERMINAL.md): a second scan of the same card within this many seconds toggles nothing.</summary>
+    public int TerminalDoubleScanSeconds { get; set; } = TerminalLimits.DefaultDoubleScanSeconds;
+    /// <summary>Terminal: oldest queued (offline) scan a terminal may still send, in hours.</summary>
+    public int TerminalOfflineHours { get; set; } = TerminalLimits.DefaultOfflineHours;
+    /// <summary>Terminal: unknown/blocked scans one key may send per 10 minutes before it gets 429s.</summary>
+    public int TerminalUnknownCardLimit { get; set; } = TerminalLimits.DefaultUnknownCardLimit;
     
     /// <summary>
     /// Timestamp of the last settings update. Used to notify members of rule changes.
@@ -189,4 +196,12 @@ public class Organization
     
     [JsonIgnore]
     public ICollection<Holiday> Holidays { get; set; } = new List<Holiday>();
+}
+
+/// <summary>Defaults and allowed ranges of the per-organization terminal settings.</summary>
+public static class TerminalLimits
+{
+    public const int DefaultDoubleScanSeconds = 60, MinDoubleScanSeconds = 5, MaxDoubleScanSeconds = 600;
+    public const int DefaultOfflineHours = 72, MinOfflineHours = 1, MaxOfflineHours = 168;
+    public const int DefaultUnknownCardLimit = 20, MinUnknownCardLimit = 5, MaxUnknownCardLimit = 200;
 }

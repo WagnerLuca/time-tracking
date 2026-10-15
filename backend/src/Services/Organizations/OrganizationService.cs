@@ -91,6 +91,9 @@ public class OrganizationService : IOrganizationService
                 CoreHoursStart = o.CoreHoursStart.ToString("HH:mm"),
                 CoreHoursEnd = o.CoreHoursEnd.ToString("HH:mm"),
                 CoreHoursToleranceMinutes = o.CoreHoursToleranceMinutes,
+                TerminalDoubleScanSeconds = o.TerminalDoubleScanSeconds,
+                TerminalOfflineHours = o.TerminalOfflineHours,
+                TerminalUnknownCardLimit = o.TerminalUnknownCardLimit,
                 SettingsUpdatedAt = o.SettingsUpdatedAt,
                 CreatedAt = o.CreatedAt,
                 Members = o.UserOrganizations
@@ -548,6 +551,24 @@ public class OrganizationService : IOrganizationService
         if (request.CoreHoursToleranceMinutes.HasValue) org.CoreHoursToleranceMinutes = request.CoreHoursToleranceMinutes.Value;
         if (org.CoreHoursStart >= org.CoreHoursEnd)
             return ServiceResult.BadRequest<OrganizationSettingsResponse>(CoreHoursOrderMessage);
+        if (request.TerminalDoubleScanSeconds is { } doubleScan)
+        {
+            if (doubleScan is < TerminalLimits.MinDoubleScanSeconds or > TerminalLimits.MaxDoubleScanSeconds)
+                return ServiceResult.BadRequest<OrganizationSettingsResponse>("The double-scan window must be between 5 and 600 seconds.");
+            org.TerminalDoubleScanSeconds = doubleScan;
+        }
+        if (request.TerminalOfflineHours is { } offline)
+        {
+            if (offline is < TerminalLimits.MinOfflineHours or > TerminalLimits.MaxOfflineHours)
+                return ServiceResult.BadRequest<OrganizationSettingsResponse>("The offline window must be between 1 and 168 hours.");
+            org.TerminalOfflineHours = offline;
+        }
+        if (request.TerminalUnknownCardLimit is { } unknown)
+        {
+            if (unknown is < TerminalLimits.MinUnknownCardLimit or > TerminalLimits.MaxUnknownCardLimit)
+                return ServiceResult.BadRequest<OrganizationSettingsResponse>("The unknown-card budget must be between 5 and 200 scans per 10 minutes.");
+            org.TerminalUnknownCardLimit = unknown;
+        }
 
         org.UpdatedAt = DateTime.UtcNow;
         org.SettingsUpdatedAt = DateTime.UtcNow;
@@ -594,7 +615,10 @@ public class OrganizationService : IOrganizationService
             CoreHoursEnabled = org.CoreHoursEnabled,
             CoreHoursStart = org.CoreHoursStart.ToString("HH:mm"),
             CoreHoursEnd = org.CoreHoursEnd.ToString("HH:mm"),
-            CoreHoursToleranceMinutes = org.CoreHoursToleranceMinutes
+            CoreHoursToleranceMinutes = org.CoreHoursToleranceMinutes,
+            TerminalDoubleScanSeconds = org.TerminalDoubleScanSeconds,
+            TerminalOfflineHours = org.TerminalOfflineHours,
+            TerminalUnknownCardLimit = org.TerminalUnknownCardLimit
         });
     }
 

@@ -383,6 +383,85 @@ public class ApiKeysControllerTests : IClassFixture<TimeTrackingApiFactory>
         (await PunchAsync(s.Key, "RFID-1")).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    // ── Terminal settings per organization ──────────────────────────────
+
+    private static Task<HttpResponseMessage> SetTerminalAsync(Setup s, object settings) =>
+        s.Owner.PutAsJsonAsync($"/api/v1/Organizations/{s.Slug}/settings", settings);
+
+    [Fact]
+    public async Task TerminalSettings_DefaultToTheOldConstants_AndAreValidated()
+    {
+        var s = await SetupAsync("tset-validate");
+        var detail = await s.Owner.GetFromJsonAsync<JsonElement>($"/api/v1/Organizations/{s.Slug}");
+        detail.GetProperty("terminalDoubleScanSeconds").GetInt32().Should().Be(60);
+        detail.GetProperty("terminalOfflineHours").GetInt32().Should().Be(72);
+        detail.GetProperty("terminalUnknownCardLimit").GetInt32().Should().Be(20);
+
+        foreach (var (body, code) in new (object, string)[]
+                 {
+                     (new { terminalDoubleScanSeconds = 4 }, "terminal.doubleScanRange"),
+                     (new { terminalDoubleScanSeconds = 601 }, "terminal.doubleScanRange"),
+                     (new { terminalOfflineHours = 0 }, "terminal.offlineRange"),
+                     (new { terminalOfflineHours = 169 }, "terminal.offlineRange"),
+                     (new { terminalUnknownCardLimit = 4 }, "terminal.unknownLimitRange"),
+                     (new { terminalUnknownCardLimit = 201 }, "terminal.unknownLimitRange")
+                 })
+        {
+            var response = await SetTerminalAsync(s, body);
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await CodeAsync(response)).Should().Be(code);
+        }
+
+        var ok = await JsonAsync(await SetTerminalAsync(s, new { terminalDoubleScanSeconds = 5, terminalOfflineHours = 168, terminalUnknownCardLimit = 200 }));
+        ok.GetProperty("terminalDoubleScanSeconds").GetInt32().Should().Be(5);
+        ok.GetProperty("terminalOfflineHours").GetInt32().Should().Be(168);
+        ok.GetProperty("terminalUnknownCardLimit").GetInt32().Should().Be(200);
+    }
+
+    [Fact]
+    public async Task DoubleScanWindow_IsTheOrganizationsSetting()
+    {
+        var s = await SetupAsync("tset-double");
+        (await SetTerminalAsync(s, new { terminalDoubleScanSeconds = 300 })).EnsureSuccessStatusCode();
+
+        // 2 minutes apart: a repeat under 300 s (it would toggle with the default 60 s)
+        (await PunchAsync(s.Key, "RFID-1", Minutes(-3))).EnsureSuccessStatusCode();
+        (await JsonAsync(await PunchAsync(s.Key, "RFID-1", Minutes(-1)))).GetProperty("repeated").GetBoolean().Should().BeTrue();
+
+        (await SetTerminalAsync(s, new { terminalDoubleScanSeconds = 5 })).EnsureSuccessStatusCode();
+        (await JsonAsync(await PunchAsync(s.Key, "RFID-1"))).GetProperty("action").GetString().Should().Be("Stopped");
+    }
+
+    [Fact]
+    public async Task OfflineWindow_IsTheOrganizationsSetting()
+    {
+        var s = await SetupAsync("tset-offline");
+        (await SetTerminalAsync(s, new { terminalOfflineHours = 2 })).EnsureSuccessStatusCode();
+
+        var tooOld = await PunchAsync(s.Key, "RFID-1", DateTime.UtcNow.AddHours(-3));
+        tooOld.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var problem = await JsonAsync(tooOld);
+        problem.GetProperty("code").GetString().Should().Be("terminal.scannedAtOutOfRange");
+        problem.GetProperty("detail").GetString().Should().Contain("2 hours");
+
+        (await SetTerminalAsync(s, new { terminalOfflineHours = 100 })).EnsureSuccessStatusCode();
+        (await PunchAsync(s.Key, "RFID-1", DateTime.UtcNow.AddHours(-80))).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task UnknownCardBudget_IsTheOrganizationsSetting()
+    {
+        var s = await SetupAsync("tset-budget");
+        (await SetTerminalAsync(s, new { terminalUnknownCardLimit = 5 })).EnsureSuccessStatusCode();
+
+        for (var i = 0; i < 5; i++)
+            (await PunchAsync(s.Key, $"GUESS-{i}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await PunchAsync(s.Key, "GUESS-X")).StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+
+        (await SetTerminalAsync(s, new { terminalUnknownCardLimit = 7 })).EnsureSuccessStatusCode();
+        (await PunchAsync(s.Key, "GUESS-Y")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     // ── Entry source per path ───────────────────────────────────────────
 
     [Fact]
