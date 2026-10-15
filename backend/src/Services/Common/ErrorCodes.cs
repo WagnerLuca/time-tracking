@@ -140,6 +140,7 @@ public static class ErrorCodes
         ["User is already in this group."] = "group.alreadyMember",
         ["Member not found in group."] = "group.memberNotFound",
         ["Parent group not found."] = "group.parentNotFound",
+        ["Choose either a parent group or the top level, not both."] = "group.parentOrTopLevel",
         ["A group cannot be moved into itself or one of its sub-groups."] = "group.cycle",
         ["Groups can be nested at most 3 levels deep."] = "group.tooDeep",
         ["This group has sub-groups. Choose whether to move them up one level or delete them with it."] = "group.hasSubGroups",

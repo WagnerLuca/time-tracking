@@ -223,8 +223,13 @@ public class SubGroupTests : IClassFixture<TimeTrackingApiFactory>
             .Should().Be("group.tooDeep");
         (await CodeAsync(await CreateAsync(owner, slug, "Nowhere", 999999))).Should().Be("group.parentNotFound");
 
+        // A rename without parentGroupId keeps the parent; the top level is an explicit choice (#63)
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{team}", new { name = "Team" })).EnsureSuccessStatusCode();
+        (await CodeAsync(await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{squad}", new { name = "Squad", parentGroupId = dept, moveToTopLevel = true })))
+            .Should().Be("group.parentOrTopLevel");
+
         // a valid move: Squad up to the top level, then Other below Dept
-        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{squad}", new { name = "Squad" })).EnsureSuccessStatusCode();
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{squad}", new { name = "Squad", moveToTopLevel = true })).EnsureSuccessStatusCode();
         (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{other}", new { name = "Other", parentGroupId = dept })).EnsureSuccessStatusCode();
         var groups = await owner.GetFromJsonAsync<JsonElement>($"/api/v1/Organizations/{slug}/groups");
         int? Parent(int id) => groups.EnumerateArray().Single(g => g.GetProperty("id").GetInt32() == id).GetProperty("parentGroupId") is

@@ -28,6 +28,7 @@ public class GroupService : IGroupService
     }
 
     public const string ParentNotFoundMessage = "Parent group not found.";
+    public const string ParentOrTopLevelMessage = "Choose either a parent group or the top level, not both.";
     public const string HasSubGroupsMessage = "This group has sub-groups. Choose whether to move them up one level or delete them with it.";
     public const string UnknownCapabilityMessage = "Unknown group admin capability.";
 
@@ -179,6 +180,8 @@ public class GroupService : IGroupService
 
         if (group is null) return ServiceResult.NotFound<GroupDetailResponse>("Group not found.");
 
+        if (request.MoveToTopLevel && request.ParentGroupId != null)
+            return ServiceResult.BadRequest<GroupDetailResponse>(ParentOrTopLevelMessage);
         if (request.ParentGroupId != group.ParentGroupId && request.ParentGroupId is { } parentId)
         {
             var tree = await GroupTree.LoadAsync(_context, org.Id);
@@ -191,7 +194,8 @@ public class GroupService : IGroupService
         group.Name = request.Name.Trim();
         group.Description = request.Description?.Trim();
         group.Color = request.Color?.Trim();
-        group.ParentGroupId = request.ParentGroupId;
+        if (request.MoveToTopLevel) group.ParentGroupId = null;
+        else if (request.ParentGroupId != null) group.ParentGroupId = request.ParentGroupId;
         group.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();

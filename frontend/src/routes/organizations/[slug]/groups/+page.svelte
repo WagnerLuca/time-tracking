@@ -201,7 +201,9 @@
 				name: editName.trim(),
 				description: editDescription.trim() || undefined,
 				color: editColor,
-				parentGroupId: editParent
+				// A missing parent keeps it on the server; the top level has to be chosen explicitly
+				parentGroupId: editParent ?? undefined,
+				moveToTopLevel: editParent == null
 			});
 			toast.success(t('groups.saved'));
 			editingGroup = false;

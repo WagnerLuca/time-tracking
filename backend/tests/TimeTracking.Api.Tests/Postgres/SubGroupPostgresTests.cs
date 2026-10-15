@@ -47,7 +47,7 @@ public class SubGroupPostgresTests
         (await sibling.GetAsync(url)).StatusCode.Should().NotBe(HttpStatusCode.OK);   // another branch's admin
 
         // Moving the team out of the department ends the lead's reach (the FK accepts a top-level group)
-        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/groups/{team}", new { name = "Team" })).EnsureSuccessStatusCode();
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/groups/{team}", new { name = "Team", moveToTopLevel = true })).EnsureSuccessStatusCode();
         (await lead.GetAsync(url)).StatusCode.Should().NotBe(HttpStatusCode.OK);
     }
 }

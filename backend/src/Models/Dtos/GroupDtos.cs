@@ -57,8 +57,10 @@ public record UpdateGroupRequest(
     string Name,
     string? Description,
     string? Color,
-    // Parent group (same organization), null = top level; a group cannot move into its own subtree
-    int? ParentGroupId = null
+    // New parent group (same organization); a group cannot move into its own subtree. Left out (null) the
+    // parent stays — moving to the top level is the explicit MoveToTopLevel = true (then without ParentGroupId).
+    int? ParentGroupId = null,
+    bool MoveToTopLevel = false
 );
 
 /// <summary>What happens to the sub-groups of a group that is deleted.</summary>
