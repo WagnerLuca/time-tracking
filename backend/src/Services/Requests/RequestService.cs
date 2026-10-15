@@ -86,6 +86,10 @@ public class RequestService : IRequestService
             // The request is still recorded for a complete audit trail.
             var autoApprove = request.Type == RequestType.RequestAbsence
                 && await EffectiveRuleResolver.CanApproveAbsencesAsync(_context, org.Id, userId);
+            // A running timer is stopped, not edited (and the closed-month guard lets a stop through)
+            if (request.Type == RequestType.EditPastEntry && request.RelatedEntityId is { } entryId
+                && await _context.TimeEntries.AnyAsync(e => e.Id == entryId && e.IsRunning))
+                return ServiceResult.BadRequest<OrgRequestResponse>("Cannot edit a running time entry.");
             await ClosedPeriods.EnsureRequestOpenAsync(_context, org, userId, new OrgRequest
             {
                 OrganizationId = org.Id, UserId = userId, Type = request.Type,
@@ -514,6 +518,8 @@ public class RequestService : IRequestService
                                                && e.UserId == orgRequest.UserId);
                     if (entry == null)
                         return "The time entry no longer exists.";
+                    if (entry.IsRunning)
+                        return "The time entry is still running.";
 
                     var data = JsonSerializer.Deserialize<EditEntryRequestData>(orgRequest.RequestData, RequestDataJson);
                     if (data != null)

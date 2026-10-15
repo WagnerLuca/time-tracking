@@ -307,6 +307,77 @@ public class ClosedPeriodTests : IClassFixture<TimeTrackingApiFactory>
             new { endTime = DateTime.UtcNow.AddDays(-2).AddHours(8) }), thisMonth);
     }
 
+    [Fact]
+    public async Task RunningEntry_OnlyAPureStopPassesTheGuard_EditRequestsAreRefused()
+    {
+        var (owner, member, slug, orgId, memberId) = await SetupAsync("cp-running");
+        var start = DateTime.UtcNow.AddMinutes(-30);
+        int runningId, pendingId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<TimeTrackingDbContext>();
+            var running = new TimeEntry { UserId = memberId, OrganizationId = orgId, StartTime = start, IsRunning = true, CreatedAt = start, UpdatedAt = start };
+            db.TimeEntries.Add(running);
+            await db.SaveChangesAsync();
+            runningId = running.Id;
+            // A request from before the timer was (re)started, still pending
+            var pending = new OrgRequest
+            {
+                UserId = memberId, OrganizationId = orgId, Type = RequestType.EditPastEntry, RelatedEntityId = runningId,
+                RequestData = JsonSerializer.Serialize(new { endTime = DateTime.UtcNow }), Status = RequestStatus.Pending
+            };
+            db.OrgRequests.Add(pending);
+            await db.SaveChangesAsync();
+            pendingId = pending.Id;
+        }
+        (await CloseAsync(owner, slug, LastMonth, LastMonth)).EnsureSuccessStatusCode();
+        (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/settings", new { editPastEntriesMode = 1 })).EnsureSuccessStatusCode();
+
+        // A running entry is stopped, not edited: no new request, and the pending one cannot be applied
+        var created = await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/requests", new
+        {
+            type = 1, relatedEntityId = runningId, requestData = JsonSerializer.Serialize(new { startTime = Day(14).Start })
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("entry.running");
+        var applied = await owner.PutAsJsonAsync($"/api/v1/organizations/{slug}/requests/{pendingId}", new { accept = true });
+        applied.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await applied.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("request.cannotApply");
+
+        // The guard: stopping while moving the start into the closed month is a change, a pure stop is not
+        using (var scope = _factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<RlsContext>().ActAsUser(memberId);
+            var db = scope.ServiceProvider.GetRequiredService<TimeTrackingDbContext>();
+            var entry = await db.TimeEntries.FirstAsync(e => e.Id == runningId);
+            (entry.StartTime, entry.EndTime, entry.IsRunning) = (Day(14).Start, Day(14).End, false);
+            (await FluentActions.Awaiting(() => db.SaveChangesAsync()).Should().ThrowAsync<PeriodClosedException>())
+                .Which.Month.Should().Be(LastMonth);
+            (entry.StartTime, entry.EndTime) = (start, DateTime.UtcNow);
+            await db.SaveChangesAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Guard_UsesTheOrgTimeZone_AtTheMonthBoundary()
+    {
+        var (owner, member, slug, orgId, _) = await TestHelpers.OrgWithMemberAsync(_factory, "cp-ny",
+            new { editPastEntriesMode = Allowed, timeZone = "America/New_York" }, "closed.test");
+        (await CloseAsync(owner, slug, LastMonth, LastMonth)).EnsureSuccessStatusCode();
+        var ny = OrgClock.For("America/New_York");
+
+        // 23:30 in New York on the last day of the closed month is already the next month in UTC (and in Berlin)
+        var lateStart = ny.ToUtc(LastMonth.AddMonths(1).AddDays(-1).ToDateTime(new TimeOnly(23, 30)));
+        lateStart.Month.Should().Be(LastMonth.AddMonths(1).Month);
+        await ShouldBeClosedAsync(await member.PostAsJsonAsync("/api/v1/TimeTracking/manual",
+            new { startTime = lateStart, endTime = lateStart.AddMinutes(20), organizationId = orgId }));
+
+        // 00:30 on the first day of the next month is open
+        var nextStart = ny.ToUtc(LastMonth.AddMonths(1).ToDateTime(new TimeOnly(0, 30)));
+        (await member.PostAsJsonAsync("/api/v1/TimeTracking/manual",
+            new { startTime = nextStart, endTime = nextStart.AddMinutes(20), organizationId = orgId })).StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
     private static async Task ShouldBeClosedOrThisMonthAsync(HttpResponseMessage response, DateOnly month)
     {
         response.StatusCode.Should().Be(HttpStatusCode.Conflict, await response.Content.ReadAsStringAsync());

@@ -121,8 +121,9 @@ public static class ClosedPeriods
             switch (e.Entity)
             {
                 case TimeEntry entry:
-                    // Stopping a running timer is not a change of a finished entry (the start stays put)
-                    if (e.State == EntityState.Modified && (bool)e.Property(nameof(TimeEntry.IsRunning)).OriginalValue!) continue;
+                    // Stopping a running timer is not a change of a finished entry — as long as the start and org stay put
+                    if (e.State == EntityState.Modified && (bool)e.Property(nameof(TimeEntry.IsRunning)).OriginalValue!
+                        && Unchanged(e, nameof(TimeEntry.StartTime)) && Unchanged(e, nameof(TimeEntry.OrganizationId))) continue;
                     foreach (var (org, start) in Versions(e, nameof(TimeEntry.OrganizationId), nameof(TimeEntry.StartTime)))
                         if (org is int orgId)
                             touches.Add(new Touch(orgId, entry.UserId, nameof(TimeEntry), entry, (DateTime)start!, default, null));
@@ -139,6 +140,9 @@ public static class ClosedPeriods
         }
         return touches;
     }
+
+    private static bool Unchanged(EntityEntry e, string property) =>
+        Equals(e.Property(property).OriginalValue, e.Property(property).CurrentValue);
 
     private static IEnumerable<(object? A, object? B)> Versions(EntityEntry e, string a, string b)
     {
