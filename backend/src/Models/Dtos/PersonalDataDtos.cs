@@ -10,6 +10,8 @@ public record PersonalDataExport
     public required List<PersonalMembership> Memberships { get; init; }
     /// <summary>Terminal cards, by hint and label (the card value itself is not stored).</summary>
     public required List<PersonalCard> Cards { get; init; }
+    /// <summary>The terminal's log of your card scans (kept 400 days).</summary>
+    public required List<PersonalPunch> TerminalPunches { get; init; }
     public required List<PersonalTimeEntry> TimeEntries { get; init; }
     public required List<PersonalAbsence> Absences { get; init; }
     public required List<PersonalRequest> Requests { get; init; }
@@ -20,6 +22,8 @@ public record PersonalDataExport
 public record PersonalMembership(string Organization, string Role, DateTime JoinedAt, bool Active, double VacationDaysPerYear, double InitialOvertimeHours,
     string? PersonnelNumber);
 public record PersonalCard(string Organization, string CardHint, string? Label, bool IsBlocked, DateTime CreatedAt, DateTime? LastUsedAt);
+/// <summary>Terminal is null once its API key has been deleted; Result is Started/Stopped/ClosedFailure/Repeated/Blocked/Rejected.</summary>
+public record PersonalPunch(string Organization, DateTime ScannedAt, string? Terminal, string Result, string CardHint);
 public record PersonalTimeEntry(string? Organization, DateTime StartTime, DateTime? EndTime, int PauseMinutes, string? Description, bool IsFailure);
 public record PersonalAbsence(string Organization, DateOnly Date, string Type, bool IsHalfDay, string? Note);
 public record PersonalRequest(string Organization, string Type, string Status, string? Message, string? RequestData, DateTime CreatedAt, DateTime? RespondedAt);

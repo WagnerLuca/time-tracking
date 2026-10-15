@@ -317,6 +317,11 @@ public class AuthService : IAuthService
                 .OrderBy(c => c.CreatedAt)
                 .Select(c => new PersonalCard(c.Organization.Name, c.CardHint, c.Label, c.IsBlocked, c.CreatedAt, c.LastUsedAt))
                 .ToListAsync(),
+            TerminalPunches = await _context.TerminalPunches.IgnoreQueryFilters().AsNoTracking()
+                .Where(p => p.UserId == userId)
+                .OrderBy(p => p.ScannedAt)
+                .Select(p => new PersonalPunch(p.Organization.Name, p.ScannedAt, p.ApiKey != null ? p.ApiKey.Name : null, p.Result.ToString(), p.CardHint))
+                .ToListAsync(),
             TimeEntries = await _context.TimeEntries.IgnoreQueryFilters().AsNoTracking()
                 .Where(t => t.UserId == userId)
                 .OrderBy(t => t.StartTime)

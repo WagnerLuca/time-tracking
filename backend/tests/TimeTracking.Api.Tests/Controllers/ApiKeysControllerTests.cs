@@ -353,12 +353,20 @@ public class ApiKeysControllerTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     [Fact]
-    public async Task PersonalDataExport_ListsCardsByHintOnly()
+    public async Task PersonalDataExport_ListsCardsByHintOnly_AndThePunchLog()
     {
         var s = await SetupAsync("gdpr", card: "SECRET-UID-9876");
 
+        (await PunchAsync(s.Key, "SECRET-UID-9876")).StatusCode.Should().Be(HttpStatusCode.OK);
+
         var export = await s.Member.GetStringAsync("/api/v1/Auth/me/export");
         export.Should().Contain("9876").And.NotContain("SECRET-UID");
+        // The punch log is part of it (GDPR Art. 15): time, terminal, result
+        var punch = JsonDocument.Parse(export).RootElement.GetProperty("terminalPunches").EnumerateArray().Single();
+        (punch.GetProperty("terminal").GetString(), punch.GetProperty("result").GetString(), punch.GetProperty("cardHint").GetString())
+            .Should().Be(("Entrance", "Started", "9876"));
+        punch.GetProperty("scannedAt").GetDateTime().Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        (await s.Owner.GetStringAsync("/api/v1/Auth/me/export")).Should().Contain("\"terminalPunches\": []");
     }
 
     [Fact]

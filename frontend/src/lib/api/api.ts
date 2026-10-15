@@ -1117,6 +1117,10 @@ export interface PersonalDataExport {
      * Terminal cards, by hint and label (the card value itself is not stored).
      */
     'cards': Array<PersonalCard> | null;
+    /**
+     * The terminal\'s log of your card scans (kept 400 days).
+     */
+    'terminalPunches': Array<PersonalPunch> | null;
     'timeEntries': Array<PersonalTimeEntry> | null;
     'absences': Array<PersonalAbsence> | null;
     'requests': Array<PersonalRequest> | null;
@@ -1147,6 +1151,16 @@ export interface PersonalNotification {
     'message'?: string | null;
     'createdAt'?: string;
     'isRead'?: boolean;
+}
+/**
+ * Terminal is null once its API key has been deleted; Result is Started/Stopped/ClosedFailure/Repeated/Blocked/Rejected.
+ */
+export interface PersonalPunch {
+    'organization'?: string | null;
+    'scannedAt'?: string;
+    'terminal'?: string | null;
+    'result'?: string | null;
+    'cardHint'?: string | null;
 }
 export interface PersonalRequest {
     'organization'?: string | null;
