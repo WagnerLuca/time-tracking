@@ -894,7 +894,7 @@ export interface OrganizationMemberResponse {
     'lastName': string | null;
     'profileImageUrl'?: string | null;
     /**
-     * Org role; null when the caller may not see the member\'s groups and roles.
+     * Org role; shown whenever the member is.
      */
     'role'?: string | null;
     'joinedAt'?: string;
@@ -946,7 +946,10 @@ export interface OrganizationResponse {
     'website'?: string | null;
     'logoUrl'?: string | null;
     'createdAt'?: string;
-    'memberCount'?: number;
+    /**
+     * Members the caller can see; null in the directory for organizations the caller does not belong to.
+     */
+    'memberCount'?: number | null;
     'joinPolicy': string | null;
 }
 /**
@@ -1590,6 +1593,7 @@ export interface UpdateGroupRequest {
     'description'?: string | null;
     'color'?: string | null;
     'parentGroupId'?: number | null;
+    'moveToTopLevel'?: boolean;
 }
 /**
  * Request payload for updating a holiday.

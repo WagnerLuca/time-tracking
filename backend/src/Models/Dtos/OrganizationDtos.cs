@@ -12,7 +12,8 @@ public record OrganizationResponse
     public string? Website { get; init; }
     public string? LogoUrl { get; init; }
     public DateTime CreatedAt { get; init; }
-    public int MemberCount { get; init; }
+    /// <summary>Members the caller can see; null in the directory for organizations the caller does not belong to.</summary>
+    public int? MemberCount { get; init; }
     public required string JoinPolicy { get; init; }
 }
 
@@ -72,7 +73,7 @@ public record OrganizationMemberResponse
     public required string FirstName { get; init; }
     public required string LastName { get; init; }
     public string? ProfileImageUrl { get; init; }
-    /// <summary>Org role; null when the caller may not see the member's groups and roles.</summary>
+    /// <summary>Org role; shown whenever the member is.</summary>
     public string? Role { get; init; }
     public DateTime JoinedAt { get; init; }
     public double InitialOvertimeHours { get; init; }

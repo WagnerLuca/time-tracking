@@ -186,7 +186,8 @@
 								<div class="text-base-content/70 text-sm line-clamp-2">{org.description}</div>
 							{/if}
 							<div class="flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/70 mt-auto pt-2 border-t border-base-200">
-								<span>{tp('orgs.members', org.memberCount ?? 0)}</span>
+								<!-- No member count for organizations you are not in (the API sends none) -->
+								<span>{org.memberCount != null ? tp('orgs.members', org.memberCount) : ''}</span>
 								{#if pendingJoinSlugs.has(org.slug!)}
 									<span class="badge badge-warning badge-sm">{t('orgs.join.pending')}</span>
 								{:else if org.joinPolicy !== 'Disabled'}

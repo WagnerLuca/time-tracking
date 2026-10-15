@@ -189,6 +189,25 @@ public class MemberVisibilityTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     [Fact]
+    public async Task OrgRole_IsShownWithThePerson_DirectoryHidesForeignCounts()
+    {
+        var s = await SetupAsync("vis-role", ("Member", true, true), ("Groups", false, false));
+
+        // Groups are hidden, the org role is not (#63)
+        var colleague = (await DetailAsync(s.Viewer, s.Slug)).Members.Single(m => m.Id == s.ColleagueId);
+        colleague.VisibleInfo.Should().NotContain("Groups");
+        colleague.Groups.Should().BeEmpty();
+        colleague.Role.Should().Be("Member");
+        (await DetailAsync(s.Viewer, s.Slug)).Members.Single(m => m.Id == s.OwnerId).Role.Should().Be("Owner");
+
+        // The directory shows member counts only for the caller's own organizations
+        var (stranger, _) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "vis-role-stranger@vis.test");
+        var directory = await stranger.GetFromJsonAsync<JsonElement>("/api/v1/Organizations?limit=200");
+        directory.GetProperty("items").EnumerateArray().Single(o => o.GetProperty("slug").GetString() == s.Slug)
+            .GetProperty("memberCount").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task TrackedTimesAndSchedule_OpenToGroupColleagues()
     {
         var s = await SetupAsync("vis-time", ("TrackedTime", true, false), ("WorkSchedule", true, false), ("Presence", true, true), ("Email", false, false));

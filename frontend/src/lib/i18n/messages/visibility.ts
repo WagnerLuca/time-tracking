@@ -38,7 +38,7 @@ export const de = {
 	kinds: {
 		Member: 'Person (Name, Bild)',
 		Email: 'E-Mail-Adresse',
-		Groups: 'Gruppen und Rollen',
+		Groups: 'Gruppen (inkl. Gruppenleitung)',
 		Presence: 'Anwesenheit (Timer läuft)',
 		Vacation: 'Urlaub',
 		SickDays: 'Krankheitstage',
@@ -104,7 +104,7 @@ export const en: typeof de = {
 	kinds: {
 		Member: 'Person (name, picture)',
 		Email: 'Email address',
-		Groups: 'Groups and roles',
+		Groups: 'Groups (incl. group leads)',
 		Presence: 'Presence (timer running)',
 		Vacation: 'Vacation',
 		SickDays: 'Sick days',

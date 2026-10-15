@@ -28,7 +28,7 @@ public enum MemberInfo
     /// <summary>The person appears at all (name, avatar, join date). Every other kind requires it.</summary>
     Member = 1,
     Email = 2,
-    /// <summary>Group memberships and roles (org role, group admin).</summary>
+    /// <summary>Group memberships and group roles (group admin); the org role is always shown with the person.</summary>
     Groups = 4,
     /// <summary>Whether a timer is running right now.</summary>
     Presence = 8,

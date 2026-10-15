@@ -42,17 +42,16 @@ public class OrganizationService : IOrganizationService
                 Website = o.Website,
                 LogoUrl = o.LogoUrl,
                 CreatedAt = o.CreatedAt,
-                MemberCount = o.UserOrganizations.Count(),
                 JoinPolicy = o.JoinPolicy.ToString()
             })
             .ToListAsync();
 
-        // In the caller's own organizations the count follows the visibility matrix (no hidden people)
-        if (callerUserId is int caller)
-        {
-            var counts = await VisibleMemberCountsAsync(caller, organizations.Select(o => o.Id));
-            organizations = organizations.Select(o => counts.TryGetValue(o.Id, out var c) ? o with { MemberCount = c } : o).ToList();
-        }
+        // In the caller's own organizations the count follows the visibility matrix (no hidden people);
+        // other organizations' sizes are not the caller's business (#63)
+        var counts = callerUserId is int caller
+            ? await VisibleMemberCountsAsync(caller, organizations.Select(o => o.Id))
+            : new Dictionary<int, int>();
+        organizations = organizations.Select(o => o with { MemberCount = counts.TryGetValue(o.Id, out var c) ? c : null }).ToList();
 
         return ServiceResult.Ok(new PaginatedResponse<OrganizationResponse>
         {
@@ -222,7 +221,7 @@ public class OrganizationService : IOrganizationService
             return m with
             {
                 Email = can.HasFlag(MemberInfo.Email) ? m.Email : null,
-                Role = can.HasFlag(MemberInfo.Groups) ? m.Role : null,
+                Role = m.Role,   // the org role is shown whenever the person is (#63)
                 VacationVisible = visible,
                 VacationDaysPerYear = visible ? m.VacationDaysPerYear : 0,
                 VacationDaysUsed = visible ? used : 0,
@@ -749,7 +748,7 @@ public class OrganizationService : IOrganizationService
                 FirstName = m.User.FirstName,
                 LastName = m.User.LastName,
                 Email = visibility.Can(m.UserId, MemberInfo.Email) ? m.User.Email : null,
-                Role = visibility.Can(m.UserId, MemberInfo.Groups) ? m.Role.ToString() : null,
+                Role = m.Role.ToString(),
                 WeeklyWorkHours = visibility.Can(m.UserId, MemberInfo.WorkSchedule) ? schedule?.WeeklyWorkHours : null,
                 TotalTrackedMinutes = Math.Round(totalMinutes, 1),
                 NetTrackedMinutes = Math.Round(netMinutes, 1),
