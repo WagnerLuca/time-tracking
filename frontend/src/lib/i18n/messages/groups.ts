@@ -82,7 +82,11 @@ export const de = {
 			off: 'Aus',
 			own: 'Eigene',
 			start: 'Beginn der Kernarbeitszeit',
-			end: 'Ende der Kernarbeitszeit'
+			end: 'Ende der Kernarbeitszeit',
+			tolerance: 'Toleranz',
+			toleranceDescription: 'Erlaubter späterer Beginn, früheres Ende oder Lücke. Bei mehreren Gruppen gilt die größte.',
+			toleranceValue: '{minutes} min',
+			toleranceInput: 'Toleranz in Minuten'
 		},
 		disabled: 'Aus',
 		enabled: 'An',
@@ -188,7 +192,11 @@ export const en: typeof de = {
 			off: 'Off',
 			own: 'Own',
 			start: 'Core hours start',
-			end: 'Core hours end'
+			end: 'Core hours end',
+			tolerance: 'Tolerance',
+			toleranceDescription: 'Allowed late start, early leave or gap. With several groups the largest wins.',
+			toleranceValue: '{minutes} min',
+			toleranceInput: 'Tolerance in minutes'
 		},
 		disabled: 'Off',
 		enabled: 'On',

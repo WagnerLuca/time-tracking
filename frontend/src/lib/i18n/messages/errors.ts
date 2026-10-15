@@ -31,7 +31,8 @@ export const de = {
 		ownerCannotLeave: 'Der Inhaber kann die Organisation nicht verlassen. Lösche sie oder übertrage die Inhaberschaft.',
 		enableOwnTwoFactorFirst: 'Aktiviere zuerst die Zwei-Faktor-Authentifizierung für dein eigenes Konto.',
 		unknownTimeZone: 'Unbekannte Zeitzone.',
-		coreHoursOrder: 'Die Kernarbeitszeit muss eine gültige Start- und Endzeit haben, der Beginn vor dem Ende.'
+		coreHoursOrder: 'Die Kernarbeitszeit braucht eine gültige Start- und Endzeit, die sich unterscheiden (ein Ende vor dem Beginn reicht über Mitternacht).',
+		coreHoursBackfillDays: 'Es lassen sich 1 bis 31 vergangene Tage prüfen.'
 	},
 	user: {
 		notFound: 'Benutzer nicht gefunden.'
@@ -152,6 +153,7 @@ export const de = {
 	},
 	group: {
 		notFound: 'Gruppe nicht gefunden.',
+		coreHoursTolerance: 'Die Toleranz muss zwischen 0 und 120 Minuten liegen.',
 		alreadyMember: 'Diese Person ist bereits in der Gruppe.',
 		memberNotFound: 'Mitglied nicht in der Gruppe gefunden.',
 		parentNotFound: 'Übergeordnete Gruppe nicht gefunden.',
@@ -211,7 +213,8 @@ export const en: typeof de = {
 		ownerCannotLeave: 'The owner cannot leave. Delete the organization or transfer ownership first.',
 		enableOwnTwoFactorFirst: 'Enable two-factor authentication for your own account first.',
 		unknownTimeZone: 'Unknown time zone.',
-		coreHoursOrder: 'Core working hours need a valid start and end time, with the start before the end.'
+		coreHoursOrder: 'Core working hours need a valid start and end time that differ (an end before the start runs past midnight).',
+		coreHoursBackfillDays: 'You can check 1 to 31 past days.'
 	},
 	user: {
 		notFound: 'User not found.'
@@ -332,6 +335,7 @@ export const en: typeof de = {
 	},
 	group: {
 		notFound: 'Group not found.',
+		coreHoursTolerance: 'The tolerance must be between 0 and 120 minutes.',
 		alreadyMember: 'This person is already in the group.',
 		memberNotFound: 'Member not found in the group.',
 		parentNotFound: 'Parent group not found.',

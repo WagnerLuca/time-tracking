@@ -20,6 +20,7 @@
 	import ModeSelector from '$lib/components/ModeSelector.svelte';
 	import VisibilityMatrix from '$lib/components/VisibilityMatrix.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
+	import CoreHoursBackfill from '$lib/components/CoreHoursBackfill.svelte';
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationSettingsRequest,
@@ -344,6 +345,18 @@
 		saveSettings({ coreHoursStart: start, coreHoursEnd: end }, t('orgSettings.coreHours.failed'));
 	}
 
+	/** "Auch die letzten N Tage prüfen", sent with the switch-on only. */
+	let coreBackfill = $state(false);
+	let coreBackfillDays = $state(7);
+
+	function toggleCoreHours() {
+		if (org?.coreHoursEnabled) return saveSettings({ coreHoursEnabled: false }, t('orgSettings.coreHours.failed'));
+		return saveSettings(
+			{ coreHoursEnabled: true, ...(coreBackfill ? { coreHoursBackfillDays: coreBackfillDays } : {}) },
+			t('orgSettings.coreHours.failed')
+		);
+	}
+
 	function saveCoreHoursTolerance(e: Event) {
 		const val = Number((e.currentTarget as HTMLInputElement).value);
 		if (!Number.isInteger(val) || val < 0 || val > 120) {
@@ -595,7 +608,7 @@
 							aria-checked={!!org.coreHoursEnabled}
 							aria-label={t('orgSettings.coreHours.label')}
 							disabled={settingsSaving}
-							onchange={(e) => { e.currentTarget.checked = !!org?.coreHoursEnabled; toggleSetting('coreHoursEnabled'); }}
+							onchange={(e) => { e.currentTarget.checked = !!org?.coreHoursEnabled; toggleCoreHours(); }}
 						/>
 					</div>
 					<div class="flex items-center gap-2 flex-wrap mt-3 text-sm">
@@ -607,12 +620,18 @@
 							<span class="text-base-content/70">{t('orgSettings.coreHours.to')}</span>
 							<input id="core-hours-end" type="time" class="input input-sm w-28" value={org.coreHoursEnd ?? '15:00'} onchange={saveCoreHoursWindow} disabled={settingsSaving} />
 						</label>
+						{#if (org.coreHoursEnd ?? '15:00') < (org.coreHoursStart ?? '09:00')}
+							<span class="text-xs text-base-content/70" data-testid="core-hours-overnight">{t('orgSettings.coreHours.overnight')}</span>
+						{/if}
 						<label class="flex items-center gap-2">
 							<span class="text-base-content/70">{t('orgSettings.coreHours.tolerance')}</span>
 							<input id="core-hours-tolerance" type="number" class="input input-sm w-20 text-center" min="0" max="120" step="1" value={org.coreHoursToleranceMinutes ?? 5} onchange={saveCoreHoursTolerance} disabled={settingsSaving} />
 							<span class="text-base-content/70">{t('orgSettings.coreHours.minutes')}</span>
 						</label>
 					</div>
+					{#if !org.coreHoursEnabled}
+						<CoreHoursBackfill bind:enabled={coreBackfill} bind:days={coreBackfillDays} disabled={settingsSaving} />
+					{/if}
 				</div>
 
 

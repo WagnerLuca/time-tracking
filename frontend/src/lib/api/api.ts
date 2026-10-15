@@ -254,6 +254,10 @@ export interface ComplianceDayResponse {
      * With TimeTracking.Api.Models.Dtos.ComplianceDayResponse.CoreHours: the window that was checked, \"HH:mm-HH:mm\" (one half on a half day).
      */
     'coreHoursWindow'?: string | null;
+    /**
+     * With TimeTracking.Api.Models.Dtos.ComplianceDayResponse.CoreHours: flagged by a backfill when core hours were switched on (never notified).
+     */
+    'coreHoursBackfilled'?: boolean;
 }
 /**
  * A group\'s core working hours override (null on the group = inherit from the organization).
@@ -556,6 +560,7 @@ export interface GroupPermissionsResponse {
     'coreHoursStart'?: string | null;
     'coreHoursEnd'?: string | null;
     'parentGroupId'?: number | null;
+    'coreHoursToleranceMinutes'?: number | null;
 }
 export interface GroupResponse {
     'id'?: number;
@@ -1655,6 +1660,8 @@ export interface UpdateGroupPermissionsRequest {
     'coreHoursMode'?: CoreHoursMode;
     'coreHoursStart'?: string | null;
     'coreHoursEnd'?: string | null;
+    'coreHoursToleranceMinutes'?: number | null;
+    'coreHoursBackfillDays'?: number | null;
     'inheritCapabilities'?: Array<string> | null;
 }
 
@@ -1731,7 +1738,7 @@ export interface UpdateOrganizationSettingsRequest {
     'timeZone'?: string | null;
     'coreHoursEnabled'?: boolean | null;
     /**
-     * Core hours start as local \"HH:mm\"; must be before TimeTracking.Api.Models.Dtos.UpdateOrganizationSettingsRequest.CoreHoursEnd.
+     * Core hours start as local \"HH:mm\"; an end before it means past midnight (night shift), an equal end is invalid.
      */
     'coreHoursStart'?: string | null;
     'coreHoursEnd'?: string | null;
@@ -1739,6 +1746,10 @@ export interface UpdateOrganizationSettingsRequest {
      * Allowed late start / early leave / gap in minutes.
      */
     'coreHoursToleranceMinutes'?: number | null;
+    /**
+     * With core hours on: also flag the last N (1-31) days, silently (no notifications), in the background.
+     */
+    'coreHoursBackfillDays'?: number | null;
     /**
      * Terminal double-scan window in seconds (5-600).
      */

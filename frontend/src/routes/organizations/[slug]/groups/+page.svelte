@@ -17,6 +17,7 @@
 	import { cell, groupCell, previewSentence, VISIBILITY_KINDS, type Column, type VisibilityKind } from '$lib/utils/visibility';
 	import { buildGroupTree, chain, inheritedFrom, MAX_GROUP_DEPTH, parentOptions, type GroupNode, type Inherited } from '$lib/utils/groupTree';
 	import VisibilityMatrix from '$lib/components/VisibilityMatrix.svelte';
+	import CoreHoursBackfill from '$lib/components/CoreHoursBackfill.svelte';
 	import type {
 		GroupResponse,
 		GroupDetailResponse,
@@ -388,6 +389,27 @@
 		return inheritText(inherited, orgWindow, (v) => v);
 	}
 
+	function toleranceHint(): string {
+		const id = selectedGroup?.id;
+		if (id == null) return '';
+		return inheritText(inheritedFrom(permGroups, id, (g) => g.coreHoursToleranceMinutes ?? null), orgDetail?.coreHoursToleranceMinutes ?? 5, (minutes) =>
+			t('groups.perm.coreHours.toleranceValue', { minutes })
+		);
+	}
+
+	/** Own tolerance (0-120 min) or back to inherit (null). */
+	function setCoreTolerance(minutes: number | null) {
+		if (minutes !== null && (!Number.isInteger(minutes) || minutes < 0 || minutes > 120)) {
+			toast.error(t('orgSettings.coreHours.toleranceInvalid'));
+			return;
+		}
+		return setPermValue('coreHoursToleranceMinutes', minutes);
+	}
+
+	/** "Auch die letzten N Tage prüfen", sent when the group switches to its own window. */
+	let coreBackfill = $state(false);
+	let coreBackfillDays = $state(7);
+
 	/** Per cell of the matrix: what the group inherits (parent's effective value, else the org's) and from where. */
 	const inheritedVisibility = $derived.by(() => {
 		const id = selectedGroup?.id;
@@ -416,9 +438,11 @@
 	/** Core hours override: null = inherit, 0 = off, 1 = own window (times default to 09:00-15:00). */
 	function setCoreHours(mode: number | null, start?: string, end?: string) {
 		if (mode !== 1) return setPermValue('coreHoursMode', mode);
+		const switchingOn = permissions?.coreHoursMode !== 'Own' && coreBackfill;
 		return setPermValue('coreHoursMode', 1, {
 			coreHoursStart: start ?? permissions?.coreHoursStart ?? '09:00',
-			coreHoursEnd: end ?? permissions?.coreHoursEnd ?? '15:00'
+			coreHoursEnd: end ?? permissions?.coreHoursEnd ?? '15:00',
+			...(switchingOn ? { coreHoursBackfillDays: coreBackfillDays } : {})
 		});
 	}
 
@@ -760,14 +784,42 @@
 						size="xs"
 					/>
 					{#if permissions.coreHoursMode === 'Own'}
-						<div class="flex items-center gap-2 text-sm w-full justify-end">
+						<div class="flex items-center gap-2 text-sm w-full justify-end flex-wrap">
 							<input type="time" class="input input-xs w-24" aria-label={t('groups.perm.coreHours.start')} value={permissions.coreHoursStart ?? '09:00'}
 								onchange={(e) => setCoreHours(1, e.currentTarget.value, undefined)} disabled={permissionsSaving} />
 							<span class="text-base-content/70">–</span>
 							<input type="time" class="input input-xs w-24" aria-label={t('groups.perm.coreHours.end')} value={permissions.coreHoursEnd ?? '15:00'}
 								onchange={(e) => setCoreHours(1, undefined, e.currentTarget.value)} disabled={permissionsSaving} />
+							{#if (permissions.coreHoursEnd ?? '15:00') < (permissions.coreHoursStart ?? '09:00')}
+								<span class="text-xs text-base-content/70">{t('orgSettings.coreHours.overnight')}</span>
+							{/if}
+						</div>
+					{:else}
+						<div class="w-full flex justify-end">
+							<CoreHoursBackfill bind:enabled={coreBackfill} bind:days={coreBackfillDays} disabled={permissionsSaving} />
 						</div>
 					{/if}
+				</div>
+				<div class="flex items-center justify-between gap-3 p-3 border-b border-base-200 flex-wrap" data-testid="group-core-tolerance">
+					<div>
+						<div class="text-sm font-medium text-base-content">{t('groups.perm.coreHours.tolerance')}</div>
+						<div class="text-xs text-base-content/70">{t('groups.perm.coreHours.toleranceDescription')}</div>
+						{#if permissions.coreHoursToleranceMinutes == null}{@render hint(toleranceHint())}{/if}
+					</div>
+					<div class="flex items-center gap-2">
+						<ModeSelector
+							options={withInherit([{ value: 1, label: t('groups.perm.coreHours.own'), activeClass: 'btn-primary' }])}
+							value={permissions.coreHoursToleranceMinutes == null ? null : 1}
+							onselect={(v) => setCoreTolerance(v === null ? null : (orgDetail?.coreHoursToleranceMinutes ?? 5))}
+							disabled={permissionsSaving}
+							size="xs"
+						/>
+						{#if permissions.coreHoursToleranceMinutes != null}
+							<input type="number" class="input input-xs w-16 text-center" min="0" max="120" step="1" aria-label={t('groups.perm.coreHours.toleranceInput')}
+								value={permissions.coreHoursToleranceMinutes} onchange={(e) => setCoreTolerance(Number(e.currentTarget.value))} disabled={permissionsSaving} />
+							<span class="text-sm text-base-content/70">{t('orgSettings.coreHours.minutes')}</span>
+						{/if}
+					</div>
 				</div>
 
 				<!-- Group Admin capability flags -->
