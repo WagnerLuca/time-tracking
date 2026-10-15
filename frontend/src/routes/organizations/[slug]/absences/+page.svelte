@@ -3,6 +3,7 @@
 	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
@@ -16,12 +17,14 @@
 	import { isOrgAdmin } from '$lib/utils/orgRules';
 	import { canSee } from '$lib/utils/visibility';
 	import { markSeen } from '$lib/utils/onboarding';
+	import { buildGroupTree, flattenGroupTree } from '$lib/utils/groupTree';
 	import AbsenceDialog from '$lib/components/AbsenceDialog.svelte';
 	import LockIcon from '$lib/components/LockIcon.svelte';
 	import { closedMonthSet, isClosedDay, lockText } from '$lib/utils/closedPeriods';
 	import AbsenceTypeBadge from '$lib/components/AbsenceTypeBadge.svelte';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import type {
+		GroupResponse,
 		OrganizationDetailResponse,
 		HolidayResponse,
 		AbsenceDayResponse,
@@ -73,6 +76,26 @@
 
 	const orgSlug = $derived(page.params.slug ?? '');
 
+	// "Gruppenkalender" (#66): ?group=<id> shows the group and its sub-groups (the backend filters), ?user=<id> one person
+	const groupFilter = $derived(Number(page.url.searchParams.get('group')) || null);
+	let groupOptions = $state<{ group: GroupResponse; depth: number }[]>([]);
+	let loadedGroup: number | null = null;
+
+	function setGroupFilter(id: number | null) {
+		const url = new URL(page.url);
+		if (id) url.searchParams.set('group', String(id));
+		else url.searchParams.delete('group');
+		goto(url, { replaceState: true, keepFocus: true, noScroll: true });
+	}
+
+	async function loadGroupOptions() {
+		try {
+			groupOptions = flattenGroupTree(buildGroupTree((await groupApi.apiV1OrganizationsSlugGroupsGet(orgSlug)).data));
+		} catch {
+			groupOptions = []; // the calendar works without the group filter
+		}
+	}
+
 	// (Re)load whenever the slug in the URL changes, so switching orgs never shows stale data
 	$effect(() => {
 		if (!orgSlug) return;
@@ -90,6 +113,8 @@
 		try {
 			const data = await getOrgDetail(orgSlug);
 			org = data; // → the effect below loads the absences
+			calendarUserFilter = Number(page.url.searchParams.get('user')) || null;
+			loadGroupOptions();
 			loadHolidays();
 			loadEffectivePermissions();
 			loadAbsenceTypes();
@@ -151,14 +176,16 @@
 
 	$effect(() => {
 		const years = neededYears;
+		const group = groupFilter;
 		if (!org) return;
 		untrack(() => {
-			if (!loadedYears || years.from < loadedYears.from || years.to > loadedYears.to) loadAbsences(years);
+			if (!loadedYears || group !== loadedGroup || years.from < loadedYears.from || years.to > loadedYears.to) loadAbsences(years);
 		});
 	});
 
 	async function loadAbsences(years: YearRange = loadedYears ?? neededYears) {
 		const request = ++absencesRequest;
+		const group = (loadedGroup = groupFilter);
 		absencesLoading = true;
 		absencesError = '';
 		// A few days either side: the month grid shows the neighbouring years' first/last week
@@ -166,7 +193,7 @@
 		const to = `${years.to + 1}-01-07`;
 		try {
 			const items = await fetchAllPages((limit, offset) =>
-				absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, undefined, from, to, limit, offset).then((r) => r.data));
+				absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, undefined, from, to, limit, offset, group ?? undefined).then((r) => r.data));
 			if (request !== absencesRequest) return;
 			absences = items.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
 			loadedYears = years;
@@ -518,6 +545,15 @@
 
 			<!-- Calendar member filter + mobile add -->
 			<div class="flex items-center justify-end gap-2 mb-3 flex-wrap">
+				{#if groupOptions.length > 0}
+					<label class="text-xs text-base-content/70" for="calendar-group-filter">{t('absences.group')}</label>
+					<select id="calendar-group-filter" value={groupFilter ?? ''} onchange={(e) => setGroupFilter(Number(e.currentTarget.value) || null)} class="select select-sm max-w-[14rem]">
+						<option value="">{t('absences.allGroups')}</option>
+						{#each groupOptions as o (o.group.id)}
+							<option value={o.group.id}>{'  '.repeat(o.depth - 1)}{o.group.name}</option>
+						{/each}
+					</select>
+				{/if}
 				{#if calendarUserOptions.length > 1}
 					<label class="text-xs text-base-content/70" for="calendar-user-filter">{t('absences.show')}</label>
 					<select id="calendar-user-filter" bind:value={calendarUserFilter} class="select select-sm max-w-[14rem]">

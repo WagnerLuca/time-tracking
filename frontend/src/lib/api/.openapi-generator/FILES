@@ -79,6 +79,10 @@ docs/MemberVacationDaysResponse.md
 docs/NotificationResponse.md
 docs/NotificationResponsePaginatedResponse.md
 docs/NotificationsApi.md
+docs/OrgChartGroupResponse.md
+docs/OrgChartMembershipResponse.md
+docs/OrgChartPersonResponse.md
+docs/OrgChartResponse.md
 docs/OrgRequestResponse.md
 docs/OrgRequestResponsePaginatedResponse.md
 docs/OrganizationDetailResponse.md

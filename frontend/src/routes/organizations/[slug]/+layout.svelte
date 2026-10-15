@@ -22,6 +22,7 @@
 		{ path: '', label: t('orgs.tabs.schedule') },
 		{ path: 'members', label: t('orgs.tabs.members') },
 		{ path: 'groups', label: t('orgs.tabs.groups') },
+		{ path: 'chart', label: t('orgs.tabs.chart') },
 		{ path: 'settings', label: isAdmin ? t('orgs.tabs.settings') : t('orgs.tabs.rules') },
 		{ path: 'holidays', label: t('orgs.tabs.holidays') },
 		...(isAdmin ? [{ path: 'terminal', label: t('orgs.tabs.terminal') }] : []),
@@ -45,7 +46,7 @@
 		<nav class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0" aria-label={t('orgs.tabs.label')}>
 			<div class="tabs flex-nowrap w-max min-w-full">
 				{#each tabs as tab (tab.path)}
-					<a href={tabHref(tab.path)} class="tab whitespace-nowrap min-h-11" class:tab-active={currentPath === tabHref(tab.path)} aria-current={currentPath === tabHref(tab.path) ? 'page' : undefined}>{tab.label}</a>
+					<a href={tabHref(tab.path)} class="tab whitespace-nowrap min-h-11 px-2.5" class:tab-active={currentPath === tabHref(tab.path)} aria-current={currentPath === tabHref(tab.path) ? 'page' : undefined}>{tab.label}</a>
 				{/each}
 			</div>
 		</nav>

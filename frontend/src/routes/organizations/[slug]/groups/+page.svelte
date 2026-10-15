@@ -103,6 +103,13 @@
 		try {
 			const { data } = await groupApi.apiV1OrganizationsSlugGroupsGet(orgSlug);
 			groups = data;
+			// ?group=<id> (Organigramm → "Gruppe verwalten") opens that group, with its parents expanded
+			const wanted = Number(page.url.searchParams.get('group'));
+			if (wanted && groups.some((g) => g.id === wanted) && selectedGroup?.id !== wanted) {
+				const path = chain(groups, wanted).map((g) => g.id!);
+				collapsed = collapsed.filter((id) => !path.includes(id));
+				selectGroup(wanted).then(() => document.querySelector(`[data-group-id="${wanted}"]`)?.scrollIntoView({ block: 'start' }));
+			}
 		} catch (err) {
 			error = extractErrorMessage(err, t('groups.loadFailed'));
 		} finally {
@@ -520,7 +527,7 @@
 		{@const group = node.group}
 		{@const isSelected = selectedGroup?.id === group.id}
 		{@const isCollapsed = collapsed.includes(group.id!)}
-		<li class="grid grid-cols-[minmax(0,1fr)] gap-2 min-w-0" data-testid="group-node" data-depth={node.depth}>
+		<li class="grid grid-cols-[minmax(0,1fr)] gap-2 min-w-0" data-testid="group-node" data-depth={node.depth} data-group-id={group.id}>
 			<div class="flex items-stretch gap-0.5 sm:gap-1">
 				{#if node.children.length > 0}
 					<button
@@ -870,6 +877,7 @@
 			<!-- Header -->
 			<div class="flex items-center justify-between gap-2 mb-4 flex-wrap">
 				<h2 class="text-xl font-bold text-base-content m-0">{t('groups.title')}</h2>
+				<a class="btn btn-ghost btn-sm ml-auto" href="/organizations/{orgSlug}/chart">{t('orgChart.link')}</a>
 				{#if isAdmin}
 					<button class="btn btn-primary btn-sm" onclick={() => openCreateForm()} aria-expanded={showCreateForm}>
 						{showCreateForm ? t('common.cancel') : t('groups.create')}

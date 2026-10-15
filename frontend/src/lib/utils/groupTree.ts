@@ -46,6 +46,11 @@ export function buildGroupTree<T extends TreeGroup>(groups: T[]): GroupNode<T>[]
 	return groups.filter((g) => !parent.has(g.id!)).map((g) => build(g, 1)).sort(byName);
 }
 
+/** The forest in tree order with each group's depth (for indented pickers). */
+export function flattenGroupTree<T extends TreeGroup>(nodes: GroupNode<T>[]): { group: T; depth: number }[] {
+	return nodes.flatMap((n) => [{ group: n.group, depth: n.depth }, ...flattenGroupTree(n.children)]);
+}
+
 /** The group, then its parent, up to the top. */
 export function chain<T extends TreeGroup>(groups: T[], id: number): T[] {
 	const parent = parentMap(groups);

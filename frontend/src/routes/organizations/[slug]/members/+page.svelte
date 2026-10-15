@@ -110,6 +110,7 @@
 				<h2 class="text-xl text-base-content/70 m-0">
 					{groupFilter !== null ? t('memberList.headingFiltered', { count: members.length, total: (org.members ?? []).length }) : t('memberList.heading', { count: members.length })}
 				</h2>
+				<a class="btn btn-ghost btn-sm ml-auto" href="/organizations/{orgSlug}/chart">{t('orgChart.link')}</a>
 				{#if groupOptions.length > 0}
 					<label class="flex items-center gap-2 text-sm">
 						<span class="sr-only">{t('memberList.filterLabel')}</span>

@@ -65,6 +65,7 @@ export const de = {
 		schedule: 'Mein Arbeitszeitmodell',
 		members: 'Mitglieder',
 		groups: 'Gruppen',
+		chart: 'Organigramm',
 		absences: 'Abwesenheiten',
 		holidays: 'Feiertage',
 		settings: 'Regeln & Sichtbarkeit',

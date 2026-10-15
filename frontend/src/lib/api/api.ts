@@ -868,6 +868,56 @@ export interface NotificationResponsePaginatedResponse {
      */
     'hasMore'?: boolean;
 }
+export interface OrgChartGroupResponse {
+    'id'?: number;
+    'name'?: string | null;
+    'description'?: string | null;
+    'color'?: string | null;
+    'parentGroupId'?: number | null;
+    /**
+     * The caller may manage this group\'s members (org admin, or a lead of it or an ancestor with member management).
+     */
+    'canManageMembers'?: boolean;
+}
+export interface OrgChartMembershipResponse {
+    'groupId'?: number;
+    'isLead'?: boolean;
+}
+/**
+ * One person of the chart (always with name and org role, like every list showing people).
+ */
+export interface OrgChartPersonResponse {
+    'userId'?: number;
+    'firstName': string | null;
+    'lastName': string | null;
+    'profileImageUrl'?: string | null;
+    'role': string | null;
+    /**
+     * Needs Email.
+     */
+    'email'?: string | null;
+    /**
+     * The person\'s direct active groups (leads marked); null = the caller may not see the groups (the person sits in a node of their own).
+     */
+    'groups'?: Array<OrgChartMembershipResponse> | null;
+    /**
+     * A timer runs in this organization right now (the team overview\'s rule: failure entries never count); needs Presence.
+     */
+    'present'?: boolean | null;
+    'presentSince'?: string | null;
+    /**
+     * The kinds of information the caller may see about the person (like the org detail\'s members).
+     */
+    'visibleInfo'?: Array<string> | null;
+}
+/**
+ * The Organigramm (issue #66): the organization\'s active groups and the people the caller may see, in one  response. The frontend builds the tree (organization → groups → sub-groups → people) from the parent ids and  each person\'s direct memberships. Hidden people are left out entirely; every nullable value is null where  the member visibility matrix hides it. The balance is not part of it — the person card loads it from  GET members/{id}/balance when `TrackedTime` is in TimeTracking.Api.Models.Dtos.OrgChartPersonResponse.VisibleInfo.
+ */
+export interface OrgChartResponse {
+    'organizationName': string | null;
+    'groups'?: Array<OrgChartGroupResponse> | null;
+    'people'?: Array<OrgChartPersonResponse> | null;
+}
 /**
  * Response representing an organization request (join, edit entry, etc.).
  */
@@ -2259,10 +2309,11 @@ export const AbsenceDayApiAxiosParamCreator = function (configuration?: Configur
          * @param {string} [to] End of date range.
          * @param {number} [limit] Max items per page (default 50, max 200).
          * @param {number} [offset] Number of items to skip.
+         * @param {number} [groupId] Only the members of this group and of its sub-groups (whose groups the caller may see).
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugAbsencesGet: async (slug: string, userId?: number, from?: string, to?: string, limit?: number, offset?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        apiV1OrganizationsSlugAbsencesGet: async (slug: string, userId?: number, from?: string, to?: string, limit?: number, offset?: number, groupId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'slug' is not null or undefined
             assertParamExists('apiV1OrganizationsSlugAbsencesGet', 'slug', slug)
             const localVarPath = `/api/v1/organizations/{slug}/absences`
@@ -2304,6 +2355,10 @@ export const AbsenceDayApiAxiosParamCreator = function (configuration?: Configur
 
             if (offset !== undefined) {
                 localVarQueryParameter['offset'] = offset;
+            }
+
+            if (groupId !== undefined) {
+                localVarQueryParameter['groupId'] = groupId;
             }
 
 
@@ -2545,11 +2600,12 @@ export const AbsenceDayApiFp = function(configuration?: Configuration) {
          * @param {string} [to] End of date range.
          * @param {number} [limit] Max items per page (default 50, max 200).
          * @param {number} [offset] Number of items to skip.
+         * @param {number} [groupId] Only the members of this group and of its sub-groups (whose groups the caller may see).
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1OrganizationsSlugAbsencesGet(slug: string, userId?: number, from?: string, to?: string, limit?: number, offset?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AbsenceDayResponsePaginatedResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAbsencesGet(slug, userId, from, to, limit, offset, options);
+        async apiV1OrganizationsSlugAbsencesGet(slug: string, userId?: number, from?: string, to?: string, limit?: number, offset?: number, groupId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AbsenceDayResponsePaginatedResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAbsencesGet(slug, userId, from, to, limit, offset, groupId, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['AbsenceDayApi.apiV1OrganizationsSlugAbsencesGet']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -2680,11 +2736,12 @@ export const AbsenceDayApiFactory = function (configuration?: Configuration, bas
          * @param {string} [to] End of date range.
          * @param {number} [limit] Max items per page (default 50, max 200).
          * @param {number} [offset] Number of items to skip.
+         * @param {number} [groupId] Only the members of this group and of its sub-groups (whose groups the caller may see).
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1OrganizationsSlugAbsencesGet(slug: string, userId?: number, from?: string, to?: string, limit?: number, offset?: number, options?: RawAxiosRequestConfig): AxiosPromise<AbsenceDayResponsePaginatedResponse> {
-            return localVarFp.apiV1OrganizationsSlugAbsencesGet(slug, userId, from, to, limit, offset, options).then((request) => request(axios, basePath));
+        apiV1OrganizationsSlugAbsencesGet(slug: string, userId?: number, from?: string, to?: string, limit?: number, offset?: number, groupId?: number, options?: RawAxiosRequestConfig): AxiosPromise<AbsenceDayResponsePaginatedResponse> {
+            return localVarFp.apiV1OrganizationsSlugAbsencesGet(slug, userId, from, to, limit, offset, groupId, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -2807,11 +2864,12 @@ export class AbsenceDayApi extends BaseAPI {
      * @param {string} [to] End of date range.
      * @param {number} [limit] Max items per page (default 50, max 200).
      * @param {number} [offset] Number of items to skip.
+     * @param {number} [groupId] Only the members of this group and of its sub-groups (whose groups the caller may see).
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public apiV1OrganizationsSlugAbsencesGet(slug: string, userId?: number, from?: string, to?: string, limit?: number, offset?: number, options?: RawAxiosRequestConfig) {
-        return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsencesGet(slug, userId, from, to, limit, offset, options).then((request) => request(this.axios, this.basePath));
+    public apiV1OrganizationsSlugAbsencesGet(slug: string, userId?: number, from?: string, to?: string, limit?: number, offset?: number, groupId?: number, options?: RawAxiosRequestConfig) {
+        return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsencesGet(slug, userId, from, to, limit, offset, groupId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -8777,6 +8835,44 @@ export const OrganizationsApiAxiosParamCreator = function (configuration?: Confi
         },
         /**
          * 
+         * @summary The Organigramm: the organization\'s groups (with parent ids and whether the caller may manage them) and every  person the caller may see, with direct memberships (leads marked), presence and the visible kinds of information —  per the member visibility matrix, hidden people are left out. Open to every member.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugOrgChartGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugOrgChartGet', 'slug', slug)
+            const localVarPath = `/api/v1/Organizations/{slug}/org-chart`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Update an existing organization (admin only).
          * @param {string} slug Organization URL slug.
          * @param {UpdateOrganizationRequest} [updateOrganizationRequest] 
@@ -9117,6 +9213,19 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary The Organigramm: the organization\'s groups (with parent ids and whether the caller may manage them) and every  person the caller may see, with direct memberships (leads marked), presence and the visible kinds of information —  per the member visibility matrix, hidden people are left out. Open to every member.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugOrgChartGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OrgChartResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugOrgChartGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['OrganizationsApi.apiV1OrganizationsSlugOrgChartGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Update an existing organization (admin only).
          * @param {string} slug Organization URL slug.
          * @param {UpdateOrganizationRequest} [updateOrganizationRequest] 
@@ -9306,6 +9415,16 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
         },
         /**
          * 
+         * @summary The Organigramm: the organization\'s groups (with parent ids and whether the caller may manage them) and every  person the caller may see, with direct memberships (leads marked), presence and the visible kinds of information —  per the member visibility matrix, hidden people are left out. Open to every member.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugOrgChartGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<OrgChartResponse> {
+            return localVarFp.apiV1OrganizationsSlugOrgChartGet(slug, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Update an existing organization (admin only).
          * @param {string} slug Organization URL slug.
          * @param {UpdateOrganizationRequest} [updateOrganizationRequest] 
@@ -9488,6 +9607,17 @@ export class OrganizationsApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug: string, memberId: number, setVacationDaysRequest?: SetVacationDaysRequest, options?: RawAxiosRequestConfig) {
         return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug, memberId, setVacationDaysRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary The Organigramm: the organization\'s groups (with parent ids and whether the caller may manage them) and every  person the caller may see, with direct memberships (leads marked), presence and the visible kinds of information —  per the member visibility matrix, hidden people are left out. Open to every member.
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugOrgChartGet(slug: string, options?: RawAxiosRequestConfig) {
+        return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugOrgChartGet(slug, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

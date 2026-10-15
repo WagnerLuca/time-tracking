@@ -66,6 +66,7 @@ export const en: typeof de = {
 		schedule: 'My schedule',
 		members: 'Members',
 		groups: 'Groups',
+		chart: 'Org chart',
 		absences: 'Absences',
 		holidays: 'Holidays',
 		settings: 'Rules & visibility',

@@ -25,6 +25,8 @@ export const de = {
 	today: 'Heute',
 	show: 'Anzeigen',
 	allMembers: 'Alle Mitglieder',
+	group: 'Gruppe',
+	allGroups: 'Alle Gruppen',
 	clearFilter: 'Zurücksetzen',
 	youSuffix: ' (du)',
 	requestAbsence: 'Abwesenheit beantragen',

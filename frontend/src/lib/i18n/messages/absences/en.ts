@@ -26,6 +26,8 @@ export const en: typeof de = {
 	today: 'Today',
 	show: 'Show',
 	allMembers: 'All members',
+	group: 'Group',
+	allGroups: 'All groups',
 	clearFilter: 'Clear',
 	youSuffix: ' (you)',
 	requestAbsence: 'Request absence',
