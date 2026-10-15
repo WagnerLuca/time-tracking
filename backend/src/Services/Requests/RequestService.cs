@@ -265,6 +265,48 @@ public class RequestService : IRequestService
             responder != null ? $"{responder.FirstName} {responder.LastName}" : null));
     }
 
+    /// <summary>
+    /// The requester takes back an own request while it is still pending. Approvers see open
+    /// requests only as pending rows (no stored notifications), so it simply drops out of their
+    /// inbox; no mail. Marked as seen right away: there is no decision to tell the requester.
+    /// </summary>
+    public async Task<ServiceResult<OrgRequestResponse>> WithdrawRequestAsync(string slug, int userId, int requestId)
+    {
+        var org = await _context.FindOrgBySlugAsync(slug);
+        if (org == null)
+            return ServiceResult.NotFound<OrgRequestResponse>("Organization not found");
+
+        // Someone else's request is "not found" rather than forbidden: no hint that it exists
+        var orgRequest = await _context.OrgRequests
+            .Include(r => r.User)
+            .Include(r => r.Group)
+            .FirstOrDefaultAsync(r => r.Id == requestId && r.OrganizationId == org.Id && r.UserId == userId);
+        if (orgRequest == null)
+            return ServiceResult.NotFound<OrgRequestResponse>("Request not found.");
+
+        if (orgRequest.Status != RequestStatus.Pending)
+            return ServiceResult.BadRequest<OrgRequestResponse>("Only pending requests can be withdrawn.");
+
+        var now = DateTime.UtcNow;
+        orgRequest.Status = RequestStatus.Withdrawn;
+        orgRequest.RespondedAt = now;
+        orgRequest.RespondedByUserId = userId;
+        orgRequest.UserNotifiedAt = now;
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Status is a concurrency token: an approver answered (or a second click withdrew) it meanwhile
+            return ServiceResult.Conflict<OrgRequestResponse>("Only pending requests can be withdrawn.");
+        }
+
+        _logger.LogInformation("Request {RequestId} withdrawn by user {UserId}", requestId, userId);
+        return ServiceResult.Ok(MapToResponse(orgRequest, org.Name, org.Slug));
+    }
+
     public async Task<ServiceResult<PaginatedResponse<OrgRequestResponse>>> GetMyRequestsAsync(int userId, RequestType? type, int limit, int offset)
     {
         (limit, offset) = PaginationDefaults.Normalize(limit, offset);

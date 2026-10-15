@@ -71,6 +71,18 @@ public class RequestsController : OrganizationBaseController
         return ToResponse(await _service.RespondToRequestAsync(slug, userId.Value, id, request));
     }
 
+    /// <summary>Withdraw one of your own requests while it is still pending (no membership needed, so a join request works too).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="id">Request ID.</param>
+    [HttpPost("{slug}/requests/{id}/withdraw")]
+    [ProducesResponseType(typeof(OrgRequestResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> WithdrawRequest(string slug, int id)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.WithdrawRequestAsync(slug, userId.Value, id));
+    }
+
     /// <summary>List the current user's requests across all organizations.</summary>
     /// <param name="type">Filter by request type.</param>
     /// <param name="limit">Max items per page (default 50, max 200).</param>

@@ -11,6 +11,7 @@ public interface IRequestService
     Task<ServiceResult<OrgRequestResponse>> CreateRequestAsync(string slug, int userId, CreateOrgRequestRequest request);
     Task<ServiceResult<PaginatedResponse<OrgRequestResponse>>> GetRequestsAsync(string slug, int callerUserId, RequestType? type, RequestStatus? status, int limit, int offset);
     Task<ServiceResult<OrgRequestResponse>> RespondToRequestAsync(string slug, int callerUserId, int requestId, RespondToOrgRequestRequest request);
+    Task<ServiceResult<OrgRequestResponse>> WithdrawRequestAsync(string slug, int userId, int requestId);
     Task<ServiceResult<PaginatedResponse<OrgRequestResponse>>> GetMyRequestsAsync(int userId, RequestType? type, int limit, int offset);
     Task<ServiceResult<AdminNotificationResponse>> GetAdminNotificationsAsync(int userId);
     Task<ServiceResult<UserNotificationResponse>> GetUserNotificationsAsync(int userId);

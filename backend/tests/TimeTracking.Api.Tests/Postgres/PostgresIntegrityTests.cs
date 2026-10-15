@@ -115,4 +115,20 @@ public class PostgresIntegrityTests
         var history = await member.GetFromJsonAsync<JsonElement>("/api/v1/TimeTracking?limit=50");
         history.GetProperty("items").EnumerateArray().Count(e => e.GetProperty("description").GetString() == "once").Should().Be(1);
     }
+
+    [Fact]
+    public async Task WithdrawRacingApprovalAndDoubleClick_OnlyOneWins()
+    {
+        var (owner, member, slug, _, _) = await TestHelpers.OrgWithMemberAsync(_factory, "pg-withdraw", new { initialOvertimeMode = 1 }, "pg.test");
+        var id = (await (await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/requests", new { type = 3, requestData = "2" }))
+            .Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+
+        // A double click on "withdraw" plus an approver accepting at the same moment: Status is the concurrency token
+        var results = await Task.WhenAll(
+            member.PostAsync($"/api/v1/organizations/{slug}/requests/{id}/withdraw", null),
+            member.PostAsync($"/api/v1/organizations/{slug}/requests/{id}/withdraw", null),
+            owner.PutAsJsonAsync($"/api/v1/organizations/{slug}/requests/{id}", new { accept = true }));
+        results.Count(r => r.IsSuccessStatusCode).Should().Be(1);
+        results.Should().OnlyContain(r => r.IsSuccessStatusCode || r.StatusCode == HttpStatusCode.Conflict || r.StatusCode == HttpStatusCode.BadRequest);
+    }
 }

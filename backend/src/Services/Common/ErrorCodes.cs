@@ -98,6 +98,7 @@ public static class ErrorCodes
         ["You already have a pending request of this type for this organization."] = "request.duplicate",
         ["This request has already been responded to."] = "request.alreadyResponded",
         ["Request not found."] = "request.notFound",
+        ["Only pending requests can be withdrawn."] = "request.notWithdrawable",
         ["You are already a member of this organization."] = "request.alreadyMember",
         ["This organization does not accept join requests. Ask an admin to add you."] = "request.joinClosed",
         ["This feature is disabled for this organization."] = "request.featureDisabled",

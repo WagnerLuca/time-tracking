@@ -6,7 +6,9 @@ public enum RequestStatus
 {
     Pending = 0,
     Accepted = 1,
-    Declined = 2
+    Declined = 2,
+    /// <summary>The requester took it back while it was still pending.</summary>
+    Withdrawn = 3
 }
 
 public enum RequestType
