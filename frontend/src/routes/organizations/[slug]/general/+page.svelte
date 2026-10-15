@@ -177,7 +177,7 @@
 			</div>
 		</form>
 
-		<ClosedPeriodsPanel {orgSlug} />
+		<ClosedPeriodsPanel {orgSlug} timeZone={org.timeZone} />
 
 		<section class="card border border-error/50 bg-error/5 p-4 sm:p-5 mt-8 max-w-2xl" aria-labelledby="general-danger" data-testid="danger-zone">
 			<h2 id="general-danger" class="text-base font-semibold text-error m-0">{t('orgHome.general.danger')}</h2>

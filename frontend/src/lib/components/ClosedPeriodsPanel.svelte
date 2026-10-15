@@ -11,9 +11,9 @@
 	import { t } from '$lib/i18n';
 
 	/** Allgemein → closed months (issue #57): close a range, reopen one with a reason, the audit log. Admins only. */
-	let { orgSlug }: { orgSlug: string } = $props();
+	let { orgSlug, timeZone }: { orgSlug: string; timeZone?: string | null } = $props();
 
-	const latest = lastClosableMonth();
+	const latest = lastClosableMonth(new Date(), untrack(() => timeZone));
 	let data = $state<ClosedPeriodsResponse | null>(null);
 	let loadError = $state('');
 	let from = $state(latest);

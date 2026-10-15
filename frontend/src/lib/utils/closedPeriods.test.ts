@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closedMonthSet, entryLock, formatMonth, isClosedDay, lastClosableMonth, monthKey, monthsBetween } from './closedPeriods';
+import { closedMonthSet, entryLock, formatMonth, isClosedDay, lastClosableMonth, monthKey, monthsBetween, orgDateKey } from './closedPeriods';
 
 describe('closed periods', () => {
 	it('matches days against closed months', () => {
@@ -27,5 +27,21 @@ describe('closed periods', () => {
 		expect(entryLock({ ...entry, organizationId: 4 }, org, false)).toBe('');
 		expect(entryLock({ ...entry, startTime: '2026-10-01T06:00:00Z' }, org, false)).toBe('');
 		expect(entryLock(entry, null, false)).toBe('');
+	});
+
+	it("takes the month of an instant in the organization's time zone, not the browser's (Berlin in tests)", () => {
+		// 23:30 in New York on 30 Sep = 03:30 UTC / 05:30 Berlin on 1 Oct
+		const lateSeptember = '2026-10-01T03:30:00Z';
+		const ny = { id: 3, closedMonths: ['2026-09-01'], timeZone: 'America/New_York' };
+		expect(orgDateKey(new Date(lateSeptember), 'America/New_York')).toBe('2026-09-30');
+		expect(orgDateKey(new Date(lateSeptember))).toBe('2026-10-01');
+		expect(orgDateKey(new Date(lateSeptember), 'Not/AZone')).toBe('2026-10-01');
+		expect(entryLock({ startTime: lateSeptember, organizationId: 3 }, ny, false)).toMatch(/September 2026/);
+		expect(entryLock({ startTime: lateSeptember, organizationId: 3 }, { ...ny, timeZone: 'Europe/Berlin' }, false)).toBe('');
+		// Midnight is past in Berlin, New York is still in September: September has not ended there
+		expect(lastClosableMonth(new Date(lateSeptember), 'America/New_York')).toBe('2026-08');
+		expect(lastClosableMonth(new Date(lateSeptember), 'Europe/Berlin')).toBe('2026-09');
+		// Already the new year in Tokyo
+		expect(lastClosableMonth(new Date('2025-12-31T16:00:00Z'), 'Asia/Tokyo')).toBe('2025-12');
 	});
 });

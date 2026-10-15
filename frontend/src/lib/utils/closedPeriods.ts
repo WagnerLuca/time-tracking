@@ -25,10 +25,22 @@ export function formatMonth(month: string): string {
 	return formatDate(new Date(y, m - 1, 1), { month: 'long', year: 'numeric' });
 }
 
-/** The latest month that may be closed: the one before the current month. */
-export function lastClosableMonth(today: Date = new Date()): string {
-	const d = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+/** 'YYYY-MM-DD' of an instant in the organization's time zone (the browser's without one or for an unknown zone). */
+export function orgDateKey(instant: Date, timeZone?: string | null): string {
+	if (!timeZone) return dateKey(instant);
+	try {
+		const parts = new Intl.DateTimeFormat('en', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(instant);
+		const part = (type: string) => parts.find((p) => p.type === type)?.value;
+		return `${part('year')}-${part('month')}-${part('day')}`;
+	} catch {
+		return dateKey(instant);
+	}
+}
+
+/** The latest month that may be closed: the one before the current month in the organization's time zone. */
+export function lastClosableMonth(now: Date = new Date(), timeZone?: string | null): string {
+	const [y, m] = orgDateKey(now, timeZone).split('-').map(Number);
+	return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
 }
 
 /** The months from..to ('YYYY-MM', inclusive); empty when to is before from. */
@@ -49,15 +61,16 @@ export function lockText(day: string): string {
 }
 
 /**
- * Why the caller may not change this entry, or '' when they may: its start day lies in a closed
- * month of the organization and the caller is no org admin (admins change it with a reason).
+ * Why the caller may not change this entry, or '' when they may: its start day (in the organization's
+ * time zone, like the backend guard) lies in a closed month of the organization and the caller is no
+ * org admin (admins change it with a reason).
  */
 export function entryLock(
 	entry: { startTime?: string | null; organizationId?: number | null },
-	org: { id?: number; closedMonths?: string[] | null } | null | undefined,
+	org: { id?: number; closedMonths?: string[] | null; timeZone?: string | null } | null | undefined,
 	isAdmin: boolean
 ): string {
 	if (isAdmin || !org || !entry.startTime || entry.organizationId !== org.id) return '';
-	const day = dateKey(new Date(entry.startTime));
+	const day = orgDateKey(new Date(entry.startTime), org.timeZone);
 	return isClosedDay(day, closedMonthSet(org.closedMonths)) ? lockText(day) : '';
 }
