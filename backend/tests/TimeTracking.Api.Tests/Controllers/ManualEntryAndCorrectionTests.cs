@@ -163,13 +163,24 @@ public class ManualEntryAndCorrectionTests : IClassFixture<TimeTrackingApiFactor
         (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/groups/{groupId}/members", new { userId = memberId, role = "Member" })).EnsureSuccessStatusCode();
         (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/groups/{groupId}/members", new { userId = ga.User.Id, role = "Admin" })).EnsureSuccessStatusCode();
         (await groupAdmin.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/entries", body)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        // The org detail tells the UI the same: the group admin sees the member, but no correction controls
+        (await CanCorrectAsync(groupAdmin, slug, memberId)).Should().BeFalse();
         (await owner.PutAsJsonAsync($"/api/v1/organizations/{slug}/groups/{groupId}/permissions", new { groupAdminCanApproveTimeEdits = true })).EnsureSuccessStatusCode();
 
         (await groupAdmin.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/entries", body)).StatusCode.Should().Be(HttpStatusCode.Created);
+        (await CanCorrectAsync(groupAdmin, slug, memberId)).Should().BeTrue();
         // ...but not for themselves (that would bypass their own edit rule)
         (await groupAdmin.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{ga.User.Id}/entries", body)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        _ = member;
+        (await CanCorrectAsync(groupAdmin, slug, ga.User.Id)).Should().BeFalse();
+        // Org admins may correct everyone but themselves (the UI never offers corrections of one's own entries)
+        (await CanCorrectAsync(owner, slug, memberId)).Should().BeTrue();
+        (await CanCorrectAsync(owner, slug, ga.User.Id)).Should().BeTrue();
+        (await CanCorrectAsync(member, slug, ga.User.Id)).Should().BeFalse();
     }
+
+    private static async Task<bool> CanCorrectAsync(HttpClient caller, string slug, int memberId) =>
+        (await JsonAsync(await caller.GetAsync($"/api/v1/organizations/{slug}"))).GetProperty("members").EnumerateArray()
+            .Single(m => m.GetProperty("id").GetInt32() == memberId).GetProperty("canCorrectEntries").GetBoolean();
 
     [Fact]
     public async Task WorkingTimeActWarnings_OnManualEntryAndInComplianceList()

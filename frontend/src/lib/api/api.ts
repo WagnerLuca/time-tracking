@@ -930,6 +930,10 @@ export interface OrganizationMemberResponse {
      * Whether a timer is running right now; null when presence is not visible to the caller.
      */
     'isPresent'?: boolean | null;
+    /**
+     * Whether the caller may add, correct and delete this member\'s time entries (never for themselves).
+     */
+    'canCorrectEntries'?: boolean;
 }
 /**
  * Summary view of an organization.

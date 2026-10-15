@@ -154,10 +154,18 @@ public class MemberEntryService(TimeTrackingDbContext context, ILogger<MemberEnt
         if (memberRole == null) return (org, (ServiceErrorType.NotFound, "Member not found in this organization."));
         if (callerRole >= OrganizationRole.Admin) return (org, null);
 
-        var isGroupAdmin = memberId != callerUserId && memberRole == OrganizationRole.Member
-            && (await GroupTree.LoadAsync(context, org.Id)).ActsFor(callerUserId, memberId, g => g.GroupAdminCanApproveTimeEdits == true);
-        return isGroupAdmin
+        return MayCorrect(false, callerUserId, memberId, memberRole.Value, await GroupTree.LoadAsync(context, org.Id))
             ? (org, null)
             : (org, (ServiceErrorType.Forbidden, "Only admins can change other members' time entries."));
     }
+
+    /// <summary>
+    /// The one correction rule (also sent as <c>canCorrectEntries</c> on the org detail's members):
+    /// org admins always; a group admin for the plain members of the groups they administer
+    /// (incl. sub-groups) whose effective capability allows approving time edits.
+    /// </summary>
+    public static bool MayCorrect(bool callerIsOrgAdmin, int callerUserId, int memberId, OrganizationRole memberRole, GroupTree tree) =>
+        callerIsOrgAdmin
+        || (memberId != callerUserId && memberRole == OrganizationRole.Member
+            && tree.ActsFor(callerUserId, memberId, g => g.GroupAdminCanApproveTimeEdits == true));
 }

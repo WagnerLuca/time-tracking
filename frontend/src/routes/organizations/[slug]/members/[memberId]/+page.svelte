@@ -60,10 +60,8 @@
 	let canViewSchedule = $derived(canSee(member, 'WorkSchedule'));
 	let canViewAbsences = $derived(isAdmin || canSee(member, 'Vacation') || canSee(member, 'SickDays') || canSee(member, 'OtherAbsences'));
 
-	let callerAdminGroupIds = $derived(new Set((org?.members?.find((m) => m.id === auth.user?.id)?.groups ?? []).filter((g) => g.isGroupAdmin).map((g) => g.groupId)));
-	// Admin corrections of the member's entries: org admins, or group admins of a shared group for plain members.
-	// ponytail: the group's "may approve time edits" flag is not checked here; the backend answers 403 without it.
-	let canCorrect = $derived(!isSelf && (isAdmin || (member?.role === 'Member' && (member?.groups ?? []).some((g) => callerAdminGroupIds.has(g.groupId)))));
+	// Admin corrections of the member's entries: the backend's rule (org admins; group admins whose group may approve time edits)
+	let canCorrect = $derived(!isSelf && !!member?.canCorrectEntries);
 
 	$effect(() => {
 		if (!orgSlug || !memberId) return;

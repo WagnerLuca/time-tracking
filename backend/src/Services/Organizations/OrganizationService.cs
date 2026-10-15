@@ -234,7 +234,9 @@ public class OrganizationService : IOrganizationService
                 InitialOvertimeHours = callerIsAdmin || m.Id == callerUserId.Value ? m.InitialOvertimeHours : 0,
                 Groups = can.HasFlag(MemberInfo.Groups) ? groupsByUser.GetValueOrDefault(m.Id) ?? new List<MemberGroupResponse>() : new List<MemberGroupResponse>(),
                 VisibleInfo = MemberVisibility.Kinds.Where(k => can.HasFlag(k)).Select(k => k.ToString()).ToList(),
-                IsPresent = can.HasFlag(MemberInfo.Presence) ? present.Contains(m.Id) : null
+                IsPresent = can.HasFlag(MemberInfo.Presence) ? present.Contains(m.Id) : null,
+                CanCorrectEntries = m.Id != callerUserId.Value && Enum.TryParse<OrganizationRole>(m.Role, out var memberRole)
+                    && MemberEntryService.MayCorrect(callerIsAdmin, callerUserId.Value, m.Id, memberRole, tree)
             };
         }).ToList();
 

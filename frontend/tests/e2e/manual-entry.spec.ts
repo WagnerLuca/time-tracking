@@ -84,3 +84,39 @@ test('member detail: the owner adds, corrects and deletes an entry of a member',
 	await page.getByRole('dialog').getByRole('button', { name: 'Löschen' }).click();
 	await expect(details.getByText(note)).toHaveCount(0);
 });
+
+/**
+ * #52: a group admin sees Tom's entries (view-all right) but gets the correction controls only once
+ * the group may approve time edits — the page follows the backend's `canCorrectEntries`.
+ */
+test('member detail: a group admin corrects entries only with the time-edit right', async ({ page, request }) => {
+	const SLUG = 'mueller-software';
+	const headers = { Authorization: `Bearer ${await apiToken(request, 'max.mueller@example.com')}` };
+	const org = await (await request.get(`${API}/organizations/${SLUG}`, { headers })).json();
+	const userId = (email: string): number => org.members.find((m: { email: string }) => m.email === email).id;
+	const group = await (await request.post(`${API}/organizations/${SLUG}/groups`, { headers, data: { name: `E2E Korrektur ${Date.now()}` } })).json();
+	const perms = (data: object) => request.put(`${API}/organizations/${SLUG}/groups/${group.id}/permissions`, { headers, data });
+	try {
+		expect((await perms({ groupAdminCanViewAllTimeEntries: true })).ok()).toBeTruthy();
+		for (const [uid, role] of [[userId('tom.weber@example.com'), 'Member'], [userId('niklas.hoffmann@example.com'), 'Admin']] as const) {
+			const added = await request.post(`${API}/organizations/${SLUG}/groups/${group.id}/members`, { headers, data: { userId: uid, role } });
+			expect(added.ok(), await added.text()).toBeTruthy();
+		}
+
+		await login(page, 'niklas.hoffmann@example.com');
+		const openDay = async () => {
+			await page.goto(`/organizations/${SLUG}/members/${userId('tom.weber@example.com')}`);
+			await page.getByRole('button', { name: 'Vorheriger Monat' }).click();
+			await page.locator('[data-day$="-14"]').first().click();
+			return page.getByTestId('day-details');
+		};
+		const details = await openDay();
+		await expect(details).toBeVisible();
+		await expect(details.getByRole('button', { name: 'Eintrag hinzufügen' })).toHaveCount(0);
+
+		expect((await perms({ groupAdminCanApproveTimeEdits: true })).ok()).toBeTruthy();
+		await expect((await openDay()).getByRole('button', { name: 'Eintrag hinzufügen' })).toBeVisible();
+	} finally {
+		await request.delete(`${API}/organizations/${SLUG}/groups/${group.id}`, { headers });
+	}
+});

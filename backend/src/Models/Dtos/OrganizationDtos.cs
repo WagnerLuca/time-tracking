@@ -99,6 +99,8 @@ public record OrganizationMemberResponse
     public List<string> VisibleInfo { get; init; } = new();
     /// <summary>Whether a timer is running right now; null when presence is not visible to the caller.</summary>
     public bool? IsPresent { get; init; }
+    /// <summary>Whether the caller may add, correct and delete this member's time entries (never for themselves).</summary>
+    public bool CanCorrectEntries { get; init; }
 }
 
 /// <summary>One row of the member visibility matrix: may members see this kind about people in / outside their groups.</summary>
