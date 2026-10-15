@@ -56,9 +56,9 @@ only found by scrolling a long page.
 | 13 | Toasts | all | Checked – every save/fail already toasts; inline approval adds "Antrag von X angenommen/abgelehnt" |
 | 14 | Forms: date/time inputs | all | Checked – native `type=date/time` everywhere (phone pickers), inline validation existed; invite form capped at `max-w-2xl` |
 | 15 | Settings toggles (32 px) and the dense group-override matrix on phones | admin | **Deferred** – switches grew to 32 px on touch (WCAG 2.5.8 AA's 24 px met), the matrix is a desktop table that scrolls inside its card; a phone layout for the matrix is its own task |
-| 16 | Remaining vacation is not on the dashboard | member | **Deferred** – one click away (Organisation → Mein Arbeitszeitmodell); a fourth key figure needs the vacation endpoint on the dashboard and a layout decision |
-| 17 | Withdrawing an own open request | member | **Deferred** – the inbox lists open requests, but the API has no withdraw endpoint |
-| 18 | Admin "edit/delete organization" sits on the personal "Mein Arbeitszeitmodell" page | admin | **Deferred** – rarely used; moving it to a settings section touches the slug-change redirect |
+| 16 | Remaining vacation is not on the dashboard | member | **Fixed** (round 2) – fourth figure card "Resturlaub 12 von 30 Tagen" (taken/planned below) from the org detail's vacation figures, linking to the team calendar; 2×2 on phones. Leads see own figures and team side by side from `lg` |
+| 17 | Withdrawing an own open request | member | **Fixed** (round 2) – `POST organizations/{slug}/requests/{id}/withdraw` (requester only, pending only, `Status` concurrency token), status `Withdrawn` ("zurückgezogen"); button with confirm dialog in the inbox |
+| 18 | Admin "edit/delete organization" sits on the personal "Mein Arbeitszeitmodell" page | admin | **Fixed** (round 2) – admin-only "Allgemein" section (first tab): profile, time zone, business day end, danger zone with typed name (owner); a slug change redirects to the new `/general` |
 | 19 | Days outside the current month in calendars stay faint (`/30`) | all | **Deferred** – inactive filler days, intentionally de-emphasised |
 | 20 | e2e runs hit the 10 logins/min limit, so specs used odd users (an org admin as plain team member) | – | **Fixed** – `RateLimiting:AuthStrictPerMinute` (10 in production, 200 only in Development, pinned by `RateLimitConfigTests`); `sub-groups.spec` now uses Tom (member) in the team and Niklas (lead) as department admin |
 
