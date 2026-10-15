@@ -607,18 +607,18 @@ public class CoreHoursTests : IClassFixture<TimeTrackingApiFactory>
         var wednesday = new DateOnly(2026, 4, 22);
         var (owner, _, slug, orgId, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, "core-catch-guard", CoreSettings);
         var ownerId = await UserIdAsync("core-catch-guard-owner@t.test");
-        // Core hours changed on Wednesday at noon; the member joined on Thursday at noon
+        // Core hours changed on Wednesday at noon; the member joined on Friday morning
         await BackdateAsync(orgId, changedAt: Berlin.ToUtc(At(wednesday, 12)));
         await WithDbAsync(async db =>
         {
-            (await db.UserOrganizations.SingleAsync(uo => uo.OrganizationId == orgId && uo.UserId == memberId)).JoinedAt = Berlin.ToUtc(At(wednesday.AddDays(1), 12));
+            (await db.UserOrganizations.SingleAsync(uo => uo.OrganizationId == orgId && uo.UserId == memberId)).JoinedAt = Berlin.ToUtc(At(wednesday.AddDays(2), 8));
             await db.SaveChangesAsync();
         });
 
         await CheckAsync(Berlin.ToUtc(At(wednesday.AddDays(2), 10)));
         (await CheckRowAsync(ownerId, wednesday)).Should().BeNull("its window started before the change");
         (await CheckRowAsync(ownerId, wednesday.AddDays(1)))!.CheckedLate.Should().BeTrue();
-        (await CheckRowAsync(memberId, wednesday.AddDays(1))).Should().BeNull("the member joined during that window");
+        (await CheckRowAsync(memberId, wednesday.AddDays(1))).Should().BeNull("the member joined the day after");
     }
 
     // ── Tolerance per group ────────────────────────────────────────────

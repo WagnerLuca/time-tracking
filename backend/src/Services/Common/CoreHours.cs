@@ -174,8 +174,8 @@ public static class CoreHours
     /// start days), so a restart or downtime catches up. Stores the checks and notifies violations once
     /// (in-app, plus mail when <paramref name="email"/> is given) to the member, the org admins/owners and
     /// the admins of the member's groups. A check more than <see cref="LateAfter"/> after its due time is
-    /// <see cref="CoreHoursCheck.CheckedLate"/> and says so; it is skipped for a window that started before
-    /// the member joined or before the core hours last changed (<see cref="Organization.CoreHoursChangedAt"/>):
+    /// <see cref="CoreHoursCheck.CheckedLate"/> and says so; it is skipped for a day before the member joined
+    /// (org-local) or a window that started before the core hours last changed (<see cref="Organization.CoreHoursChangedAt"/>):
     /// those days were not under this rule. A requested backfill (<see cref="Organization.CoreHoursBackfillFrom"/>)
     /// flags exactly those days before the change silently (<see cref="CoreHoursCheck.Backfilled"/>) and is
     /// then cleared. A few queries per organization, independent of members and days. Returns the number
@@ -234,8 +234,8 @@ public static class CoreHours
                     var beforeChange = from < org.CoreHoursChangedAt;
                     var backfill = day >= backfillFrom && beforeChange;
                     var late = !backfill && nowUtc >= dueAt + LateAfter;
-                    if (backfill ? from < member.JoinedAt
-                                 : day < catchUpFrom || (late && (beforeChange || from < member.JoinedAt)))
+                    var beforeJoining = day < clock.LocalDate(member.JoinedAt);
+                    if (backfill ? beforeJoining : day < catchUpFrom || (late && (beforeChange || beforeJoining)))
                         continue;
 
                     due.Add(new CoreHoursCheck
