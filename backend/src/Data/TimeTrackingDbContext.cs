@@ -140,6 +140,9 @@ public class TimeTrackingDbContext : DbContext
 
             // Create unique index on UserId and OrganizationId combination
             entity.HasIndex(e => new { e.UserId, e.OrganizationId }).IsUnique();
+            // Unique when set (Postgres treats NULLs as distinct)
+            entity.Property(e => e.PersonnelNumber).HasMaxLength(UserOrganizationLimits.PersonnelNumberMaxLength);
+            entity.HasIndex(e => new { e.OrganizationId, e.PersonnelNumber }).IsUnique();
 
             // Defense in depth for the API's strict enum parsing: no role outside Member..Owner
             entity.ToTable(t => t.HasCheckConstraint("CK_UserOrganizations_Role", "\"Role\" BETWEEN 0 AND 2"));

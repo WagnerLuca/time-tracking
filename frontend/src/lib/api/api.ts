@@ -587,10 +587,16 @@ export interface GroupVisibilityRuleResponse {
     'outsideGroups'?: boolean | null;
 }
 /**
- * A country whose public holidays can be imported.
+ * A region whose public holidays can be imported.
  */
 export interface HolidayPresetResponse {
+    /**
+     * Stable key (\"DE\", \"DE-BY\", \"AT\", \"CH\"); the UI translates the region name by it.
+     */
     'key': string | null;
+    /**
+     * German name, a fallback for clients that do not know the key.
+     */
     'name': string | null;
 }
 /**
@@ -743,6 +749,10 @@ export interface MemberGroupResponse {
 export interface MemberInitialOvertimeResponse {
     'userId'?: number;
     'initialOvertimeHours'?: number;
+}
+export interface MemberPersonnelNumberResponse {
+    'userId'?: number;
+    'personnelNumber'?: string | null;
 }
 /**
  * Per-member time tracking statistics for the admin overview.
@@ -957,6 +967,10 @@ export interface OrganizationMemberResponse {
      */
     'isPresent'?: boolean | null;
     /**
+     * Personnel number for payroll; only filled in for org admins.
+     */
+    'personnelNumber'?: string | null;
+    /**
      * Whether the caller may add, correct and delete this member\'s time entries (never for themselves).
      */
     'canCorrectEntries'?: boolean;
@@ -1126,6 +1140,7 @@ export interface PersonalMembership {
     'active'?: boolean;
     'vacationDaysPerYear'?: number;
     'initialOvertimeHours'?: number;
+    'personnelNumber'?: string | null;
 }
 export interface PersonalNotification {
     'title'?: string | null;
@@ -1296,6 +1311,12 @@ export type RuleMode = typeof RuleMode[keyof typeof RuleMode];
  */
 export interface SetInitialOvertimeRequest {
     'initialOvertimeHours'?: number;
+}
+/**
+ * Sets a member\'s personnel number; empty or null removes it.
+ */
+export interface SetPersonnelNumberRequest {
+    'personnelNumber'?: string | null;
 }
 /**
  * Request payload for setting a member\'s vacation day allowance.
@@ -8247,6 +8268,52 @@ export const OrganizationsApiAxiosParamCreator = function (configuration?: Confi
         },
         /**
          * 
+         * @summary Set or clear a member\'s personnel number for the payroll export (admin only; unique per organization).
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Member ID to update.
+         * @param {SetPersonnelNumberRequest} [setPersonnelNumberRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdPersonnelNumberPut: async (slug: string, memberId: number, setPersonnelNumberRequest?: SetPersonnelNumberRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdPersonnelNumberPut', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdPersonnelNumberPut', 'memberId', memberId)
+            const localVarPath = `/api/v1/Organizations/{slug}/members/{memberId}/personnel-number`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(setPersonnelNumberRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Update a member\'s role in the organization (admin only).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID to update.
@@ -8634,6 +8701,21 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Set or clear a member\'s personnel number for the payroll export (admin only; unique per organization).
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Member ID to update.
+         * @param {SetPersonnelNumberRequest} [setPersonnelNumberRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdPersonnelNumberPut(slug: string, memberId: number, setPersonnelNumberRequest?: SetPersonnelNumberRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MemberPersonnelNumberResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdPersonnelNumberPut(slug, memberId, setPersonnelNumberRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['OrganizationsApi.apiV1OrganizationsSlugMembersMemberIdPersonnelNumberPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Update a member\'s role in the organization (admin only).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID to update.
@@ -8817,6 +8899,18 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
         },
         /**
          * 
+         * @summary Set or clear a member\'s personnel number for the payroll export (admin only; unique per organization).
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Member ID to update.
+         * @param {SetPersonnelNumberRequest} [setPersonnelNumberRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdPersonnelNumberPut(slug: string, memberId: number, setPersonnelNumberRequest?: SetPersonnelNumberRequest, options?: RawAxiosRequestConfig): AxiosPromise<MemberPersonnelNumberResponse> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdPersonnelNumberPut(slug, memberId, setPersonnelNumberRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Update a member\'s role in the organization (admin only).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID to update.
@@ -8984,6 +9078,19 @@ export class OrganizationsApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugMembersMemberIdInitialOvertimePut(slug: string, memberId: number, setInitialOvertimeRequest?: SetInitialOvertimeRequest, options?: RawAxiosRequestConfig) {
         return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdInitialOvertimePut(slug, memberId, setInitialOvertimeRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Set or clear a member\'s personnel number for the payroll export (admin only; unique per organization).
+     * @param {string} slug Organization URL slug.
+     * @param {number} memberId Member ID to update.
+     * @param {SetPersonnelNumberRequest} [setPersonnelNumberRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdPersonnelNumberPut(slug: string, memberId: number, setPersonnelNumberRequest?: SetPersonnelNumberRequest, options?: RawAxiosRequestConfig) {
+        return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdPersonnelNumberPut(slug, memberId, setPersonnelNumberRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

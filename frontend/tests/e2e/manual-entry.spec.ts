@@ -120,3 +120,24 @@ test('member detail: a group admin corrects entries only with the time-edit righ
 		await request.delete(`${API}/organizations/${SLUG}/groups/${group.id}`, { headers });
 	}
 });
+
+/** #54: the owner sets a member's personnel number on the member page and removes it again. */
+test('member detail: the owner sets and clears a personnel number', async ({ page, request }) => {
+	const headers = { Authorization: `Bearer ${await apiToken(request, 'max.mueller@example.com')}` };
+	const org = await (await request.get(`${API}/organizations/mueller-software`, { headers })).json();
+	const tom = org.members.find((m: { email: string }) => m.email === 'tom.weber@example.com');
+	const number = `E2E-${Date.now()}`;
+
+	await login(page, 'max.mueller@example.com');
+	await page.goto(`/organizations/mueller-software/members/${tom.id}`);
+	const card = page.locator('section', { has: page.getByRole('heading', { name: 'Personalnummer' }) });
+	await card.getByRole('button', { name: 'Bearbeiten' }).click();
+	await card.getByLabel('Personalnummer').fill(number);
+	await card.getByRole('button', { name: 'Speichern' }).click();
+	await expect(card.getByText(number)).toBeVisible();
+
+	await card.getByRole('button', { name: 'Bearbeiten' }).click();
+	await card.getByLabel('Personalnummer').fill('');
+	await card.getByRole('button', { name: 'Speichern' }).click();
+	await expect(card.getByText('Keine Personalnummer hinterlegt.')).toBeVisible();
+});

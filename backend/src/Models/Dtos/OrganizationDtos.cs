@@ -100,6 +100,8 @@ public record OrganizationMemberResponse
     public List<string> VisibleInfo { get; init; } = new();
     /// <summary>Whether a timer is running right now; null when presence is not visible to the caller.</summary>
     public bool? IsPresent { get; init; }
+    /// <summary>Personnel number for payroll; only filled in for org admins.</summary>
+    public string? PersonnelNumber { get; init; }
     /// <summary>Whether the caller may add, correct and delete this member's time entries (never for themselves).</summary>
     public bool CanCorrectEntries { get; init; }
 }
@@ -231,6 +233,19 @@ public record SetVacationDaysRequest
 {
     [Range(0, 365)]
     public double Days { get; init; }
+}
+
+/// <summary>Sets a member's personnel number; empty or null removes it.</summary>
+public record SetPersonnelNumberRequest
+{
+    [MaxLength(UserOrganizationLimits.PersonnelNumberMaxLength)]
+    public string? PersonnelNumber { get; init; }
+}
+
+public record MemberPersonnelNumberResponse
+{
+    public int UserId { get; init; }
+    public string? PersonnelNumber { get; init; }
 }
 
 /// <summary>Organization settings after an update (rule modes as their string names).</summary>

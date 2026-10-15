@@ -21,6 +21,7 @@
 	import MemberSchedule from '$lib/components/member/MemberSchedule.svelte';
 	import MemberVacation from '$lib/components/member/MemberVacation.svelte';
 	import MemberCards from '$lib/components/member/MemberCards.svelte';
+	import MemberPersonnelNumber from '$lib/components/member/MemberPersonnelNumber.svelte';
 	import type {
 		OrganizationDetailResponse,
 		OrganizationMemberResponse,
@@ -216,6 +217,7 @@
 			<MemberVacation class="mb-5" {orgSlug} {member} canEdit={isAdmin} onchanged={reloadOrg} />
 		{/if}
 		{#if isAdmin}
+			<MemberPersonnelNumber {orgSlug} {member} onchanged={reloadOrg} />
 			<MemberCards {orgSlug} {memberId} onchanged={reloadOrg} />
 		{/if}
 		{#if canViewSchedule}

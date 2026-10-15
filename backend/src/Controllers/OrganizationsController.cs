@@ -206,4 +206,19 @@ public class OrganizationsController : OrganizationBaseController
         if (userId == null) return Unauthorized();
         return ToResponse(await _service.SetMemberVacationDaysAsync(slug, userId.Value, memberId, request));
     }
+
+    /// <summary>Set or clear a member's personnel number for the payroll export (admin only; unique per organization).</summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID to update.</param>
+    [HttpPut("{slug}/members/{memberId}/personnel-number")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(typeof(MemberPersonnelNumberResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> SetMemberPersonnelNumber(
+        string slug, int memberId, [FromBody] SetPersonnelNumberRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.SetMemberPersonnelNumberAsync(slug, userId.Value, memberId, request));
+    }
 }

@@ -1079,6 +1079,10 @@ namespace TimeTracking.Api.Migrations
                     b.Property<int>("OrganizationId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("PersonnelNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<int>("Role")
                         .HasColumnType("integer");
 
@@ -1090,7 +1094,8 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrganizationId");
+                    b.HasIndex("OrganizationId", "PersonnelNumber")
+                        .IsUnique();
 
                     b.HasIndex("UserId", "OrganizationId")
                         .IsUnique();

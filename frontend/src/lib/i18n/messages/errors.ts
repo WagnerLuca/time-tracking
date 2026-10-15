@@ -17,6 +17,7 @@ export const de = {
 	org: {
 		notFound: 'Organisation nicht gefunden.',
 		notMember: 'Du bist kein Mitglied dieser Organisation.',
+		personnelNumberTaken: 'Diese Personalnummer hat bereits ein anderes Mitglied.',
 		userNotMember: 'Diese Person ist kein Mitglied der Organisation.',
 		memberNotFound: 'Mitglied nicht gefunden.',
 		twoFactorRequired: 'Diese Organisation verlangt die Zwei-Faktor-Authentifizierung. Richte sie in den Einstellungen ein, um fortzufahren.',
@@ -192,6 +193,7 @@ export const en: typeof de = {
 	org: {
 		notFound: 'Organization not found.',
 		notMember: 'You are not a member of this organization.',
+		personnelNumberTaken: 'Another member already has this personnel number.',
 		userNotMember: 'This person is not a member of the organization.',
 		memberNotFound: 'Member not found.',
 		twoFactorRequired: 'This organization requires two-factor authentication. Set it up in your settings to continue.',

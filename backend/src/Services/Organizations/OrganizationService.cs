@@ -105,6 +105,7 @@ public class OrganizationService : IOrganizationService
                         JoinedAt = uo.JoinedAt,
                         InitialOvertimeHours = uo.InitialOvertimeHours,
                         VacationDaysPerYear = uo.VacationDaysPerYear,
+                        PersonnelNumber = uo.PersonnelNumber,
                         CardCount = _context.BadgeCards.Count(c => c.OrganizationId == uo.OrganizationId && c.UserId == uo.UserId)
                     })
                     .ToList(),
@@ -229,6 +230,7 @@ public class OrganizationService : IOrganizationService
                 VacationDaysPlanned = visible ? planned : 0,
                 VacationDaysRemaining = visible ? Math.Max(0, m.VacationDaysPerYear - used) : 0,
                 CardCount = callerIsAdmin ? m.CardCount : 0,
+                PersonnelNumber = callerIsAdmin ? m.PersonnelNumber : null,
                 // Starting overtime balance is payroll data: the person and admins only
                 InitialOvertimeHours = callerIsAdmin || m.Id == callerUserId.Value ? m.InitialOvertimeHours : 0,
                 Groups = can.HasFlag(MemberInfo.Groups) ? groupsByUser.GetValueOrDefault(m.Id) ?? new List<MemberGroupResponse>() : new List<MemberGroupResponse>(),
@@ -881,5 +883,31 @@ public class OrganizationService : IOrganizationService
             request.Days, userId, org.Id, callerUserId);
 
         return ServiceResult.Ok(new MemberVacationDaysResponse { UserId = userId, VacationDaysPerYear = membership.VacationDaysPerYear });
+    }
+
+    public async Task<ServiceResult<MemberPersonnelNumberResponse>> SetMemberPersonnelNumberAsync(
+        string slug, int callerUserId, int userId, SetPersonnelNumberRequest request)
+    {
+        var org = await _context.FindOrgBySlugAsync(slug);
+        if (org == null)
+            return ServiceResult.NotFound<MemberPersonnelNumberResponse>("Organization not found");
+        if (await _context.GetOrgRoleAsync(callerUserId, org.Id) is not >= OrganizationRole.Admin)
+            return ServiceResult.Forbidden<MemberPersonnelNumberResponse>();
+
+        var membership = await _context.UserOrganizations
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
+        if (membership == null)
+            return ServiceResult.NotFound<MemberPersonnelNumberResponse>("Member not found in this organization.");
+
+        var number = string.IsNullOrWhiteSpace(request.PersonnelNumber) ? null : request.PersonnelNumber.Trim();
+        // Inactive memberships keep theirs, and the unique index covers them too
+        if (number != null && await _context.UserOrganizations.IgnoreQueryFilters()
+                .AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId != userId && uo.PersonnelNumber == number))
+            return ServiceResult.Conflict<MemberPersonnelNumberResponse>("This personnel number is already used by another member.");
+
+        membership.PersonnelNumber = number;
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Personnel number of user {UserId} in org {OrgId} set by user {CallerId}", userId, org.Id, callerUserId);
+        return ServiceResult.Ok(new MemberPersonnelNumberResponse { UserId = userId, PersonnelNumber = number });
     }
 }

@@ -9,6 +9,11 @@ public enum OrganizationRole
     Owner = 2  // For the creator of the organization
 }
 
+public static class UserOrganizationLimits
+{
+    public const int PersonnelNumberMaxLength = 50;
+}
+
 public class UserOrganization
 {
     public int Id { get; set; }
@@ -26,6 +31,9 @@ public class UserOrganization
     
     // Number of vacation days this member is entitled to per year
     public double VacationDaysPerYear { get; set; }
+
+    /// <summary>Optional personnel number for payroll (admin-set, unique per organization when set).</summary>
+    public string? PersonnelNumber { get; set; }
     
     // Navigation properties
     [JsonIgnore]

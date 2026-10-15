@@ -69,6 +69,7 @@ docs/MarkedSeenResponse.md
 docs/MemberEntriesApi.md
 docs/MemberGroupResponse.md
 docs/MemberInitialOvertimeResponse.md
+docs/MemberPersonnelNumberResponse.md
 docs/MemberTimeOverviewResponse.md
 docs/MemberVacationDaysResponse.md
 docs/NotificationResponse.md
@@ -109,6 +110,7 @@ docs/ResetPasswordRequest.md
 docs/RespondToOrgRequestRequest.md
 docs/RuleMode.md
 docs/SetInitialOvertimeRequest.md
+docs/SetPersonnelNumberRequest.md
 docs/SetVacationDaysRequest.md
 docs/StartTimeEntryRequest.md
 docs/StopTimeEntryRequest.md

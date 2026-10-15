@@ -79,6 +79,15 @@ export const de = {
 			exportData: 'Daten exportieren'
 		}
 	},
+	personnelNumber: {
+		title: 'Personalnummer',
+		label: 'Personalnummer',
+		hint: 'Steht im Lohnexport. Leer lassen, um sie zu entfernen.',
+		tooLong: 'Höchstens {max} Zeichen.',
+		none: 'Keine Personalnummer hinterlegt.',
+		saved: 'Personalnummer gespeichert.',
+		saveFailed: 'Die Personalnummer konnte nicht gespeichert werden.'
+	},
 	vacation: {
 		title: 'Urlaubstage',
 		daysPerYear: 'Tage pro Jahr',
@@ -203,6 +212,15 @@ export const en: typeof de = {
 			viewAllTimeEntries: 'View all time entries',
 			exportData: 'Export data'
 		}
+	},
+	personnelNumber: {
+		title: 'Personnel number',
+		label: 'Personnel number',
+		hint: 'Appears in the payroll export. Leave it empty to remove it.',
+		tooLong: 'At most {max} characters.',
+		none: 'No personnel number set.',
+		saved: 'Personnel number saved.',
+		saveFailed: 'Could not save the personnel number.'
 	},
 	vacation: {
 		title: 'Vacation days',

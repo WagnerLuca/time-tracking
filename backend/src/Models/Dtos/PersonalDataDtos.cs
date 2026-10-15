@@ -17,7 +17,8 @@ public record PersonalDataExport
     public required List<PersonalEntryChange> EntryChanges { get; init; }
 }
 
-public record PersonalMembership(string Organization, string Role, DateTime JoinedAt, bool Active, double VacationDaysPerYear, double InitialOvertimeHours);
+public record PersonalMembership(string Organization, string Role, DateTime JoinedAt, bool Active, double VacationDaysPerYear, double InitialOvertimeHours,
+    string? PersonnelNumber);
 public record PersonalCard(string Organization, string CardHint, string? Label, bool IsBlocked, DateTime CreatedAt, DateTime? LastUsedAt);
 public record PersonalTimeEntry(string? Organization, DateTime StartTime, DateTime? EndTime, int PauseMinutes, string? Description, bool IsFailure);
 public record PersonalAbsence(string Organization, DateOnly Date, string Type, bool IsHalfDay, string? Note);

@@ -33,5 +33,6 @@ public interface IOrganizationService
     Task<ServiceResult<MemberInitialOvertimeResponse>> SetMemberInitialOvertimeAsync(string slug, int callerUserId, int userId, SetInitialOvertimeRequest request);
 
     // ── Vacation days (admin) ──
+    Task<ServiceResult<MemberPersonnelNumberResponse>> SetMemberPersonnelNumberAsync(string slug, int callerUserId, int userId, SetPersonnelNumberRequest request);
     Task<ServiceResult<MemberVacationDaysResponse>> SetMemberVacationDaysAsync(string slug, int callerUserId, int userId, SetVacationDaysRequest request);
 }
