@@ -116,6 +116,30 @@ describe('apiClient', () => {
 		expect(nav.goto).toHaveBeenCalledTimes(1);
 	});
 
+	it('asks an admin for a reason when a closed month needs one and sends the request again with it', async () => {
+		const { confirmState } = await import('$lib/stores/confirm.svelte');
+		const reasons: (string | undefined)[] = [];
+		respond = (config) => {
+			const reason = config.headers?.['X-Change-Reason'] as string | undefined;
+			reasons.push(reason);
+			return reason ? { status: 200, data: { id: 9 } } : { status: 409, data: { code: 'period.reasonRequired', month: '2026-09' } };
+		};
+		const saved = client.timeTrackingApi.apiV1TimeTrackingIdPut(9, {});
+		await vi.waitFor(() => expect(confirmState.current?.input).toBeTruthy());
+		expect(confirmState.current?.message).toContain('September 2026');
+		confirmState.answer(true, '  Lohn & Gehalt ');
+		await expect(saved).resolves.toMatchObject({ data: { id: 9 } });
+		expect(reasons).toEqual([undefined, encodeURIComponent('Lohn & Gehalt')]);
+
+		// Cancelled: the original error reaches the caller, nothing is sent again
+		reasons.length = 0;
+		const cancelled = client.timeTrackingApi.apiV1TimeTrackingIdPut(9, {});
+		await vi.waitFor(() => expect(confirmState.current).toBeTruthy());
+		confirmState.answer(false);
+		await expect(cancelled).rejects.toMatchObject({ response: { status: 409 } });
+		expect(reasons).toEqual([undefined]);
+	});
+
 	it('turns a JSON error body of a blob download back into an object', async () => {
 		respond = () => ({ status: 400, data: new Blob([JSON.stringify({ code: 'range.tooLong' })], { type: 'application/problem+json' }) });
 		await expect(client.authApi.apiV1AuthMeGet()).rejects.toMatchObject({ response: { data: { code: 'range.tooLong' } } });

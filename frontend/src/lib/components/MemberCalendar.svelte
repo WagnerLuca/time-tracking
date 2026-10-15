@@ -22,6 +22,8 @@
 	import EntryEditForm from '$lib/components/EntryEditForm.svelte';
 	import RequestModal from '$lib/components/RequestModal.svelte';
 	import AbsenceDialog from '$lib/components/AbsenceDialog.svelte';
+	import LockIcon from '$lib/components/LockIcon.svelte';
+	import { closedMonthSet, formatMonth, isClosedDay, lockText } from '$lib/utils/closedPeriods';
 	import { t, tp } from '$lib/i18n';
 
 	/**
@@ -95,6 +97,9 @@
 
 	let myRole = $derived(orgDetail?.members?.find((m) => m.id === auth.user?.id)?.role ?? null);
 	let isAdmin = $derived(isOrgAdmin(myRole));
+	/** Closed months (issue #57): marked for everyone; locked for non-admins (admins change them with a reason). */
+	const closed = $derived(closedMonthSet(orgDetail?.closedMonths));
+	const lockedDay = (key: string) => !isAdmin && isClosedDay(key, closed);
 	let selfAbsenceMode = $derived(effectivePerms?.absenceSelfServiceMode ?? orgDetail?.absenceSelfServiceMode ?? 'Allowed');
 	/** Admins can add for the viewed person; members can add/request for themselves. */
 	let canAddAbsence = $derived(isAdmin || (isSelf && selfAbsenceMode !== 'Disabled'));
@@ -399,7 +404,7 @@
 
 	/** Right click / long press: select the day and open the absence dialog for it. */
 	function dayOpenHandler(day: CalendarDay): (() => void) | undefined {
-		if (!canAddAbsence || !day.isCurrentMonth) return undefined;
+		if (!canAddAbsence || !day.isCurrentMonth || lockedDay(day.key)) return undefined;
 		return () => {
 			if (selectedDayKey !== day.key) editor.cancelEditEntry();
 			selectedDayKey = day.key;
@@ -662,6 +667,9 @@
 							{#if day.hasFailure}
 								<span class="absolute top-1 right-1 h-2 w-2 rounded-full bg-error" title={t('calendar.needsCorrection')}></span>
 							{/if}
+							{#if day.isCurrentMonth && isClosedDay(day.key, closed)}
+								<LockIcon title={lockText(day.key)} class="absolute bottom-1 right-1" />
+							{/if}
 							{#if compliance.has(day.key)}
 								<span class="absolute top-0.5 right-4 text-[0.7rem] leading-none text-warning" title={complianceText(compliance.get(day.key)!)} data-testid="compliance-marker">⚠<span class="sr-only">{complianceText(compliance.get(day.key)!)}</span></span>
 							{/if}
@@ -703,6 +711,9 @@
 							{#if day.hasFailure}
 								<span class="badge badge-error badge-xs" title={t('calendar.needsCorrection')}>!</span>
 							{/if}
+							{#if isClosedDay(day.key, closed)}
+								<LockIcon title={lockText(day.key)} />
+							{/if}
 							{#if compliance.has(day.key)}
 								<span class="text-warning text-xs" title={complianceText(compliance.get(day.key)!)}>⚠<span class="sr-only">{complianceText(compliance.get(day.key)!)}</span></span>
 							{/if}
@@ -733,10 +744,10 @@
 							<span class="text-sm text-base-content/70">{formatDateFull(dayDetails.date)}</span>
 						</div>
 						<div class="flex flex-wrap gap-2">
-							{#if canAddEntry && isPastOrToday(dayDetails.date) && editor.creatingDay !== dayDetails.key}
+							{#if canAddEntry && !lockedDay(dayDetails.key) && isPastOrToday(dayDetails.date) && editor.creatingDay !== dayDetails.key}
 								<button type="button" class="btn btn-outline btn-sm" onclick={() => editor.startCreate(dayDetails.key)}>{correcting ? t('entries.manual.addAdmin') : t('entries.manual.add')}</button>
 							{/if}
-							{#if canAddAbsence}
+							{#if canAddAbsence && !lockedDay(dayDetails.key)}
 								<button type="button" class="btn btn-outline btn-sm" onclick={() => openAbsenceDialog(dayDetails.key)}>{mustRequest ? t('calendar.requestAbsence') : t('calendar.addAbsence')}</button>
 							{/if}
 						</div>
@@ -756,6 +767,12 @@
 							<span class="badge {dayTypeClasses(dayDetails.dayType).badge}">{dayDetails.dayTypeLabel}</span>
 						{/if}
 					</div>
+					{#if isClosedDay(dayDetails.key, closed)}
+						<div role="status" class="alert alert-info text-sm mb-3 py-2" data-testid="closed-day-notice">
+							<LockIcon title={lockText(dayDetails.key)} muted={false} />
+							<span>{t(isAdmin ? 'closedPeriods.lockedDayAdmin' : 'closedPeriods.lockedDay', { month: formatMonth(dayDetails.key) })}</span>
+						</div>
+					{/if}
 					{#if compliance.has(dayDetails.key)}
 						<div role="status" class="alert alert-warning text-sm mb-3 py-2">{complianceText(compliance.get(dayDetails.key)!)}</div>
 					{/if}
@@ -783,12 +800,12 @@
 						<ul class="flex flex-col gap-2">
 							{#each selectedDayEntries as entry (entry.id)}
 								<li class="rounded-lg border border-base-300 bg-base-200/40 overflow-hidden">
-									<EntryRow {entry} editor={isSelf || correcting ? editor : undefined} {...entryPerms} compact />
+									<EntryRow {entry} editor={isSelf || correcting ? editor : undefined} {...entryPerms} compact locked={lockedDay(dayDetails.key) ? lockText(dayDetails.key) : ''} />
 								</li>
 							{/each}
 						</ul>
 					{:else}
-						<EmptyState text={canAddEntry && isPastOrToday(dayDetails.date) ? t('calendar.noEntriesAdd') : t('calendar.noEntries')} />
+						<EmptyState text={canAddEntry && !lockedDay(dayDetails.key) && isPastOrToday(dayDetails.date) ? t('calendar.noEntriesAdd') : t('calendar.noEntries')} />
 					{/if}
 				</section>
 			{/if}
@@ -802,6 +819,7 @@
 				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background: {heatColor(1, 1)}"></span> {t('calendar.targetMet')}</span>
 				<span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background: {heatColor(1, 2)}"></span> {t('calendar.underTarget')}</span>
 				<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full shrink-0 bg-error"></span> {t('calendar.correctionLegend')}</span>
+				{#if closed.has(`${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`)}<span class="flex items-center gap-1.5"><LockIcon title={t('closedPeriods.closed')} /> {t('closedPeriods.closed')}</span>{/if}
 			</div>
 
 			<!-- Daily breakdown for month (the agenda list covers this on phones) -->

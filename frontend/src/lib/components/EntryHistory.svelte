@@ -39,12 +39,14 @@
 	{:else if changes}
 		<ol class="list-none p-0 m-0 mt-1 flex flex-col gap-2">
 			{#each changes as c (c.id)}
-				<li class="border-l-2 border-base-300 pl-2">
+				<li class="border-l-2 pl-2 {c.inClosedPeriod ? 'border-warning' : 'border-base-300'}" data-testid={c.inClosedPeriod ? 'history-closed' : undefined}>
 					<div class="text-xs text-base-content/70">
 						<span class="font-semibold">{historyKindLabel(c.kind)}</span>
 						· {c.changedAt ? formatDateTime(c.changedAt) : ''}
 						· {c.changedByName ?? t('entries.history.system')}
+						{#if c.inClosedPeriod}<span class="badge badge-warning badge-xs ml-1">{t('closedPeriods.inHistory')}</span>{/if}
 					</div>
+					{#if c.reason}<div class="text-xs text-base-content/80 break-words">{t('closedPeriods.reason', { reason: c.reason })}</div>{/if}
 					{#if c.changes && c.changes.length > 0}
 						<ul class="list-none p-0 m-0 text-xs text-base-content/70">
 							{#each c.changes as f, i (i)}

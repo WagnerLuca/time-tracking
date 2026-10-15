@@ -12,6 +12,7 @@
 	import { t } from '$lib/i18n';
 	import type { OrganizationDetailResponse } from '$lib/api';
 	import Skeleton from '$lib/components/Skeleton.svelte';
+	import ClosedPeriodsPanel from '$lib/components/ClosedPeriodsPanel.svelte';
 
 	/** "Allgemein" (admins only): the organization's profile, time reference and the danger zone. */
 	const orgSlug = $derived(page.params.slug ?? '');
@@ -179,6 +180,8 @@
 				<button type="submit" class="btn btn-primary max-sm:w-full" disabled={saving}>{saving ? t('common.saving') : t('common.saveChanges')}</button>
 			</div>
 		</form>
+
+		<ClosedPeriodsPanel {orgSlug} />
 
 		<section class="card border border-error/50 bg-error/5 p-4 sm:p-5 mt-8 max-w-2xl" aria-labelledby="general-danger" data-testid="danger-zone">
 			<h2 id="general-danger" class="text-base font-semibold text-error m-0">{t('orgHome.general.danger')}</h2>

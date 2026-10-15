@@ -23,6 +23,10 @@ docs/AuthResponse.md
 docs/BadgeCardResponse.md
 docs/BalanceResponse.md
 docs/ChangePasswordRequest.md
+docs/CloseMonthsRequest.md
+docs/ClosedPeriodEventResponse.md
+docs/ClosedPeriodsApi.md
+docs/ClosedPeriodsResponse.md
 docs/ComplianceDayResponse.md
 docs/CoreHoursMode.md
 docs/CreateAbsenceDayRequest.md
@@ -103,6 +107,7 @@ docs/PunchResponse.md
 docs/RefreshTokenRequest.md
 docs/RefreshTokenResponse.md
 docs/RegisterRequest.md
+docs/ReopenMonthRequest.md
 docs/ReportsApi.md
 docs/RequestStatus.md
 docs/RequestType.md

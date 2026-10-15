@@ -1,9 +1,12 @@
 import axios from 'axios';
 import { env } from '$env/dynamic/public';
 import { goto } from '$app/navigation';
-import { isTwoFactorRequired } from '$lib/utils/errorHandler';
+import { getErrorCode, getErrorMonth, isTwoFactorRequired } from '$lib/utils/errorHandler';
+import { promptDialog } from '$lib/stores/confirm.svelte';
+import { formatMonth } from '$lib/utils/closedPeriods';
+import { t } from '$lib/i18n';
 import { installRefreshInterceptor, type RefreshedTokens } from '$lib/authRefresh';
-import { Configuration, AbsenceDayApi, ApiKeysApi, AuthApi, ExportImportApi, GroupApi, HolidayApi, InvitationsApi, MemberEntriesApi, NotificationsApi, OrganizationsApi, PauseRulesApi, ReportsApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
+import { Configuration, AbsenceDayApi, ApiKeysApi, AuthApi, ClosedPeriodsApi, ExportImportApi, GroupApi, HolidayApi, InvitationsApi, MemberEntriesApi, NotificationsApi, OrganizationsApi, PauseRulesApi, ReportsApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
 
 // Detect base URL: browser uses current hostname, SSR uses Docker service name
 const getApiBaseUrl = (): string => {
@@ -102,6 +105,26 @@ axiosInstance.interceptors.response.use(undefined, (error) => {
     return Promise.reject(error);
 });
 
+// A closed month (issue #57): an org admin's change needs a reason. Ask for it once and send the
+// same request again with it (X-Change-Reason, URL-encoded so any text fits a header). This covers
+// every write path at once — entries, corrections, absences, schedules, imports, approvals.
+axiosInstance.interceptors.response.use(undefined, async (error) => {
+    const config = error?.config;
+    if (getErrorCode(error) !== 'period.reasonRequired' || !config || config.headers?.['X-Change-Reason']) {
+        return Promise.reject(error);
+    }
+    const month = getErrorMonth(error);
+    const reason = await promptDialog({
+        title: t('closedPeriods.reasonTitle'),
+        message: t('closedPeriods.reasonMessage', { month: month ? formatMonth(month) : '' }),
+        confirmLabel: t('closedPeriods.reasonConfirm'),
+        input: { label: t('closedPeriods.reasonLabel'), maxLength: 500 }
+    });
+    if (!reason) return Promise.reject(error);
+    config.headers['X-Change-Reason'] = encodeURIComponent(reason);
+    return axiosInstance(config);
+});
+
 // SDK Configuration — accessToken is a function so it reads fresh token on every request
 const config = new Configuration({
     basePath: getApiBaseUrl(),
@@ -124,3 +147,4 @@ export const reportsApi = new ReportsApi(config, undefined, axiosInstance);
 export const apiKeysApi = new ApiKeysApi(config, undefined, axiosInstance);
 export const invitationsApi = new InvitationsApi(config, undefined, axiosInstance);
 export const memberEntriesApi = new MemberEntriesApi(config, undefined, axiosInstance);
+export const closedPeriodsApi = new ClosedPeriodsApi(config, undefined, axiosInstance);

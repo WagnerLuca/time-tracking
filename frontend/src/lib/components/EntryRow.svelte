@@ -5,6 +5,7 @@
 	import { formatTime, formatDateShort, formatDuration, formatClock } from '$lib/utils/formatters';
 	import EntryEditForm from './EntryEditForm.svelte';
 	import EntryHistory from './EntryHistory.svelte';
+	import LockIcon from './LockIcon.svelte';
 	import { entrySourceBadge } from '$lib/utils/terminal';
 	import { t } from '$lib/i18n';
 
@@ -26,6 +27,8 @@
 		/** Show the organization badge. */
 		showOrg?: boolean;
 		compact?: boolean;
+		/** Closed period (issue #57): the tooltip; no actions then. */
+		locked?: string;
 	}
 	let {
 		entry,
@@ -36,11 +39,12 @@
 		canRequestEditPause = false,
 		showDate = false,
 		showOrg = false,
-		compact = false
+		compact = false,
+		locked = ''
 	}: Props = $props();
 
 	const editing = $derived(!!editor && editor.editingEntryId === entry.id);
-	const actionable = $derived(!!editor && !entry.isRunning);
+	const actionable = $derived(!!editor && !entry.isRunning && !locked);
 	const pause = $derived(entry.pauseDurationMinutes ?? 0);
 	const source = $derived(entrySourceBadge(entry));
 	const liveElapsed = $derived(entry.isRunning && timer.current?.id === entry.id ? formatClock(timer.elapsedSeconds) : null);
@@ -69,6 +73,7 @@
 				{#if showDate}
 					<span class="text-xs text-base-content/70">{formatDateShort(entry.startTime!)}</span>
 				{/if}
+				{#if locked}<LockIcon title={locked} class="self-center" />{/if}
 			</div>
 			{#if entry.description}
 				<div class="text-sm text-base-content/70 break-words">{entry.description}</div>

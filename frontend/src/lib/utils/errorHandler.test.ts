@@ -20,6 +20,12 @@ describe('extractErrorMessage', () => {
 		expect(extractErrorMessage(null, 'Fallback')).toBe('Fallback');
 	});
 
+	it('names the closed month of a refused write', () => {
+		const err = problem({ code: 'period.closed', month: '2026-09', detail: 'The period 2026-09 is closed.' }, 409);
+		expect(extractErrorMessage(err, 'x')).toBe('Der Zeitraum September 2026 ist abgeschlossen. Änderungen darin können nur Admins der Organisation vornehmen.');
+		expect(translateErrorCode('period.closed', 'garbage')).toContain('{month}');
+	});
+
 	it('does not treat a namespace as a translation', () => {
 		expect(translateErrorCode('auth')).toBeNull();
 		expect(translateErrorCode(undefined)).toBeNull();

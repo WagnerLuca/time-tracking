@@ -16,7 +16,8 @@
 	import { balanceToMinutes, type BalanceMinutes } from '$lib/utils/balance';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { dayTypeClasses } from '$lib/utils/colors';
-	import { canEditEntries, canRequestEditEntries, canEditPause, canRequestEditPause } from '$lib/utils/orgRules';
+	import { canEditEntries, canRequestEditEntries, canEditPause, canRequestEditPause, isOrgAdmin } from '$lib/utils/orgRules';
+	import { entryLock } from '$lib/utils/closedPeriods';
 	import { loadDaysOff, emptyDaysOff, type DaysOffData } from '$lib/utils/daysOff';
 	import { createEntryEditor } from '$lib/utils/entryEditor.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
@@ -391,7 +392,7 @@
 				<ul class="card bg-base-100 border border-base-300 overflow-hidden">
 					{#each weekEntries as entry (entry.id)}
 						<li class="border-b border-base-200 last:border-b-0">
-							<EntryRow {entry} {editor} {...entryPerms} showDate showOrg />
+							<EntryRow {entry} {editor} {...entryPerms} showDate showOrg locked={entryLock(entry, orgDetail, isOrgAdmin(orgDetail?.members?.find((m) => m.id === auth.user?.id)?.role))} />
 						</li>
 					{/each}
 				</ul>

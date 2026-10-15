@@ -7,6 +7,7 @@
 import { t, type MessageKey } from '$lib/i18n';
 import { de } from '$lib/i18n/de';
 import { lookup } from '$lib/i18n/translate';
+import { formatMonth } from './closedPeriods';
 
 /** The stable `code` of a backend ProblemDetails (e.g. "auth.sessionEnded"), or null. */
 export function getErrorCode(err: unknown): string | null {
@@ -15,10 +16,18 @@ export function getErrorCode(err: unknown): string | null {
 }
 
 /** The translated text for a backend error code, or null when the code is unknown. */
-export function translateErrorCode(code: string | null | undefined): string | null {
+export function translateErrorCode(code: string | null | undefined, month?: unknown): string | null {
 	if (!code) return null;
 	const key = `errors.${code}`;
-	return typeof lookup(de, key) === 'string' ? t(key as MessageKey) : null;
+	// Closed periods name their month ('YYYY-MM', ProblemDetails extension `month`)
+	const params = typeof month === 'string' && /^\d{4}-\d{2}$/.test(month) ? { month: formatMonth(month) } : undefined;
+	return typeof lookup(de, key) === 'string' ? t(key as MessageKey, params) : null;
+}
+
+/** The closed month ('YYYY-MM') a refused write named, or null. */
+export function getErrorMonth(err: unknown): string | null {
+	const month = (err as { response?: { data?: { month?: unknown } } } | null)?.response?.data?.month;
+	return typeof month === 'string' ? month : null;
 }
 
 /**
@@ -41,7 +50,7 @@ export function extractErrorMessage(err: unknown, fallback: string = t('common.u
 			if (typeof res.data === 'object') {
 				// Org requires 2FA the caller has not set up (RequireOrgRole filter)
 				if (isTwoFactorRequired(err)) return t('common.twoFactorRequired');
-				const translated = translateErrorCode(getErrorCode(err));
+				const translated = translateErrorCode(getErrorCode(err), getErrorMonth(err));
 				if (translated) return translated;
 				// Backend ServiceResult / custom JSON: { message: "..." }
 				if ('message' in res.data && typeof res.data.message === 'string') {

@@ -23,6 +23,7 @@ import * as invitations from './messages/invitations';
 import * as visibility from './messages/visibility';
 import * as inbox from './messages/inbox';
 import * as onboarding from './messages/onboarding';
+import * as closedPeriods from './messages/closedPeriods';
 
 /** German is the default and the fallback for any missing English string. */
 export const de = {
@@ -50,7 +51,8 @@ export const de = {
 	invitations: invitations.de,
 	visibility: visibility.de,
 	inbox: inbox.de,
-	onboarding: onboarding.de
+	onboarding: onboarding.de,
+	closedPeriods: closedPeriods.de
 };
 
 export type Dictionary = typeof de;

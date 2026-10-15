@@ -184,6 +184,13 @@ export const de = {
 		cardRequired: 'Gib eine Karten-ID ein oder wähle eine gescannte Karte.',
 		cardNotFound: 'Karte nicht gefunden.',
 		scanNotFound: 'Scan nicht gefunden.'
+	},
+	period: {
+		closed: 'Der Zeitraum {month} ist abgeschlossen. Änderungen darin können nur Admins der Organisation vornehmen.',
+		reasonRequired: 'Der Zeitraum {month} ist abgeschlossen. Gib einen Grund für die Änderung an.',
+		notEnded: 'Nur Monate, die schon vorbei sind, lassen sich abschließen.',
+		tooManyMonths: 'Schließe höchstens 24 Monate auf einmal ab.',
+		notClosed: 'Dieser Monat ist nicht abgeschlossen.'
 	}
 };
 
@@ -366,5 +373,12 @@ export const en: typeof de = {
 		cardRequired: 'Enter a card ID or pick a scanned card.',
 		cardNotFound: 'Card not found.',
 		scanNotFound: 'Scan not found.'
+	},
+	period: {
+		closed: 'The period {month} is closed. Only organization admins can change it.',
+		reasonRequired: 'The period {month} is closed. Give a reason for the change.',
+		notEnded: 'Only months that have ended can be closed.',
+		tooManyMonths: 'Close at most 24 months at once.',
+		notClosed: 'This month is not closed.'
 	}
 };

@@ -15,6 +15,9 @@
 	import DeclineForm from '$lib/components/DeclineForm.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
+	import LockIcon from '$lib/components/LockIcon.svelte';
+	import { formatMonth } from '$lib/utils/closedPeriods';
+	import { isOrgAdmin } from '$lib/utils/orgRules';
 
 	let respondingId = $state<number | null>(null);
 	let decliningId = $state<number | null>(null);
@@ -160,6 +163,7 @@
 			<h2 id="inbox-approve" class="text-base font-semibold mb-2">{t('inbox.approve.title')} <span class="badge badge-error badge-sm">{inbox.toApprove.length}</span></h2>
 			<ul class="flex flex-col gap-3 m-0 p-0 list-none">
 				{#each inbox.toApprove as req (req.id)}
+					{@const closedLead = !!req.closedMonth && !isOrgAdmin(orgContext.organizations.find((o) => o.organizationId === req.organizationId)?.role)}
 					<li class="card bg-base-100 border border-base-300 p-4" data-testid="inbox-item">
 						<div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
 							<span class="font-semibold">{req.userFirstName} {req.userLastName} · <span class="text-primary">{formatRequestType(req.type)}</span></span>
@@ -167,11 +171,17 @@
 						</div>
 						<p class="m-0 text-xs text-base-content/70">{req.organizationName}{#if req.groupName} · {t('inbox.approve.via', { group: req.groupName })}{/if}</p>
 						{@render requestDetails(req)}
+						{#if req.closedMonth}
+							<p class="m-0 mt-2 text-xs flex items-center gap-1 {closedLead ? 'text-warning' : 'text-base-content/70'}" data-testid="request-closed-hint">
+								<LockIcon title={formatMonth(req.closedMonth)} />
+								{t(closedLead ? 'closedPeriods.requestHintLead' : 'closedPeriods.requestHint', { month: formatMonth(req.closedMonth) })}
+							</p>
+						{/if}
 						<div class="mt-3 flex flex-wrap gap-2 border-t border-base-200 pt-3">
 							{#if decliningId === req.id}
 								<DeclineForm busy={respondingId === req.id} onconfirm={(reason) => respond(req, false, reason)} oncancel={() => (decliningId = null)} />
 							{:else}
-								<button type="button" class="btn btn-success btn-sm max-sm:flex-1" disabled={respondingId === req.id} onclick={() => respond(req, true)}>{t('inbox.approve.accept')}</button>
+								<button type="button" class="btn btn-success btn-sm max-sm:flex-1" disabled={respondingId === req.id || closedLead} onclick={() => respond(req, true)}>{t('inbox.approve.accept')}</button>
 								<button type="button" class="btn btn-outline btn-error btn-sm max-sm:flex-1" disabled={respondingId === req.id} onclick={() => (decliningId = req.id ?? null)}>{t('inbox.approve.decline')}</button>
 							{/if}
 						</div>

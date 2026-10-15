@@ -221,6 +221,46 @@ export interface ChangePasswordRequest {
     'newPassword': string;
 }
 /**
+ * Close the months from..to (any day inside each; both inclusive). Only months that have ended.
+ */
+export interface CloseMonthsRequest {
+    'from'?: string;
+    'to'?: string;
+    'reason'?: string | null;
+}
+export interface ClosedPeriodEventResponse {
+    'id'?: number;
+    'month'?: string;
+    /**
+     * Closed, Reopened or AdminChange.
+     */
+    'kind': string | null;
+    'at'?: string;
+    'userName'?: string | null;
+    'reason'?: string | null;
+    /**
+     * AdminChange: whose data changed (null when several).
+     */
+    'memberName'?: string | null;
+    /**
+     * AdminChange: e.g. \"TimeEntry:2,AbsenceDay:1\".
+     */
+    'summary'?: string | null;
+}
+/**
+ * Closed months of an organization and (for org admins) the audit list.
+ */
+export interface ClosedPeriodsResponse {
+    /**
+     * First day of each closed month, ascending.
+     */
+    'months': Array<string> | null;
+    /**
+     * Newest first; empty for non-admins.
+     */
+    'events': Array<ClosedPeriodEventResponse> | null;
+}
+/**
  * A day that breaks the Working Time Act (see WorkingTimeAct) or misses the core working hours (see CoreHours).
  */
 export interface ComplianceDayResponse {
@@ -854,6 +894,10 @@ export interface OrgRequestResponse {
     'responseReason'?: string | null;
     'groupId'?: number | null;
     'groupName'?: string | null;
+    /**
+     * Pending only: the first closed month approving it would change (only org admins may approve it, with a reason).
+     */
+    'closedMonth'?: string | null;
 }
 /**
  * Standard paginated response wrapper for list endpoints.
@@ -925,6 +969,10 @@ export interface OrganizationDetailResponse {
     'terminalUnknownCardLimit'?: number;
     'settingsUpdatedAt'?: string | null;
     'createdAt'?: string;
+    /**
+     * Closed months (first day each, org-local; issue #57): only org admins change entries, absences and schedules there.
+     */
+    'closedMonths'?: Array<string> | null;
     'members': Array<OrganizationMemberResponse> | null;
     'pauseRules'?: Array<PauseRuleResponse> | null;
 }
@@ -1150,6 +1198,7 @@ export interface PersonalEntryChange {
     'kind'?: string | null;
     'changedByYou'?: boolean;
     'changes'?: string | null;
+    'reason'?: string | null;
 }
 export interface PersonalMembership {
     'organization'?: string | null;
@@ -1278,6 +1327,13 @@ export interface RegisterRequest {
      * User\'s last name.
      */
     'lastName': string;
+}
+export interface ReopenMonthRequest {
+    /**
+     * Any day of the month to reopen.
+     */
+    'month'?: string;
+    'reason': string;
 }
 
 export const RequestStatus = {
@@ -1471,6 +1527,11 @@ export interface TimeEntryChangeResponse {
      */
     'kind': string | null;
     'changes': Array<TimeEntryFieldChangeResponse> | null;
+    /**
+     * An org admin changed the entry inside a closed month (issue #57), with TimeTracking.Api.Models.Dtos.TimeEntryChangeResponse.Reason.
+     */
+    'inClosedPeriod'?: boolean;
+    'reason'?: string | null;
 }
 /**
  * A field before/after a change. Times are ISO 8601 UTC, numbers invariant, null = not set.
@@ -4960,6 +5021,269 @@ export class AuthApi extends BaseAPI {
      */
     public apiV1AuthVerifyEmailResendPost(options?: RawAxiosRequestConfig) {
         return AuthApiFp(this.configuration).apiV1AuthVerifyEmailResendPost(options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * ClosedPeriodsApi - axios parameter creator
+ */
+export const ClosedPeriodsApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary The closed months; org admins also get the audit list.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugClosedPeriodsGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugClosedPeriodsGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/closed-periods`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Close the months from..to (admin only; only months that have ended).
+         * @param {string} slug 
+         * @param {CloseMonthsRequest} [closeMonthsRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugClosedPeriodsPost: async (slug: string, closeMonthsRequest?: CloseMonthsRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugClosedPeriodsPost', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/closed-periods`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(closeMonthsRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Reopen one month (admin only, with a reason).
+         * @param {string} slug 
+         * @param {ReopenMonthRequest} [reopenMonthRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugClosedPeriodsReopenPost: async (slug: string, reopenMonthRequest?: ReopenMonthRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugClosedPeriodsReopenPost', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/closed-periods/reopen`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(reopenMonthRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * ClosedPeriodsApi - functional programming interface
+ */
+export const ClosedPeriodsApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = ClosedPeriodsApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary The closed months; org admins also get the audit list.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugClosedPeriodsGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ClosedPeriodsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugClosedPeriodsGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ClosedPeriodsApi.apiV1OrganizationsSlugClosedPeriodsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Close the months from..to (admin only; only months that have ended).
+         * @param {string} slug 
+         * @param {CloseMonthsRequest} [closeMonthsRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugClosedPeriodsPost(slug: string, closeMonthsRequest?: CloseMonthsRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ClosedPeriodsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugClosedPeriodsPost(slug, closeMonthsRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ClosedPeriodsApi.apiV1OrganizationsSlugClosedPeriodsPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Reopen one month (admin only, with a reason).
+         * @param {string} slug 
+         * @param {ReopenMonthRequest} [reopenMonthRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugClosedPeriodsReopenPost(slug: string, reopenMonthRequest?: ReopenMonthRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ClosedPeriodsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugClosedPeriodsReopenPost(slug, reopenMonthRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['ClosedPeriodsApi.apiV1OrganizationsSlugClosedPeriodsReopenPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * ClosedPeriodsApi - factory interface
+ */
+export const ClosedPeriodsApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = ClosedPeriodsApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary The closed months; org admins also get the audit list.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugClosedPeriodsGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<ClosedPeriodsResponse> {
+            return localVarFp.apiV1OrganizationsSlugClosedPeriodsGet(slug, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Close the months from..to (admin only; only months that have ended).
+         * @param {string} slug 
+         * @param {CloseMonthsRequest} [closeMonthsRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugClosedPeriodsPost(slug: string, closeMonthsRequest?: CloseMonthsRequest, options?: RawAxiosRequestConfig): AxiosPromise<ClosedPeriodsResponse> {
+            return localVarFp.apiV1OrganizationsSlugClosedPeriodsPost(slug, closeMonthsRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Reopen one month (admin only, with a reason).
+         * @param {string} slug 
+         * @param {ReopenMonthRequest} [reopenMonthRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugClosedPeriodsReopenPost(slug: string, reopenMonthRequest?: ReopenMonthRequest, options?: RawAxiosRequestConfig): AxiosPromise<ClosedPeriodsResponse> {
+            return localVarFp.apiV1OrganizationsSlugClosedPeriodsReopenPost(slug, reopenMonthRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * ClosedPeriodsApi - object-oriented interface
+ */
+export class ClosedPeriodsApi extends BaseAPI {
+    /**
+     * 
+     * @summary The closed months; org admins also get the audit list.
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugClosedPeriodsGet(slug: string, options?: RawAxiosRequestConfig) {
+        return ClosedPeriodsApiFp(this.configuration).apiV1OrganizationsSlugClosedPeriodsGet(slug, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Close the months from..to (admin only; only months that have ended).
+     * @param {string} slug 
+     * @param {CloseMonthsRequest} [closeMonthsRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugClosedPeriodsPost(slug: string, closeMonthsRequest?: CloseMonthsRequest, options?: RawAxiosRequestConfig) {
+        return ClosedPeriodsApiFp(this.configuration).apiV1OrganizationsSlugClosedPeriodsPost(slug, closeMonthsRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Reopen one month (admin only, with a reason).
+     * @param {string} slug 
+     * @param {ReopenMonthRequest} [reopenMonthRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugClosedPeriodsReopenPost(slug: string, reopenMonthRequest?: ReopenMonthRequest, options?: RawAxiosRequestConfig) {
+        return ClosedPeriodsApiFp(this.configuration).apiV1OrganizationsSlugClosedPeriodsReopenPost(slug, reopenMonthRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

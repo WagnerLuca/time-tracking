@@ -17,6 +17,8 @@
 	import { canSee } from '$lib/utils/visibility';
 	import { markSeen } from '$lib/utils/onboarding';
 	import AbsenceDialog from '$lib/components/AbsenceDialog.svelte';
+	import LockIcon from '$lib/components/LockIcon.svelte';
+	import { closedMonthSet, isClosedDay, lockText } from '$lib/utils/closedPeriods';
 	import AbsenceTypeBadge from '$lib/components/AbsenceTypeBadge.svelte';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import type {
@@ -28,6 +30,7 @@
 	} from '$lib/api';
 
 	let org = $state<OrganizationDetailResponse | null>(null);
+	const closed = $derived(closedMonthSet(org?.closedMonths));
 	let loading = $state(true);
 	let error = $state('');
 
@@ -617,6 +620,7 @@
 										<span class="text-[10px] font-medium leading-none {isToday ? 'bg-primary text-primary-content rounded-full w-5 h-5 flex items-center justify-center' : ''} {!inMonth ? 'text-base-content/70' : isWeekend ? 'text-base-content/70' : 'text-base-content'}">
 											{date.getDate()}
 										</span>
+										{#if inMonth && isClosedDay(key, closed)}<LockIcon title={lockText(key)} />{/if}
 									</div>
 									<div class="flex flex-col gap-[2px] mt-1 min-h-[48px]">
 										{#each weekLanes as lane (lane.userId)}

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from './toast.svelte';
-import { confirmDialog, confirmState } from './confirm.svelte';
+import { confirmDialog, confirmState, promptDialog } from './confirm.svelte';
 
 /** A Map-backed localStorage stand-in. */
 function memoryStorage(initial: Record<string, string> = {}) {
@@ -102,6 +102,17 @@ describe('confirm store', () => {
 		const second = confirmDialog({ title: 'Nochmal?' });
 		confirmState.answer(false);
 		await expect(second).resolves.toBe(false);
+	});
+
+	it('a prompt resolves with the trimmed text, or null when cancelled', async () => {
+		const asked = promptDialog({ title: 'Grund?', input: { label: 'Grund' } });
+		expect(confirmState.current?.input?.label).toBe('Grund');
+		confirmState.answer(true, '  Korrektur  ');
+		await expect(asked).resolves.toBe('Korrektur');
+
+		const cancelled = promptDialog({ title: 'Grund?', input: { label: 'Grund' } });
+		confirmState.answer(false, 'ignored');
+		await expect(cancelled).resolves.toBeNull();
 	});
 
 	it('a new dialog cancels the one still open', async () => {

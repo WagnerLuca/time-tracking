@@ -23,6 +23,7 @@ import * as invitations from './messages/invitations';
 import * as visibility from './messages/visibility';
 import * as inbox from './messages/inbox';
 import * as onboarding from './messages/onboarding';
+import * as closedPeriods from './messages/closedPeriods';
 import type { Dictionary } from './de';
 
 export const en: Dictionary = {
@@ -50,5 +51,6 @@ export const en: Dictionary = {
 	invitations: invitations.en,
 	visibility: visibility.en,
 	inbox: inbox.en,
-	onboarding: onboarding.en
+	onboarding: onboarding.en,
+	closedPeriods: closedPeriods.en
 };
