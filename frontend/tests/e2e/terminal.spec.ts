@@ -71,3 +71,26 @@ test('terminal: unknown card is assigned from the list and then punches', async 
 		await stopTom();
 	}
 });
+
+/** Terminal rules: the owner changes the double-scan window in the Terminal section; out-of-range values are refused. */
+test('terminal: rules are organization settings edited in the terminal section', async ({ page, request }) => {
+	const token = await apiToken(request, 'max.mueller@example.com');
+	const headers = { Authorization: `Bearer ${token}` };
+	await login(page, 'max.mueller@example.com');
+	await page.goto('/organizations/mueller-software/terminal');
+	const rules = page.getByTestId('terminal-rules');
+	const field = rules.getByLabel('Doppel-Scan-Fenster');
+
+	await field.fill('4');
+	await rules.getByRole('button', { name: 'Speichern' }).click();
+	await expect(field).toHaveAttribute('aria-invalid', 'true');
+
+	await field.fill('90');
+	await rules.getByRole('button', { name: 'Speichern' }).click();
+	await expect(page.getByText('Terminal-Regeln gespeichert.')).toBeVisible();
+	const org = await (await request.get(`${API}/Organizations/mueller-software`, { headers })).json();
+	expect(org.terminalDoubleScanSeconds).toBe(90);
+
+	// Back to the default for other specs
+	expect((await request.put(`${API}/Organizations/mueller-software/settings`, { headers, data: { terminalDoubleScanSeconds: 60 } })).ok()).toBeTruthy();
+});
