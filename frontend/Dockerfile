@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Multi-stage build for SvelteKit with SSR support
 # Use BUILDPLATFORM for build stage to avoid QEMU issues with npm
-FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:25-alpine AS builder
 
 # Set the working directory
 WORKDIR /app
@@ -31,7 +31,7 @@ RUN npm run check
 RUN npm run build
 
 # Production runtime stage - uses target platform
-FROM node:22-alpine AS runner
+FROM node:25-alpine AS runner
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
