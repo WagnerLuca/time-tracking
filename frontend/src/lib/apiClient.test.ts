@@ -59,6 +59,32 @@ function backend(refreshOk = true) {
 }
 
 describe('apiClient', () => {
+	it('offline: refuses at once, reads quietly (retried on reconnect), writes with an error', async () => {
+		backend();
+		storage.set('authToken', 'good');
+		const { network } = await import('$lib/pwa/network.svelte');
+		const { toast } = await import('$lib/stores/toast.svelte');
+		vi.stubGlobal('navigator', { onLine: false });
+		try {
+			const read = await client.authApi.apiV1AuthMeGet().catch((e) => e);
+			const write = await client.pushApi.apiV1PushSubscriptionsRemovePost({ endpoint: 'x' }).catch((e) => e);
+			expect(seen).toEqual([]);
+			expect(read).toMatchObject({ quiet: true, response: { data: { code: 'network.offline' } } });
+			expect(write).toMatchObject({ quiet: false });
+			expect(toast.error(read)).toBe(0); // the offline banner explains it
+			expect(toast.error(write)).toBeGreaterThan(0);
+			expect(toast.items.at(-1)?.message).toContain('Keine Verbindung');
+		} finally {
+			vi.stubGlobal('navigator', { onLine: true });
+		}
+		// The missed read makes the next "online" a reconnect
+		const listeners: Record<string, () => void> = {};
+		vi.stubGlobal('window', { location, addEventListener: (n: string, f: () => void) => (listeners[n] = f), removeEventListener: () => {} });
+		network.listen()();
+		expect(network.reconnects).toBe(1);
+		vi.stubGlobal('window', { location });
+	});
+
 	it('sends the stored bearer token to the configured base URL', async () => {
 		backend();
 		storage.set('authToken', 'good');

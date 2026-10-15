@@ -38,5 +38,8 @@ export const toast = {
 	warning: (message: string) => show('warning', message),
 	/** Accepts a caught error (message extracted from the API response) or a plain string. */
 	error: (errOrMessage: unknown, fallback?: string) =>
-		show('error', typeof errOrMessage === 'string' ? errOrMessage : extractErrorMessage(errOrMessage, fallback))
+		// A read refused offline needs no toast: the offline banner says it all
+		(errOrMessage as { quiet?: boolean } | null)?.quiet
+			? 0
+			: show('error', typeof errOrMessage === 'string' ? errOrMessage : extractErrorMessage(errOrMessage, fallback))
 };

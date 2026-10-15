@@ -88,3 +88,6 @@ export async function removeAbsences(request: APIRequestContext, email: string, 
 		expect(del.ok(), await del.text()).toBeTruthy();
 	}
 }
+
+/** The production preview pwa.spec.ts runs against (see playwright.config.ts). */
+export const PWA_URL = process.env.E2E_PWA_URL ?? 'http://localhost:4179';

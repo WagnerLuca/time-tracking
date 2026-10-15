@@ -191,5 +191,14 @@ export const de = {
 		notEnded: 'Nur Monate, die schon vorbei sind, lassen sich abschließen.',
 		tooManyMonths: 'Schließe höchstens 24 Monate auf einmal ab.',
 		notClosed: 'Dieser Monat ist nicht abgeschlossen.'
+	},
+	push: {
+		notConfigured: 'Push-Benachrichtigungen sind auf diesem Server nicht eingerichtet.',
+		unsupportedService: 'Dieser Push-Dienst wird nicht unterstützt.',
+		invalidSubscription: 'Die Anmeldung für Benachrichtigungen ist ungültig.',
+		otherAccount: 'Dieses Gerät erhält bereits Benachrichtigungen für ein anderes Konto.'
+	},
+	network: {
+		offline: 'Keine Verbindung. Versuche es erneut, sobald du wieder online bist.'
 	}
 };

@@ -6,7 +6,7 @@ export const de = {
 	tabs: {
 		profile: 'Profil',
 		organization: 'Organisation',
-		appearance: 'Darstellung'
+		appearance: 'App & Darstellung'
 	},
 	profile: {
 		title: 'Profil',

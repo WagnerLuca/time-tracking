@@ -1244,6 +1244,10 @@ export interface PersonalDataExport {
     'requests': Array<PersonalRequest> | null;
     'notifications': Array<PersonalNotification> | null;
     'entryChanges': Array<PersonalEntryChange> | null;
+    /**
+     * Devices that receive push notifications (push service host only, never the keys).
+     */
+    'pushDevices': Array<PersonalPushDevice> | null;
 }
 /**
  * Changes is the stored JSON array of {field, oldValue, newValue}.
@@ -1280,6 +1284,13 @@ export interface PersonalPunch {
     'terminal'?: string | null;
     'result'?: string | null;
     'cardHint'?: string | null;
+}
+export interface PersonalPushDevice {
+    'pushService'?: string | null;
+    'userAgent'?: string | null;
+    'locale'?: string | null;
+    'createdAt'?: string;
+    'lastUsedAt'?: string;
 }
 export interface PersonalRequest {
     'organization'?: string | null;
@@ -1339,6 +1350,33 @@ export interface PunchResponse {
     'firstName': string | null;
     'lastName': string | null;
     'entry': TimeEntryResponse;
+}
+/**
+ * The VAPID public key the browser subscribes with; null when push is not configured.
+ */
+export interface PushPublicKeyResponse {
+    'publicKey'?: string | null;
+}
+/**
+ * Which push categories the user receives (on all of their devices).
+ */
+export interface PushSettingsDto {
+    'reminders'?: boolean;
+    'requests'?: boolean;
+    'coreHours'?: boolean;
+    'organization'?: boolean;
+}
+/**
+ * A browser\'s PushSubscription (`subscription.toJSON()`: endpoint + keys) and its language.
+ */
+export interface PushSubscribeRequest {
+    'endpoint'?: string | null;
+    'p256dh'?: string | null;
+    'auth'?: string | null;
+    'locale'?: string | null;
+}
+export interface PushUnsubscribeRequest {
+    'endpoint'?: string | null;
 }
 /**
  * Request containing a refresh token (used for refresh and logout).
@@ -10100,6 +10138,385 @@ export class PauseRulesApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugPauseRulesRuleIdPut(slug: string, ruleId: number, updatePauseRuleRequest?: UpdatePauseRuleRequest, options?: RawAxiosRequestConfig) {
         return PauseRulesApiFp(this.configuration).apiV1OrganizationsSlugPauseRulesRuleIdPut(slug, ruleId, updatePauseRuleRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * PushApi - axios parameter creator
+ */
+export const PushApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary The VAPID public key (null when the server has no keys configured).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1PushPublicKeyGet: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Push/public-key`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Which push categories the current user receives.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1PushSettingsGet: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Push/settings`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Switches push categories on or off (for all of the user\'s devices).
+         * @param {PushSettingsDto} [pushSettingsDto] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1PushSettingsPut: async (pushSettingsDto?: PushSettingsDto, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Push/settings`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(pushSettingsDto, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Registers this device\'s push subscription for the current user.
+         * @param {PushSubscribeRequest} [pushSubscribeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1PushSubscriptionsPost: async (pushSubscribeRequest?: PushSubscribeRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Push/subscriptions`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(pushSubscribeRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Removes this device\'s push subscription.
+         * @param {PushUnsubscribeRequest} [pushUnsubscribeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1PushSubscriptionsRemovePost: async (pushUnsubscribeRequest?: PushUnsubscribeRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/v1/Push/subscriptions/remove`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(pushUnsubscribeRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * PushApi - functional programming interface
+ */
+export const PushApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = PushApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary The VAPID public key (null when the server has no keys configured).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1PushPublicKeyGet(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PushPublicKeyResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1PushPublicKeyGet(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PushApi.apiV1PushPublicKeyGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Which push categories the current user receives.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1PushSettingsGet(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PushSettingsDto>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1PushSettingsGet(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PushApi.apiV1PushSettingsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Switches push categories on or off (for all of the user\'s devices).
+         * @param {PushSettingsDto} [pushSettingsDto] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1PushSettingsPut(pushSettingsDto?: PushSettingsDto, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<PushSettingsDto>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1PushSettingsPut(pushSettingsDto, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PushApi.apiV1PushSettingsPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Registers this device\'s push subscription for the current user.
+         * @param {PushSubscribeRequest} [pushSubscribeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1PushSubscriptionsPost(pushSubscribeRequest?: PushSubscribeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1PushSubscriptionsPost(pushSubscribeRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PushApi.apiV1PushSubscriptionsPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Removes this device\'s push subscription.
+         * @param {PushUnsubscribeRequest} [pushUnsubscribeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1PushSubscriptionsRemovePost(pushUnsubscribeRequest?: PushUnsubscribeRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1PushSubscriptionsRemovePost(pushUnsubscribeRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['PushApi.apiV1PushSubscriptionsRemovePost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * PushApi - factory interface
+ */
+export const PushApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = PushApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary The VAPID public key (null when the server has no keys configured).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1PushPublicKeyGet(options?: RawAxiosRequestConfig): AxiosPromise<PushPublicKeyResponse> {
+            return localVarFp.apiV1PushPublicKeyGet(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Which push categories the current user receives.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1PushSettingsGet(options?: RawAxiosRequestConfig): AxiosPromise<PushSettingsDto> {
+            return localVarFp.apiV1PushSettingsGet(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Switches push categories on or off (for all of the user\'s devices).
+         * @param {PushSettingsDto} [pushSettingsDto] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1PushSettingsPut(pushSettingsDto?: PushSettingsDto, options?: RawAxiosRequestConfig): AxiosPromise<PushSettingsDto> {
+            return localVarFp.apiV1PushSettingsPut(pushSettingsDto, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Registers this device\'s push subscription for the current user.
+         * @param {PushSubscribeRequest} [pushSubscribeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1PushSubscriptionsPost(pushSubscribeRequest?: PushSubscribeRequest, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1PushSubscriptionsPost(pushSubscribeRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Removes this device\'s push subscription.
+         * @param {PushUnsubscribeRequest} [pushUnsubscribeRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1PushSubscriptionsRemovePost(pushUnsubscribeRequest?: PushUnsubscribeRequest, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1PushSubscriptionsRemovePost(pushUnsubscribeRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * PushApi - object-oriented interface
+ */
+export class PushApi extends BaseAPI {
+    /**
+     * 
+     * @summary The VAPID public key (null when the server has no keys configured).
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1PushPublicKeyGet(options?: RawAxiosRequestConfig) {
+        return PushApiFp(this.configuration).apiV1PushPublicKeyGet(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Which push categories the current user receives.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1PushSettingsGet(options?: RawAxiosRequestConfig) {
+        return PushApiFp(this.configuration).apiV1PushSettingsGet(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Switches push categories on or off (for all of the user\'s devices).
+     * @param {PushSettingsDto} [pushSettingsDto] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1PushSettingsPut(pushSettingsDto?: PushSettingsDto, options?: RawAxiosRequestConfig) {
+        return PushApiFp(this.configuration).apiV1PushSettingsPut(pushSettingsDto, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Registers this device\'s push subscription for the current user.
+     * @param {PushSubscribeRequest} [pushSubscribeRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1PushSubscriptionsPost(pushSubscribeRequest?: PushSubscribeRequest, options?: RawAxiosRequestConfig) {
+        return PushApiFp(this.configuration).apiV1PushSubscriptionsPost(pushSubscribeRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Removes this device\'s push subscription.
+     * @param {PushUnsubscribeRequest} [pushUnsubscribeRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1PushSubscriptionsRemovePost(pushUnsubscribeRequest?: PushUnsubscribeRequest, options?: RawAxiosRequestConfig) {
+        return PushApiFp(this.configuration).apiV1PushSubscriptionsRemovePost(pushUnsubscribeRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

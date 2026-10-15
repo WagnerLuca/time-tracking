@@ -2,7 +2,17 @@
 <html lang="de">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="description" content="WL Zeiterfassung – Arbeitszeit erfassen, Abwesenheiten planen, Anfragen bearbeiten." />
+		<!-- PWA (issue #67): manifest, icons, status bar colour (= --color-surface, set per theme below) -->
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+		<meta name="theme-color" content="#FFFFFF" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-title" content="Zeiterfassung" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 		<script nonce="%sveltekit.nonce%">
 			// Apply the shared Wagner Luca light/dark and language choices before first paint
 			// (see stores/theme.svelte.ts and stores/locale.svelte.ts). Storage may be blocked.
@@ -13,6 +23,7 @@
 				// Always set one class: newer @wagnerluca/ui tokens follow the OS when neither is present
 				document.documentElement.classList.add(dark ? 'dark' : 'light');
 				document.documentElement.lang = lang === 'en' ? 'en' : 'de';
+				document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#201F23' : '#FFFFFF');
 			})();
 		</script>
 		%sveltekit.head%

@@ -9,7 +9,6 @@
 	import { page } from '$app/state';
 	import { goto, afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import favicon from '$lib/assets/favicon.svg';
 	import { authApi } from '$lib/apiClient';
 	import { inbox } from '$lib/stores/inbox.svelte';
 	import { getOrgDetail } from '$lib/stores/orgDetail';
@@ -20,6 +19,11 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import Toaster from '$lib/components/Toaster.svelte';
 	import NavIcon from '$lib/components/NavIcon.svelte';
+	import { dev } from '$app/environment';
+	import { network } from '$lib/pwa/network.svelte';
+	import { serviceWorker } from '$lib/pwa/serviceWorker.svelte';
+	import { install } from '$lib/pwa/install.svelte';
+	import { disablePush, syncPush } from '$lib/pwa/push';
 
 	let { children } = $props();
 
@@ -55,7 +59,7 @@
 	// The inbox also refreshes every minute while the tab is visible
 	onMount(() => {
 		const interval = setInterval(() => {
-			if (document.visibilityState === 'visible' && auth.isAuthenticated) inbox.load();
+			if (document.visibilityState === 'visible' && auth.isAuthenticated && network.online) inbox.load();
 		}, 60_000);
 		const onVisible = () => { if (document.visibilityState === 'visible' && auth.isAuthenticated) inbox.refresh(); };
 		document.addEventListener('visibilitychange', onVisible);
@@ -107,7 +111,36 @@
 		orgContext.init();
 		theme.load();
 		document.documentElement.lang = locale.current;
+		// PWA (issue #67): the service worker only in production builds / preview
+		if (!dev) serviceWorker.register((path) => goto(path)).catch(() => {});
+		const stopNetwork = network.listen();
+		const stopInstall = install.listen();
+		return () => {
+			stopNetwork();
+			stopInstall();
+		};
 	});
+
+	// Keep this device's push subscription in step with the account and language (no prompt here)
+	$effect(() => {
+		const userId = auth.user?.id;
+		const lang = locale.current;
+		if (auth.isAuthenticated && userId != null) syncPush(userId, lang).catch(() => {});
+	});
+
+	// Back online after a read failed: refresh the shared stores (the page remounts via {#key})
+	$effect(() => {
+		if (network.reconnects > 0 && auth.isAuthenticated && auth.user?.id != null) {
+			orgContext.loadOrganizations(auth.user.id);
+			inbox.refresh();
+			timer.refresh().catch(() => {});
+		}
+	});
+
+	async function installApp() {
+		openMenu = null;
+		if (!(await install.prompt())) goto('/settings#app');
+	}
 
 	$effect(() => {
 		if (!auth.loading && !auth.isAuthenticated && !isPublicRoute) {
@@ -171,6 +204,8 @@
 
 	async function handleLogout() {
 		openMenu = null;
+		// This device stops receiving the account's notifications
+		await disablePush().catch(() => {});
 		await auth.logout();
 		timer.reset();
 		inbox.reset();
@@ -178,11 +213,21 @@
 	}
 </script>
 
-<svelte:head>
-	<link rel="icon" href={favicon} />
-</svelte:head>
-
 <svelte:window onkeydown={(e) => { if (e.key === 'Escape' && openMenu) openMenu = null; }} />
+
+{#snippet pwaBanners()}
+	{#if !network.online}
+		<div role="status" class="alert alert-warning mb-6 max-sm:alert-vertical text-sm" data-testid="offline-banner">
+			<span><strong>{t('pwa.offline.title')}</strong> {t('pwa.offline.hint')}</span>
+		</div>
+	{/if}
+	{#if serviceWorker.updateAvailable}
+		<div role="status" class="alert alert-info mb-6 text-sm">
+			<span>{t('pwa.update.available')}</span>
+			<button type="button" class="btn btn-sm" onclick={() => serviceWorker.applyUpdate()}>{t('pwa.update.reload')}</button>
+		</div>
+	{/if}
+{/snippet}
 
 {#snippet languageToggle()}
 	<div class="join" role="group" aria-label={t('nav.switchLanguage')}>
@@ -210,8 +255,8 @@
 
 	<a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-[60] btn btn-primary btn-sm">{t('nav.skipToContent')}</a>
 
-	<nav class="sticky top-0 z-50 border-b border-base-300 bg-base-100/95 shadow-sm backdrop-blur" aria-label={t('nav.menu')}>
-		<div class="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-2 sm:gap-3">
+	<nav class="sticky top-0 z-50 border-b border-base-300 bg-base-100/95 pt-[env(safe-area-inset-top)] shadow-sm backdrop-blur" aria-label={t('nav.menu')}>
+		<div class="mx-auto flex w-full max-w-6xl items-center gap-2 py-2 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:gap-3">
 			<!-- Port of @wagnerluca/ui's LogoLockup (accent="time") -->
 			<a href="/" class="flex shrink-0 items-center justify-center gap-2.5 text-base-content no-underline min-h-11 min-w-11" aria-label={t('nav.brandHome')}>
 				<svg width="28" height="28" viewBox="0 0 100 100" fill="none" aria-hidden="true">
@@ -311,6 +356,9 @@
 					</li>
 				{/each}
 				<li><a href="/settings" class="min-h-11 {isActive('/settings') ? 'menu-active' : ''}" aria-current={isActive('/settings') ? 'page' : undefined}><NavIcon name="settings" />{t('nav.settings')}</a></li>
+				{#if !install.installed}
+					<li><button type="button" class="min-h-11" onclick={installApp}><NavIcon name="download" />{t('pwa.install.button')}</button></li>
+				{/if}
 				<li><div class="flex min-h-11 items-center justify-between">{t('nav.language')} {@render languageToggle()}</div></li>
 				<li><button type="button" class="min-h-11" onclick={handleLogout}><NavIcon name="logout" />{t('nav.signOut')}</button></li>
 			</ul>
@@ -336,7 +384,8 @@
 		</ul>
 	</nav>
 
-	<main id="main" tabindex="-1" class="max-w-5xl mx-auto px-4 pt-6 pb-24 sm:px-6 sm:pt-8 lg:pb-8 focus:outline-none">
+	<main id="main" tabindex="-1" class="max-w-5xl mx-auto px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 sm:pt-8 lg:pb-8 focus:outline-none">
+		{@render pwaBanners()}
 		{#if requires2faSetup && !page.url.pathname.startsWith('/settings')}
 			<div class="flex items-center justify-center min-h-[60vh]">
 				<div class="card bg-base-100 border border-warning shadow-lg w-full max-w-md">
@@ -371,10 +420,17 @@
 					<a href={failureLink} class="btn btn-sm shrink-0 whitespace-nowrap">{t('nav.failure.correct')}</a>
 				</div>
 			{/if}
-			{@render children?.()}
+			<!-- Offline every control that needs the server is locked; a read that failed offline
+			     remounts the page on reconnect so it loads again (lib/pwa/network.svelte.ts) -->
+			<fieldset class="contents" disabled={!network.online}>
+				{#key network.reconnects}
+					{@render children?.()}
+				{/key}
+			</fieldset>
 		{/if}
 	</main>
 {:else if isPublicRoute}
+	<div class="mx-auto max-w-md px-4 pt-4 empty:hidden">{@render pwaBanners()}</div>
 	{@render children?.()}
 {:else}
 	<!-- Protected page while signed out: render nothing (no API calls) until the redirect to /login lands -->

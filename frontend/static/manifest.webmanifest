@@ -1,0 +1,27 @@
+{
+	"id": "/",
+	"name": "WL Zeiterfassung",
+	"short_name": "Zeiterfassung",
+	"description": "Arbeitszeit erfassen, Abwesenheiten planen und Anfragen bearbeiten – Wagner Luca Zeiterfassung.",
+	"lang": "de",
+	"dir": "ltr",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"orientation": "any",
+	"theme_color": "#FFFFFF",
+	"background_color": "#FAFAF8",
+	"categories": ["business", "productivity"],
+	"icons": [
+		{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+		{ "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+		{ "src": "/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+		{ "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+		{ "src": "/icons/icon-monochrome-512.png", "sizes": "512x512", "type": "image/png", "purpose": "monochrome" }
+	],
+	"shortcuts": [
+		{ "name": "Timer starten/stoppen", "short_name": "Timer", "url": "/time", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+		{ "name": "Verlauf", "url": "/history", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+		{ "name": "Teamkalender", "short_name": "Team", "url": "/team", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+	]
+}

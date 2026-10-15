@@ -12,6 +12,9 @@ const config = {
 		adapter: adapter({
 			out: 'build'
 		}),
+		// src/service-worker.ts is registered by lib/pwa/serviceWorker.svelte.ts, production only
+		// (the dev server never runs it), so the update prompt controls when a new one takes over
+		serviceWorker: { register: false },
 		// Nonces/hashes for SvelteKit's own inline scripts and the pre-paint script in app.html
 		csp: {
 			mode: 'auto',
@@ -26,6 +29,9 @@ const config = {
 				// proxy in dev (vite.config.ts). Never make this depend on the mode — a
 				// `vite build` rewrites .svelte-kit/generated, which the dev server shares.
 				'connect-src': ['self'],
+				// The PWA's service worker and manifest (issue #67)
+				'worker-src': ['self'],
+				'manifest-src': ['self'],
 				'object-src': ['none'],
 				'base-uri': ['self'],
 				'form-action': ['self'],

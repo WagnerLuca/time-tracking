@@ -7,7 +7,7 @@ export const en: typeof de = {
 	tabs: {
 		profile: 'Profile',
 		organization: 'Organization',
-		appearance: 'Appearance'
+		appearance: 'App & appearance'
 	},
 	profile: {
 		title: 'Profile',

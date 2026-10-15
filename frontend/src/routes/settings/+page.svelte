@@ -3,6 +3,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { authApi, workScheduleApi } from '$lib/apiClient';
 	import type { WorkScheduleResponse, UpdateProfileRequest, TwoFactorSetupResponse } from '$lib/api';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
@@ -12,6 +13,7 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { t } from '$lib/i18n';
 	import SchedulePeriodEditor from '$lib/components/SchedulePeriodEditor.svelte';
+	import AppSettings from '$lib/components/AppSettings.svelte';
 	import InitialOvertimeEditor from '$lib/components/InitialOvertimeEditor.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import { downloadBlob } from '$lib/utils/download';
@@ -21,6 +23,10 @@
 	const MIN_PASSWORD_LENGTH = 8;
 
 	let activeTab = $state<'profile' | 'organization' | 'appearance'>('profile');
+	// "App installieren" in the Mehr menu links to #app (install + push live on the appearance tab)
+	$effect(() => {
+		if (page.url.hash === '#app' || page.url.hash === '#push') activeTab = 'appearance';
+	});
 
 	// Profile
 	let profileFirstName = $state('');
@@ -597,6 +603,8 @@
 			{/if}
 		{/if}
 	{:else}
+		<AppSettings />
+
 		<section class="card bg-base-100 border border-base-300 shadow-sm mb-5">
 			<div class="card-body">
 				<h2 class="card-title text-base">{t('settings.appearance.theme')}</h2>

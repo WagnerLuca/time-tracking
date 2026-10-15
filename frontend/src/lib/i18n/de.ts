@@ -25,6 +25,7 @@ import { de as inbox } from './messages/inbox/de';
 import { de as onboarding } from './messages/onboarding/de';
 import { de as closedPeriods } from './messages/closedPeriods/de';
 import { de as orgChart } from './messages/orgChart/de';
+import { de as pwa } from './messages/pwa/de';
 
 /** German is the default and the fallback for any missing English string. */
 export const de = {
@@ -54,7 +55,8 @@ export const de = {
 	inbox,
 	onboarding,
 	closedPeriods,
-	orgChart
+	orgChart,
+	pwa
 };
 
 export type Dictionary = typeof de;

@@ -104,11 +104,17 @@ docs/PersonalEntryChange.md
 docs/PersonalMembership.md
 docs/PersonalNotification.md
 docs/PersonalPunch.md
+docs/PersonalPushDevice.md
 docs/PersonalRequest.md
 docs/PersonalTimeEntry.md
 docs/ProblemDetails.md
 docs/PunchRequest.md
 docs/PunchResponse.md
+docs/PushApi.md
+docs/PushPublicKeyResponse.md
+docs/PushSettingsDto.md
+docs/PushSubscribeRequest.md
+docs/PushUnsubscribeRequest.md
 docs/RefreshTokenRequest.md
 docs/RefreshTokenResponse.md
 docs/RegisterRequest.md

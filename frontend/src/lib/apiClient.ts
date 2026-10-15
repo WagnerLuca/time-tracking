@@ -6,7 +6,8 @@ import { promptDialog } from '$lib/stores/confirm.svelte';
 import { formatMonth } from '$lib/utils/closedPeriods';
 import { t } from '$lib/i18n';
 import { installRefreshInterceptor, type RefreshedTokens } from '$lib/authRefresh';
-import { Configuration, AbsenceDayApi, ApiKeysApi, AuthApi, ClosedPeriodsApi, ExportImportApi, GroupApi, HolidayApi, InvitationsApi, MemberEntriesApi, NotificationsApi, OrganizationsApi, PauseRulesApi, ReportsApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
+import { network, offlineError } from '$lib/pwa/network.svelte';
+import { Configuration, AbsenceDayApi, ApiKeysApi, AuthApi, ClosedPeriodsApi, ExportImportApi, GroupApi, HolidayApi, InvitationsApi, MemberEntriesApi, NotificationsApi, OrganizationsApi, PauseRulesApi, PushApi, ReportsApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
 
 // Detect base URL: browser uses current hostname, SSR uses Docker service name
 const getApiBaseUrl = (): string => {
@@ -40,6 +41,15 @@ axiosInstance.interceptors.request.use(
     },
     (error) => Promise.reject(error)
 );
+
+// Offline (issue #67): fail at once instead of after the timeout. A read is retried when the
+// connection is back (the layout remounts the page); a write is never queued or replayed.
+axiosInstance.interceptors.request.use((config) => {
+    if (typeof navigator === 'undefined' || navigator.onLine !== false) return config;
+    const read = (config.method ?? 'get').toLowerCase() === 'get';
+    if (read) network.markMissed();
+    return Promise.reject(offlineError(read));
+});
 
 // A failed `responseType: 'blob'` download (CSV/PDF/JSON export) carries its ProblemDetails as a
 // Blob: parse it back to JSON so extractErrorMessage can read `code`/`detail` like everywhere else.
@@ -148,3 +158,4 @@ export const apiKeysApi = new ApiKeysApi(config, undefined, axiosInstance);
 export const invitationsApi = new InvitationsApi(config, undefined, axiosInstance);
 export const memberEntriesApi = new MemberEntriesApi(config, undefined, axiosInstance);
 export const closedPeriodsApi = new ClosedPeriodsApi(config, undefined, axiosInstance);
+export const pushApi = new PushApi(config, undefined, axiosInstance);

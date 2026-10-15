@@ -186,5 +186,14 @@ export const en: typeof de = {
 		notEnded: 'Only months that have ended can be closed.',
 		tooManyMonths: 'Close at most 24 months at once.',
 		notClosed: 'This month is not closed.'
+	},
+	push: {
+		notConfigured: 'Push notifications are not set up on this server.',
+		unsupportedService: 'This push service is not supported.',
+		invalidSubscription: 'The notification subscription is invalid.',
+		otherAccount: 'This device already receives notifications for another account.'
+	},
+	network: {
+		offline: 'No connection. Try again once you are back online.'
 	}
 };

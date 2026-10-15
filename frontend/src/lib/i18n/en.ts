@@ -26,6 +26,7 @@ import { en as inbox } from './messages/inbox/en';
 import { en as onboarding } from './messages/onboarding/en';
 import { en as closedPeriods } from './messages/closedPeriods/en';
 import { en as orgChart } from './messages/orgChart/en';
+import { en as pwa } from './messages/pwa/en';
 import type { Dictionary } from './de';
 
 export const en: Dictionary = {
@@ -55,5 +56,6 @@ export const en: Dictionary = {
 	inbox,
 	onboarding,
 	closedPeriods,
-	orgChart
+	orgChart,
+	pwa
 };
