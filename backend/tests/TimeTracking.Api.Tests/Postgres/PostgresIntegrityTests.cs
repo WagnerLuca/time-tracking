@@ -3,6 +3,13 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
+using Npgsql;
+using TimeTracking.Api.Data;
+using TimeTracking.Api.Models.Dtos;
+using TimeTracking.Api.Services;
 using TimeTracking.Api.Tests.Infrastructure;
 
 namespace TimeTracking.Api.Tests.Postgres;
@@ -128,6 +135,42 @@ public class PostgresIntegrityTests
         var (_, next) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "pg-pn-next@pg.test");
         (await TestHelpers.AddMemberAsync(_factory, owner, slug, next)).EnsureSuccessStatusCode();
         (await owner.PutAsJsonAsync(Url(next.User.Id), new { personnelNumber = "P-7" })).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    /// <summary>Gives <paramref name="number"/> to another member just before the first save goes out.</summary>
+    private sealed class ConcurrentNumber(string connection, int orgId, int otherUserId, string number) : SaveChangesInterceptor
+    {
+        private bool _done;
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_done)
+            {
+                _done = true;
+                await using var other = new TimeTrackingDbContext(new DbContextOptionsBuilder<TimeTrackingDbContext>().UseNpgsql(connection).Options);
+                (await other.UserOrganizations.SingleAsync(uo => uo.OrganizationId == orgId && uo.UserId == otherUserId, cancellationToken))
+                    .PersonnelNumber = number;
+                await other.SaveChangesAsync(cancellationToken);
+            }
+            return result;
+        }
+    }
+
+    [Fact]
+    public async Task PersonnelNumber_TakenAtTheSameTime_IsAConflictNotAnError()
+    {
+        var (_, _, slug, orgId, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, "pg-pn-race", new { }, "pg.test");
+        var connection = new NpgsqlConnectionStringBuilder(_factory.SuperuserConnectionString) { Database = "timetracking" }.ConnectionString;
+        int ownerId;
+        await using (var setup = new TimeTrackingDbContext(new DbContextOptionsBuilder<TimeTrackingDbContext>().UseNpgsql(connection).Options))
+            ownerId = await setup.UserOrganizations.Where(uo => uo.OrganizationId == orgId && uo.UserId != memberId).Select(uo => uo.UserId).SingleAsync();
+
+        await using var db = new TimeTrackingDbContext(new DbContextOptionsBuilder<TimeTrackingDbContext>().UseNpgsql(connection)
+            .AddInterceptors(new ConcurrentNumber(connection, orgId, ownerId, "P-9")).Options);
+        var result = await new OrganizationService(db, NullLogger<OrganizationService>.Instance)
+            .SetMemberPersonnelNumberAsync(slug, ownerId, memberId, new SetPersonnelNumberRequest { PersonnelNumber = "P-9" });
+        result.ErrorType.Should().Be(ServiceErrorType.Conflict);
+        ErrorCodes.For(result.ErrorMessage!).Should().Be("org.personnelNumberTaken");
     }
 
     [Fact]
