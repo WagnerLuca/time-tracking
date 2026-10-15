@@ -42,9 +42,10 @@ describe('core hours notices', () => {
 	});
 
 	it('name the member only for others', () => {
-		expect(coreHoursNotice({ relatedEntityId: 7, message }, 7)).toEqual({ date: '2026-03-03', name: null });
-		expect(coreHoursNotice({ relatedEntityId: 7, message }, 2)).toEqual({ date: '2026-03-03', name: 'Tom Weber' });
-		expect(coreHoursNotice({ relatedEntityId: 7, message: 'reworded' }, 2)).toEqual({ date: null, name: null });
+		expect(coreHoursNotice({ relatedEntityId: 7, message }, 7)).toEqual({ date: '2026-03-03', name: null, late: false });
+		expect(coreHoursNotice({ relatedEntityId: 7, message }, 2)).toEqual({ date: '2026-03-03', name: 'Tom Weber', late: false });
+		expect(coreHoursNotice({ relatedEntityId: 7, message: 'reworded' }, 2)).toEqual({ date: null, name: null, late: false });
+		expect(coreHoursNotice({ relatedEntityId: 7, message: message.replace(/\.$/, ' (checked late).') }, 7).late).toBe(true);
 	});
 });
 

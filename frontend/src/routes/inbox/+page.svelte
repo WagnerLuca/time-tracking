@@ -96,9 +96,10 @@
 		if (n.type === 'FailureEntry') return date ? t('nav.notifications.failureStarted', { date: formatDate(date) }) : t('nav.notifications.failureCorrect');
 		if (n.type === 'TimerReminder') return t('nav.notifications.reminderText');
 		if (n.type === 'CoreHoursViolation') {
-			const { date: day, name } = coreHoursNotice(n, auth.user?.id);
+			const { date: day, name, late } = coreHoursNotice(n, auth.user?.id);
 			const d = day ? formatDate(day) : '';
-			return name ? t('nav.notifications.coreHoursOther', { name, date: d }) : t('nav.notifications.coreHoursOwn', { date: d });
+			const text = name ? t('nav.notifications.coreHoursOther', { name, date: d }) : t('nav.notifications.coreHoursOwn', { date: d });
+			return late ? `${text} ${t('nav.notifications.coreHoursLate')}` : text;
 		}
 		return n.message ?? '';
 	}

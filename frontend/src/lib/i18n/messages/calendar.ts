@@ -4,6 +4,7 @@ export const de = {
 		dailyMax: 'Arbeitszeitgesetz: {hours} h an diesem Tag (mehr als 10 h).',
 		restPeriod: 'Arbeitszeitgesetz: nur {hours} h Ruhezeit davor (weniger als 11 h).',
 		coreHours: 'Kernarbeitszeit {window} nicht eingehalten: {issues} ({minutes} min nicht abgedeckt).',
+		coreHoursBackfilled: 'Nachträglich markiert, als die Kernarbeitszeit eingeschaltet wurde.',
 		issues: { late: 'später begonnen', early: 'früher beendet', gap: 'Lücke', missing: 'keine Zeit erfasst' }
 	},
 	pageTitle: 'Verlauf',
@@ -62,6 +63,7 @@ export const en: typeof de = {
 		dailyMax: 'Working Time Act: {hours} h on this day (more than 10 h).',
 		restPeriod: 'Working Time Act: only {hours} h of rest before (less than 11 h).',
 		coreHours: 'Core working hours {window} missed: {issues} ({minutes} min not covered).',
+		coreHoursBackfilled: 'Flagged afterwards, when core working hours were switched on.',
 		issues: { late: 'late start', early: 'early leave', gap: 'gap', missing: 'no time tracked' }
 	},
 	pageTitle: 'History',

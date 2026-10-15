@@ -16,14 +16,19 @@ function messageDate(message?: string | null): string | null {
 }
 
 /**
- * A CoreHoursViolation notice: its day and, when it is about someone else (`relatedEntityId`
- * is the affected member), their name from the message ("Tom Weber did not keep … on 03.03.2026 …").
+ * A CoreHoursViolation notice: its day, when it is about someone else (`relatedEntityId` is the
+ * affected member) their name from the message ("Tom Weber did not keep … on 03.03.2026 …"), and
+ * whether the day was only checked later by the catch-up ("… (checked late).").
  */
-export function coreHoursNotice(n: NotificationLike, currentUserId: number | null | undefined): { date: string | null; name: string | null } {
+export function coreHoursNotice(
+	n: NotificationLike,
+	currentUserId: number | null | undefined
+): { date: string | null; name: string | null; late: boolean } {
 	const own = n.relatedEntityId == null || n.relatedEntityId === currentUserId;
 	return {
 		date: messageDate(n.message),
-		name: own ? null : (n.message?.match(/^(.+?) did not keep the core working hours/)?.[1] ?? null)
+		name: own ? null : (n.message?.match(/^(.+?) did not keep the core working hours/)?.[1] ?? null),
+		late: n.message?.includes('(checked late)') ?? false
 	};
 }
 

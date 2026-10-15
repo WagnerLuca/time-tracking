@@ -140,6 +140,7 @@
 				issues: (day.coreHoursIssues ?? []).map((i) => t(`calendar.compliance.issues.${i as 'late' | 'early' | 'gap' | 'missing'}`)).join(', '),
 				minutes: day.coreHoursMissingMinutes ?? 0
 			}));
+		if (day.coreHours && day.coreHoursBackfilled) parts.push(t('calendar.compliance.coreHoursBackfilled'));
 		return parts.join(' ');
 	}
 
