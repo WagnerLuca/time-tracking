@@ -13,7 +13,12 @@ const api = vi.hoisted(() => ({
 		apiV1AuthLogoutPost: vi.fn(),
 		apiV1AuthMeGet: vi.fn()
 	},
-	organizationsApi: { apiV1OrganizationsMineGet: vi.fn(), apiV1OrganizationsSlugGet: vi.fn() },
+	organizationsApi: {
+		apiV1OrganizationsMineGet: vi.fn(),
+		apiV1OrganizationsSlugGet: vi.fn(),
+		apiV1OrganizationsSlugSettingsPut: vi.fn(),
+		apiV1OrganizationsSlugPut: vi.fn()
+	},
 	timeTrackingApi: { apiV1TimeTrackingCurrentGet: vi.fn(), apiV1TimeTrackingStartPost: vi.fn(), apiV1TimeTrackingStopPost: vi.fn() },
 	setAuthHandlers: vi.fn()
 }));
@@ -325,6 +330,24 @@ describe('organization detail cache', () => {
 		expect((await getOrgDetail('b')).id).toBe(4);
 		invalidateOrgDetail();
 		expect((await getOrgDetail('b')).id).toBe(6);
+	});
+
+	it('drops the cached details once the time settings are saved, even when the profile save fails', async () => {
+		let n = 0;
+		api.organizationsApi.apiV1OrganizationsSlugGet.mockImplementation(async (slug: string) => ({ data: { slug, id: ++n } }));
+		api.organizationsApi.apiV1OrganizationsSlugPut.mockRejectedValueOnce(httpError(409));
+		const { getOrgDetail, saveOrgGeneral } = await load();
+		const current = { timeZone: 'Europe/Berlin', businessDayEnd: '00:00' };
+
+		await getOrgDetail('a');
+		await expect(saveOrgGeneral('a', current, { timeZone: 'America/New_York', businessDayEnd: '00:00' }, { name: 'A' })).rejects.toThrow();
+		expect(api.organizationsApi.apiV1OrganizationsSlugSettingsPut).toHaveBeenCalledWith('a', { timeZone: 'America/New_York', businessDayEnd: '00:00' });
+		expect((await getOrgDetail('a')).id).toBe(2);
+
+		// Unchanged time settings are not sent again
+		await saveOrgGeneral('a', current, current, { name: 'A' });
+		expect(api.organizationsApi.apiV1OrganizationsSlugSettingsPut).toHaveBeenCalledTimes(1);
+		expect((await getOrgDetail('a')).id).toBe(3);
 	});
 
 	it('never caches a failure', async () => {
