@@ -4,6 +4,7 @@
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { inbox } from '$lib/stores/inbox.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
+	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { invalidateOrgDetail } from '$lib/stores/orgDetail';
 	import { requestsApi } from '$lib/apiClient';
 	import type { NotificationResponse, OrgRequestResponse } from '$lib/api';
@@ -17,6 +18,28 @@
 
 	let respondingId = $state<number | null>(null);
 	let decliningId = $state<number | null>(null);
+	let withdrawingId = $state<number | null>(null);
+
+	async function withdraw(req: OrgRequestResponse) {
+		const type = formatRequestType(req.type);
+		const ok = await confirmDialog({
+			title: t('inbox.own.confirmTitle'),
+			message: t('inbox.own.confirmMessage', { type }),
+			confirmLabel: t('inbox.own.withdraw'),
+			danger: true
+		});
+		if (!ok) return;
+		withdrawingId = req.id ?? null;
+		try {
+			await inbox.withdraw(req);
+			toast.success(t('inbox.own.withdrawn'));
+		} catch (err) {
+			toast.error(err, t('inbox.own.withdrawFailed'));
+			await inbox.load(); // e.g. decided meanwhile: show the current state
+		} finally {
+			withdrawingId = null;
+		}
+	}
 
 	// Decided requests of the selected org (only approvers get them; 403 = not an approver)
 	let history = $state<OrgRequestResponse[]>([]);
@@ -230,14 +253,23 @@
 			<h2 id="inbox-own" class="text-base font-semibold mb-2">{t('inbox.own.title')}</h2>
 			<ul class="flex flex-col gap-2 m-0 p-0 list-none">
 				{#each inbox.ownOpen as req (req.id)}
-					<li class="card border border-base-300 bg-base-100 p-4">
-						<p class="m-0 flex flex-wrap items-center gap-2">
-							<span class="badge badge-sm badge-warning">{formatRequestStatus(req.status)}</span>
-							<span class="font-semibold">{formatRequestType(req.type)}</span>
-							<span class="text-xs text-base-content/70">{req.organizationName}</span>
-						</p>
-						{@render requestDetails(req)}
-						<p class="m-0 mt-1 text-xs text-base-content/70">{t('inbox.own.waiting', { time: formatTimeAgo(req.createdAt) })}</p>
+					<li class="card flex-row flex-wrap items-start justify-between gap-3 border border-base-300 bg-base-100 p-4" data-testid="inbox-own-item">
+						<div class="min-w-0 flex-1">
+							<p class="m-0 flex flex-wrap items-center gap-2">
+								<span class="badge badge-sm badge-warning">{formatRequestStatus(req.status)}</span>
+								<span class="font-semibold">{formatRequestType(req.type)}</span>
+								<span class="text-xs text-base-content/70">{req.organizationName}</span>
+							</p>
+							{@render requestDetails(req)}
+							<p class="m-0 mt-1 text-xs text-base-content/70">{t('inbox.own.waiting', { time: formatTimeAgo(req.createdAt) })}</p>
+						</div>
+						<button
+							type="button"
+							class="btn btn-outline btn-error btn-sm max-sm:w-full"
+							aria-label={t('inbox.own.withdrawLabel', { type: formatRequestType(req.type) })}
+							disabled={withdrawingId === req.id}
+							onclick={() => withdraw(req)}
+						>{withdrawingId === req.id ? t('inbox.own.withdrawing') : t('inbox.own.withdraw')}</button>
 					</li>
 				{/each}
 			</ul>

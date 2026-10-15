@@ -7,14 +7,16 @@ const api = vi.hoisted(() => ({
 	seen: vi.fn(),
 	list: vi.fn(),
 	read: vi.fn(),
-	failures: vi.fn()
+	failures: vi.fn(),
+	withdraw: vi.fn()
 }));
 vi.mock('$lib/apiClient', () => ({
 	requestsApi: {
 		apiV1OrganizationsNotificationsGet: api.admin,
 		apiV1OrganizationsUserNotificationsGet: api.user,
 		apiV1OrganizationsMyRequestsGet: api.mine,
-		apiV1OrganizationsUserNotificationsMarkSeenPost: api.seen
+		apiV1OrganizationsUserNotificationsMarkSeenPost: api.seen,
+		apiV1OrganizationsSlugRequestsIdWithdrawPost: api.withdraw
 	},
 	notificationsApi: { apiV1NotificationsGet: api.list, apiV1NotificationsIdReadPut: api.read },
 	timeTrackingApi: { apiV1TimeTrackingFailuresGet: api.failures }
@@ -76,5 +78,20 @@ describe('inbox store', () => {
 		expect(api.seen).toHaveBeenCalledWith([5]);
 		expect(api.read).toHaveBeenCalledWith(12);
 		expect(inbox.decisions).toEqual([]);
+	});
+
+	it('withdraws an own open request and drops it from the list', async () => {
+		await inbox.load();
+		api.withdraw.mockReturnValue(ok({ id: 6, status: 'Withdrawn' }));
+		await inbox.withdraw({ id: 6, organizationSlug: 'acme' });
+		expect(api.withdraw).toHaveBeenCalledWith('acme', 6);
+		expect(inbox.ownOpen).toEqual([]);
+	});
+
+	it('keeps the request when withdrawing fails', async () => {
+		await inbox.load();
+		api.withdraw.mockReturnValue(Promise.reject(new Error('400')));
+		await expect(inbox.withdraw({ id: 6, organizationSlug: 'acme' })).rejects.toThrow('400');
+		expect(inbox.ownOpen.map((r) => r.id)).toEqual([6]);
 	});
 });

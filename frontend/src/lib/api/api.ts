@@ -912,6 +912,12 @@ export interface OrganizationDetailResponse {
     'coreHoursStart'?: string | null;
     'coreHoursEnd'?: string | null;
     'coreHoursToleranceMinutes'?: number;
+    /**
+     * Terminal settings (docs/TERMINAL.md).
+     */
+    'terminalDoubleScanSeconds'?: number;
+    'terminalOfflineHours'?: number;
+    'terminalUnknownCardLimit'?: number;
     'settingsUpdatedAt'?: string | null;
     'createdAt'?: string;
     'members': Array<OrganizationMemberResponse> | null;
@@ -1051,6 +1057,9 @@ export interface OrganizationSettingsResponse {
     'coreHoursStart'?: string | null;
     'coreHoursEnd'?: string | null;
     'coreHoursToleranceMinutes'?: number;
+    'terminalDoubleScanSeconds'?: number;
+    'terminalOfflineHours'?: number;
+    'terminalUnknownCardLimit'?: number;
 }
 /**
  * Automatic pause rule (deduct X minutes after Y hours worked).
@@ -1269,7 +1278,8 @@ export interface RegisterRequest {
 export const RequestStatus = {
     NUMBER_0: 0,
     NUMBER_1: 1,
-    NUMBER_2: 2
+    NUMBER_2: 2,
+    NUMBER_3: 3
 } as const;
 
 export type RequestStatus = typeof RequestStatus[keyof typeof RequestStatus];
@@ -1729,6 +1739,18 @@ export interface UpdateOrganizationSettingsRequest {
      * Allowed late start / early leave / gap in minutes.
      */
     'coreHoursToleranceMinutes'?: number | null;
+    /**
+     * Terminal double-scan window in seconds (5-600).
+     */
+    'terminalDoubleScanSeconds'?: number | null;
+    /**
+     * Terminal offline window in hours (1-168).
+     */
+    'terminalOfflineHours'?: number | null;
+    /**
+     * Unknown/blocked scans per key and 10 minutes (5-200).
+     */
+    'terminalUnknownCardLimit'?: number | null;
 }
 
 
@@ -10037,6 +10059,48 @@ export const RequestsApiAxiosParamCreator = function (configuration?: Configurat
         },
         /**
          * 
+         * @summary Withdraw one of your own requests while it is still pending (no membership needed, so a join request works too).
+         * @param {string} slug Organization URL slug.
+         * @param {number} id Request ID.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugRequestsIdWithdrawPost: async (slug: string, id: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugRequestsIdWithdrawPost', 'slug', slug)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugRequestsIdWithdrawPost', 'id', id)
+            const localVarPath = `/api/v1/organizations/{slug}/requests/{id}/withdraw`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Create a new request for the organization (e.g. join, edit entry). No membership required for join requests.
          * @param {string} slug Organization URL slug.
          * @param {CreateOrgRequestRequest} [createOrgRequestRequest] 
@@ -10219,6 +10283,20 @@ export const RequestsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Withdraw one of your own requests while it is still pending (no membership needed, so a join request works too).
+         * @param {string} slug Organization URL slug.
+         * @param {number} id Request ID.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugRequestsIdWithdrawPost(slug: string, id: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<OrgRequestResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugRequestsIdWithdrawPost(slug, id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['RequestsApi.apiV1OrganizationsSlugRequestsIdWithdrawPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Create a new request for the organization (e.g. join, edit entry). No membership required for join requests.
          * @param {string} slug Organization URL slug.
          * @param {CreateOrgRequestRequest} [createOrgRequestRequest] 
@@ -10314,6 +10392,17 @@ export const RequestsApiFactory = function (configuration?: Configuration, baseP
         },
         /**
          * 
+         * @summary Withdraw one of your own requests while it is still pending (no membership needed, so a join request works too).
+         * @param {string} slug Organization URL slug.
+         * @param {number} id Request ID.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugRequestsIdWithdrawPost(slug: string, id: number, options?: RawAxiosRequestConfig): AxiosPromise<OrgRequestResponse> {
+            return localVarFp.apiV1OrganizationsSlugRequestsIdWithdrawPost(slug, id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Create a new request for the organization (e.g. join, edit entry). No membership required for join requests.
          * @param {string} slug Organization URL slug.
          * @param {CreateOrgRequestRequest} [createOrgRequestRequest] 
@@ -10398,6 +10487,18 @@ export class RequestsApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugRequestsIdPut(slug: string, id: number, respondToOrgRequestRequest?: RespondToOrgRequestRequest, options?: RawAxiosRequestConfig) {
         return RequestsApiFp(this.configuration).apiV1OrganizationsSlugRequestsIdPut(slug, id, respondToOrgRequestRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Withdraw one of your own requests while it is still pending (no membership needed, so a join request works too).
+     * @param {string} slug Organization URL slug.
+     * @param {number} id Request ID.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugRequestsIdWithdrawPost(slug: string, id: number, options?: RawAxiosRequestConfig) {
+        return RequestsApiFp(this.configuration).apiV1OrganizationsSlugRequestsIdWithdrawPost(slug, id, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

@@ -23,7 +23,8 @@ export const de = {
 	requestStatus: {
 		Accepted: 'Angenommen',
 		Declined: 'Abgelehnt',
-		Pending: 'Offen'
+		Pending: 'Offen',
+		Withdrawn: 'Zurückgezogen'
 	},
 	requestData: {
 		start: 'Beginn: {value}',
@@ -152,7 +153,8 @@ export const en: typeof de = {
 	requestStatus: {
 		Accepted: 'Accepted',
 		Declined: 'Declined',
-		Pending: 'Pending'
+		Pending: 'Pending',
+		Withdrawn: 'Withdrawn'
 	},
 	requestData: {
 		start: 'Start: {value}',

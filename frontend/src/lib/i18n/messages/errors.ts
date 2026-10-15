@@ -110,7 +110,8 @@ export const de = {
 		alreadyMember: 'Du bist bereits Mitglied dieser Organisation.',
 		joinClosed: 'Diese Organisation nimmt keine Beitrittsanfragen an. Bitte einen Admin um eine Einladung.',
 		featureDisabled: 'Diese Funktion ist in der Organisation deaktiviert.',
-		notNeeded: 'Das kannst du direkt erledigen, ohne Anfrage.'
+		notNeeded: 'Das kannst du direkt erledigen, ohne Anfrage.',
+		notWithdrawable: 'Nur offene Anfragen lassen sich zurückziehen – diese wurde schon entschieden oder zurückgezogen.'
 	},
 	absence: {
 		notFound: 'Abwesenheit nicht gefunden.',
@@ -171,7 +172,10 @@ export const de = {
 		unknownCard: 'Unbekannte Karte.',
 		cardBlocked: 'Diese Karte ist gesperrt.',
 		tooManyUnknown: 'Zu viele unbekannte Karten gescannt. Bitte später erneut versuchen.',
-		scannedAtOutOfRange: 'Die Scan-Zeit muss zwischen vor 72 Stunden und in 2 Minuten liegen.',
+		scannedAtOutOfRange: 'Die Scan-Zeit liegt außerhalb des Offline-Fensters der Organisation oder mehr als 2 Minuten in der Zukunft.',
+		doubleScanRange: 'Das Doppel-Scan-Fenster muss zwischen 5 und 600 Sekunden liegen.',
+		offlineRange: 'Das Offline-Fenster muss zwischen 1 und 168 Stunden liegen.',
+		unknownLimitRange: 'Das Limit für unbekannte Karten muss zwischen 5 und 200 Scans pro 10 Minuten liegen.',
 		outOfOrder: 'Dieser Scan ist älter als der letzte Stempel des Mitglieds.',
 		timerElsewhere: 'Ein Timer läuft außerhalb dieser Organisation. Bitte zuerst in der App stoppen.',
 		cardTaken: 'Diese Karte ist bereits registriert.',
@@ -286,7 +290,8 @@ export const en: typeof de = {
 		alreadyMember: 'You are already a member of this organization.',
 		joinClosed: 'This organization does not accept join requests. Ask an admin for an invitation.',
 		featureDisabled: 'This feature is disabled in the organization.',
-		notNeeded: 'You can do this directly, without a request.'
+		notNeeded: 'You can do this directly, without a request.',
+		notWithdrawable: 'Only open requests can be withdrawn – this one was already decided or withdrawn.'
 	},
 	absence: {
 		notFound: 'Absence not found.',
@@ -347,7 +352,10 @@ export const en: typeof de = {
 		unknownCard: 'Unknown card.',
 		cardBlocked: 'This card is blocked.',
 		tooManyUnknown: 'Too many unknown cards were scanned. Try again later.',
-		scannedAtOutOfRange: 'The scan time must lie between 72 hours ago and 2 minutes from now.',
+		scannedAtOutOfRange: "The scan time lies outside the organization's offline window or more than 2 minutes ahead.",
+		doubleScanRange: 'The double-scan window must be between 5 and 600 seconds.',
+		offlineRange: 'The offline window must be between 1 and 168 hours.',
+		unknownLimitRange: 'The unknown-card budget must be between 5 and 200 scans per 10 minutes.',
 		outOfOrder: "This scan is older than the member's last punch.",
 		timerElsewhere: 'A timer is running outside this organization. Stop it in the app first.',
 		cardTaken: 'This card is already registered.',

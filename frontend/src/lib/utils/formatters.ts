@@ -176,7 +176,7 @@ export function formatRequestTypeFull(type: string | null | undefined): string {
 
 /** Label for a request status (Accepted / Declined / Pending). */
 export function formatRequestStatus(status: string | null | undefined): string {
-	if (status === 'Accepted' || status === 'Declined' || status === 'Pending') return t(`format.requestStatus.${status}`);
+	if (status === 'Accepted' || status === 'Declined' || status === 'Pending' || status === 'Withdrawn') return t(`format.requestStatus.${status}`);
 	return status ?? t('common.unknown');
 }
 

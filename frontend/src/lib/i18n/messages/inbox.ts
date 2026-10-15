@@ -29,7 +29,14 @@ export const de = {
 	},
 	own: {
 		title: 'Meine offenen Anträge',
-		waiting: 'Gestellt {time} · wartet auf Entscheidung'
+		waiting: 'Gestellt {time} · wartet auf Entscheidung',
+		withdraw: 'Zurückziehen',
+		withdrawLabel: 'Antrag „{type}“ zurückziehen',
+		withdrawing: 'Wird zurückgezogen…',
+		confirmTitle: 'Antrag zurückziehen?',
+		confirmMessage: 'Der Antrag „{type}“ wird nicht mehr entschieden und erscheint bei dir und den Freigebenden als „zurückgezogen“. Das lässt sich nicht rückgängig machen – du kannst ihn aber neu stellen.',
+		withdrawn: 'Antrag zurückgezogen.',
+		withdrawFailed: 'Antrag konnte nicht zurückgezogen werden.'
 	},
 	decisions: {
 		title: 'Antworten auf meine Anträge',
@@ -74,7 +81,14 @@ export const en: typeof de = {
 	},
 	own: {
 		title: 'My open requests',
-		waiting: 'Sent {time} · waiting for a decision'
+		waiting: 'Sent {time} · waiting for a decision',
+		withdraw: 'Withdraw',
+		withdrawLabel: 'Withdraw the request "{type}"',
+		withdrawing: 'Withdrawing…',
+		confirmTitle: 'Withdraw this request?',
+		confirmMessage: 'The request "{type}" will no longer be decided and shows as "withdrawn" to you and the approvers. This cannot be undone, but you can send it again.',
+		withdrawn: 'Request withdrawn.',
+		withdrawFailed: 'Could not withdraw the request.'
 	},
 	decisions: {
 		title: 'Answers to my requests',

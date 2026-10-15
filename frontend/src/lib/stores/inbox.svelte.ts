@@ -55,6 +55,12 @@ function createInbox() {
 		if (decisionIds.length > 0) await markRead(decisionIds);
 	}
 
+	/** Takes back an own open request (only while pending; the server refuses a decided one). */
+	async function withdraw(req: OrgRequestResponse) {
+		await requestsApi.apiV1OrganizationsSlugRequestsIdWithdrawPost(req.organizationSlug!, req.id!);
+		ownOpen = ownOpen.filter((r) => r.id !== req.id);
+	}
+
 	function reset() {
 		toApprove = [];
 		decisions = [];
@@ -77,6 +83,7 @@ function createInbox() {
 		refresh,
 		markRead,
 		dismissDecisions,
+		withdraw,
 		reset
 	};
 }
