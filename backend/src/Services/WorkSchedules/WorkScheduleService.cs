@@ -99,6 +99,10 @@ public class WorkScheduleService : IWorkScheduleService
         if (schedule == null)
             return ServiceResult.NotFound<WorkScheduleResponse>("Work schedule not found");
 
+        var updateError = await CheckUpdateAsync(schedule, request);
+        if (updateError != null)
+            return ServiceResult.BadRequest<WorkScheduleResponse>(updateError);
+
         ApplyUpdate(schedule, request);
         await _context.SaveChangesAsync();
         _logger.LogInformation("Work schedule {ScheduleId} updated by user {UserId}", scheduleId, userId);
@@ -263,6 +267,10 @@ public class WorkScheduleService : IWorkScheduleService
 
         var membership = await GetMembershipAsync(memberId, org.Id);
 
+        var updateError = await CheckUpdateAsync(schedule, request);
+        if (updateError != null)
+            return ServiceResult.BadRequest<WorkScheduleResponse>(updateError);
+
         ApplyUpdate(schedule, request);
         await _context.SaveChangesAsync();
 
@@ -355,7 +363,7 @@ public class WorkScheduleService : IWorkScheduleService
     private static void ApplyUpdate(WorkSchedule schedule, UpdateWorkScheduleRequest request)
     {
         if (request.ValidFrom.HasValue) schedule.ValidFrom = request.ValidFrom.Value;
-        schedule.ValidTo = request.ValidTo ?? schedule.ValidTo;
+        schedule.ValidTo = NewValidTo(schedule, request);
 
         if (request.WeeklyWorkHours.HasValue)
         {
@@ -383,6 +391,21 @@ public class WorkScheduleService : IWorkScheduleService
                 schedule.TargetSun = request.TargetSun ?? schedule.TargetSun;
             }
         }
+    }
+
+    /// <summary>A missing <c>validTo</c> keeps the end; <c>clearValidTo</c> makes the period open-ended.</summary>
+    private static DateOnly? NewValidTo(WorkSchedule schedule, UpdateWorkScheduleRequest request) =>
+        request.ClearValidTo ? null : request.ValidTo ?? schedule.ValidTo;
+
+    /// <summary>The edited period must still end after it starts and fit between its neighbours.</summary>
+    private async Task<string?> CheckUpdateAsync(WorkSchedule schedule, UpdateWorkScheduleRequest request)
+    {
+        var from = request.ValidFrom ?? schedule.ValidFrom;
+        var to = NewValidTo(schedule, request);
+        if (to < from)
+            return "The end date must not be before the start date.";
+        // An edit closes nothing automatically, so an open neighbour counts as an overlap too
+        return await CheckOverlapAsync(schedule.UserId, schedule.OrganizationId, from, to, schedule.Id, autoClose: false);
     }
 
     private static WorkScheduleResponse MapToResponse(
@@ -460,7 +483,7 @@ public class WorkScheduleService : IWorkScheduleService
     }
 
     private async Task<string?> CheckOverlapAsync(
-        int userId, int orgId, DateOnly from, DateOnly? to, int? excludeId = null)
+        int userId, int orgId, DateOnly from, DateOnly? to, int? excludeId = null, bool autoClose = true)
     {
         var existing = await _context.WorkSchedules
             .AsNoTracking()
@@ -473,17 +496,15 @@ public class WorkScheduleService : IWorkScheduleService
             var sEnd = s.ValidTo ?? DateOnly.MaxValue;
             var newEnd = to ?? DateOnly.MaxValue;
 
+            // Inclusive on both ends: one period ending on the day the next starts would give that day two targets
             if (from <= sEnd && s.ValidFrom <= newEnd)
             {
-                if (from < sEnd && s.ValidFrom < newEnd)
-                {
-                    if (s.ValidTo == null && s.ValidFrom < from)
-                        continue; // Will be auto-closed
+                if (autoClose && s.ValidTo == null && s.ValidFrom < from)
+                    continue; // Will be auto-closed
 
-                    return $"This schedule overlaps with an existing one ({s.ValidFrom:yyyy-MM-dd} – " +
-                           $"{(s.ValidTo.HasValue ? s.ValidTo.Value.ToString("yyyy-MM-dd") : "ongoing")}). " +
-                           "Only one schedule at a time is allowed.";
-                }
+                return $"This schedule overlaps with an existing one ({s.ValidFrom:yyyy-MM-dd} – " +
+                       $"{(s.ValidTo.HasValue ? s.ValidTo.Value.ToString("yyyy-MM-dd") : "ongoing")}). " +
+                       "Only one schedule at a time is allowed.";
             }
         }
         return null;

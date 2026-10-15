@@ -42,7 +42,10 @@ public record CreateWorkScheduleRequest
 public record UpdateWorkScheduleRequest
 {
     public DateOnly? ValidFrom { get; init; }
+    /// <summary>New end date; leave it out to keep the current one.</summary>
     public DateOnly? ValidTo { get; init; }
+    /// <summary>True removes the end date (the period runs open-ended); wins over <see cref="ValidTo"/>.</summary>
+    public bool ClearValidTo { get; init; }
     public double? WeeklyWorkHours { get; init; }
     public bool DistributeEvenly { get; init; } = true;
     public double? TargetMon { get; init; }

@@ -1721,7 +1721,14 @@ export interface UpdateTimeEntryRequest {
  */
 export interface UpdateWorkScheduleRequest {
     'validFrom'?: string | null;
+    /**
+     * New end date; leave it out to keep the current one.
+     */
     'validTo'?: string | null;
+    /**
+     * True removes the end date (the period runs open-ended); wins over TimeTracking.Api.Models.Dtos.UpdateWorkScheduleRequest.ValidTo.
+     */
+    'clearValidTo'?: boolean;
     'weeklyWorkHours'?: number | null;
     'distributeEvenly'?: boolean;
     'targetMon'?: number | null;

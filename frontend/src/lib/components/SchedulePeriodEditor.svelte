@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { workScheduleApi } from '$lib/apiClient';
-	import type { CreateWorkScheduleRequest, WorkScheduleResponse } from '$lib/api';
+	import type { CreateWorkScheduleRequest, UpdateWorkScheduleRequest, WorkScheduleResponse } from '$lib/api';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import { dayNamesShort, formatDateFull, formatNumber } from '$lib/utils/formatters';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
@@ -122,12 +122,14 @@
 			targetSun: distribute ? undefined : sun
 		};
 		const existingId = replacing?.id;
+		// An emptied end date has to be cleared explicitly; a missing validTo keeps the old one
+		const update: UpdateWorkScheduleRequest = { ...payload, clearValidTo: !to };
 		try {
 			if (memberId) {
-				if (existingId) await workScheduleApi.apiV1OrganizationsSlugMembersMemberIdWorkSchedulesIdPut(orgSlug, memberId, existingId, payload);
+				if (existingId) await workScheduleApi.apiV1OrganizationsSlugMembersMemberIdWorkSchedulesIdPut(orgSlug, memberId, existingId, update);
 				else await workScheduleApi.apiV1OrganizationsSlugMembersMemberIdWorkSchedulesPost(orgSlug, memberId, payload);
 			} else {
-				if (existingId) await workScheduleApi.apiV1OrganizationsSlugWorkSchedulesIdPut(orgSlug, existingId, payload);
+				if (existingId) await workScheduleApi.apiV1OrganizationsSlugWorkSchedulesIdPut(orgSlug, existingId, update);
 				else await workScheduleApi.apiV1OrganizationsSlugWorkSchedulesPost(orgSlug, payload);
 			}
 			toast.success(existingId ? t('schedule.periods.updated') : t('schedule.periods.added'));

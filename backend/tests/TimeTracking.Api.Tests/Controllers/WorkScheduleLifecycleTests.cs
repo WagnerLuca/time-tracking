@@ -101,6 +101,49 @@ public class WorkScheduleLifecycleTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     [Fact]
+    public async Task PeriodsSharingABoundaryDay_AreRejected()
+    {
+        var (_, member, slug, _, _) = await SetupAsync("wsl-boundary", new { workScheduleChangeMode = Allowed });
+        var url = $"/api/v1/organizations/{slug}/work-schedules";
+        await CreateAsync(member, url, new { validFrom = "2026-01-01", validTo = "2026-03-31", weeklyWorkHours = 40, distributeEvenly = true });
+
+        var sameDay = await member.PostAsJsonAsync(url, new { validFrom = "2026-03-31", validTo = "2026-05-31", weeklyWorkHours = 20, distributeEvenly = true });
+        sameDay.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await sameDay.Content.ReadAsStringAsync()).Should().Contain("schedule.overlap");
+
+        // The day after is fine
+        await CreateAsync(member, url, new { validFrom = "2026-04-01", validTo = "2026-05-31", weeklyWorkHours = 20, distributeEvenly = true });
+    }
+
+    [Fact]
+    public async Task Update_CanClearTheEndDate_AndIsCheckedForOverlaps()
+    {
+        var (_, member, slug, _, _) = await SetupAsync("wsl-clear", new { workScheduleChangeMode = Allowed });
+        var url = $"/api/v1/organizations/{slug}/work-schedules";
+        var first = await CreateAsync(member, url, new { validFrom = "2026-01-01", validTo = "2026-03-31", weeklyWorkHours = 40, distributeEvenly = true });
+
+        // A missing validTo keeps the end date
+        var kept = await member.PutAsJsonAsync($"{url}/{first.Id}", new { weeklyWorkHours = 30 });
+        (await kept.Content.ReadFromJsonAsync<WorkScheduleResponseDto>(TestHelpers.JsonOptions))!.ValidTo.Should().Be("2026-03-31");
+
+        // clearValidTo makes the period open-ended again
+        var cleared = await member.PutAsJsonAsync($"{url}/{first.Id}", new { clearValidTo = true });
+        cleared.EnsureSuccessStatusCode();
+        (await cleared.Content.ReadFromJsonAsync<WorkScheduleResponseDto>(TestHelpers.JsonOptions))!.ValidTo.Should().BeNull();
+
+        // Close it again, add a successor: re-opening or stretching onto its first day now collides
+        (await member.PutAsJsonAsync($"{url}/{first.Id}", new { validTo = "2026-03-31" })).EnsureSuccessStatusCode();
+        await CreateAsync(member, url, new { validFrom = "2026-04-01", weeklyWorkHours = 20, distributeEvenly = true });
+        (await member.PutAsJsonAsync($"{url}/{first.Id}", new { clearValidTo = true })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await member.PutAsJsonAsync($"{url}/{first.Id}", new { validTo = "2026-04-01" })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // ...and the end must not be before the start
+        var backwards = await member.PutAsJsonAsync($"{url}/{first.Id}", new { validTo = "2025-12-31" });
+        backwards.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await backwards.Content.ReadAsStringAsync()).Should().Contain("range.endBeforeStart");
+    }
+
+    [Fact]
     public async Task Update_ManualTargetsKeepUnsentDays_DistributeEvenlyClearsTheWeekend()
     {
         var (_, member, slug, _, _) = await SetupAsync("wsl-update", new { workScheduleChangeMode = Allowed });
