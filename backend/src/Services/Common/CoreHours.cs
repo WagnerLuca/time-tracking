@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using TimeTracking.Api.Data;
 using TimeTracking.Api.Models;
 
@@ -174,109 +175,130 @@ public static class CoreHours
     /// start days), so a restart or downtime catches up. Stores the checks and notifies violations once
     /// (in-app, plus mail when <paramref name="email"/> is given) to the member, the org admins/owners and
     /// the admins of the member's groups. A check more than <see cref="LateAfter"/> after its due time is
-    /// <see cref="CoreHoursCheck.CheckedLate"/> and says so; it is skipped for a day before the member joined
-    /// (org-local) or a window that started before the core hours last changed (<see cref="Organization.CoreHoursChangedAt"/>):
-    /// those days were not under this rule. A requested backfill (<see cref="Organization.CoreHoursBackfillFrom"/>)
-    /// flags exactly those days before the change silently (<see cref="CoreHoursCheck.Backfilled"/>) and is
-    /// then cleared. A few queries per organization, independent of members and days. Returns the number
+    /// <see cref="CoreHoursCheck.CheckedLate"/> and says so. A window that started before the member joined or
+    /// before the core hours last changed (<see cref="Organization.CoreHoursChangedAt"/>) is never checked:
+    /// that day was not (wholly) under this rule — switching on at 15:20 or joining at 14:00 notifies nothing
+    /// that day. A requested backfill (<see cref="Organization.CoreHoursBackfillFrom"/>) flags exactly the days
+    /// before the change silently (<see cref="CoreHoursCheck.Backfilled"/>) and is then cleared.
+    /// The groups of every organization are loaded once; an organization with nothing due then costs one
+    /// query, one with due days a few, independent of members and days. Each organization is saved on its
+    /// own, and a failing one is logged and retried next run without blocking the others. Returns the number
     /// of notified violations.
     /// </summary>
     public static async Task<int> CheckDueAsync(TimeTrackingDbContext context, DateTime nowUtc,
-        IEmailSender? email = null, string? frontendBaseUrl = null, CancellationToken ct = default)
+        IEmailSender? email = null, string? frontendBaseUrl = null, CancellationToken ct = default, ILogger? logger = null)
     {
-        var orgs = await context.Organizations   // tracked: a handled backfill request is cleared
+        var orgs = await context.Organizations.AsNoTracking()
             .Where(o => o.CoreHoursEnabled || o.CoreHoursBackfillFrom != null
                      || context.Groups.Any(g => g.OrganizationId == o.Id && g.IsActive && g.CoreHoursMode == CoreHoursMode.Own))
             .ToListAsync(ct);
+        if (orgs.Count == 0) return 0;
+        var orgIds = orgs.Select(o => o.Id).ToList();
+        var groups = (await context.Groups.AsNoTracking()
+                .Where(g => orgIds.Contains(g.OrganizationId) && g.IsActive)
+                .Include(g => g.Members)
+                .ToListAsync(ct))
+            .ToLookup(g => g.OrganizationId);
 
-        var save = false;
-        var violations = new List<(Organization Org, CoreHoursCheck Check)>();
-        var trees = new Dictionary<int, GroupTree>();
+        var notified = 0;
         foreach (var org in orgs)
         {
-            var clock = OrgClock.For(org);
-            var today = clock.Today(nowUtc);
-            var catchUpFrom = today.AddDays(-CatchUpDays);
-            var backfillFrom = org.CoreHoursBackfillFrom;
-            var first = backfillFrom < catchUpFrom ? backfillFrom.Value : catchUpFrom;
-            if (backfillFrom != null)
+            try
             {
-                org.CoreHoursBackfillFrom = null;
-                save = true;
+                notified += await CheckOrgAsync(context, org, new GroupTree(groups[org.Id]), nowUtc, email, frontendBaseUrl, ct);
             }
-
-            var members = await context.UserOrganizations.AsNoTracking()
-                .Where(uo => uo.OrganizationId == org.Id && uo.IsActive && uo.User.IsActive)
-                .Select(uo => new { uo.UserId, uo.JoinedAt })
-                .ToListAsync(ct);
-            if (members.Count == 0) continue;
-            var done = (await context.CoreHoursChecks.AsNoTracking()
-                    .Where(c => c.OrganizationId == org.Id && c.Date >= first && c.Date <= today)
-                    .Select(c => new { c.UserId, c.Date })
-                    .ToListAsync(ct))
-                .Select(c => (c.UserId, c.Date)).ToHashSet();
-
-            var tree = trees[org.Id] = await GroupTree.LoadAsync(context, org.Id, ct);
-            var due = new List<CoreHoursCheck>();
-            foreach (var member in members)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                var groups = tree.EffectiveGroupsOf(member.UserId).ToList();
-                var window = EffectiveRuleResolver.CombineCoreHours(org, groups);
-                if (window == null) continue;
-                var tolerance = EffectiveRuleResolver.CombineCoreTolerance(org, groups);
+                context.ChangeTracker.Clear();   // nothing of this organization stays pending; the next run retries it
+                logger?.LogError(ex, "Error while checking the core working hours of organization {OrganizationId}.", org.Id);
+            }
+        }
+        return notified;
+    }
 
-                for (var day = first; day <= today; day = day.AddDays(1))
+    /// <summary>One organization of <see cref="CheckDueAsync"/>: a single query when nothing is due.</summary>
+    public static async Task<int> CheckOrgAsync(TimeTrackingDbContext context, Organization org, GroupTree tree, DateTime nowUtc,
+        IEmailSender? email, string? frontendBaseUrl, CancellationToken ct)
+    {
+        var clock = OrgClock.For(org);
+        var today = clock.Today(nowUtc);
+        var catchUpFrom = today.AddDays(-CatchUpDays);
+        var backfillFrom = org.CoreHoursBackfillFrom;
+        var first = backfillFrom < catchUpFrom ? backfillFrom.Value : catchUpFrom;
+
+        // The members with their days already checked, in one query
+        var members = await context.UserOrganizations.AsNoTracking()
+            .Where(uo => uo.OrganizationId == org.Id && uo.IsActive && uo.User.IsActive)
+            .Select(uo => new
+            {
+                uo.UserId, uo.JoinedAt,
+                Done = context.CoreHoursChecks
+                    .Where(c => c.OrganizationId == org.Id && c.UserId == uo.UserId && c.Date >= first && c.Date <= today)
+                    .Select(c => c.Date).ToList()
+            })
+            .ToListAsync(ct);
+
+        var due = new List<CoreHoursCheck>();
+        foreach (var member in members)
+        {
+            var groups = tree.EffectiveGroupsOf(member.UserId).ToList();
+            var window = EffectiveRuleResolver.CombineCoreHours(org, groups);
+            if (window == null) continue;
+            var tolerance = EffectiveRuleResolver.CombineCoreTolerance(org, groups);
+
+            for (var day = first; day <= today; day = day.AddDays(1))
+            {
+                if (member.Done.Contains(day)) continue;
+                var (from, to) = window.Utc(day, clock);
+                var dueAt = to.AddMinutes(tolerance);
+                if (nowUtc < dueAt) continue;
+                var beforeChange = from < org.CoreHoursChangedAt;
+                var beforeJoining = from < member.JoinedAt;
+                var backfill = day >= backfillFrom && beforeChange;
+                if (backfill ? beforeJoining : day < catchUpFrom || beforeChange || beforeJoining)
+                    continue;
+
+                due.Add(new CoreHoursCheck
                 {
-                    if (done.Contains((member.UserId, day))) continue;
-                    var (from, to) = window.Utc(day, clock);
-                    var dueAt = to.AddMinutes(tolerance);
-                    if (nowUtc < dueAt) continue;
-                    var beforeChange = from < org.CoreHoursChangedAt;
-                    var backfill = day >= backfillFrom && beforeChange;
-                    var late = !backfill && nowUtc >= dueAt + LateAfter;
-                    var beforeJoining = day < clock.LocalDate(member.JoinedAt);
-                    if (backfill ? beforeJoining : day < catchUpFrom || (late && (beforeChange || beforeJoining)))
-                        continue;
-
-                    due.Add(new CoreHoursCheck
-                    {
-                        OrganizationId = org.Id, UserId = member.UserId, Date = day,
-                        WindowStart = window.Start, WindowEnd = window.End, ToleranceMinutes = tolerance,
-                        CheckedAt = nowUtc, CheckedLate = late, Backfilled = backfill
-                    });
-                }
+                    OrganizationId = org.Id, UserId = member.UserId, Date = day,
+                    WindowStart = window.Start, WindowEnd = window.End, ToleranceMinutes = tolerance,
+                    CheckedAt = nowUtc, CheckedLate = !backfill && nowUtc >= dueAt + LateAfter, Backfilled = backfill
+                });
             }
-            if (due.Count == 0) continue;
-
-            await EvaluateAsync(context, org.Id, clock, due, nowUtc, ct);
-            context.CoreHoursChecks.AddRange(due);
-            save = true;
-            violations.AddRange(due.Where(c => c.Issues != CoreHoursIssue.None && !c.Backfilled).Select(c => (org, c)));
         }
 
-        if (!save) return 0;
+        if (backfillFrom != null)
+        {
+            context.Organizations.Attach(org);   // the backfill request is handled
+            org.CoreHoursBackfillFrom = null;
+        }
+        else if (due.Count == 0) return 0;
+
+        if (due.Count > 0)
+        {
+            await EvaluateAsync(context, org.Id, clock, due, nowUtc, ct);
+            context.CoreHoursChecks.AddRange(due);
+        }
         await context.SaveChangesAsync(ct);   // stored before notifying: a crash may skip a notice, never repeat one
+        var violations = due.Where(c => c.Issues != CoreHoursIssue.None && !c.Backfilled).ToList();
         if (violations.Count == 0) return 0;
 
-        // Recipients, batched: the org admins once per organization, every user involved in one query.
+        // Recipients, batched: the org admins once, every user involved in one query.
         // Org admins only while they may see members' hours (MemberTimeEntryVisibility, #63).
-        var orgAdmins = new Dictionary<int, List<int>>();
-        foreach (var org in violations.Select(v => v.Org).Distinct())
-            orgAdmins[org.Id] = org.MemberTimeEntryVisibility
-                ? await context.UserOrganizations.AsNoTracking()
-                    .Where(uo => uo.OrganizationId == org.Id && uo.IsActive && uo.Role >= OrganizationRole.Admin)
-                    .Select(uo => uo.UserId)
-                    .ToListAsync(ct)
-                : [];
-        var recipients = violations.Select(v =>
+        var orgAdmins = org.MemberTimeEntryVisibility
+            ? await context.UserOrganizations.AsNoTracking()
+                .Where(uo => uo.OrganizationId == org.Id && uo.IsActive && uo.Role >= OrganizationRole.Admin)
+                .Select(uo => uo.UserId)
+                .ToListAsync(ct)
+            : [];
+        var recipients = violations.Select(check =>
         {
             // The admins of the member's groups and of every ancestor group (sub-groups, GroupTree);
             // with the org switch off only those of groups whose admins may view entries (effective value)
-            var tree = trees[v.Org.Id];
-            var groupAdmins = tree.ChainGroupsOf(v.Check.UserId)
-                .Where(id => v.Org.MemberTimeEntryVisibility || tree.Effective(id).GroupAdminCanViewAllTimeEntries == true)
+            var groupAdmins = tree.ChainGroupsOf(check.UserId)
+                .Where(id => org.MemberTimeEntryVisibility || tree.Effective(id).GroupAdminCanViewAllTimeEntries == true)
                 .SelectMany(tree.AdminsOf);
-            return orgAdmins[v.Org.Id].Concat(groupAdmins).Prepend(v.Check.UserId).Distinct().ToList();
+            return orgAdmins.Concat(groupAdmins).Prepend(check.UserId).Distinct().ToList();
         }).ToList();
         var allIds = recipients.SelectMany(ids => ids).ToHashSet();
         var users = await context.Users.AsNoTracking()
@@ -286,7 +308,7 @@ public static class CoreHours
         var mails = new List<(string To, string Subject, string Body)>();
         for (var i = 0; i < violations.Count; i++)
         {
-            var (org, check) = violations[i];
+            var check = violations[i];
             if (!users.TryGetValue(check.UserId, out var member)) continue;
             var window = new CoreWindow(check.WindowStart, check.WindowEnd);
             var date = check.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture);
