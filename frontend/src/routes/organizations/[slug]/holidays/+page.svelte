@@ -8,7 +8,7 @@
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { holidayApi } from '$lib/apiClient';
 	import { t, tp } from '$lib/i18n';
-	import { formatDate } from '$lib/utils/formatters';
+	import { formatDate, holidayRegionLabel } from '$lib/utils/formatters';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import type { OrganizationDetailResponse, HolidayResponse, HolidayPresetResponse } from '$lib/api';
@@ -292,7 +292,7 @@
 								<label for="holidayPreset" class="label text-xs">{t('holidays.import.region')}</label>
 								<select id="holidayPreset" class="select select-sm w-full sm:w-64" bind:value={importPreset} disabled={importing || presets.length === 0}>
 									{#each presets as p (p.key)}
-										<option value={p.key}>{p.name}</option>
+										<option value={p.key}>{holidayRegionLabel(p.key, p.name)}</option>
 									{/each}
 								</select>
 							</div>

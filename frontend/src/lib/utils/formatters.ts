@@ -8,6 +8,8 @@
  */
 import { locale } from '$lib/stores/locale.svelte';
 import { t, type MessageKey } from '$lib/i18n';
+import { de } from '$lib/i18n/de';
+import { lookup } from '$lib/i18n/translate';
 
 // ── Locale-aware primitives ──
 
@@ -190,6 +192,12 @@ export function normalizeAbsenceType(type: string | null | undefined): 'SickDay'
 export function absenceTypeLabel(type: string | null | undefined): string {
 	const normalized = normalizeAbsenceType(type);
 	return normalized ? t(`format.absenceType.${normalized}`) : (type ?? t('common.unknown'));
+}
+
+/** Name of a holiday preset region by its stable key ("DE-BY"); unknown keys fall back to the server's (German) name. */
+export function holidayRegionLabel(key: string | null | undefined, fallback?: string | null): string {
+	const k = `holidays.regions.${key}`;
+	return key && typeof lookup(de, k) === 'string' ? t(k as MessageKey) : (fallback ?? key ?? '');
 }
 
 /** Label for an organization role (Owner / Admin / Member). */

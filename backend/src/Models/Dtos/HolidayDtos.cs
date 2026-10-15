@@ -37,9 +37,11 @@ public record UpdateHolidayRequest
     public bool? IsHalfDay { get; init; }
 }
 
-/// <summary>A country whose public holidays can be imported.</summary>
+/// <summary>A region whose public holidays can be imported.</summary>
 public record HolidayPresetResponse
 {
+    /// <summary>Stable key ("DE", "DE-BY", "AT", "CH"); the UI translates the region name by it.</summary>
     public required string Key { get; init; }
+    /// <summary>German name, a fallback for clients that do not know the key.</summary>
     public required string Name { get; init; }
 }

@@ -24,6 +24,7 @@ import {
 	getMonthName,
 	normalizeAbsenceType,
 	parseRequestData,
+	holidayRegionLabel,
 	roleLabel,
 	statusBadgeClass
 } from './formatters';
@@ -216,6 +217,15 @@ describe('formatters: domain labels', () => {
 		expect(roleLabel(null)).toBe('');
 		locale.set('en');
 		expect(roleLabel('Owner')).toBe('Owner');
+	});
+
+	it('names holiday regions by key in the UI language, falling back to the server name', () => {
+		const keys = ['DE', 'DE-BW', 'DE-BY', 'DE-BE', 'DE-BB', 'DE-HB', 'DE-HH', 'DE-HE', 'DE-MV', 'DE-NI', 'DE-NW', 'DE-RP', 'DE-SL', 'DE-SN', 'DE-ST', 'DE-SH', 'DE-TH', 'AT', 'CH'];
+		expect(holidayRegionLabel('DE-BY', 'x')).toBe('Bayern');
+		locale.set('en');
+		expect(holidayRegionLabel('DE-BY', 'Bayern')).toBe('Bavaria');
+		expect(keys.map((k) => holidayRegionLabel(k)).every((name, i) => name && name !== keys[i])).toBe(true);
+		expect(holidayRegionLabel('XX', 'Somewhere')).toBe('Somewhere');
 	});
 
 	it('getInitials', () => {
