@@ -60,9 +60,12 @@ internal static class TimeEntryHistory
     }
 
     /// <summary>The history rows, once the entries have their ids.</summary>
-    public static IEnumerable<TimeEntryChange> Rows(IEnumerable<Pending> pending, int? changedByUserId) =>
+    public static IEnumerable<TimeEntryChange> Rows(IEnumerable<Pending> pending, int? changedByUserId,
+        IReadOnlySet<TimeEntry>? inClosedPeriod = null, string? reason = null) =>
         pending.Select(p => new TimeEntryChange
         {
+            InClosedPeriod = inClosedPeriod?.Contains(p.Entry) == true,
+            Reason = inClosedPeriod?.Contains(p.Entry) == true ? reason : null,
             TimeEntryId = p.Entry.Id,
             UserId = p.Entry.UserId,
             OrganizationId = p.Entry.OrganizationId,

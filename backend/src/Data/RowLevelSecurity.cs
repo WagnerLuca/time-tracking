@@ -25,6 +25,25 @@ public sealed class RlsContext
 
     public bool IsSystem => _http.HttpContext == null && _actingUserId == null;
 
+    /// <summary>The signed-in caller (not a user the code acts for, like the terminal's member).</summary>
+    public int? AuthenticatedUserId => _actingUserId == null ? UserId : null;
+
+    /// <summary>
+    /// Why an org admin changes a closed month (issue #57): the <c>X-Change-Reason</c> header,
+    /// URL-encoded by the client so any text fits a header; trimmed, null when empty.
+    /// </summary>
+    public string? ChangeReason
+    {
+        get
+        {
+            var raw = _http.HttpContext?.Request.Headers["X-Change-Reason"].ToString();
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            var text = Uri.UnescapeDataString(raw).Trim();
+            if (text.Length == 0) return null;
+            return text.Length > Services.ClosedPeriods.MaxReasonLength ? text[..Services.ClosedPeriods.MaxReasonLength] : text;
+        }
+    }
+
     public int? UserId =>
         _actingUserId
         ?? (int.TryParse(_http.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null);

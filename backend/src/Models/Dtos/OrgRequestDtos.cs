@@ -27,6 +27,8 @@ public record OrgRequestResponse
     public string? ResponseReason { get; init; }
     public int? GroupId { get; init; }
     public string? GroupName { get; init; }
+    /// <summary>Pending only: the first closed month approving it would change (only org admins may approve it, with a reason).</summary>
+    public DateOnly? ClosedMonth { get; init; }
 }
 
 /// <summary>Request payload for creating a new organization request.</summary>

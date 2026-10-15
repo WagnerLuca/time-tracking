@@ -34,6 +34,12 @@ public class TimeEntryChange
     /// <summary>JSON array of <c>{ field, oldValue, newValue }</c> (values as invariant strings, times as ISO 8601 UTC).</summary>
     public required string Changes { get; set; }
 
+    /// <summary>The change was made by an org admin inside a closed month (issue #57).</summary>
+    public bool InClosedPeriod { get; set; }
+
+    /// <summary>The reason the admin gave for changing a closed month.</summary>
+    public string? Reason { get; set; }
+
     public User User { get; set; } = null!;
     public User? ChangedByUser { get; set; }
 }

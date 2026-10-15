@@ -25,6 +25,22 @@ public class ExceptionHandlingMiddleware
         {
             await _next(context);
         }
+        catch (Services.PeriodClosedException ex)
+        {
+            // A refused write into a closed month (ClosedPeriods): an expected answer, not a fault
+            _logger.LogInformation("Refused {Method} {Path}: {Message}", context.Request.Method, context.Request.Path, ex.Message);
+            var problem = new ProblemDetails
+            {
+                Type = "https://httpstatuses.io/409",
+                Title = "Conflict",
+                Status = StatusCodes.Status409Conflict,
+                Detail = ex.Message,
+                Instance = context.Request.Path,
+                Extensions = { ["code"] = ex.Code, ["month"] = ex.Month.ToString("yyyy-MM") }
+            };
+            context.Response.StatusCode = StatusCodes.Status409Conflict;
+            await context.Response.WriteAsJsonAsync(problem, (System.Text.Json.JsonSerializerOptions?)null, "application/problem+json");
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception on {Method} {Path}", context.Request.Method, context.Request.Path);

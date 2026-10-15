@@ -350,7 +350,7 @@ public class AuthService : IAuthService
             EntryChanges = await _context.TimeEntryChanges.IgnoreQueryFilters().AsNoTracking()
                 .Where(c => c.UserId == userId)
                 .OrderBy(c => c.ChangedAt)
-                .Select(c => new PersonalEntryChange(c.TimeEntryId, c.ChangedAt, c.Kind.ToString(), c.ChangedByUserId == userId, c.Changes))
+                .Select(c => new PersonalEntryChange(c.TimeEntryId, c.ChangedAt, c.Kind.ToString(), c.ChangedByUserId == userId, c.Changes, c.Reason))
                 .ToListAsync()
         });
     }

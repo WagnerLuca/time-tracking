@@ -397,20 +397,30 @@ public class ApiKeyService : IApiKeyService
             return await RejectAsync(punch, ServiceResult.Conflict<PunchResponse>("A timer is running outside this organization. Stop it in the app first."));
 
         ServiceResult<TimeEntryResponse> result;
-        if (running != null)
+        try
         {
-            punch.Result = PunchResult.Stopped;
-            result = await _timeTracking.StopAsync(userId, null, scannedAt);
+            if (running != null)
+            {
+                punch.Result = PunchResult.Stopped;
+                result = await _timeTracking.StopAsync(userId, null, scannedAt);
+            }
+            else if (scannedAt != null && await FindFailureAsync(userId, key.OrganizationId, at) is { } failure)
+            {
+                punch.Result = PunchResult.ClosedFailure;
+                result = await CloseFailureAsync(failure, at);
+            }
+            else
+            {
+                punch.Result = PunchResult.Started;
+                result = await _timeTracking.StartAsync(userId, new StartTimeEntryRequest { OrganizationId = key.OrganizationId }, scannedAt, TimeEntrySource.Terminal);
+            }
         }
-        else if (scannedAt != null && await FindFailureAsync(userId, key.OrganizationId, at) is { } failure)
+        catch (PeriodClosedException closed)
         {
-            punch.Result = PunchResult.ClosedFailure;
-            result = await CloseFailureAsync(failure, at);
-        }
-        else
-        {
-            punch.Result = PunchResult.Started;
-            result = await _timeTracking.StartAsync(userId, new StartTimeEntryRequest { OrganizationId = key.OrganizationId }, scannedAt, TimeEntrySource.Terminal);
+            // A queued scan into a closed month (ClosedPeriods): drop the staged entry, log the refusal
+            foreach (var staged in _context.ChangeTracker.Entries<TimeEntry>().Where(e => e.State != EntityState.Unchanged).ToList())
+                staged.State = EntityState.Detached;
+            result = ServiceResult.Conflict<TimeEntryResponse>(closed.Message, closed.Code);
         }
 
         if (!result.IsSuccess)

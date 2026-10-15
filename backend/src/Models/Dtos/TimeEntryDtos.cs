@@ -154,6 +154,9 @@ public record TimeEntryChangeResponse
     /// <summary>Created, Updated, Deleted or ApprovedRequest.</summary>
     public required string Kind { get; init; }
     public required List<TimeEntryFieldChangeResponse> Changes { get; init; }
+    /// <summary>An org admin changed the entry inside a closed month (issue #57), with <see cref="Reason"/>.</summary>
+    public bool InClosedPeriod { get; init; }
+    public string? Reason { get; init; }
 }
 
 /// <summary>A field before/after a change. Times are ISO 8601 UTC, numbers invariant, null = not set.</summary>

@@ -28,5 +28,5 @@ public record PersonalTimeEntry(string? Organization, DateTime StartTime, DateTi
 public record PersonalAbsence(string Organization, DateOnly Date, string Type, bool IsHalfDay, string? Note);
 public record PersonalRequest(string Organization, string Type, string Status, string? Message, string? RequestData, DateTime CreatedAt, DateTime? RespondedAt);
 /// <summary>Changes is the stored JSON array of {field, oldValue, newValue}.</summary>
-public record PersonalEntryChange(int TimeEntryId, DateTime ChangedAt, string Kind, bool ChangedByYou, string Changes);
+public record PersonalEntryChange(int TimeEntryId, DateTime ChangedAt, string Kind, bool ChangedByYou, string Changes, string? Reason = null);
 public record PersonalNotification(string Title, string Message, DateTime CreatedAt, bool IsRead);

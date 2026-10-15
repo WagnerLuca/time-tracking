@@ -53,6 +53,8 @@ public record OrganizationDetailResponse
     public int TerminalUnknownCardLimit { get; init; } = TerminalLimits.DefaultUnknownCardLimit;
     public DateTime? SettingsUpdatedAt { get; init; }
     public DateTime CreatedAt { get; init; }
+    /// <summary>Closed months (first day each, org-local; issue #57): only org admins change entries, absences and schedules there.</summary>
+    public List<DateOnly> ClosedMonths { get; init; } = new();
     public required List<OrganizationMemberResponse> Members { get; init; }
     public List<PauseRuleResponse>? PauseRules { get; init; }
 }

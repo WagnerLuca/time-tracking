@@ -395,6 +395,8 @@ public class TimeTrackingService : ITimeTrackingService
             ChangedByName = NameVisible(c.Change) ? c.ChangedByName : null,
             ChangedAt = c.Change.ChangedAt,
             Kind = c.Change.Kind.ToString(),
+            InClosedPeriod = c.Change.InClosedPeriod,
+            Reason = c.Change.Reason,
             Changes = TimeEntryHistory.Parse(c.Change.Changes)
                 .Select(f => new TimeEntryFieldChangeResponse { Field = f.Field, OldValue = f.OldValue, NewValue = f.NewValue })
                 .ToList()

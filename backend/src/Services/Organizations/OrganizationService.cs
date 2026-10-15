@@ -96,6 +96,7 @@ public class OrganizationService : IOrganizationService
                 TerminalUnknownCardLimit = o.TerminalUnknownCardLimit,
                 SettingsUpdatedAt = o.SettingsUpdatedAt,
                 CreatedAt = o.CreatedAt,
+                ClosedMonths = _context.ClosedPeriods.Where(p => p.OrganizationId == o.Id).OrderBy(p => p.Month).Select(p => p.Month).ToList(),
                 Members = o.UserOrganizations
                     .Select(uo => new OrganizationMemberResponse
                     {

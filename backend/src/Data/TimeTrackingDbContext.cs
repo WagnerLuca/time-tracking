@@ -46,6 +46,8 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<OrgInvitation> OrgInvitations { get; set; }
     public DbSet<TimeEntryChange> TimeEntryChanges { get; set; }
     public DbSet<CoreHoursCheck> CoreHoursChecks { get; set; }
+    public DbSet<ClosedPeriod> ClosedPeriods { get; set; }
+    public DbSet<ClosedPeriodEvent> ClosedPeriodEvents { get; set; }
 
     /// <summary>
     /// Saves, and records every change a user made to a finished time entry in
@@ -55,14 +57,18 @@ public class TimeTrackingDbContext : DbContext
     /// </summary>
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
-        var pending = _rls is { IsSystem: false } ? TimeEntryHistory.Capture(this, EntryChangeKindOverride) : [];
+        if (_rls is not { IsSystem: false }) return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+
+        // Closed months (issue #57): throws for members, lets admins through with a reason
+        var closed = await Services.ClosedPeriods.GuardAsync(this, _rls.AuthenticatedUserId, _rls.ChangeReason, cancellationToken);
+        var pending = TimeEntryHistory.Capture(this, EntryChangeKindOverride);
         if (pending.Count == 0) return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
 
         await using var transaction = Database.IsRelational() && Database.CurrentTransaction == null
             ? await Database.BeginTransactionAsync(cancellationToken)
             : null;
         var saved = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-        TimeEntryChanges.AddRange(TimeEntryHistory.Rows(pending, _rls!.UserId));
+        TimeEntryChanges.AddRange(TimeEntryHistory.Rows(pending, _rls.UserId, closed, _rls.ChangeReason));
         await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
         if (transaction != null) await transaction.CommitAsync(cancellationToken);
         return saved;
@@ -502,6 +508,7 @@ public class TimeTrackingDbContext : DbContext
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Changes).IsRequired();
+            entity.Property(e => e.Reason).HasMaxLength(Services.ClosedPeriods.MaxReasonLength);
             entity.HasIndex(e => new { e.TimeEntryId, e.ChangedAt });
             entity.HasOne(e => e.User)
                 .WithMany()
@@ -578,6 +585,27 @@ public class TimeTrackingDbContext : DbContext
                 .HasForeignKey(e => e.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasQueryFilter(e => e.Organization.IsActive);
+        });
+
+        modelBuilder.Entity<ClosedPeriod>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.OrganizationId, e.Month }).IsUnique();
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.ClosedByUserId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasQueryFilter(e => e.Organization.IsActive);
+        });
+
+        modelBuilder.Entity<ClosedPeriodEvent>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Reason).HasMaxLength(Services.ClosedPeriods.MaxReasonLength);
+            entity.Property(e => e.Summary).HasMaxLength(200);
+            entity.HasIndex(e => new { e.OrganizationId, e.At });
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(e => e.MemberUser).WithMany().HasForeignKey(e => e.MemberUserId).OnDelete(DeleteBehavior.SetNull);
             entity.HasQueryFilter(e => e.Organization.IsActive);
         });
 

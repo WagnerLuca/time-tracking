@@ -13,10 +13,12 @@ public class RequestService : IRequestService
     private readonly IEmailSender _email;
     private readonly EmailSettings _emailSettings;
     private readonly ILogger<RequestService> _logger;
+    private readonly RlsContext _rls;
 
-    public RequestService(TimeTrackingDbContext context, IEmailSender email, EmailSettings emailSettings, ILogger<RequestService> logger)
+    public RequestService(TimeTrackingDbContext context, IEmailSender email, EmailSettings emailSettings, ILogger<RequestService> logger, RlsContext rls)
     {
         _context = context;
+        _rls = rls;
         _email = email;
         _emailSettings = emailSettings;
         _logger = logger;
@@ -82,8 +84,14 @@ public class RequestService : IRequestService
 
             // Absence requests from users who can themselves approve absences are auto-approved.
             // The request is still recorded for a complete audit trail.
-            if (request.Type == RequestType.RequestAbsence
-                && await EffectiveRuleResolver.CanApproveAbsencesAsync(_context, org.Id, userId))
+            var autoApprove = request.Type == RequestType.RequestAbsence
+                && await EffectiveRuleResolver.CanApproveAbsencesAsync(_context, org.Id, userId);
+            await ClosedPeriods.EnsureRequestOpenAsync(_context, org, userId, new OrgRequest
+            {
+                OrganizationId = org.Id, UserId = userId, Type = request.Type,
+                RelatedEntityId = request.RelatedEntityId, RequestData = request.RequestData
+            }, autoApprove, _rls.ChangeReason);
+            if (autoApprove)
             {
                 var autoApproved = new OrgRequest
                 {
@@ -176,7 +184,7 @@ public class RequestService : IRequestService
 
         return ServiceResult.Ok(new PaginatedResponse<OrgRequestResponse>
         {
-            Items = requests.Select(r => MapToResponse(r, org.Name, org.Slug)).ToList(),
+            Items = await WithClosedMonthsAsync(requests, requests.Select(r => MapToResponse(r, org.Name, org.Slug))),
             TotalCount = totalCount,
             Limit = limit,
             Offset = offset
@@ -348,7 +356,7 @@ public class RequestService : IRequestService
 
         return ServiceResult.Ok(new PaginatedResponse<OrgRequestResponse>
         {
-            Items = items,
+            Items = await WithClosedMonthsAsync(requests, items),
             TotalCount = totalCount,
             Limit = limit,
             Offset = offset
@@ -411,8 +419,8 @@ public class RequestService : IRequestService
         return ServiceResult.Ok(new AdminNotificationResponse
         {
             PendingRequests = pendingRequests.Count,
-            Requests = pendingRequests.Select(r =>
-                MapToResponse(r, r.Organization.Name, r.Organization.Slug)).ToList()
+            Requests = await WithClosedMonthsAsync(pendingRequests, pendingRequests.Select(r =>
+                MapToResponse(r, r.Organization.Name, r.Organization.Slug)))
         });
     }
 
@@ -723,6 +731,13 @@ public class RequestService : IRequestService
 
         _logger.LogInformation("CSV import approved: {Count} entries created for user {UserId} in org {OrgId}",
             imported, userId, org.Id);
+    }
+
+    /// <summary>Marks the pending requests that would change a closed month (the hint in the inbox).</summary>
+    private async Task<List<OrgRequestResponse>> WithClosedMonthsAsync(List<OrgRequest> requests, IEnumerable<OrgRequestResponse> mapped)
+    {
+        var closed = await ClosedPeriods.TouchedByRequestsAsync(_context, requests);
+        return mapped.Select(m => closed.TryGetValue(m.Id, out var month) ? m with { ClosedMonth = month } : m).ToList();
     }
 
     private static OrgRequestResponse MapToResponse(
