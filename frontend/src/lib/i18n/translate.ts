@@ -55,7 +55,7 @@ function isPlural(value: unknown): value is Plural {
  * rather than an empty gap.
  */
 export function translate<L extends string>(
-	dicts: Record<L, unknown>,
+	dicts: Partial<Record<L, unknown>>,
 	locale: L,
 	fallback: L,
 	key: string,
@@ -69,7 +69,7 @@ export function translate<L extends string>(
 }
 
 export function translatePlural<L extends string>(
-	dicts: Record<L, unknown>,
+	dicts: Partial<Record<L, unknown>>,
 	locale: L,
 	fallback: L,
 	key: string,

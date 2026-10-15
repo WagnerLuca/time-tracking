@@ -1,6 +1,6 @@
 import { locale } from '$lib/stores/locale.svelte';
-import { de, type Dictionary } from './de';
-import { en } from './en';
+import type { Dictionary } from './de';
+import { dictionaries } from './dictionaries';
 import { translate, translatePlural, type LeafPaths, type Params, type PluralPaths } from './translate';
 
 /**
@@ -8,16 +8,16 @@ import { translate, translatePlural, type LeafPaths, type Params, type PluralPat
  * hardcode either language. Both functions read `locale.current`, so every
  * template expression using them re-renders when the language is toggled.
  *
- * Where to add a string: the namespace module in `messages/` that matches the
- * page/component (both `de` and `en` in the same file; `en` is typed against
- * `de`, so a missing English key is a type error). Counted strings use a
- * `{ one, other }` entry and `tp()`.
+ * Where to add a string: the namespace folder in `messages/` that matches the
+ * page/component — `messages/<ns>/de.ts` and `messages/<ns>/en.ts` (`en` is
+ * typed against `de`, so a missing English key is a type error). Counted
+ * strings use a `{ one, other }` entry and `tp()`. Only German is bundled; the
+ * English dictionary is loaded on demand (`dictionaries.ts`) and falls back
+ * to German, then to the key, until it is there.
  */
 export type MessageKey = LeafPaths<Dictionary>;
 export type PluralKey = PluralPaths<Dictionary>;
 export type { Params };
-
-const dictionaries = { de, en };
 
 export function t(key: MessageKey, params?: Params): string {
 	return translate(dictionaries, locale.current, 'de', key, params);

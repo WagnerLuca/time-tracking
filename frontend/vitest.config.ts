@@ -8,6 +8,8 @@ export default defineConfig({
 	test: {
 		include: ['src/**/*.test.ts'],
 		env: { TZ: 'Europe/Berlin' },
+		// English loaded up front, so tests can switch languages synchronously (see the file)
+		setupFiles: ['src/test-setup.ts'],
 		coverage: {
 			provider: 'v8',
 			reporter: ['text', 'text-summary', 'json-summary', 'lcov', 'html'],

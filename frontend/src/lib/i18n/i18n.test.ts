@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { locale } from '$lib/stores/locale.svelte';
 import { t, tp } from './index';
 import { de } from './de';
@@ -110,5 +110,34 @@ describe('app dictionaries', () => {
 			}
 		}
 		expect(missing).toEqual([]);
+	});
+});
+
+describe('loading on demand', () => {
+	afterEach(() => {
+		vi.doUnmock('./en');
+		vi.resetModules();
+	});
+
+	it('the English dictionary is not imported at startup in German, only on switching', async () => {
+		vi.resetModules(); // a fresh app: the test setup preloads English into the shared modules
+		let imported = 0;
+		vi.doMock('./en', async (importOriginal) => {
+			imported++;
+			return importOriginal();
+		});
+		const { locale } = await import('$lib/stores/locale.svelte');
+		const { t } = await import('./index');
+		const { isLoaded } = await import('./dictionaries');
+		expect(locale.current).toBe('de');
+		expect(t('common.save')).toBe('Speichern');
+		expect(imported).toBe(0);
+		expect(isLoaded('en')).toBe(false);
+
+		await locale.set('en');
+		expect(imported).toBe(1);
+		expect(t('common.save')).toBe('Save');
+		await locale.set('de');
+		expect(t('common.save')).toBe('Speichern');
 	});
 });

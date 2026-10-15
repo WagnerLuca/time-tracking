@@ -210,7 +210,7 @@ describe('locale store', () => {
 	it('blocked storage falls back to German and set() still switches', async () => {
 		const { locale, doc } = await load(blockedStorage);
 		expect(locale.current).toBe('de');
-		locale.set('en');
+		await locale.set('en');
 		expect(locale.current).toBe('en');
 		expect(doc.documentElement.lang).toBe('en');
 	});
@@ -218,7 +218,7 @@ describe('locale store', () => {
 	it('set() / toggle() persist and update <html lang>', async () => {
 		const storage = memoryStorage();
 		const { locale, doc } = await load(storage);
-		locale.toggle();
+		await locale.toggle();
 		expect(locale.current).toBe('en');
 		expect(storage.map.get('wl-locale')).toBe('en');
 		expect(doc.documentElement.lang).toBe('en');
@@ -226,5 +226,25 @@ describe('locale store', () => {
 		expect(locale.current).toBe('de');
 		expect(storage.map.get('wl-locale')).toBe('de');
 		expect(doc.documentElement.lang).toBe('de');
+	});
+
+	it('set() waits for the dictionary; a later choice wins over a slow load', async () => {
+		const { locale } = await load(memoryStorage());
+		const english = locale.set('en');
+		expect(locale.current).toBe('de'); // not before English is there
+		await locale.set('de');
+		await english;
+		expect(locale.current).toBe('de');
+	});
+
+	it('a dictionary that fails to load keeps the current language', async () => {
+		vi.doMock('$lib/i18n/dictionaries', () => ({ isLoaded: () => false, loadDictionary: () => Promise.reject(new Error('stale chunk')) }));
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const { locale } = await load(memoryStorage());
+		await locale.set('en');
+		expect(locale.current).toBe('de');
+		expect(error).toHaveBeenCalled();
+		vi.doUnmock('$lib/i18n/dictionaries');
+		error.mockRestore();
 	});
 });

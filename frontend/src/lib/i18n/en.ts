@@ -1,3 +1,4 @@
+/** English, loaded on demand by `dictionaries.ts` — never import this file statically (it would land in the initial bundle). */
 import { en as common } from './messages/common/en';
 import { en as format } from './messages/format/en';
 import { en as nav } from './messages/nav/en';
