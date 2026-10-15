@@ -7,7 +7,7 @@ namespace TimeTracking.Api.Services;
 /// </summary>
 public interface IAbsenceDayService
 {
-    Task<ServiceResult<PaginatedResponse<AbsenceDayResponse>>> GetAbsencesAsync(string slug, int callerUserId, int? userId, DateOnly? from, DateOnly? to, int limit, int offset);
+    Task<ServiceResult<PaginatedResponse<AbsenceDayResponse>>> GetAbsencesAsync(string slug, int callerUserId, int? userId, DateOnly? from, DateOnly? to, int limit, int offset, int? groupId = null);
     Task<ServiceResult<AbsenceDayResponse>> CreateAbsenceAsync(string slug, int userId, CreateAbsenceDayRequest request);
     Task<ServiceResult<AbsenceDayResponse>> AdminCreateAbsenceAsync(string slug, int callerUserId, AdminCreateAbsenceDayRequest request);
     /// <summary>All weekdays of a range, all or nothing (own absences, self-service rule applies).</summary>

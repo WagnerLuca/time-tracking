@@ -24,6 +24,7 @@ public interface IOrganizationService
 
     // ── Team overview (dashboard) ──
     Task<ServiceResult<TeamOverviewResponse>> GetTeamOverviewAsync(string slug, int callerUserId);
+    Task<ServiceResult<OrgChartResponse>> GetOrgChartAsync(string slug, int callerUserId);
 
     // ── Time overview (admin) ──
     Task<ServiceResult<List<MemberTimeOverviewResponse>>> GetTimeOverviewAsync(string slug, int callerUserId, DateTime? from, DateTime? to);

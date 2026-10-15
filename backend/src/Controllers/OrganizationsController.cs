@@ -144,6 +144,21 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.GetTeamOverviewAsync(slug, userId.Value));
     }
 
+    /// <summary>
+    /// The Organigramm: the organization's groups (with parent ids and whether the caller may manage them) and every
+    /// person the caller may see, with direct memberships (leads marked), presence and the visible kinds of information —
+    /// per the member visibility matrix, hidden people are left out. Open to every member.
+    /// </summary>
+    [HttpGet("{slug}/org-chart")]
+    [RequireOrgRole]
+    [ProducesResponseType(typeof(OrgChartResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOrgChart(string slug)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.GetOrgChartAsync(slug, userId.Value));
+    }
+
     /// <summary>Get time tracking overview for visible members (admin or group admin).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="from">Start of date range filter.</param>

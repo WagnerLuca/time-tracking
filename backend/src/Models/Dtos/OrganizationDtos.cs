@@ -332,3 +332,41 @@ public record TeamMemberResponse
     /// <summary>Today's core working hours check found a violation that still holds; needs TrackedTime.</summary>
     public bool? CoreHoursViolationToday { get; init; }
 }
+
+/// <summary>
+/// The Organigramm (issue #66): the organization's active groups and the people the caller may see, in one
+/// response. The frontend builds the tree (organization → groups → sub-groups → people) from the parent ids and
+/// each person's direct memberships. Hidden people are left out entirely; every nullable value is null where
+/// the member visibility matrix hides it. The balance is not part of it — the person card loads it from
+/// GET members/{id}/balance when <c>TrackedTime</c> is in <see cref="OrgChartPersonResponse.VisibleInfo"/>.
+/// </summary>
+public record OrgChartResponse
+{
+    public required string OrganizationName { get; init; }
+    public List<OrgChartGroupResponse> Groups { get; init; } = new();
+    public List<OrgChartPersonResponse> People { get; init; } = new();
+}
+
+/// <param name="CanManageMembers">The caller may manage this group's members (org admin, or a lead of it or an ancestor with member management).</param>
+public record OrgChartGroupResponse(int Id, string Name, string? Description, string? Color, int? ParentGroupId, bool CanManageMembers);
+
+/// <summary>One person of the chart (always with name and org role, like every list showing people).</summary>
+public record OrgChartPersonResponse
+{
+    public int UserId { get; init; }
+    public required string FirstName { get; init; }
+    public required string LastName { get; init; }
+    public string? ProfileImageUrl { get; init; }
+    public required string Role { get; init; }
+    /// <summary>Needs Email.</summary>
+    public string? Email { get; init; }
+    /// <summary>The person's direct active groups (leads marked); null = the caller may not see the groups (the person sits in a node of their own).</summary>
+    public List<OrgChartMembershipResponse>? Groups { get; init; }
+    /// <summary>A timer runs in this organization right now (the team overview's rule: failure entries never count); needs Presence.</summary>
+    public bool? Present { get; init; }
+    public DateTime? PresentSince { get; init; }
+    /// <summary>The kinds of information the caller may see about the person (like the org detail's members).</summary>
+    public List<string> VisibleInfo { get; init; } = new();
+}
+
+public record OrgChartMembershipResponse(int GroupId, bool IsLead);

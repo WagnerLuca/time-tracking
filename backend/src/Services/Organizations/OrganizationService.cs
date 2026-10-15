@@ -686,8 +686,7 @@ public class OrganizationService : IOrganizationService
         var today = clock.Today();
         var entries = await DailyReportAggregator.LoadEntriesAsync(_context, org.Id,
             timeIds.Union(presenceIds).ToList(), clock.StartOfDayUtc(today.AddDays(1)));
-        var running = entries.Where(e => e.IsRunning && !e.IsFailure)
-            .GroupBy(e => e.UserId).ToDictionary(g => g.Key, g => g.Min(e => e.StartTime));
+        var running = RunningSince(entries);
         var failures = entries.Where(e => e.IsFailure).GroupBy(e => e.UserId).ToDictionary(g => g.Key, g => g.Count());
         var balances = await DailyReportAggregator.BalancesAsync(_context, org,
             members.Where(m => timeIds.Contains(m.UserId)).ToDictionary(m => m.UserId, m => m.InitialOvertimeHours),
@@ -713,6 +712,75 @@ public class OrganizationService : IOrganizationService
                     PresentSince = present == true ? running[m.UserId] : null,
                     FailureCount = times ? failures.GetValueOrDefault(m.UserId) : null,
                     CoreHoursViolationToday = times ? violations.ContainsKey(m.UserId) : null
+                };
+            }).ToList()
+        });
+    }
+
+    /// <summary>Presence (team overview, Organigramm): who runs a timer right now, since when — failure entries never count.</summary>
+    private static Dictionary<int, DateTime> RunningSince(IEnumerable<TimeEntry> entries) =>
+        entries.Where(e => e.IsRunning && !e.IsFailure).GroupBy(e => e.UserId).ToDictionary(g => g.Key, g => g.Min(e => e.StartTime));
+
+    // ────────────────────────────────────────────────────
+    //  Organigramm (issue #66)
+    // ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Groups (with parents) and every person the caller may see, with their direct memberships and presence —
+    /// 5 queries however large the organization: org, the matrix (members + group tree), names, running timers.
+    /// Balances are not computed here (that would be the team overview's 4 extra queries over everyone's whole
+    /// history on each open); the person card asks the balance endpoint for the one person clicked.
+    /// </summary>
+    public async Task<ServiceResult<OrgChartResponse>> GetOrgChartAsync(string slug, int callerUserId)
+    {
+        var org = await _context.FindOrgBySlugAsync(slug);
+        if (org == null)
+            return ServiceResult.NotFound<OrgChartResponse>("Organization not found");
+
+        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
+        var tree = visibility.Tree;
+        var visibleIds = visibility.Ids(MemberInfo.Member);
+        if (!visibleIds.Contains(callerUserId))
+            return ServiceResult.Forbidden<OrgChartResponse>();
+
+        var people = (await _context.UserOrganizations.AsNoTracking()
+                .Where(uo => uo.OrganizationId == org.Id && uo.User.IsActive)
+                .Select(uo => new { uo.UserId, uo.User.FirstName, uo.User.LastName, uo.User.Email, uo.User.ProfileImageUrl, uo.Role })
+                .ToListAsync())
+            .Where(p => visibleIds.Contains(p.UserId))
+            .OrderBy(p => p.LastName).ThenBy(p => p.FirstName)
+            .ToList();
+
+        var presenceIds = people.Select(p => p.UserId).Where(id => visibility.Can(id, MemberInfo.Presence)).ToList();
+        var running = RunningSince(await _context.TimeEntries.AsNoTracking()
+            .Where(e => e.OrganizationId == org.Id && e.IsRunning && presenceIds.Contains(e.UserId))
+            .Select(e => new TimeEntry { UserId = e.UserId, StartTime = e.StartTime, IsRunning = e.IsRunning, IsFailure = e.IsFailure })
+            .ToListAsync());
+
+        return ServiceResult.Ok(new OrgChartResponse
+        {
+            OrganizationName = org.Name,
+            Groups = tree.Groups.OrderBy(g => g.Name).Select(g => new OrgChartGroupResponse(
+                g.Id, g.Name, g.Description, g.Color, tree.ParentOf(g.Id),
+                visibility.CallerIsOrgAdmin || tree.AdministersWith(callerUserId, g.Id, x => x.GroupAdminCanManageMembers == true))).ToList(),
+            People = people.Select(p =>
+            {
+                var can = visibility.Of(p.UserId);
+                var present = can.HasFlag(MemberInfo.Presence) ? running.ContainsKey(p.UserId) : (bool?)null;
+                return new OrgChartPersonResponse
+                {
+                    UserId = p.UserId,
+                    FirstName = p.FirstName,
+                    LastName = p.LastName,
+                    ProfileImageUrl = p.ProfileImageUrl,
+                    Role = p.Role.ToString(),
+                    Email = can.HasFlag(MemberInfo.Email) ? p.Email : null,
+                    Groups = can.HasFlag(MemberInfo.Groups)
+                        ? tree.MembershipsOf(p.UserId).Select(m => new OrgChartMembershipResponse(m.GroupId, m.Role == GroupRole.Admin)).ToList()
+                        : null,
+                    Present = present,
+                    PresentSince = present == true ? running[p.UserId] : null,
+                    VisibleInfo = MemberVisibility.Kinds.Where(k => can.HasFlag(k)).Select(k => k.ToString()).ToList()
                 };
             }).ToList()
         });

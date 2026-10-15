@@ -17,7 +17,7 @@ public class AbsenceDayService : IAbsenceDayService
     }
 
     public async Task<ServiceResult<PaginatedResponse<AbsenceDayResponse>>> GetAbsencesAsync(
-        string slug, int callerUserId, int? filterUserId, DateOnly? from, DateOnly? to, int limit, int offset)
+        string slug, int callerUserId, int? filterUserId, DateOnly? from, DateOnly? to, int limit, int offset, int? groupId = null)
     {
         var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
@@ -48,6 +48,18 @@ public class AbsenceDayService : IAbsenceDayService
         }
         if (filterUserId.HasValue)
             query = query.Where(a => a.UserId == filterUserId.Value);
+        if (groupId is { } gid)
+        {
+            // "Gruppenkalender": the group and its sub-groups; only people whose groups the caller may see,
+            // so the filter never reveals a hidden membership
+            var tree = visibility.Tree;
+            if (tree.Find(gid) is null)
+                return ServiceResult.NotFound<PaginatedResponse<AbsenceDayResponse>>("Group not found.");
+            var groupMemberIds = tree.Subtree(gid).SelectMany(id => tree.Find(id)!.Members).Select(m => m.UserId)
+                .Where(id => callerIsAdmin || visibility.Can(id, MemberInfo.Member | MemberInfo.Groups))
+                .Distinct().ToList();
+            query = query.Where(a => groupMemberIds.Contains(a.UserId));
+        }
 
         if (from.HasValue) query = query.Where(a => a.Date >= from.Value);
         if (to.HasValue)   query = query.Where(a => a.Date <= to.Value);

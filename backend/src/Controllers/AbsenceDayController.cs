@@ -35,16 +35,17 @@ public class AbsenceDayController : OrganizationBaseController
     /// <param name="to">End of date range.</param>
     /// <param name="limit">Max items per page (default 50, max 200).</param>
     /// <param name="offset">Number of items to skip.</param>
+    /// <param name="groupId">Only the members of this group and of its sub-groups (whose groups the caller may see).</param>
     [HttpGet("{slug}/absences")]
     [RequireOrgRole]
     [ProducesResponseType(typeof(PaginatedResponse<AbsenceDayResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAbsences(
         string slug, [FromQuery] int? userId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to,
-        [FromQuery] int limit = 50, [FromQuery] int offset = 0)
+        [FromQuery] int limit = 50, [FromQuery] int offset = 0, [FromQuery] int? groupId = null)
     {
         var callerId = GetCurrentUserId();
         if (callerId == null) return Unauthorized();
-        return ToResponse(await _service.GetAbsencesAsync(slug, callerId.Value, userId, from, to, limit, offset));
+        return ToResponse(await _service.GetAbsencesAsync(slug, callerId.Value, userId, from, to, limit, offset, groupId));
     }
 
     /// <summary>Create an absence day for the current user (members only).</summary>
