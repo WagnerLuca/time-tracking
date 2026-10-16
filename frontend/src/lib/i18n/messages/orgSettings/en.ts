@@ -128,6 +128,7 @@ export const en: typeof de = {
 		saved: 'Pause rule saved.',
 		saveFailed: 'Could not save the pause rule.',
 		deleteTitle: 'Delete pause rule?',
+		capHint: 'Never more than the time beyond the threshold is deducted: 6 h 15 min with “≥ 6 h → 30 min” gives 6 h, not 5 h 45 min. With several rules the largest deduction applies; gaps of 15 min or more and manual pauses count.',
 		deleteMessage: '≥ {hours} h tracked → {minutes} min pause',
 		deleteLabel: 'Delete rule',
 		deleted: 'Pause rule deleted.',

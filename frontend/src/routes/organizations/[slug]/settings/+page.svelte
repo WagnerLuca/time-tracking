@@ -593,6 +593,7 @@
 									</li>
 								{/each}
 							</ul>
+							<p class="text-sm text-base-content/60 mt-2">{t('orgSettings.pause.capHint')}</p>
 						{/if}
 					</div>
 				{/if}
@@ -929,6 +930,7 @@
 									<li class="p-2 bg-base-200/50 border border-base-300 rounded-lg text-sm text-base-content/80">{@render pauseRuleText(rule)}</li>
 								{/each}
 							</ul>
+							<p class="text-sm text-base-content/60 mt-2">{t('orgSettings.pause.capHint')}</p>
 						{/if}
 					</div>
 				{/if}

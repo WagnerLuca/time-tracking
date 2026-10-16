@@ -127,6 +127,7 @@ export const de = {
 		saved: 'Pausenregel gespeichert.',
 		saveFailed: 'Pausenregel konnte nicht gespeichert werden.',
 		deleteTitle: 'Pausenregel löschen?',
+		capHint: 'Es wird höchstens die Zeit über der Schwelle abgezogen: 6 h 15 min mit „≥ 6 h → 30 Min.“ ergeben 6 h, nicht 5 h 45 min. Bei mehreren Regeln gilt der größte Abzug; Lücken ab 15 Min. und manuelle Pausen zählen mit.',
 		deleteMessage: '≥ {hours} h erfasst → {minutes} Min. Pause',
 		deleteLabel: 'Regel löschen',
 		deleted: 'Pausenregel gelöscht.',
