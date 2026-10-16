@@ -117,7 +117,25 @@ export const de = {
 		skipped: '{count} übersprungen.',
 		failed: 'Der Import ist fehlgeschlagen.',
 		requestApproval: 'Import-Genehmigung beantragen',
-		approvalHint: 'Ein Admin muss den Import genehmigen, bevor die Zeiteinträge übernommen werden.'
+		approvalHint: 'Ein Admin muss den Import genehmigen, bevor die Zeiteinträge übernommen werden.',
+		formatLabel: 'Format',
+		formats: {
+			auto: 'Automatisch erkennen',
+			standard: 'Standard (Datum, Start, Ende)',
+			evaluation: 'Tagesauswertung (Auswertungen-Export)'
+		},
+		formatsHint:
+			'Erkannt werden diese App (Export „Einzelne Zeiteinträge“), einfache Tabellen mit Datum/Start/Ende (Komma oder Semikolon, Datum als 2026-03-02 oder 02.03.2026) und der Tagesauswertungs-Export („Auswertungen“) eines anderen Zeiterfassungs-Tools.',
+		summary: {
+			format: 'Gelesen als: {format}',
+			employee: 'Daten von {name}',
+			employeeMismatch: 'Die Datei enthält die Zeiten von {name}, nicht deine. Importiert wird immer in dein eigenes Konto.',
+			skippedRows: { one: '{count} Zeile ohne Arbeitszeit übersprungen (z. B. Wochenende, Feiertag, Abwesenheit).', other: '{count} Zeilen ohne Arbeitszeit übersprungen (z. B. Wochenende, Feiertag, Abwesenheit).' },
+			absences: 'Abwesenheiten werden nicht importiert – bitte separat eintragen: {list}.',
+			vacationDays: { one: '{count} Urlaubstag', other: '{count} Urlaubstage' },
+			sickDays: { one: '{count} Krankheitstag', other: '{count} Krankheitstage' },
+			otherAbsenceDays: { one: '{count} Tag mit sonstiger Abwesenheit', other: '{count} Tage mit sonstiger Abwesenheit' }
+		}
 	},
 	request: {
 		title: 'CSV-Import-Genehmigung beantragen',

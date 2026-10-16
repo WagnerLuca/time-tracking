@@ -22,6 +22,7 @@
 	import Modal from '$lib/components/Modal.svelte';
 	import { locale } from '$lib/stores/locale.svelte';
 	import { downloadBlob } from '$lib/utils/download';
+	import { importFormatOptions, importSummary, type ImportFormat, type ImportSummary } from '$lib/utils/csvImport';
 
 	// ── Tab state ──
 	let activeTab = $state<'export' | 'import' | 'report'>('export');
@@ -230,6 +231,8 @@
 	let previewRows = $state<ImportPreviewRow[]>([]);
 	let previewWarnings = $state<string[]>([]);
 	let previewDuplicateCount = $state(0);
+	let previewSummary = $state<ImportSummary>({ notes: [], warnings: [] });
+	let importFormat = $state<ImportFormat>('auto');
 	let selectedRows = $state<Set<number>>(new Set());
 	let showPreview = $state(false);
 	let fileInput = $state<HTMLInputElement>();
@@ -256,6 +259,7 @@
 		previewRows = [];
 		previewWarnings = [];
 		previewDuplicateCount = 0;
+		previewSummary = { notes: [], warnings: [] };
 		selectedRows = new Set();
 	}
 
@@ -274,10 +278,12 @@
 		try {
 			const { data } = await exportImportApi.apiV1ExportImportImportPreviewPost(
 				orgContext.selectedOrgSlug,
+				importFormat,
 				importFile
 			);
 
 			previewRows = data.rows ?? [];
+			previewSummary = importSummary(data);
 			previewWarnings = data.warnings ?? [];
 			previewDuplicateCount = data.duplicateCount ?? 0;
 
@@ -774,6 +780,7 @@
 						<p class="text-sm text-base-content/70">
 							{t('export.import.description', { required: 'Date, Start Time, End Time', optional: 'Pause (min), Description' })}
 						</p>
+						<p class="text-xs text-base-content/70">{t('export.import.formatsHint')}</p>
 
 						{#if !importAllowed}
 							<div class="alert alert-info text-sm py-2">
@@ -803,6 +810,19 @@
 										disabled={importPreviewing || importConfirming}
 									/>
 								</div>
+							</label>
+							<label class="flex flex-col gap-1.5 w-full sm:w-auto">
+								<span class="text-xs font-medium text-base-content/70">{t('export.import.formatLabel')}</span>
+								<select
+									class="select select-sm"
+									bind:value={importFormat}
+									onchange={resetPreview}
+									disabled={importPreviewing || importConfirming}
+								>
+									{#each importFormatOptions() as option (option.value)}
+										<option value={option.value}>{option.label}</option>
+									{/each}
+								</select>
 							</label>
 							<button
 								type="button"
@@ -841,6 +861,22 @@
 									<button type="button" class="btn btn-ghost btn-xs" onclick={deselectAll}>{t('export.import.none')}</button>
 								</div>
 							</div>
+
+							{#if previewSummary.notes.length > 0}
+								<ul class="text-xs text-base-content/70 space-y-0.5">
+									{#each previewSummary.notes as note, i (i)}
+										<li>{note}</li>
+									{/each}
+								</ul>
+							{/if}
+
+							{#if previewSummary.warnings.length > 0}
+								<div class="alert alert-info text-xs py-2 flex-col items-start">
+									{#each previewSummary.warnings as w, i (i)}
+										<p>{w}</p>
+									{/each}
+								</div>
+							{/if}
 
 							{#if previewWarnings.length > 0}
 								<div class="alert alert-warning text-xs py-2 flex-col items-start">

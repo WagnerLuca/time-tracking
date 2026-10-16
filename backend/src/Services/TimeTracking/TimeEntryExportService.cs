@@ -206,7 +206,7 @@ public class TimeEntryExportService : ITimeEntryExportService
     }
 
     public async Task<ServiceResult<ImportPreviewResponse>> PreviewImportAsync(
-        int userId, string orgSlug, byte[] csvData)
+        int userId, string orgSlug, byte[] csvData, string? format = null)
     {
         var org = await _context.Organizations.AsNoTracking()
             .FirstOrDefaultAsync(o => o.Slug == orgSlug);
@@ -218,27 +218,43 @@ public class TimeEntryExportService : ITimeEntryExportService
         if (await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.CsvImport) == RuleMode.Disabled)
             return ServiceResult.Forbidden<ImportPreviewResponse>("CSV import is disabled in this organization.");
 
-        var csvText = Encoding.UTF8.GetString(csvData);
-        var lines = csvText.Split(["\r\n", "\n"], StringSplitOptions.None)
-            .Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
-
-        if (lines.Count < 2)
+        var table = CsvTable.Parse(csvData);
+        if (table == null || table.Rows.Count == 0)
             return ServiceResult.BadRequest<ImportPreviewResponse>("CSV file must have a header row and at least one data row.");
-        if (lines.Count - 1 > EntryTimes.MaxImportRows)
-            return ServiceResult.BadRequest<ImportPreviewResponse>($"A CSV file can hold at most {EntryTimes.MaxImportRows} entries. Split it into several files.");
 
-        var headers = ParseCsvLine(lines[0]).Select(h => h.Trim().ToLowerInvariant()).ToList();
-
-        // English and German headers, so both export languages import again
-        var dateIdx = FindColumnIndex(headers, "date", "datum");
-        var startIdx = FindColumnIndex(headers, "start time", "starttime", "start", "beginn");
-        var endIdx = FindColumnIndex(headers, "end time", "endtime", "end", "ende");
-        var pauseIdx = FindColumnIndex(headers, "pause", "pause (min)", "pause minutes");
-        var descIdx = FindColumnIndex(headers, "description", "notes", "desc", "beschreibung");
-
-        if (dateIdx < 0 || startIdx < 0 || endIdx < 0)
+        // The format: detected from the header row, or the one the caller picked
+        ICsvImportFormat? csvFormat;
+        if (string.IsNullOrWhiteSpace(format) || format.Equals(CsvImportFormats.Auto, StringComparison.OrdinalIgnoreCase))
+            csvFormat = CsvImportFormats.Detect(table);
+        else
+        {
+            csvFormat = CsvImportFormats.Find(format);
+            if (csvFormat == null)
+                return ServiceResult.BadRequest<ImportPreviewResponse>("Unknown import format.");
+            if (!csvFormat.Matches(table))
+                return ServiceResult.BadRequest<ImportPreviewResponse>("The file does not have the columns of the selected import format.");
+        }
+        if (csvFormat == null)
             return ServiceResult.BadRequest<ImportPreviewResponse>(
                 "CSV must contain 'Date', 'Start Time', and 'End Time' columns.");
+
+        var parsed = csvFormat.Parse(table);
+        // The limit counts entries, so a daily export with many days off still fits
+        if (parsed.Rows.Count > EntryTimes.MaxImportRows)
+            return ServiceResult.BadRequest<ImportPreviewResponse>($"A CSV file can hold at most {EntryTimes.MaxImportRows} entries. Split it into several files.");
+        // Members import their own time: a file must not mix several people
+        if (parsed.Employees.Count > 1)
+            return ServiceResult.BadRequest<ImportPreviewResponse>(
+                "The file contains data of several employees. Import one employee per file.");
+
+        string? employeeName = parsed.Employees.Count == 1 ? parsed.Employees[0] : null;
+        bool? employeeMatches = null;
+        if (employeeName != null)
+        {
+            var me = await _context.Users.AsNoTracking().Where(u => u.Id == userId)
+                .Select(u => new { u.FirstName, u.LastName }).FirstAsync();
+            employeeMatches = string.Equals(employeeName, $"{me.FirstName} {me.LastName}".Trim(), StringComparison.OrdinalIgnoreCase);
+        }
 
         var existingEntries = await _context.TimeEntries.AsNoTracking()
             .Where(e => e.UserId == userId && e.OrganizationId == org.Id && !e.IsRunning)
@@ -252,39 +268,24 @@ public class TimeEntryExportService : ITimeEntryExportService
             .ToHashSet();
 
         var rows = new List<ImportPreviewRow>();
-        var warnings = new List<string>();
         var duplicateCount = 0;
 
-        for (var i = 1; i < lines.Count; i++)
+        foreach (var row in parsed.Rows)
         {
-            var fields = ParseCsvLine(lines[i]);
-            if (fields.Count <= dateIdx || fields.Count <= startIdx || fields.Count <= endIdx)
-            {
-                warnings.Add($"Row {i}: insufficient columns, skipped.");
-                continue;
-            }
-
-            var date = fields[dateIdx].Trim();
-            var start = fields[startIdx].Trim();
-            var end = fields[endIdx].Trim();
-            var pause = pauseIdx >= 0 && pauseIdx < fields.Count ? fields[pauseIdx].Trim() : "0";
-            var desc = descIdx >= 0 && descIdx < fields.Count ? fields[descIdx].Trim() : "";
-
-            int.TryParse(pause, out var pauseMins);
-
-            var isDuplicate = existingSet.Contains($"{date}|{start}");
+            var isDuplicate = existingSet.Contains($"{row.Date}|{row.StartTime}");
             if (isDuplicate) duplicateCount++;
 
-            var warning = ParseImportRow(importClock, date, start, end, pauseMins, desc, out _, out _);
+            var warning = row.Warning
+                ?? ParseImportRow(importClock, row.Date, row.StartTime, row.EndTime, row.PauseMinutes, row.Description, out _, out _);
 
             rows.Add(new ImportPreviewRow
             {
-                RowNumber = i,
-                Date = date,
-                StartTime = start,
-                EndTime = end,
-                PauseMinutes = pauseMins,
-                Description = desc,
+                RowNumber = row.RowNumber,
+                Date = row.Date,
+                StartTime = row.StartTime,
+                EndTime = row.EndTime,
+                PauseMinutes = row.PauseMinutes,
+                Description = row.Description,
                 IsDuplicate = isDuplicate,
                 Warning = warning
             });
@@ -295,7 +296,14 @@ public class TimeEntryExportService : ITimeEntryExportService
             Rows = rows,
             TotalRows = rows.Count,
             DuplicateCount = duplicateCount,
-            Warnings = warnings.Count > 0 ? warnings : null
+            Warnings = parsed.Warnings.Count > 0 ? parsed.Warnings : null,
+            Format = csvFormat.Id,
+            SkippedRowCount = parsed.SkippedRowCount,
+            SkippedVacationDays = parsed.VacationDays,
+            SkippedSickDays = parsed.SickDays,
+            SkippedOtherAbsenceDays = parsed.OtherAbsenceDays,
+            EmployeeName = employeeName,
+            EmployeeMatchesUser = employeeMatches
         });
     }
 
@@ -470,59 +478,5 @@ public class TimeEntryExportService : ITimeEntryExportService
         if (value.Contains('"') || value.Contains(',') || value.Contains('\n') || value.Contains('\r'))
             return $"\"{value.Replace("\"", "\"\"")}\"";
         return value;
-    }
-
-    private static int FindColumnIndex(List<string> headers, params string[] names)
-    {
-        foreach (var name in names)
-        {
-            var idx = headers.IndexOf(name.ToLowerInvariant());
-            if (idx >= 0) return idx;
-        }
-        return -1;
-    }
-
-    private static List<string> ParseCsvLine(string line)
-    {
-        var fields = new List<string>();
-        var current = new StringBuilder();
-        var inQuotes = false;
-
-        for (var i = 0; i < line.Length; i++)
-        {
-            var c = line[i];
-            if (inQuotes)
-            {
-                if (c == '"')
-                {
-                    if (i + 1 < line.Length && line[i + 1] == '"')
-                    {
-                        current.Append('"');
-                        i++;
-                    }
-                    else
-                    {
-                        inQuotes = false;
-                    }
-                }
-                else
-                {
-                    current.Append(c);
-                }
-            }
-            else
-            {
-                if (c == '"') { inQuotes = true; }
-                else if (c == ',')
-                {
-                    fields.Add(current.ToString());
-                    current.Clear();
-                }
-                else { current.Append(c); }
-            }
-        }
-
-        fields.Add(current.ToString());
-        return fields;
     }
 }

@@ -100,7 +100,10 @@ export const de = {
 		requiresApproval: 'Der CSV-Import muss genehmigt werden. Bitte stelle eine Anfrage.',
 		empty: 'Die CSV-Datei braucht eine Kopfzeile und mindestens eine Datenzeile.',
 		missingColumns: 'Die CSV-Datei braucht die Spalten Datum, Start und Ende.',
-		tooManyRows: 'Ein Import darf höchstens 1000 Zeilen enthalten.'
+		tooManyRows: 'Ein Import darf höchstens 1000 Zeilen enthalten.',
+		unknownFormat: 'Unbekanntes Import-Format.',
+		formatMismatch: 'Die Datei hat nicht die Spalten des gewählten Formats.',
+		severalEmployees: 'Die Datei enthält Daten mehrerer Personen. Bitte pro Datei nur eine Person importieren.'
 	},
 	request: {
 		duplicate: 'Eine gleiche Anfrage ist bereits offen.',

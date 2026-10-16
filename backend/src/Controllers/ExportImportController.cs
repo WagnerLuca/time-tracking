@@ -71,13 +71,18 @@ public class ExportImportController : OrganizationBaseController
         return File(result.Data!, "text/csv", fileName);
     }
 
-    /// <summary>Preview a CSV file for import (parse and check for duplicates).</summary>
+    /// <summary>
+    /// Preview a CSV file for import (parse and check for duplicates). <c>format</c>: "auto" (default, detected from
+    /// the header row), "standard" (Date / Start / End / Pause / Description columns, this app's export) or
+    /// "evaluation" (daily "Auswertungen" export: work start/stop/break per day; days off and absences are skipped).
+    /// </summary>
     [HttpPost("import/preview")]
     [ProducesResponseType(typeof(ImportPreviewResponse), StatusCodes.Status200OK)]
     [RequestSizeLimit(5_242_880)] // 5 MB
     public async Task<IActionResult> PreviewImport(
         [FromQuery] string orgSlug,
-        IFormFile file)
+        IFormFile file,
+        [FromQuery] string? format = null)
     {
         var userId = GetCurrentUserId();
         if (userId == null) return Unauthorized();
@@ -87,7 +92,7 @@ public class ExportImportController : OrganizationBaseController
 
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
-        var result = await _exportService.PreviewImportAsync(userId.Value, orgSlug, ms.ToArray());
+        var result = await _exportService.PreviewImportAsync(userId.Value, orgSlug, ms.ToArray(), format);
         return ToResponse(result);
     }
 

@@ -93,6 +93,9 @@ public static class ErrorCodes
         ["CSV import requires admin approval in this organization. Please submit a request."] = "import.requiresApproval",
         ["CSV file must have a header row and at least one data row."] = "import.empty",
         ["CSV must contain 'Date', 'Start Time', and 'End Time' columns."] = "import.missingColumns",
+        ["Unknown import format."] = "import.unknownFormat",
+        ["The file does not have the columns of the selected import format."] = "import.formatMismatch",
+        ["The file contains data of several employees. Import one employee per file."] = "import.severalEmployees",
 
         // ── Requests ──
         ["You already have a pending request of this type for this organization."] = "request.duplicate",

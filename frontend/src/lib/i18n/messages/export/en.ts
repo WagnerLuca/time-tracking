@@ -118,7 +118,25 @@ export const en: typeof de = {
 		skipped: 'Skipped {count}.',
 		failed: 'Import failed.',
 		requestApproval: 'Request import approval',
-		approvalHint: 'An admin must approve before the time entries are imported.'
+		approvalHint: 'An admin must approve before the time entries are imported.',
+		formatLabel: 'Format',
+		formats: {
+			auto: 'Detect automatically',
+			standard: 'Standard (date, start, end)',
+			evaluation: 'Daily evaluation ("Auswertungen" export)'
+		},
+		formatsHint:
+			'Supported: this app (export "Individual time entries"), simple sheets with date/start/end (comma or semicolon, dates as 2026-03-02 or 02.03.2026) and the daily evaluation export ("Auswertungen") of another time-tracking tool.',
+		summary: {
+			format: 'Read as: {format}',
+			employee: 'Data of {name}',
+			employeeMismatch: 'The file holds the times of {name}, not yours. The import always goes into your own account.',
+			skippedRows: { one: '{count} row without working time skipped (e.g. weekend, holiday, absence).', other: '{count} rows without working time skipped (e.g. weekend, holiday, absence).' },
+			absences: 'Absences are not imported – please add them separately: {list}.',
+			vacationDays: { one: '{count} vacation day', other: '{count} vacation days' },
+			sickDays: { one: '{count} sick day', other: '{count} sick days' },
+			otherAbsenceDays: { one: '{count} day of other absence', other: '{count} days of other absence' }
+		}
 	},
 	request: {
 		title: 'Request CSV import approval',
