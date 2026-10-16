@@ -619,6 +619,10 @@
 		--badge-color: var(--color-secondary);
 		--badge-fg: var(--color-secondary-content);
 	}
+	.badge-accent {
+		--badge-color: var(--color-accent);
+		--badge-fg: var(--color-accent-content);
+	}
 	.badge-neutral {
 		--badge-color: var(--color-neutral);
 		--badge-fg: var(--color-neutral-content);

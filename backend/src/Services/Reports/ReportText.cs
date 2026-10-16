@@ -120,6 +120,15 @@ public sealed class ReportText
         ["pdf.missing"] = "Missing",
         ["pdf.vac"] = "Vac.",
         ["pdf.holiday"] = "Holiday",
+        ["pdf.accountingTitle"] = "Monthly Summary (Accounting)",
+        ["pdf.member"] = "Member",
+        ["pdf.personnelNo"] = "Pers. no.",
+        ["pdf.otherAbsences"] = "Other",
+        ["pdf.corrections"] = "Correct.",
+        ["pdf.former"] = "left",
+        ["pdf.total"] = "Total",
+        ["pdf.closed"] = "Month closed",
+        ["pdf.open"] = "Month open",
     };
 
     private static readonly Dictionary<string, string> German = new()
@@ -183,6 +192,15 @@ public sealed class ReportText
         ["pdf.missing"] = "Fehlt",
         ["pdf.vac"] = "Url.",
         ["pdf.holiday"] = "Feiert.",
+        ["pdf.accountingTitle"] = "Monatsübersicht (Buchhaltung)",
+        ["pdf.member"] = "Person",
+        ["pdf.personnelNo"] = "Pers.-Nr.",
+        ["pdf.otherAbsences"] = "Sonst.",
+        ["pdf.corrections"] = "Korr.",
+        ["pdf.former"] = "ausgeschieden",
+        ["pdf.total"] = "Summe",
+        ["pdf.closed"] = "Monat abgeschlossen",
+        ["pdf.open"] = "Monat offen",
     };
 
     // Last: static fields initialize in textual order, and these need the dictionaries above

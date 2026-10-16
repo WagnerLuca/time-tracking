@@ -34,6 +34,13 @@ public class UserOrganization
 
     /// <summary>Optional personnel number for payroll (admin-set, unique per organization when set).</summary>
     public string? PersonnelNumber { get; set; }
+
+    /// <summary>
+    /// Accounting role ("Buchhaltung", docs/ACCOUNTING_ROLE_PLAN.md): orthogonal to <see cref="Role"/>.
+    /// Grants the accounting panel (org-wide reports and payroll regardless of <see cref="Organization.MemberTimeEntryVisibility"/>,
+    /// month closing, vacation overview) and nothing else.
+    /// </summary>
+    public bool IsAccountant { get; set; }
     
     // Navigation properties
     [JsonIgnore]

@@ -35,5 +35,6 @@ public interface IOrganizationService
 
     // ── Vacation days (admin) ──
     Task<ServiceResult<MemberPersonnelNumberResponse>> SetMemberPersonnelNumberAsync(string slug, int callerUserId, int userId, SetPersonnelNumberRequest request);
+    Task<ServiceResult<MemberAccountantResponse>> SetMemberAccountantAsync(string slug, int callerUserId, int userId, SetAccountantRequest request);
     Task<ServiceResult<MemberVacationDaysResponse>> SetMemberVacationDaysAsync(string slug, int callerUserId, int userId, SetVacationDaysRequest request);
 }

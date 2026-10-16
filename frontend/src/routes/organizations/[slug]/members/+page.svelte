@@ -150,6 +150,7 @@
 								{#if member.email}<div class="text-sm text-base-content/70 mt-0.5 truncate">{member.email}</div>{/if}
 								<div class="flex gap-x-3 gap-y-1 mt-1.5 flex-wrap items-center text-xs text-base-content/70">
 									{#if member.role}<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>{/if}
+									{#if member.isAccountant}<span class="badge badge-sm badge-accent uppercase tracking-wide" data-testid="accountant-badge">{t('accounting.role')}</span>{/if}
 									{#if member.vacationVisible !== false && (member.vacationDaysPerYear ?? 0) > 0}
 										{@const left = member.vacationDaysRemaining ?? member.vacationDaysPerYear ?? 0}
 										<span title={t('memberList.vacationTitle', { used: formatNumber(member.vacationDaysUsed ?? 0), total: formatNumber(member.vacationDaysPerYear ?? 0) })}>

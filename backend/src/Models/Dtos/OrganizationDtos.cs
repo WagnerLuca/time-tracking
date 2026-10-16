@@ -108,6 +108,8 @@ public record OrganizationMemberResponse
     public bool? IsPresent { get; init; }
     /// <summary>Personnel number for payroll; only filled in for org admins.</summary>
     public string? PersonnelNumber { get; init; }
+    /// <summary>Has the accounting role (sees everybody's figures); shown whenever the person is, like the role.</summary>
+    public bool IsAccountant { get; init; }
     /// <summary>Whether the caller may add, correct and delete this member's time entries (never for themselves).</summary>
     public bool CanCorrectEntries { get; init; }
 }
@@ -126,6 +128,8 @@ public record UserOrganizationResponse
     public string? Description { get; init; }
     public required string Slug { get; init; }
     public required string Role { get; init; }
+    /// <summary>Has the accounting role (Buchhaltung, docs/ACCOUNTING_ROLE_PLAN.md).</summary>
+    public bool IsAccountant { get; init; }
     public DateTime JoinedAt { get; init; }
     public int MemberCount { get; init; }
     public bool Require2fa { get; init; }
@@ -260,6 +264,18 @@ public record MemberPersonnelNumberResponse
 {
     public int UserId { get; init; }
     public string? PersonnelNumber { get; init; }
+}
+
+/// <summary>Grant or revoke the accounting role (docs/ACCOUNTING_ROLE_PLAN.md).</summary>
+public record SetAccountantRequest
+{
+    public bool IsAccountant { get; init; }
+}
+
+public record MemberAccountantResponse
+{
+    public int UserId { get; init; }
+    public bool IsAccountant { get; init; }
 }
 
 /// <summary>Organization settings after an update (rule modes as their string names).</summary>

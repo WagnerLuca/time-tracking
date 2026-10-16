@@ -236,7 +236,33 @@ public static class ClosedPeriods
             .Where(e => ids.Contains(e.Id)).ToDictionaryAsync(e => e.Id, e => e.StartTime);
     }
 
-    private static DateOnly? FirstClosed(List<DateOnly> months, OrgClock clock, OrgRequest r, Dictionary<int, DateTime> entryStarts)
+    /// <summary>
+    /// How many pending requests of the organization would change each of the given months (first days) —
+    /// the accounting panel's warning before closing (same ranges as the guard uses for requests).
+    /// </summary>
+    public static async Task<Dictionary<DateOnly, int>> PendingRequestsPerMonthAsync(TimeTrackingDbContext db, Organization org, IReadOnlyCollection<DateOnly> months)
+    {
+        var pending = await db.OrgRequests.AsNoTracking()
+            .Where(r => r.OrganizationId == org.Id && r.Status == RequestStatus.Pending)
+            .ToListAsync();
+        var result = months.ToDictionary(m => m, _ => 0);
+        if (pending.Count == 0) return result;
+        var clock = OrgClock.For(org);
+        var starts = await EntryStartsAsync(db, pending);
+        foreach (var r in pending)
+        {
+            var ranges = Ranges(clock, r, starts);
+            foreach (var month in months)
+                if (ranges.Any(x => FirstClosed([month], x.From, x.To) != null)) result[month]++;
+        }
+        return result;
+    }
+
+    private static DateOnly? FirstClosed(List<DateOnly> months, OrgClock clock, OrgRequest r, Dictionary<int, DateTime> entryStarts) =>
+        Ranges(clock, r, entryStarts).Select(x => FirstClosed(months, x.From, x.To)).Where(m => m != null).Min();
+
+    /// <summary>The org-local days a request would change (to null = open-ended).</summary>
+    private static List<(DateOnly From, DateOnly? To)> Ranges(OrgClock clock, OrgRequest r, Dictionary<int, DateTime> entryStarts)
     {
         var ranges = new List<(DateOnly From, DateOnly? To)>();
         void Day(DateTime utc) => ranges.Add((clock.LocalDate(utc), clock.LocalDate(utc)));
@@ -271,6 +297,6 @@ public static class ClosedPeriods
         {
             // Invalid data cannot be applied anyway
         }
-        return ranges.Select(x => FirstClosed(months, x.From, x.To)).Where(m => m != null).Min();
+        return ranges;
     }
 }

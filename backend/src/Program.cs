@@ -171,6 +171,7 @@ builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddScoped<ITimeTrackingService, TimeTrackingService>();
 builder.Services.AddScoped<MemberEntryService>();
 builder.Services.AddScoped<ClosedPeriodService>();
+builder.Services.AddScoped<AccountingService>();
 builder.Services.AddScoped<PayrollExportService>();
 builder.Services.AddScoped<ITimeEntryExportService, TimeEntryExportService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();

@@ -8,7 +8,7 @@
 	import { t } from '$lib/i18n';
 	import { organizationsApi, workScheduleApi, absenceDayApi, groupApi } from '$lib/apiClient';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
-	import { isOrgAdmin } from '$lib/utils/orgRules';
+	import { canGrantAccountant, isOrgAdmin } from '$lib/utils/orgRules';
 	import { canSee } from '$lib/utils/visibility';
 	import MemberCalendar from '$lib/components/MemberCalendar.svelte';
 	import SchedulePeriodEditor from '$lib/components/SchedulePeriodEditor.svelte';
@@ -22,6 +22,7 @@
 	import MemberVacation from '$lib/components/member/MemberVacation.svelte';
 	import MemberCards from '$lib/components/member/MemberCards.svelte';
 	import MemberPersonnelNumber from '$lib/components/member/MemberPersonnelNumber.svelte';
+	import MemberAccountant from '$lib/components/member/MemberAccountant.svelte';
 	import type {
 		OrganizationDetailResponse,
 		OrganizationMemberResponse,
@@ -218,6 +219,9 @@
 		{/if}
 		{#if isAdmin}
 			<MemberPersonnelNumber {orgSlug} {member} onchanged={reloadOrg} />
+			{#if canGrantAccountant(myRole, member.role, isSelf)}
+				<MemberAccountant {orgSlug} {member} onchanged={reloadOrg} />
+			{/if}
 			<MemberCards {orgSlug} {memberId} onchanged={reloadOrg} />
 		{/if}
 		{#if canViewSchedule}

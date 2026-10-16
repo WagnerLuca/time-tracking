@@ -18,6 +18,7 @@ export const en: typeof de = {
 		twoFactorRequired: 'This organization requires two-factor authentication. Set it up in your settings to continue.',
 		adminRequired: 'Only organization admins can do that.',
 		ownerRequired: 'Only the organization owner can do that.',
+		accountantRequired: 'Only accounting and organization admins can do that.',
 		slugRequired: 'The organization is missing.',
 		featureDisabled: 'This feature is disabled in the organization.',
 		featureRequiresApproval: 'This needs approval in this organization. Please submit a request.',
@@ -88,7 +89,8 @@ export const en: typeof de = {
 	export: {
 		forbidden: "You may not export this member's data.",
 		orgRequired: 'Select an organization for this export.',
-		payrollAdminOnly: 'Only admins can export payroll data.'
+		payrollAdminOnly: 'Only admins and accounting can export payroll data.',
+		hoursHiddenFromAdmins: "In this organization admins do not see members' working hours (settings). The accounting role does."
 	},
 	import: {
 		disabled: 'CSV import is disabled in this organization.',
@@ -198,5 +200,9 @@ export const en: typeof de = {
 	},
 	network: {
 		offline: 'No connection. Try again once you are back online.'
+	},
+	accounting: {
+		invalidYear: 'The year must be between 2000 and 2100.',
+		ownerOnly: 'Only the owner can change the accounting role of admins or of yourself.'
 	}
 };

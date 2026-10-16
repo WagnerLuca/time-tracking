@@ -23,6 +23,7 @@ public static class Memberships
         {
             existing.IsActive = true;
             existing.Role = role;
+            existing.IsAccountant = false;
             existing.JoinedAt = DateTime.UtcNow;
         }
         else

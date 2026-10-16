@@ -1226,6 +1226,9 @@ namespace TimeTracking.Api.Migrations
                     b.Property<double>("InitialOvertimeHours")
                         .HasColumnType("double precision");
 
+                    b.Property<bool>("IsAccountant")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")

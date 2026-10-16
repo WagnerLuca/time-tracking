@@ -122,6 +122,70 @@ export interface AcceptedInvitationResponse {
     'role': string | null;
 }
 /**
+ * A member\'s month: hours like balances and reports (failure entries count 0), absence days, entries needing correction.
+ */
+export interface AccountingMemberSummary {
+    'userId'?: number;
+    'personnelNumber'?: string | null;
+    'name': string | null;
+    'email': string | null;
+    'targetHours'?: number;
+    'workedHours'?: number;
+    'overtimeHours'?: number;
+    /**
+     * Overtime balance at the end of the month (since the first entry, incl. the initial balance).
+     */
+    'overtimeBalance'?: number;
+    'vacationDays'?: number;
+    'sickDays'?: number;
+    'otherAbsenceDays'?: number;
+    /**
+     * Failure entries (timer not stopped) started in the month: \"Needs Correction\".
+     */
+    'failureEntryCount'?: number;
+    /**
+     * Left the organization, listed because of time or absences in the month.
+     */
+    'isFormerMember'?: boolean;
+}
+export interface AccountingMonthStatus {
+    /**
+     * First day of the month.
+     */
+    'month'?: string;
+    /**
+     * The month is over in the organization\'s time zone (only then it can be closed).
+     */
+    'hasEnded'?: boolean;
+    'isClosed'?: boolean;
+    'closedAt'?: string | null;
+    'closedByName'?: string | null;
+    /**
+     * Failure entries started in the month (still \"Needs Correction\").
+     */
+    'failureEntryCount'?: number;
+    /**
+     * Pending requests that would change the month.
+     */
+    'pendingRequestCount'?: number;
+}
+/**
+ * The months of one year with their closing state and what still needs attention before closing.
+ */
+export interface AccountingMonthsResponse {
+    'year'?: number;
+    'months': Array<AccountingMonthStatus> | null;
+}
+/**
+ * The accounting panel\'s monthly summary: one row per member (docs/ACCOUNTING_ROLE_PLAN.md).
+ */
+export interface AccountingSummaryResponse {
+    'year'?: number;
+    'month'?: number;
+    'isClosed'?: boolean;
+    'members': Array<AccountingMemberSummary> | null;
+}
+/**
  * Add a card to a member: typed in (TimeTracking.Api.Models.Dtos.AddBadgeCardRequest.CardId) or adopted from an unknown scan (TimeTracking.Api.Models.Dtos.AddBadgeCardRequest.FromPunchId).
  */
 export interface AddBadgeCardRequest {
@@ -803,6 +867,10 @@ export interface ManualEntryResponse {
 export interface MarkedSeenResponse {
     'marked'?: number;
 }
+export interface MemberAccountantResponse {
+    'userId'?: number;
+    'isAccountant'?: boolean;
+}
 /**
  * A group a member belongs to, for tag display (e.g. \"Frontend Admin\").
  */
@@ -1107,6 +1175,10 @@ export interface OrganizationMemberResponse {
      * Personnel number for payroll; only filled in for org admins.
      */
     'personnelNumber'?: string | null;
+    /**
+     * Has the accounting role (sees everybody\'s figures); shown whenever the person is, like the role.
+     */
+    'isAccountant'?: boolean;
     /**
      * Whether the caller may add, correct and delete this member\'s time entries (never for themselves).
      */
@@ -1507,6 +1579,12 @@ export const RuleMode = {
 export type RuleMode = typeof RuleMode[keyof typeof RuleMode];
 
 
+/**
+ * Grant or revoke the accounting role (docs/ACCOUNTING_ROLE_PLAN.md).
+ */
+export interface SetAccountantRequest {
+    'isAccountant'?: boolean;
+}
 /**
  * Request payload for setting a member\'s initial overtime hours.
  */
@@ -2061,9 +2139,40 @@ export interface UserOrganizationResponse {
     'description'?: string | null;
     'slug': string | null;
     'role': string | null;
+    /**
+     * Has the accounting role (Buchhaltung, docs/ACCOUNTING_ROLE_PLAN.md).
+     */
+    'isAccountant'?: boolean;
     'joinedAt'?: string;
     'memberCount'?: number;
     'require2fa'?: boolean;
+}
+/**
+ * Vacation overview of every active member for one year.
+ */
+export interface VacationOverviewResponse {
+    'year'?: number;
+    'members': Array<VacationOverviewRow> | null;
+}
+export interface VacationOverviewRow {
+    'userId'?: number;
+    'name': string | null;
+    'personnelNumber'?: string | null;
+    /**
+     * Vacation days per year (the member\'s allowance).
+     */
+    'entitlement'?: number;
+    /**
+     * Vacation days up to today (working days, holidays excluded).
+     */
+    'taken'?: number;
+    /**
+     * Vacation days after today.
+     */
+    'planned'?: number;
+    'remaining'?: number;
+    'sickDays'?: number;
+    'otherAbsenceDays'?: number;
 }
 /**
  * Confirm an email address (registration or email change) with the token from the link.
@@ -3051,6 +3160,582 @@ export class AbsenceDayApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugAbsencesRangePost(slug: string, createAbsenceRangeRequest?: CreateAbsenceRangeRequest, options?: RawAxiosRequestConfig) {
         return AbsenceDayApiFp(this.configuration).apiV1OrganizationsSlugAbsencesRangePost(slug, createAbsenceRangeRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * AccountingApi - axios parameter creator
+ */
+export const AccountingApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary One member\'s day-by-day monthly PDF (also for former members; absence notes left out).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} [year] 
+         * @param {number} [month] 
+         * @param {string} [lang] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAccountingMembersMemberIdReportGet: async (slug: string, memberId: number, year?: number, month?: number, lang?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAccountingMembersMemberIdReportGet', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAccountingMembersMemberIdReportGet', 'memberId', memberId)
+            const localVarPath = `/api/v1/organizations/{slug}/accounting/members/{memberId}/report`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (year !== undefined) {
+                localVarQueryParameter['year'] = year;
+            }
+
+            if (month !== undefined) {
+                localVarQueryParameter['month'] = month;
+            }
+
+            if (lang !== undefined) {
+                localVarQueryParameter['lang'] = lang;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary The 12 months of a year: closed (by whom, when), ended, failure entries and pending requests in them.
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAccountingMonthsGet: async (slug: string, year?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAccountingMonthsGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/accounting/months`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (year !== undefined) {
+                localVarQueryParameter['year'] = year;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary The monthly summary as payroll CSV (German format; `lang` = \"en\" for English headers).
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {number} [month] 
+         * @param {string} [lang] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAccountingSummaryCsvGet: async (slug: string, year?: number, month?: number, lang?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAccountingSummaryCsvGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/accounting/summary/csv`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (year !== undefined) {
+                localVarQueryParameter['year'] = year;
+            }
+
+            if (month !== undefined) {
+                localVarQueryParameter['month'] = month;
+            }
+
+            if (lang !== undefined) {
+                localVarQueryParameter['lang'] = lang;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary One row per member for a month: target, worked, overtime, balance, absences, entries needing correction.
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {number} [month] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAccountingSummaryGet: async (slug: string, year?: number, month?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAccountingSummaryGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/accounting/summary`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (year !== undefined) {
+                localVarQueryParameter['year'] = year;
+            }
+
+            if (month !== undefined) {
+                localVarQueryParameter['month'] = month;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary The monthly summary as PDF.
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {number} [month] 
+         * @param {string} [lang] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAccountingSummaryPdfGet: async (slug: string, year?: number, month?: number, lang?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAccountingSummaryPdfGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/accounting/summary/pdf`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (year !== undefined) {
+                localVarQueryParameter['year'] = year;
+            }
+
+            if (month !== undefined) {
+                localVarQueryParameter['month'] = month;
+            }
+
+            if (lang !== undefined) {
+                localVarQueryParameter['lang'] = lang;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Vacation entitlement, taken, planned and remaining days plus sick/other absence days of every member for a year.
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAccountingVacationGet: async (slug: string, year?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAccountingVacationGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/accounting/vacation`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (year !== undefined) {
+                localVarQueryParameter['year'] = year;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * AccountingApi - functional programming interface
+ */
+export const AccountingApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = AccountingApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary One member\'s day-by-day monthly PDF (also for former members; absence notes left out).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} [year] 
+         * @param {number} [month] 
+         * @param {string} [lang] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAccountingMembersMemberIdReportGet(slug: string, memberId: number, year?: number, month?: number, lang?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAccountingMembersMemberIdReportGet(slug, memberId, year, month, lang, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AccountingApi.apiV1OrganizationsSlugAccountingMembersMemberIdReportGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary The 12 months of a year: closed (by whom, when), ended, failure entries and pending requests in them.
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAccountingMonthsGet(slug: string, year?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AccountingMonthsResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAccountingMonthsGet(slug, year, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AccountingApi.apiV1OrganizationsSlugAccountingMonthsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary The monthly summary as payroll CSV (German format; `lang` = \"en\" for English headers).
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {number} [month] 
+         * @param {string} [lang] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAccountingSummaryCsvGet(slug: string, year?: number, month?: number, lang?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAccountingSummaryCsvGet(slug, year, month, lang, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AccountingApi.apiV1OrganizationsSlugAccountingSummaryCsvGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary One row per member for a month: target, worked, overtime, balance, absences, entries needing correction.
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {number} [month] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAccountingSummaryGet(slug: string, year?: number, month?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AccountingSummaryResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAccountingSummaryGet(slug, year, month, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AccountingApi.apiV1OrganizationsSlugAccountingSummaryGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary The monthly summary as PDF.
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {number} [month] 
+         * @param {string} [lang] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAccountingSummaryPdfGet(slug: string, year?: number, month?: number, lang?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<File>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAccountingSummaryPdfGet(slug, year, month, lang, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AccountingApi.apiV1OrganizationsSlugAccountingSummaryPdfGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Vacation entitlement, taken, planned and remaining days plus sick/other absence days of every member for a year.
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAccountingVacationGet(slug: string, year?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<VacationOverviewResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAccountingVacationGet(slug, year, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AccountingApi.apiV1OrganizationsSlugAccountingVacationGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * AccountingApi - factory interface
+ */
+export const AccountingApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = AccountingApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary One member\'s day-by-day monthly PDF (also for former members; absence notes left out).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {number} [year] 
+         * @param {number} [month] 
+         * @param {string} [lang] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAccountingMembersMemberIdReportGet(slug: string, memberId: number, year?: number, month?: number, lang?: string, options?: RawAxiosRequestConfig): AxiosPromise<File> {
+            return localVarFp.apiV1OrganizationsSlugAccountingMembersMemberIdReportGet(slug, memberId, year, month, lang, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary The 12 months of a year: closed (by whom, when), ended, failure entries and pending requests in them.
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAccountingMonthsGet(slug: string, year?: number, options?: RawAxiosRequestConfig): AxiosPromise<AccountingMonthsResponse> {
+            return localVarFp.apiV1OrganizationsSlugAccountingMonthsGet(slug, year, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary The monthly summary as payroll CSV (German format; `lang` = \"en\" for English headers).
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {number} [month] 
+         * @param {string} [lang] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAccountingSummaryCsvGet(slug: string, year?: number, month?: number, lang?: string, options?: RawAxiosRequestConfig): AxiosPromise<File> {
+            return localVarFp.apiV1OrganizationsSlugAccountingSummaryCsvGet(slug, year, month, lang, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary One row per member for a month: target, worked, overtime, balance, absences, entries needing correction.
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {number} [month] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAccountingSummaryGet(slug: string, year?: number, month?: number, options?: RawAxiosRequestConfig): AxiosPromise<AccountingSummaryResponse> {
+            return localVarFp.apiV1OrganizationsSlugAccountingSummaryGet(slug, year, month, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary The monthly summary as PDF.
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {number} [month] 
+         * @param {string} [lang] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAccountingSummaryPdfGet(slug: string, year?: number, month?: number, lang?: string, options?: RawAxiosRequestConfig): AxiosPromise<File> {
+            return localVarFp.apiV1OrganizationsSlugAccountingSummaryPdfGet(slug, year, month, lang, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Vacation entitlement, taken, planned and remaining days plus sick/other absence days of every member for a year.
+         * @param {string} slug 
+         * @param {number} [year] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAccountingVacationGet(slug: string, year?: number, options?: RawAxiosRequestConfig): AxiosPromise<VacationOverviewResponse> {
+            return localVarFp.apiV1OrganizationsSlugAccountingVacationGet(slug, year, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * AccountingApi - object-oriented interface
+ */
+export class AccountingApi extends BaseAPI {
+    /**
+     * 
+     * @summary One member\'s day-by-day monthly PDF (also for former members; absence notes left out).
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {number} [year] 
+     * @param {number} [month] 
+     * @param {string} [lang] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAccountingMembersMemberIdReportGet(slug: string, memberId: number, year?: number, month?: number, lang?: string, options?: RawAxiosRequestConfig) {
+        return AccountingApiFp(this.configuration).apiV1OrganizationsSlugAccountingMembersMemberIdReportGet(slug, memberId, year, month, lang, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary The 12 months of a year: closed (by whom, when), ended, failure entries and pending requests in them.
+     * @param {string} slug 
+     * @param {number} [year] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAccountingMonthsGet(slug: string, year?: number, options?: RawAxiosRequestConfig) {
+        return AccountingApiFp(this.configuration).apiV1OrganizationsSlugAccountingMonthsGet(slug, year, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary The monthly summary as payroll CSV (German format; `lang` = \"en\" for English headers).
+     * @param {string} slug 
+     * @param {number} [year] 
+     * @param {number} [month] 
+     * @param {string} [lang] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAccountingSummaryCsvGet(slug: string, year?: number, month?: number, lang?: string, options?: RawAxiosRequestConfig) {
+        return AccountingApiFp(this.configuration).apiV1OrganizationsSlugAccountingSummaryCsvGet(slug, year, month, lang, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary One row per member for a month: target, worked, overtime, balance, absences, entries needing correction.
+     * @param {string} slug 
+     * @param {number} [year] 
+     * @param {number} [month] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAccountingSummaryGet(slug: string, year?: number, month?: number, options?: RawAxiosRequestConfig) {
+        return AccountingApiFp(this.configuration).apiV1OrganizationsSlugAccountingSummaryGet(slug, year, month, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary The monthly summary as PDF.
+     * @param {string} slug 
+     * @param {number} [year] 
+     * @param {number} [month] 
+     * @param {string} [lang] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAccountingSummaryPdfGet(slug: string, year?: number, month?: number, lang?: string, options?: RawAxiosRequestConfig) {
+        return AccountingApiFp(this.configuration).apiV1OrganizationsSlugAccountingSummaryPdfGet(slug, year, month, lang, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Vacation entitlement, taken, planned and remaining days plus sick/other absence days of every member for a year.
+     * @param {string} slug 
+     * @param {number} [year] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAccountingVacationGet(slug: string, year?: number, options?: RawAxiosRequestConfig) {
+        return AccountingApiFp(this.configuration).apiV1OrganizationsSlugAccountingVacationGet(slug, year, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -5236,7 +5921,7 @@ export const ClosedPeriodsApiAxiosParamCreator = function (configuration?: Confi
     return {
         /**
          * 
-         * @summary The closed months; org admins also get the audit list.
+         * @summary The closed months; org admins and accountants also get the audit list.
          * @param {string} slug 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -5274,7 +5959,7 @@ export const ClosedPeriodsApiAxiosParamCreator = function (configuration?: Confi
         },
         /**
          * 
-         * @summary Close the months from..to (admin only; only months that have ended).
+         * @summary Close the months from..to (admins and accountants; only months that have ended).
          * @param {string} slug 
          * @param {CloseMonthsRequest} [closeMonthsRequest] 
          * @param {*} [options] Override http request option.
@@ -5316,7 +6001,7 @@ export const ClosedPeriodsApiAxiosParamCreator = function (configuration?: Confi
         },
         /**
          * 
-         * @summary Reopen one month (admin only, with a reason).
+         * @summary Reopen one month (admins and accountants, with a reason).
          * @param {string} slug 
          * @param {ReopenMonthRequest} [reopenMonthRequest] 
          * @param {*} [options] Override http request option.
@@ -5367,7 +6052,7 @@ export const ClosedPeriodsApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
-         * @summary The closed months; org admins also get the audit list.
+         * @summary The closed months; org admins and accountants also get the audit list.
          * @param {string} slug 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -5380,7 +6065,7 @@ export const ClosedPeriodsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Close the months from..to (admin only; only months that have ended).
+         * @summary Close the months from..to (admins and accountants; only months that have ended).
          * @param {string} slug 
          * @param {CloseMonthsRequest} [closeMonthsRequest] 
          * @param {*} [options] Override http request option.
@@ -5394,7 +6079,7 @@ export const ClosedPeriodsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Reopen one month (admin only, with a reason).
+         * @summary Reopen one month (admins and accountants, with a reason).
          * @param {string} slug 
          * @param {ReopenMonthRequest} [reopenMonthRequest] 
          * @param {*} [options] Override http request option.
@@ -5417,7 +6102,7 @@ export const ClosedPeriodsApiFactory = function (configuration?: Configuration, 
     return {
         /**
          * 
-         * @summary The closed months; org admins also get the audit list.
+         * @summary The closed months; org admins and accountants also get the audit list.
          * @param {string} slug 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -5427,7 +6112,7 @@ export const ClosedPeriodsApiFactory = function (configuration?: Configuration, 
         },
         /**
          * 
-         * @summary Close the months from..to (admin only; only months that have ended).
+         * @summary Close the months from..to (admins and accountants; only months that have ended).
          * @param {string} slug 
          * @param {CloseMonthsRequest} [closeMonthsRequest] 
          * @param {*} [options] Override http request option.
@@ -5438,7 +6123,7 @@ export const ClosedPeriodsApiFactory = function (configuration?: Configuration, 
         },
         /**
          * 
-         * @summary Reopen one month (admin only, with a reason).
+         * @summary Reopen one month (admins and accountants, with a reason).
          * @param {string} slug 
          * @param {ReopenMonthRequest} [reopenMonthRequest] 
          * @param {*} [options] Override http request option.
@@ -5456,7 +6141,7 @@ export const ClosedPeriodsApiFactory = function (configuration?: Configuration, 
 export class ClosedPeriodsApi extends BaseAPI {
     /**
      * 
-     * @summary The closed months; org admins also get the audit list.
+     * @summary The closed months; org admins and accountants also get the audit list.
      * @param {string} slug 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -5467,7 +6152,7 @@ export class ClosedPeriodsApi extends BaseAPI {
 
     /**
      * 
-     * @summary Close the months from..to (admin only; only months that have ended).
+     * @summary Close the months from..to (admins and accountants; only months that have ended).
      * @param {string} slug 
      * @param {CloseMonthsRequest} [closeMonthsRequest] 
      * @param {*} [options] Override http request option.
@@ -5479,7 +6164,7 @@ export class ClosedPeriodsApi extends BaseAPI {
 
     /**
      * 
-     * @summary Reopen one month (admin only, with a reason).
+     * @summary Reopen one month (admins and accountants, with a reason).
      * @param {string} slug 
      * @param {ReopenMonthRequest} [reopenMonthRequest] 
      * @param {*} [options] Override http request option.
@@ -5633,7 +6318,7 @@ export const ExportImportApiAxiosParamCreator = function (configuration?: Config
         },
         /**
          * 
-         * @summary Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):  target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing  correction. German format (`;`, decimal comma, UTF-8 BOM); `lang` = \"de\" (default) or \"en\" for the headers.  Org admins only, while the organization lets admins see members\' hours.
+         * @summary Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):  target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing  correction. German format (`;`, decimal comma, UTF-8 BOM); `lang` = \"de\" (default) or \"en\" for the headers.  Accountants; org admins and owners while the organization lets admins see members\' hours.
          * @param {PayrollExportRequest} [payrollExportRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -5722,7 +6407,7 @@ export const ExportImportApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):  target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing  correction. German format (`;`, decimal comma, UTF-8 BOM); `lang` = \"de\" (default) or \"en\" for the headers.  Org admins only, while the organization lets admins see members\' hours.
+         * @summary Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):  target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing  correction. German format (`;`, decimal comma, UTF-8 BOM); `lang` = \"de\" (default) or \"en\" for the headers.  Accountants; org admins and owners while the organization lets admins see members\' hours.
          * @param {PayrollExportRequest} [payrollExportRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -5777,7 +6462,7 @@ export const ExportImportApiFactory = function (configuration?: Configuration, b
         },
         /**
          * 
-         * @summary Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):  target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing  correction. German format (`;`, decimal comma, UTF-8 BOM); `lang` = \"de\" (default) or \"en\" for the headers.  Org admins only, while the organization lets admins see members\' hours.
+         * @summary Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):  target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing  correction. German format (`;`, decimal comma, UTF-8 BOM); `lang` = \"de\" (default) or \"en\" for the headers.  Accountants; org admins and owners while the organization lets admins see members\' hours.
          * @param {PayrollExportRequest} [payrollExportRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -5830,7 +6515,7 @@ export class ExportImportApi extends BaseAPI {
 
     /**
      * 
-     * @summary Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):  target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing  correction. German format (`;`, decimal comma, UTF-8 BOM); `lang` = \"de\" (default) or \"en\" for the headers.  Org admins only, while the organization lets admins see members\' hours.
+     * @summary Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):  target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing  correction. German format (`;`, decimal comma, UTF-8 BOM); `lang` = \"de\" (default) or \"en\" for the headers.  Accountants; org admins and owners while the organization lets admins see members\' hours.
      * @param {PayrollExportRequest} [payrollExportRequest] 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
@@ -8762,6 +9447,52 @@ export const OrganizationsApiAxiosParamCreator = function (configuration?: Confi
         },
         /**
          * 
+         * @summary Grant or revoke the accounting role (Buchhaltung): the Owner for anyone, admins for members only  (not for themselves or other admins).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {SetAccountantRequest} [setAccountantRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdAccountantPut: async (slug: string, memberId: number, setAccountantRequest?: SetAccountantRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdAccountantPut', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdAccountantPut', 'memberId', memberId)
+            const localVarPath = `/api/v1/Organizations/{slug}/members/{memberId}/accountant`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(setAccountantRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Remove a member from the organization (self-leave or admin).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID to remove.
@@ -9292,6 +10023,21 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Grant or revoke the accounting role (Buchhaltung): the Owner for anyone, admins for members only  (not for themselves or other admins).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {SetAccountantRequest} [setAccountantRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdAccountantPut(slug: string, memberId: number, setAccountantRequest?: SetAccountantRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MemberAccountantResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdAccountantPut(slug, memberId, setAccountantRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['OrganizationsApi.apiV1OrganizationsSlugMembersMemberIdAccountantPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Remove a member from the organization (self-leave or admin).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID to remove.
@@ -9509,6 +10255,18 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
         },
         /**
          * 
+         * @summary Grant or revoke the accounting role (Buchhaltung): the Owner for anyone, admins for members only  (not for themselves or other admins).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {SetAccountantRequest} [setAccountantRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdAccountantPut(slug: string, memberId: number, setAccountantRequest?: SetAccountantRequest, options?: RawAxiosRequestConfig): AxiosPromise<MemberAccountantResponse> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdAccountantPut(slug, memberId, setAccountantRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Remove a member from the organization (self-leave or admin).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID to remove.
@@ -9696,6 +10454,19 @@ export class OrganizationsApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugMemberEntriesMemberIdGet(slug: string, memberId: number, from?: string, to?: string, limit?: number, offset?: number, options?: RawAxiosRequestConfig) {
         return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMemberEntriesMemberIdGet(slug, memberId, from, to, limit, offset, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Grant or revoke the accounting role (Buchhaltung): the Owner for anyone, admins for members only  (not for themselves or other admins).
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {SetAccountantRequest} [setAccountantRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdAccountantPut(slug: string, memberId: number, setAccountantRequest?: SetAccountantRequest, options?: RawAxiosRequestConfig) {
+        return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdAccountantPut(slug, memberId, setAccountantRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

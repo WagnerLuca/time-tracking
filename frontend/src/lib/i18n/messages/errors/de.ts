@@ -23,6 +23,7 @@ export const de = {
 		twoFactorRequired: 'Diese Organisation verlangt die Zwei-Faktor-Authentifizierung. Richte sie in den Einstellungen ein, um fortzufahren.',
 		adminRequired: 'Das dürfen nur Admins der Organisation.',
 		ownerRequired: 'Das darf nur der Inhaber der Organisation.',
+		accountantRequired: 'Das dürfen nur die Buchhaltung und Admins der Organisation.',
 		slugRequired: 'Die Organisation fehlt.',
 		featureDisabled: 'Diese Funktion ist in der Organisation deaktiviert.',
 		featureRequiresApproval: 'Das muss in dieser Organisation genehmigt werden. Bitte stelle eine Anfrage.',
@@ -93,7 +94,8 @@ export const de = {
 	export: {
 		forbidden: 'Du darfst die Daten dieses Mitglieds nicht exportieren.',
 		orgRequired: 'Für diesen Export muss eine Organisation gewählt sein.',
-		payrollAdminOnly: 'Nur Admins können die Lohnabrechnung exportieren.'
+		payrollAdminOnly: 'Nur Admins und die Buchhaltung können die Lohnabrechnung exportieren.',
+		hoursHiddenFromAdmins: 'In dieser Organisation sehen Admins die Arbeitszeiten der Mitglieder nicht (Einstellungen). Die Rolle Buchhaltung sieht sie.'
 	},
 	import: {
 		disabled: 'Der CSV-Import ist in dieser Organisation deaktiviert.',
@@ -203,5 +205,9 @@ export const de = {
 	},
 	network: {
 		offline: 'Keine Verbindung. Versuche es erneut, sobald du wieder online bist.'
+	},
+	accounting: {
+		invalidYear: 'Das Jahr muss zwischen 2000 und 2100 liegen.',
+		ownerOnly: 'Die Rolle Buchhaltung von Admins oder dir selbst kann nur der Inhaber ändern.'
 	}
 };
