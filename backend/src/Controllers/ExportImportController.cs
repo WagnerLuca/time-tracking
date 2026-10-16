@@ -30,7 +30,7 @@ public class ExportImportController : OrganizationBaseController
     /// Payroll CSV for all active members of the organization over [from, to] (at most 731 days, from 2000):
     /// target, worked and overtime hours, overtime balance, vacation/sick/other absence days and entries needing
     /// correction. German format (<c>;</c>, decimal comma, UTF-8 BOM); <c>lang</c> = "de" (default) or "en" for the headers.
-    /// Org admins only, while the organization lets admins see members' hours.
+    /// Accountants; org admins and owners while the organization lets admins see members' hours.
     /// </summary>
     [HttpPost("payroll")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]

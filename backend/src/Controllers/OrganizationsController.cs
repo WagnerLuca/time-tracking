@@ -236,4 +236,18 @@ public class OrganizationsController : OrganizationBaseController
         if (userId == null) return Unauthorized();
         return ToResponse(await _service.SetMemberPersonnelNumberAsync(slug, userId.Value, memberId, request));
     }
+
+    /// <summary>
+    /// Grant or revoke the accounting role (Buchhaltung): the Owner for anyone, admins for members only
+    /// (not for themselves or other admins).
+    /// </summary>
+    [HttpPut("{slug}/members/{memberId}/accountant")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(typeof(MemberAccountantResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetMemberAccountant(string slug, int memberId, [FromBody] SetAccountantRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.SetMemberAccountantAsync(slug, userId.Value, memberId, request));
+    }
 }

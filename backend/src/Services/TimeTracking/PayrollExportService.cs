@@ -20,12 +20,17 @@ public record PayrollExportRequest
     public string? Lang { get; init; }
 }
 
+/// <summary>One member's figures of a period (hours rounded to 2 decimals, days as counted, failure entries started in it).</summary>
+public record PayrollRow(int UserId, string? PersonnelNumber, string Name, string Email,
+    double TargetHours, double WorkedHours, double OvertimeHours, double OvertimeBalance,
+    double VacationDays, double SickDays, double OtherAbsenceDays, int FailureEntryCount, bool IsFormerMember = false);
+
 /// <summary>
-/// One CSV for payroll: a row per active member with target, worked and overtime hours of the
+/// One CSV for payroll: a row per member (active, or former with time/absences in the period) with target, worked and overtime hours of the
 /// period, the overtime balance, absences and the number of entries that still need correcting.
 /// German format for German payroll tools: <c>;</c> separator, decimal comma, UTF-8 BOM.
 /// Hours follow the same rules as reports and balances (<see cref="DailyReportAggregator"/>).
-/// Org admins only, and only while the org lets admins see members' hours (like every export).
+/// Accountants; org admins and owners only while the org lets admins see members' hours (like every export).
 /// </summary>
 public class PayrollExportService(TimeTrackingDbContext context, ILogger<PayrollExportService> logger)
 {
@@ -47,27 +52,57 @@ public class PayrollExportService(TimeTrackingDbContext context, ILogger<Payroll
     {
         var org = await context.FindOrgBySlugAsync(request.OrgSlug);
         if (org == null) return ServiceResult.NotFound<byte[]>("Organization not found.");
-        if (await context.GetOrgRoleAsync(callerUserId, org.Id) is not >= OrganizationRole.Admin)
+        // Accountants always; admins and the Owner while the org lets admins see members' hours
+        var accounting = await context.IsAccountantAsync(callerUserId, org.Id);
+        if (!accounting && await context.GetOrgRoleAsync(callerUserId, org.Id) is not >= OrganizationRole.Admin)
             return ServiceResult.Forbidden<byte[]>("Only admins can export payroll data.");
         if (org.Require2fa && !await context.Users.AnyAsync(u => u.Id == callerUserId && u.TwoFactorEnabled))
             return ServiceResult.Forbidden<byte[]>("This organization requires two-factor authentication. Enable it in your account settings to continue.");
-        if (!org.MemberTimeEntryVisibility)
+        if (!accounting && !org.MemberTimeEntryVisibility)
             return ServiceResult.Forbidden<byte[]>("Admins may not see members' working hours in this organization (organization settings).");
         if (EntryTimes.ValidateRange(request.From, request.To) is { } rangeError)
             return ServiceResult.BadRequest<byte[]>(rangeError);
 
+        var rows = await RowsAsync(org, request.From, request.To);
+        logger.LogInformation("Payroll export of org {OrgId} for {From}..{To} by user {UserId}: {Count} members",
+            org.Id, request.From, request.To, callerUserId, rows.Count);
+        return ServiceResult.Ok(Csv(rows, request.Lang));
+    }
+
+    /// <summary>
+    /// One row per member over [from, to] (local days; days after today not counted yet): every active member,
+    /// plus former members who tracked time or were absent in the period (<see cref="PayrollRow.IsFormerMember"/>).
+    /// Also the accounting panel's monthly summary — no permission check here, callers authorize.
+    /// </summary>
+    public async Task<List<PayrollRow>> RowsAsync(Organization org, DateOnly from, DateOnly to)
+    {
         var clock = OrgClock.For(org);
-        var fromUtc = clock.StartOfDayUtc(request.From);
-        var toUtc = clock.StartOfDayUtc(request.To.AddDays(1));
+        var fromUtc = clock.StartOfDayUtc(from);
+        var toUtc = clock.StartOfDayUtc(to.AddDays(1));
 
         var members = await context.UserOrganizations.AsNoTracking()
             .Include(uo => uo.User)
             .Where(uo => uo.OrganizationId == org.Id && uo.User.IsActive)
-            .OrderBy(uo => uo.User.LastName).ThenBy(uo => uo.User.FirstName)
             .ToListAsync();
+        var activeIds = members.Select(m => m.UserId).ToHashSet();
+        var withActivity = await context.TimeEntries.AsNoTracking()
+            .Where(e => e.OrganizationId == org.Id && !e.IsRunning && e.StartTime >= fromUtc && e.StartTime < toUtc)
+            .Select(e => e.UserId)
+            .Union(context.AbsenceDays.AsNoTracking()
+                .Where(a => a.OrganizationId == org.Id && a.Date >= from && a.Date <= to)
+                .Select(a => a.UserId))
+            .Distinct()
+            .ToListAsync();
+        var formerIds = withActivity.Where(id => !activeIds.Contains(id)).ToList();
+        if (formerIds.Count > 0)
+            members.AddRange(await context.UserOrganizations.AsNoTracking().IgnoreQueryFilters()
+                .Include(uo => uo.User)
+                .Where(uo => uo.OrganizationId == org.Id && formerIds.Contains(uo.UserId))
+                .ToListAsync());
+        members = members.OrderBy(uo => uo.User.LastName).ThenBy(uo => uo.User.FirstName).ToList();
         var absences = (await context.AbsenceDays.AsNoTracking()
                 .Include(a => a.CustomType)
-                .Where(a => a.OrganizationId == org.Id && a.Date >= request.From && a.Date <= request.To)
+                .Where(a => a.OrganizationId == org.Id && a.Date >= from && a.Date <= to)
                 .ToListAsync())
             .ToLookup(a => a.UserId);
         var failures = (await context.TimeEntries.AsNoTracking()
@@ -76,31 +111,35 @@ public class PayrollExportService(TimeTrackingDbContext context, ILogger<Payroll
                 .ToListAsync())
             .ToLookup(id => id);
 
-        var csv = new StringBuilder();
-        csv.Append('﻿');
-        csv.AppendLine(string.Join(';', request.Lang?.StartsWith("en", StringComparison.OrdinalIgnoreCase) == true ? HeadersEn : HeadersDe));
-
+        var rows = new List<PayrollRow>();
         foreach (var member in members)
         {
-            var (target, worked, overtime, balance) = await HoursAsync(member, org.Id, clock, request.From, request.To);
+            var (target, worked, overtime, balance) = await HoursAsync(member, org.Id, clock, from, to);
             var memberAbsences = absences[member.UserId].ToList();
             static double Days(IEnumerable<AbsenceDay> days) => days.Sum(a => a.IsHalfDay ? 0.5 : 1.0);
             var vacation = Days(memberAbsences.Where(a => a.Type == AbsenceType.Vacation || a.CustomType?.CountsAsVacation == true));
             var sick = Days(memberAbsences.Where(a => a.Type == AbsenceType.SickDay));
             var other = Days(memberAbsences) - vacation - sick;
-
-            csv.AppendLine(string.Join(';',
-                Escape(member.PersonnelNumber ?? ""),
-                Escape($"{member.User.FirstName} {member.User.LastName}"),
-                Escape(member.User.Email),
-                Number(target), Number(worked), Number(overtime), Number(balance),
-                Number(vacation), Number(sick), Number(other),
-                failures[member.UserId].Count().ToString(German)));
+            rows.Add(new PayrollRow(member.UserId, member.PersonnelNumber, $"{member.User.FirstName} {member.User.LastName}", member.User.Email,
+                Math.Round(target, 2), Math.Round(worked, 2), Math.Round(overtime, 2), Math.Round(balance, 2),
+                vacation, sick, other, failures[member.UserId].Count(), IsFormerMember: !activeIds.Contains(member.UserId)));
         }
+        return rows;
+    }
 
-        logger.LogInformation("Payroll export of org {OrgId} for {From}..{To} by user {UserId}: {Count} members",
-            org.Id, request.From, request.To, callerUserId, members.Count);
-        return ServiceResult.Ok(new UTF8Encoding(false).GetBytes(csv.ToString()));
+    /// <summary>The rows as payroll CSV (German format; <paramref name="lang"/> "en" only changes the headers).</summary>
+    public static byte[] Csv(IEnumerable<PayrollRow> rows, string? lang)
+    {
+        var csv = new StringBuilder();
+        csv.Append('\uFEFF');
+        csv.AppendLine(string.Join(';', lang?.StartsWith("en", StringComparison.OrdinalIgnoreCase) == true ? HeadersEn : HeadersDe));
+        foreach (var r in rows)
+            csv.AppendLine(string.Join(';',
+                Escape(r.PersonnelNumber ?? ""), Escape(r.Name), Escape(r.Email),
+                Number(r.TargetHours), Number(r.WorkedHours), Number(r.OvertimeHours), Number(r.OvertimeBalance),
+                Number(r.VacationDays), Number(r.SickDays), Number(r.OtherAbsenceDays),
+                r.FailureEntryCount.ToString(German)));
+        return new UTF8Encoding(false).GetBytes(csv.ToString());
     }
 
     /// <summary>Target, net worked and overtime hours of the period, and the overtime balance at its end (since the first entry, as in the balance).</summary>

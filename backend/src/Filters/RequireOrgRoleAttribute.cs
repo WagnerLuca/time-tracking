@@ -22,16 +22,36 @@ namespace TimeTracking.Api.Filters;
 /// [RequireOrgRole]                              // any member
 /// [RequireOrgRole(OrganizationRole.Admin)]      // admin or owner
 /// [RequireOrgRole(OrganizationRole.Owner)]      // owner only
+/// [RequireOrgRole(OrganizationRole.Admin, OrAccountant = true)]  // admin, owner or accountant
 /// </code>
 /// </para>
 /// </summary>
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false)]
 public class RequireOrgRoleAttribute : TypeFilterAttribute
 {
+    private readonly OrganizationRole _minimumRole;
+    private bool _orAccountant;
+
     public RequireOrgRoleAttribute(OrganizationRole minimumRole = OrganizationRole.Member)
         : base(typeof(OrgRoleAuthorizationFilter))
     {
-        Arguments = new object[] { minimumRole };
+        _minimumRole = minimumRole;
+        Arguments = new object[] { minimumRole, false };
+    }
+
+    /// <summary>
+    /// Also let accountants in (<see cref="UserOrganization.IsAccountant"/>, docs/ACCOUNTING_ROLE_PLAN.md),
+    /// whatever their role — e.g. <c>[RequireOrgRole(OrganizationRole.Admin, OrAccountant = true)]</c>.
+    /// A refusal then carries <c>org.accountantRequired</c>.
+    /// </summary>
+    public bool OrAccountant
+    {
+        get => _orAccountant;
+        set
+        {
+            _orAccountant = value;
+            Arguments = new object[] { _minimumRole, value };
+        }
     }
 }
 
@@ -42,11 +62,13 @@ public class RequireOrgRoleAttribute : TypeFilterAttribute
 public class OrgRoleAuthorizationFilter : IAsyncActionFilter
 {
     private readonly OrganizationRole _minimumRole;
+    private readonly bool _orAccountant;
     private readonly TimeTrackingDbContext _context;
 
-    public OrgRoleAuthorizationFilter(OrganizationRole minimumRole, TimeTrackingDbContext context)
+    public OrgRoleAuthorizationFilter(OrganizationRole minimumRole, bool orAccountant, TimeTrackingDbContext context)
     {
         _minimumRole = minimumRole;
+        _orAccountant = orAccountant;
         _context = context;
     }
 
@@ -68,7 +90,7 @@ public class OrgRoleAuthorizationFilter : IAsyncActionFilter
 
         var membership = await _context.UserOrganizations
             .Where(uo => uo.Organization.Slug == slug && uo.UserId == userId)
-            .Select(uo => new { uo.Role, uo.Organization.Require2fa, uo.User.TwoFactorEnabled })
+            .Select(uo => new { uo.Role, uo.IsAccountant, uo.Organization.Require2fa, uo.User.TwoFactorEnabled })
             .FirstOrDefaultAsync();
 
         if (membership == null)
@@ -77,10 +99,13 @@ public class OrgRoleAuthorizationFilter : IAsyncActionFilter
             return;
         }
 
-        if (membership.Role < _minimumRole)
+        var accountantPasses = _orAccountant && membership.IsAccountant;
+        if (membership.Role < _minimumRole && !accountantPasses)
         {
-            context.Result = Problem(StatusCodes.Status403Forbidden, "Forbidden", $"This action requires {_minimumRole} role or higher.",
-                _minimumRole == OrganizationRole.Owner ? "org.ownerRequired" : "org.adminRequired");
+            context.Result = _orAccountant
+                ? Problem(StatusCodes.Status403Forbidden, "Forbidden", "This action requires the accounting role.", "org.accountantRequired")
+                : Problem(StatusCodes.Status403Forbidden, "Forbidden", $"This action requires {_minimumRole} role or higher.",
+                    _minimumRole == OrganizationRole.Owner ? "org.ownerRequired" : "org.adminRequired");
             return;
         }
 

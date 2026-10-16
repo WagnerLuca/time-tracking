@@ -21,12 +21,12 @@ public class PdfReportService : IPdfReportService
     }
 
     public async Task<ServiceResult<byte[]>> GenerateMonthlyReportAsync(
-        string slug, int callerUserId, int targetUserId, int year, int month, string? lang = null)
+        string slug, int callerUserId, int targetUserId, int year, int month, string? lang = null, bool forAccounting = false)
     {
         if (month is < 1 or > 12)
             return ServiceResult.BadRequest<byte[]>("Month must be between 1 and 12.");
 
-        var context = await ResolveReportContextAsync(slug, callerUserId, targetUserId);
+        var context = await ResolveReportContextAsync(slug, callerUserId, targetUserId, forAccounting);
         if (context.Error != null) return ServiceResult.Fail<byte[]>(context.Error.Value, context.ErrorMessage!);
 
         var dateFrom = new DateOnly(year, month, 1);
@@ -34,6 +34,8 @@ public class PdfReportService : IPdfReportService
 
         var (rows, overallCumulative) = await DailyReportAggregator.BuildWithRunningTotalAsync(
             _context, targetUserId, context.Org!.Id, dateFrom, dateTo, context.Membership!.InitialOvertimeHours);
+        // Accounting sees hours and absence kinds, not the personal notes on absences
+        if (forAccounting) rows = rows.Select(r => r with { AbsenceNote = null }).ToList();
 
         var t = ReportText.For(lang);
         var period = $"{t.Month(month)} {year}";
@@ -172,17 +174,22 @@ public class PdfReportService : IPdfReportService
         Organization? Org, UserOrganization? Membership, User? TargetUser,
         ServiceErrorType? Error, string? ErrorMessage);
 
-    private async Task<ReportContext> ResolveReportContextAsync(string slug, int callerUserId, int targetUserId)
+    /// <param name="forAccounting">The caller was authorized for the accounting panel: no visibility check, and
+    /// former members (left the organization) are found too.</param>
+    private async Task<ReportContext> ResolveReportContextAsync(string slug, int callerUserId, int targetUserId, bool forAccounting = false)
     {
         var org = await _context.Organizations.AsNoTracking().FirstOrDefaultAsync(o => o.Slug == slug);
         if (org == null)
             return new ReportContext(null, null, null, ServiceErrorType.NotFound, "Organization not found");
 
-        var membership = await _context.UserOrganizations.AsNoTracking()
+        var memberships = _context.UserOrganizations.AsNoTracking();
+        if (forAccounting) memberships = memberships.IgnoreQueryFilters();
+        var membership = await memberships
             .Include(uo => uo.User)
             .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == targetUserId);
         if (membership == null)
             return new ReportContext(null, null, null, ServiceErrorType.NotFound, "Member not found in this organization");
+        if (forAccounting) return new ReportContext(org, membership, membership.User, null, null);
 
         switch ((await MemberVisibility.ForCallerAsync(_context, org, callerUserId)).Check(targetUserId, MemberInfo.TrackedTime))
         {
@@ -418,7 +425,7 @@ public class PdfReportService : IPdfReportService
         });
     }
 
-    private static void ComposeFooter(QuestPDF.Infrastructure.IContainer container, ReportText t)
+    internal static void ComposeFooter(QuestPDF.Infrastructure.IContainer container, ReportText t)
     {
         container.AlignCenter().Text(text =>
         {
@@ -430,10 +437,10 @@ public class PdfReportService : IPdfReportService
         });
     }
 
-    private static QuestPDF.Infrastructure.IContainer HeaderCell(QuestPDF.Infrastructure.IContainer container) =>
+    internal static QuestPDF.Infrastructure.IContainer HeaderCell(QuestPDF.Infrastructure.IContainer container) =>
         container.Background(Colors.Grey.Darken2).Padding(4).DefaultTextStyle(x => x.FontColor(Colors.White).SemiBold().FontSize(8));
 
-    private static QuestPDF.Infrastructure.IContainer BodyCell(QuestPDF.Infrastructure.IContainer container, string background) =>
+    internal static QuestPDF.Infrastructure.IContainer BodyCell(QuestPDF.Infrastructure.IContainer container, string background) =>
         container.Background(background).Padding(4).BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten3);
 
     private static string BuildNote(ReportText t, DailyReportRow row)
@@ -443,9 +450,9 @@ public class PdfReportService : IPdfReportService
         return t.EntrySummary(row.EntrySummary);
     }
 
-    private static string FormatHours(ReportText t, double hours) => $"{hours.ToString("F2", t.Numbers)} h";
+    internal static string FormatHours(ReportText t, double hours) => $"{hours.ToString("F2", t.Numbers)} h";
 
-    private static string FormatSigned(ReportText t, double hours) => $"{hours.ToString("+0.00;-0.00;0.00", t.Numbers)} h";
+    internal static string FormatSigned(ReportText t, double hours) => $"{hours.ToString("+0.00;-0.00;0.00", t.Numbers)} h";
 
     private record MonthSummary(
         int Month, double TargetHours, double WorkedHours, double NetWorkedHours,

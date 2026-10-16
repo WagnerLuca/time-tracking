@@ -10,9 +10,11 @@ public interface IPdfReportService
     /// <summary>
     /// Generates a day-by-day PDF report for one calendar month.
     /// Allowed for the member themselves, org Admins/Owners, or Group Admins with export capability.
+    /// <paramref name="forAccounting"/>: the caller was authorized for the accounting panel — no visibility
+    /// check, former members included, absence notes left out.
     /// </summary>
     Task<ServiceResult<byte[]>> GenerateMonthlyReportAsync(
-        string slug, int callerUserId, int targetUserId, int year, int month, string? lang = null);
+        string slug, int callerUserId, int targetUserId, int year, int month, string? lang = null, bool forAccounting = false);
 
     /// <summary>
     /// Generates a month-by-month PDF summary report for one calendar year.

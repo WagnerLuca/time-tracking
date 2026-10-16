@@ -17,4 +17,13 @@ public static class OrgQueries
             .Where(uo => uo.OrganizationId == organizationId && uo.UserId == userId)
             .Select(uo => (OrganizationRole?)uo.Role)
             .FirstOrDefaultAsync();
+
+    /// <summary>
+    /// Whether the user is an active member of the organization with the accounting role
+    /// (<see cref="UserOrganization.IsAccountant"/>): sees everybody's hours whatever the org's
+    /// "admins may see members' hours" setting, and may close/reopen months.
+    /// </summary>
+    public static Task<bool> IsAccountantAsync(this TimeTrackingDbContext context, int userId, int organizationId) =>
+        context.UserOrganizations.AsNoTracking()
+            .AnyAsync(uo => uo.OrganizationId == organizationId && uo.UserId == userId && uo.IsAccountant);
 }

@@ -5,7 +5,7 @@ using TimeTracking.Api.Models.Dtos;
 
 namespace TimeTracking.Api.Services;
 
-/// <summary>Closing and reopening months (issue #57); the write guard itself is <see cref="ClosedPeriods"/>.</summary>
+/// <summary>Closing and reopening months (issue #57; org admins and accountants); the write guard itself is <see cref="ClosedPeriods"/>.</summary>
 public class ClosedPeriodService(TimeTrackingDbContext context)
 {
     /// <summary>Audit rows returned (newest first).</summary>
@@ -15,7 +15,9 @@ public class ClosedPeriodService(TimeTrackingDbContext context)
     {
         var org = await context.FindOrgBySlugAsync(slug);
         if (org == null) return ServiceResult.NotFound<ClosedPeriodsResponse>("Organization not found");
-        return ServiceResult.Ok(await StateAsync(org.Id, await context.GetOrgRoleAsync(callerUserId, org.Id) >= OrganizationRole.Admin));
+        var seesLog = await context.GetOrgRoleAsync(callerUserId, org.Id) >= OrganizationRole.Admin
+            || await context.IsAccountantAsync(callerUserId, org.Id);
+        return ServiceResult.Ok(await StateAsync(org.Id, seesLog));
     }
 
     /// <summary>Closes every month from..to that has ended (org-local) and is still open.</summary>

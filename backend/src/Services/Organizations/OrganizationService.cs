@@ -110,6 +110,7 @@ public class OrganizationService : IOrganizationService
                         InitialOvertimeHours = uo.InitialOvertimeHours,
                         VacationDaysPerYear = uo.VacationDaysPerYear,
                         PersonnelNumber = uo.PersonnelNumber,
+                        IsAccountant = uo.IsAccountant,
                         CardCount = _context.BadgeCards.Count(c => c.OrganizationId == uo.OrganizationId && c.UserId == uo.UserId)
                     })
                     .ToList(),
@@ -144,46 +145,10 @@ public class OrganizationService : IOrganizationService
         var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId!.Value);
         var visibleMembers = organization.Members.Where(m => visibility.Can(m.Id, MemberInfo.Member)).ToList();
 
-        // Compute vacation days used for each member (current year, in the org's time zone)
+        // Vacation days used for each member (current year, in the org's time zone)
         var today = OrgClock.For(organization.TimeZone).Today();
-        var currentYear = today.Year;
-        var yearStart = new DateOnly(currentYear, 1, 1);
-        var yearEnd = new DateOnly(currentYear, 12, 31);
         var memberIds = visibility.Ids(MemberInfo.VacationBalance).ToList();
-
-        // Load holiday dates for this org (to exclude from vacation count)
-        var orgHolidays = await _context.Holidays.AsNoTracking()
-            .Where(h => h.OrganizationId == organization.Id)
-            .ToListAsync();
-        var holidayDates = orgHolidays
-            .Select(h => h.DateIn(currentYear))
-            .OfType<DateOnly>()
-            .ToHashSet();
-
-        var vacationUsage = await _context.AbsenceDays.AsNoTracking()
-            .Where(a => a.OrganizationId == organization.Id
-                     && memberIds.Contains(a.UserId)
-                     && (a.Type == AbsenceType.Vacation || (a.CustomType != null && a.CustomType.CountsAsVacation))
-                     && a.Date >= yearStart && a.Date <= yearEnd)
-            .ToListAsync();
-
-        // Only the member's working days count (a vacation day on a day off costs nothing)
-        var schedulesByUser = (await _context.WorkSchedules.AsNoTracking()
-                .Where(ws => ws.OrganizationId == organization.Id && memberIds.Contains(ws.UserId))
-                .ToListAsync())
-            .ToLookup(ws => ws.UserId);
-
-        // Split usage into taken (up to today) and planned (after today, rest of year)
-        var usageByUser = vacationUsage
-            .Where(a => !holidayDates.Contains(a.Date) && WorkingDays.IsWorkingDay(schedulesByUser[a.UserId], a.Date))
-            .GroupBy(a => a.UserId)
-            .ToDictionary(
-                g => g.Key,
-                g => new
-                {
-                    Taken = g.Where(a => a.Date <= today).Sum(a => a.IsHalfDay ? 0.5 : 1.0),
-                    Planned = g.Where(a => a.Date > today).Sum(a => a.IsHalfDay ? 0.5 : 1.0)
-                });
+        var usageByUser = await VacationBalances.UsageAsync(_context, organization.Id, memberIds, today.Year, today);
 
         // Group memberships for tag display (e.g. "Frontend Admin"): direct ones, then the
         // ancestors of those groups as inherited memberships ("über Team Küche")
@@ -232,7 +197,7 @@ public class OrganizationService : IOrganizationService
                 VacationDaysUsed = visible ? used : 0,
                 VacationDaysTaken = visible ? taken : 0,
                 VacationDaysPlanned = visible ? planned : 0,
-                VacationDaysRemaining = visible ? Math.Max(0, m.VacationDaysPerYear - used) : 0,
+                VacationDaysRemaining = visible ? VacationBalances.Remaining(m.VacationDaysPerYear, usage) : 0,
                 CardCount = callerIsAdmin ? m.CardCount : 0,
                 PersonnelNumber = callerIsAdmin ? m.PersonnelNumber : null,
                 // Starting overtime balance is payroll data: the person and admins only
@@ -276,6 +241,7 @@ public class OrganizationService : IOrganizationService
                 Description = uo.Organization.Description,
                 Slug = uo.Organization.Slug,
                 Role = uo.Role.ToString(),
+                IsAccountant = uo.IsAccountant,
                 JoinedAt = uo.JoinedAt,
                 MemberCount = uo.Organization.UserOrganizations.Count(),
                 Require2fa = uo.Organization.Require2fa
@@ -491,6 +457,8 @@ public class OrganizationService : IOrganizationService
         }
 
         membership.IsActive = false;
+        // Leaving ends the accounting role too; a rejoin starts without it
+        membership.IsAccountant = false;
         // The number goes free for the next hire; payroll exports list active members only, so no
         // past period needs it (the unique index would otherwise keep holding it on the inactive row)
         membership.PersonnelNumber = null;
@@ -1035,5 +1003,34 @@ public class OrganizationService : IOrganizationService
         }
         _logger.LogInformation("Personnel number of user {UserId} in org {OrgId} set by user {CallerId}", userId, org.Id, callerUserId);
         return ServiceResult.Ok(new MemberPersonnelNumberResponse { UserId = userId, PersonnelNumber = number });
+    }
+
+    public const string AccountantOwnerOnlyMessage = "Only the owner can change the accounting role of admins or of yourself.";
+
+    /// <summary>
+    /// Grants or revokes the accounting role: the Owner for anyone, admins for members only — not for
+    /// themselves or other admins, so an admin cannot lift "admins may see members' hours" for themselves.
+    /// </summary>
+    public async Task<ServiceResult<MemberAccountantResponse>> SetMemberAccountantAsync(
+        string slug, int callerUserId, int userId, SetAccountantRequest request)
+    {
+        var org = await _context.FindOrgBySlugAsync(slug);
+        if (org == null) return ServiceResult.NotFound<MemberAccountantResponse>("Organization not found");
+        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
+        if (callerRole is not >= OrganizationRole.Admin) return ServiceResult.Forbidden<MemberAccountantResponse>();
+
+        var membership = await _context.UserOrganizations.FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
+        if (membership == null) return ServiceResult.NotFound<MemberAccountantResponse>("Member not found in this organization.");
+        if (callerRole != OrganizationRole.Owner && (userId == callerUserId || membership.Role >= OrganizationRole.Admin))
+            return ServiceResult.Forbidden<MemberAccountantResponse>(AccountantOwnerOnlyMessage, "accounting.ownerOnly");
+
+        if (membership.IsAccountant != request.IsAccountant)
+        {
+            membership.IsAccountant = request.IsAccountant;
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Accounting role of user {UserId} in org {OrgId} set to {Value} by user {CallerId}",
+                userId, org.Id, request.IsAccountant, callerUserId);
+        }
+        return ServiceResult.Ok(new MemberAccountantResponse { UserId = userId, IsAccountant = membership.IsAccountant });
     }
 }

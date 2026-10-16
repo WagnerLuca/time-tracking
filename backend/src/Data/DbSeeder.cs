@@ -10,7 +10,7 @@ public static class DbSeeder
     {
         // Everything below belongs to the demo org and its @example.com users, so it can be
         // added next to real data (SeedDemoData on a live test instance) — just only once
-        string[] demoEmails = ["max.mueller@example.com", "anna.schmidt@example.com", "tom.weber@example.com"];
+        string[] demoEmails = ["max.mueller@example.com", "anna.schmidt@example.com", "tom.weber@example.com", "lisa.buchhaltung@example.com"];
         if (context.Organizations.IgnoreQueryFilters().Any(o => o.Slug == "mueller-software")
             || context.Users.IgnoreQueryFilters().Any(u => demoEmails.Contains(u.Email)))
         {
@@ -56,7 +56,20 @@ public static class DbSeeder
             IsActive = true
         };
 
-        context.Users.AddRange(max, anna, tom);
+        // Accounting (Buchhaltung): a plain member with the accounting role, tracks no time of her own
+        var lisa = new User
+        {
+            Email = "lisa.buchhaltung@example.com",
+            FirstName = "Lisa",
+            LastName = "Buchhaltung",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123"),
+            EmailConfirmed = true,
+            CreatedAt = DateTime.UtcNow.AddMonths(-5),
+            UpdatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+
+        context.Users.AddRange(max, anna, tom, lisa);
         await context.SaveChangesAsync();
 
         // ── Additional team members ────────────────────────────────────
@@ -151,7 +164,18 @@ public static class DbSeeder
             VacationDaysPerYear = 30
         };
 
-        context.UserOrganizations.AddRange(maxMembership, annaMembership, tomMembership);
+        var lisaMembership = new UserOrganization
+        {
+            UserId = lisa.Id,
+            OrganizationId = org.Id,
+            Role = OrganizationRole.Member,
+            IsAccountant = true,
+            JoinedAt = DateTime.UtcNow.AddMonths(-5),
+            IsActive = true,
+            VacationDaysPerYear = 30
+        };
+
+        context.UserOrganizations.AddRange(maxMembership, annaMembership, tomMembership, lisaMembership);
 
         // Extra memberships (all as Member role)
         var extraMemberships = new List<UserOrganization>();
@@ -586,6 +610,7 @@ public static class DbSeeder
         Console.WriteLine($"   Max Mueller: max.mueller@example.com / Password123 (Owner)");
         Console.WriteLine($"   Anna Schmidt: anna.schmidt@example.com / Password123 (Admin)");
         Console.WriteLine($"   Tom Weber: tom.weber@example.com / Password123 (Member)");
+        Console.WriteLine($"   Lisa Buchhaltung: lisa.buchhaltung@example.com / Password123 (Member + accounting)");
         foreach (var u in extraUserEntities)
             Console.WriteLine($"   {u.FirstName} {u.LastName}: {u.Email} / Password123 (Member)");
     }
