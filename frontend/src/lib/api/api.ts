@@ -679,6 +679,28 @@ export interface ImportPreviewResponse {
     'totalRows'?: number;
     'duplicateCount'?: number;
     'warnings'?: Array<string> | null;
+    /**
+     * Format the file was read as: \"standard\" (Date/Start/End columns) or \"evaluation\" (daily \"Auswertungen\" export).
+     */
+    'format': string | null;
+    /**
+     * Data lines without a time entry (e.g. days without work in a daily export); not imported.
+     */
+    'skippedRowCount'?: number;
+    /**
+     * Days with vacation / sick / other absence time in the file. Absences are not imported.
+     */
+    'skippedVacationDays'?: number;
+    'skippedSickDays'?: number;
+    'skippedOtherAbsenceDays'?: number;
+    /**
+     * Employee named in the file (\"First Last\"), for formats that carry names.
+     */
+    'employeeName'?: string | null;
+    /**
+     * Whether TimeTracking.Api.Models.Dtos.ImportPreviewResponse.EmployeeName is the caller\'s own name; null when the file names nobody.
+     */
+    'employeeMatchesUser'?: boolean | null;
 }
 /**
  * A single row from the parsed CSV preview.
@@ -5558,13 +5580,14 @@ export const ExportImportApiAxiosParamCreator = function (configuration?: Config
         },
         /**
          * 
-         * @summary Preview a CSV file for import (parse and check for duplicates).
+         * @summary Preview a CSV file for import (parse and check for duplicates). `format`: \"auto\" (default, detected from  the header row), \"standard\" (Date / Start / End / Pause / Description columns, this app\'s export) or  \"evaluation\" (daily \"Auswertungen\" export: work start/stop/break per day; days off and absences are skipped).
          * @param {string} [orgSlug] 
+         * @param {string} [format] 
          * @param {File} [file] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1ExportImportImportPreviewPost: async (orgSlug?: string, file?: File, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        apiV1ExportImportImportPreviewPost: async (orgSlug?: string, format?: string, file?: File, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/api/v1/ExportImport/import/preview`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -5584,6 +5607,10 @@ export const ExportImportApiAxiosParamCreator = function (configuration?: Config
 
             if (orgSlug !== undefined) {
                 localVarQueryParameter['orgSlug'] = orgSlug;
+            }
+
+            if (format !== undefined) {
+                localVarQueryParameter['format'] = format;
             }
 
 
@@ -5680,14 +5707,15 @@ export const ExportImportApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Preview a CSV file for import (parse and check for duplicates).
+         * @summary Preview a CSV file for import (parse and check for duplicates). `format`: \"auto\" (default, detected from  the header row), \"standard\" (Date / Start / End / Pause / Description columns, this app\'s export) or  \"evaluation\" (daily \"Auswertungen\" export: work start/stop/break per day; days off and absences are skipped).
          * @param {string} [orgSlug] 
+         * @param {string} [format] 
          * @param {File} [file] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async apiV1ExportImportImportPreviewPost(orgSlug?: string, file?: File, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ImportPreviewResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1ExportImportImportPreviewPost(orgSlug, file, options);
+        async apiV1ExportImportImportPreviewPost(orgSlug?: string, format?: string, file?: File, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ImportPreviewResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1ExportImportImportPreviewPost(orgSlug, format, file, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['ExportImportApi.apiV1ExportImportImportPreviewPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -5737,14 +5765,15 @@ export const ExportImportApiFactory = function (configuration?: Configuration, b
         },
         /**
          * 
-         * @summary Preview a CSV file for import (parse and check for duplicates).
+         * @summary Preview a CSV file for import (parse and check for duplicates). `format`: \"auto\" (default, detected from  the header row), \"standard\" (Date / Start / End / Pause / Description columns, this app\'s export) or  \"evaluation\" (daily \"Auswertungen\" export: work start/stop/break per day; days off and absences are skipped).
          * @param {string} [orgSlug] 
+         * @param {string} [format] 
          * @param {File} [file] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        apiV1ExportImportImportPreviewPost(orgSlug?: string, file?: File, options?: RawAxiosRequestConfig): AxiosPromise<ImportPreviewResponse> {
-            return localVarFp.apiV1ExportImportImportPreviewPost(orgSlug, file, options).then((request) => request(axios, basePath));
+        apiV1ExportImportImportPreviewPost(orgSlug?: string, format?: string, file?: File, options?: RawAxiosRequestConfig): AxiosPromise<ImportPreviewResponse> {
+            return localVarFp.apiV1ExportImportImportPreviewPost(orgSlug, format, file, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -5788,14 +5817,15 @@ export class ExportImportApi extends BaseAPI {
 
     /**
      * 
-     * @summary Preview a CSV file for import (parse and check for duplicates).
+     * @summary Preview a CSV file for import (parse and check for duplicates). `format`: \"auto\" (default, detected from  the header row), \"standard\" (Date / Start / End / Pause / Description columns, this app\'s export) or  \"evaluation\" (daily \"Auswertungen\" export: work start/stop/break per day; days off and absences are skipped).
      * @param {string} [orgSlug] 
+     * @param {string} [format] 
      * @param {File} [file] 
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      */
-    public apiV1ExportImportImportPreviewPost(orgSlug?: string, file?: File, options?: RawAxiosRequestConfig) {
-        return ExportImportApiFp(this.configuration).apiV1ExportImportImportPreviewPost(orgSlug, file, options).then((request) => request(this.axios, this.basePath));
+    public apiV1ExportImportImportPreviewPost(orgSlug?: string, format?: string, file?: File, options?: RawAxiosRequestConfig) {
+        return ExportImportApiFp(this.configuration).apiV1ExportImportImportPreviewPost(orgSlug, format, file, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

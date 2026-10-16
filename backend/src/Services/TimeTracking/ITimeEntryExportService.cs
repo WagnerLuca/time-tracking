@@ -18,9 +18,10 @@ public interface ITimeEntryExportService
     Task<ServiceResult<byte[]>> ExportDailyReportCsvAsync(int userId, ExportRequest request);
 
     /// <summary>
-    /// Previews a CSV import by parsing the file and returning rows to review.
+    /// Previews a CSV import by parsing the file and returning rows to review. <paramref name="format"/> is a
+    /// <see cref="CsvImportFormats"/> id, or null / "auto" to detect it from the header row.
     /// </summary>
-    Task<ServiceResult<ImportPreviewResponse>> PreviewImportAsync(int userId, string orgSlug, byte[] csvData);
+    Task<ServiceResult<ImportPreviewResponse>> PreviewImportAsync(int userId, string orgSlug, byte[] csvData, string? format = null);
 
     /// <summary>
     /// Confirms and executes a CSV import, creating time entries from the parsed data.

@@ -41,6 +41,23 @@ public record ImportPreviewResponse
     public int TotalRows { get; init; }
     public int DuplicateCount { get; init; }
     public List<string>? Warnings { get; init; }
+
+    /// <summary>Format the file was read as: "standard" (Date/Start/End columns) or "evaluation" (daily "Auswertungen" export).</summary>
+    public required string Format { get; init; }
+
+    /// <summary>Data lines without a time entry (e.g. days without work in a daily export); not imported.</summary>
+    public int SkippedRowCount { get; init; }
+
+    /// <summary>Days with vacation / sick / other absence time in the file. Absences are not imported.</summary>
+    public int SkippedVacationDays { get; init; }
+    public int SkippedSickDays { get; init; }
+    public int SkippedOtherAbsenceDays { get; init; }
+
+    /// <summary>Employee named in the file ("First Last"), for formats that carry names.</summary>
+    public string? EmployeeName { get; init; }
+
+    /// <summary>Whether <see cref="EmployeeName"/> is the caller's own name; null when the file names nobody.</summary>
+    public bool? EmployeeMatchesUser { get; init; }
 }
 
 /// <summary>A single row from the parsed CSV preview.</summary>

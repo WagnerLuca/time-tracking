@@ -95,7 +95,10 @@ export const en: typeof de = {
 		requiresApproval: 'CSV import needs approval. Please submit a request.',
 		empty: 'The CSV file needs a header row and at least one data row.',
 		missingColumns: 'The CSV file needs the columns Date, Start Time and End Time.',
-		tooManyRows: 'An import can hold at most 1000 rows.'
+		tooManyRows: 'An import can hold at most 1000 rows.',
+		unknownFormat: 'Unknown import format.',
+		formatMismatch: 'The file does not have the columns of the selected format.',
+		severalEmployees: 'The file contains data of several people. Import one person per file.'
 	},
 	request: {
 		duplicate: 'An identical request is already pending.',
