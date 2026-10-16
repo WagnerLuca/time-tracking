@@ -12,6 +12,11 @@ docs/AbsenceType.md
 docs/AbsenceTypeDefinitionResponse.md
 docs/AcceptInvitationRequest.md
 docs/AcceptedInvitationResponse.md
+docs/AccountingApi.md
+docs/AccountingMemberSummary.md
+docs/AccountingMonthStatus.md
+docs/AccountingMonthsResponse.md
+docs/AccountingSummaryResponse.md
 docs/AddBadgeCardRequest.md
 docs/AddGroupMemberRequest.md
 docs/AdminCreateAbsenceDayRequest.md
@@ -71,6 +76,7 @@ docs/LoginResponse.md
 docs/LoginResult.md
 docs/ManualEntryResponse.md
 docs/MarkedSeenResponse.md
+docs/MemberAccountantResponse.md
 docs/MemberEntriesApi.md
 docs/MemberGroupResponse.md
 docs/MemberInitialOvertimeResponse.md
@@ -126,6 +132,7 @@ docs/RequestsApi.md
 docs/ResetPasswordRequest.md
 docs/RespondToOrgRequestRequest.md
 docs/RuleMode.md
+docs/SetAccountantRequest.md
 docs/SetInitialOvertimeRequest.md
 docs/SetPersonnelNumberRequest.md
 docs/SetVacationDaysRequest.md
@@ -166,6 +173,8 @@ docs/UpsertAbsenceTypeDefinitionRequest.md
 docs/UserInfo.md
 docs/UserNotificationResponse.md
 docs/UserOrganizationResponse.md
+docs/VacationOverviewResponse.md
+docs/VacationOverviewRow.md
 docs/VerifyEmailRequest.md
 docs/VisibilityRuleRequest.md
 docs/VisibilityRuleResponse.md

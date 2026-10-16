@@ -1,0 +1,78 @@
+/** "Auswertungen": the accounting panel (reports, month closing, vacation overview) and the accounting role. */
+export const de = {
+	title: 'Auswertungen',
+	intro: 'Monatsberichte aller Mitglieder, Lohnexport, Monatsabschluss und Urlaubsübersicht.',
+	role: 'Buchhaltung',
+	tabs: {
+		label: 'Auswertungen',
+		reports: 'Berichte',
+		closing: 'Monatsabschluss',
+		vacation: 'Urlaubsübersicht'
+	},
+	month: 'Monat',
+	year: 'Jahr',
+	load: 'Anzeigen',
+	loadFailed: 'Die Auswertung konnte nicht geladen werden.',
+	hoursHidden: 'In dieser Organisation sehen Admins die Arbeitszeiten der Mitglieder nicht (Einstellung „Admins sehen Arbeitszeiten“). Die Rolle Buchhaltung sieht sie trotzdem.',
+	empty: 'Keine Mitglieder in diesem Zeitraum.',
+	reports: {
+		heading: 'Monatsübersicht {month}',
+		closed: 'Abgeschlossen',
+		open: 'Offen',
+		csv: 'Lohnexport (CSV)',
+		pdf: 'PDF',
+		memberPdf: 'Tagesbericht von {name} (PDF)',
+		downloadFailed: 'Der Download ist fehlgeschlagen.',
+		personnelNo: 'Pers.-Nr.',
+		name: 'Name',
+		target: 'Soll',
+		worked: 'Ist',
+		overtime: 'Überstunden',
+		balance: 'Saldo',
+		vacation: 'Urlaub',
+		sick: 'Krank',
+		other: 'Sonstige',
+		corrections: 'Korrektur nötig',
+		total: 'Summe',
+		former: 'ausgeschieden',
+		correctionsHint: 'Nicht gestoppte Timer zählen 0 Stunden, bis sie korrigiert sind.'
+	},
+	closing: {
+		heading: 'Monatsabschluss {year}',
+		intro: 'Ein abgeschlossener Monat lässt sich nicht mehr ändern – weder Zeiten noch Abwesenheiten, Importe, Arbeitszeitmodelle oder Terminal-Stempel. Admins können mit Grund korrigieren; das wird protokolliert.',
+		status: 'Status',
+		closedBy: 'Abgeschlossen von {name} am {date}',
+		closedAt: 'Abgeschlossen am {date}',
+		notEnded: 'Läuft noch',
+		openState: 'Offen',
+		failures: '{count} nicht gestoppte Timer',
+		pending: '{count} offene Anfragen',
+		ready: 'Bereit',
+		close: 'Abschließen',
+		closeTitle: '{month} abschließen?',
+		closeMessage: 'Danach kann dort niemand außer Admins (mit Grund) etwas ändern.',
+		closeWarning: 'Achtung: {month} hat noch offene Punkte – {issues}. Trotzdem abschließen?',
+		closeAnyway: 'Trotzdem abschließen',
+		closedOk: '{month} ist abgeschlossen.',
+		reopen: 'Wieder öffnen',
+		moreLink: 'Mehrere Monate abschließen und Protokoll'
+	},
+	vacation: {
+		heading: 'Urlaub {year}',
+		entitlement: 'Anspruch',
+		taken: 'Genommen',
+		planned: 'Geplant',
+		remaining: 'Rest',
+		sick: 'Krankheitstage',
+		other: 'Sonstige Abwesenheiten',
+		hint: 'Genommen = bis heute, geplant = ab morgen. Urlaub zählt nur an Arbeitstagen, Feiertage ausgenommen.'
+	},
+	member: {
+		title: 'Buchhaltung',
+		text: 'Mit der Rolle Buchhaltung sieht die Person unter „Auswertungen“ Stunden, Abwesenheiten und Urlaub aller Mitglieder, exportiert die Lohnabrechnung und schließt Monate ab. Sonst ändert sich nichts an ihren Rechten.',
+		toggle: 'Rolle Buchhaltung',
+		granted: 'Rolle Buchhaltung vergeben.',
+		revoked: 'Rolle Buchhaltung entzogen.',
+		failed: 'Die Rolle konnte nicht geändert werden.'
+	}
+};

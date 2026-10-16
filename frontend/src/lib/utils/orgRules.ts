@@ -8,6 +8,29 @@ export function isOrgAdmin(role: string | null | undefined): boolean {
 	return role === 'Owner' || role === 'Admin';
 }
 
+// ── Accounting role (docs/ACCOUNTING_ROLE_PLAN.md) ──
+
+type Membership = { role?: string | null; isAccountant?: boolean | null } | null | undefined;
+
+/** The "Auswertungen" panel: owners, admins and accountants (backend `[RequireOrgRole(Admin, OrAccountant = true)]`). */
+export function canUseAccounting(membership: Membership): boolean {
+	return !!membership && (isOrgAdmin(membership.role) || !!membership.isAccountant);
+}
+
+/**
+ * Whether everybody's hours (reports, payroll) are visible: accountants always, owners/admins only while
+ * the organization lets admins see members' hours.
+ */
+export function seesAllHours(membership: Membership, org: { memberTimeEntryVisibility?: boolean | null } | null | undefined): boolean {
+	return !!membership?.isAccountant || (isOrgAdmin(membership?.role) && !!org?.memberTimeEntryVisibility);
+}
+
+/** Who may grant/revoke the accounting role: the owner for anyone, admins for members other than themselves. */
+export function canGrantAccountant(callerRole: string | null | undefined, targetRole: string | null | undefined, isSelf: boolean): boolean {
+	if (callerRole === 'Owner') return true;
+	return callerRole === 'Admin' && !isSelf && targetRole === 'Member';
+}
+
 // ── Rule mode checks ──
 
 export function isAllowed(mode: string | null | undefined): boolean {

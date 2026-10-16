@@ -12,7 +12,6 @@
 	import { t } from '$lib/i18n';
 	import type { OrganizationDetailResponse } from '$lib/api';
 	import Skeleton from '$lib/components/Skeleton.svelte';
-	import ClosedPeriodsPanel from '$lib/components/ClosedPeriodsPanel.svelte';
 
 	/** "Allgemein" (admins only): the organization's profile, time reference and the danger zone. */
 	const orgSlug = $derived(page.params.slug ?? '');
@@ -177,7 +176,11 @@
 			</div>
 		</form>
 
-		<ClosedPeriodsPanel {orgSlug} timeZone={org.timeZone} />
+		<section class="card bg-base-100 border border-base-300 p-4 sm:p-5 flex flex-col gap-2 mt-8 max-w-2xl" aria-labelledby="closed-periods-moved">
+			<h2 id="closed-periods-moved" class="text-base font-semibold m-0">{t('closedPeriods.title')}</h2>
+			<p class="text-sm text-base-content/70 m-0">{t('closedPeriods.moved')}</p>
+			<a class="btn btn-sm self-start" href="/organizations/{orgSlug}/accounting?tab=closing">{t('closedPeriods.movedLink')}</a>
+		</section>
 
 		<section class="card border border-error/50 bg-error/5 p-4 sm:p-5 mt-8 max-w-2xl" aria-labelledby="general-danger" data-testid="danger-zone">
 			<h2 id="general-danger" class="text-base font-semibold text-error m-0">{t('orgHome.general.danger')}</h2>

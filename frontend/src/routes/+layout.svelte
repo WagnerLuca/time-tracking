@@ -12,7 +12,7 @@
 	import { authApi } from '$lib/apiClient';
 	import { inbox } from '$lib/stores/inbox.svelte';
 	import { getOrgDetail } from '$lib/stores/orgDetail';
-	import { isOrgAdmin } from '$lib/utils/orgRules';
+	import { canUseAccounting, isOrgAdmin } from '$lib/utils/orgRules';
 	import { formatClock, roleLabel } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import { t, tp } from '$lib/i18n';
@@ -179,6 +179,9 @@
 		{ href: '/history', label: t('nav.history'), icon: 'list' },
 		...(orgContext.selectedOrgSlug ? [{ href: `/organizations/${orgContext.selectedOrgSlug}/absences`, label: t('nav.teamCalendar'), icon: 'calendar' }] : []),
 		...(canApprove ? [{ href: '/inbox', label: t('nav.requests'), icon: 'inbox' }] : []),
+		...(orgContext.selectedOrgSlug && canUseAccounting(orgContext.selectedOrg)
+			? [{ href: `/organizations/${orgContext.selectedOrgSlug}/accounting`, label: t('accounting.title'), icon: 'chart' }]
+			: []),
 		{ href: orgContext.selectedOrgSlug ? `/organizations/${orgContext.selectedOrgSlug}` : '/organizations', label: t('nav.organization'), icon: 'org' }
 	]);
 	/** The phone's bottom bar: the four everyday places + "Mehr" (everything else). */

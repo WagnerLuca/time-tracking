@@ -1,0 +1,79 @@
+import type { de } from './de';
+
+export const en: typeof de = {
+	title: 'Reports',
+	intro: "Every member's monthly figures, payroll export, month closing and vacation overview.",
+	role: 'Accounting',
+	tabs: {
+		label: 'Reports',
+		reports: 'Reports',
+		closing: 'Month closing',
+		vacation: 'Vacation overview'
+	},
+	month: 'Month',
+	year: 'Year',
+	load: 'Show',
+	loadFailed: 'The report could not be loaded.',
+	hoursHidden: "In this organization admins do not see members' working hours (setting \"Admins see working hours\"). The accounting role sees them anyway.",
+	empty: 'No members in this period.',
+	reports: {
+		heading: 'Monthly overview {month}',
+		closed: 'Closed',
+		open: 'Open',
+		csv: 'Payroll export (CSV)',
+		pdf: 'PDF',
+		memberPdf: 'Daily report of {name} (PDF)',
+		downloadFailed: 'The download failed.',
+		personnelNo: 'Pers. no.',
+		name: 'Name',
+		target: 'Target',
+		worked: 'Worked',
+		overtime: 'Overtime',
+		balance: 'Balance',
+		vacation: 'Vacation',
+		sick: 'Sick',
+		other: 'Other',
+		corrections: 'Needs correction',
+		total: 'Total',
+		former: 'left',
+		correctionsHint: 'Timers that were not stopped count 0 hours until they are corrected.'
+	},
+	closing: {
+		heading: 'Month closing {year}',
+		intro: 'A closed month cannot be changed any more — no times, absences, imports, work schedules or terminal punches. Admins can correct with a reason; that is logged.',
+		status: 'Status',
+		closedBy: 'Closed by {name} on {date}',
+		closedAt: 'Closed on {date}',
+		notEnded: 'Still running',
+		openState: 'Open',
+		failures: '{count} timers not stopped',
+		pending: '{count} pending requests',
+		ready: 'Ready',
+		close: 'Close',
+		closeTitle: 'Close {month}?',
+		closeMessage: 'Afterwards nobody but admins (with a reason) can change it.',
+		closeWarning: 'Careful: {month} still has open issues — {issues}. Close anyway?',
+		closeAnyway: 'Close anyway',
+		closedOk: '{month} is closed.',
+		reopen: 'Reopen',
+		moreLink: 'Close several months and log'
+	},
+	vacation: {
+		heading: 'Vacation {year}',
+		entitlement: 'Entitlement',
+		taken: 'Taken',
+		planned: 'Planned',
+		remaining: 'Remaining',
+		sick: 'Sick days',
+		other: 'Other absences',
+		hint: 'Taken = up to today, planned = from tomorrow. Vacation counts on working days only, holidays excluded.'
+	},
+	member: {
+		title: 'Accounting',
+		text: 'With the accounting role the person sees hours, absences and vacation of all members under "Reports", exports payroll and closes months. Nothing else changes about their rights.',
+		toggle: 'Accounting role',
+		granted: 'Accounting role granted.',
+		revoked: 'Accounting role revoked.',
+		failed: 'The role could not be changed.'
+	}
+};

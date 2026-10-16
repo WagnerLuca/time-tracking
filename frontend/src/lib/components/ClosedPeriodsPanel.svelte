@@ -1,17 +1,27 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { closedPeriodsApi } from '$lib/apiClient';
-	import type { ClosedPeriodsResponse } from '$lib/api';
+	import type { AccountingMonthStatus, ClosedPeriodsResponse } from '$lib/api';
 	import { invalidateOrgDetail } from '$lib/stores/orgDetail';
 	import { confirmDialog, promptDialog } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { formatDateTime } from '$lib/utils/formatters';
 	import { formatMonth, lastClosableMonth, monthKey, monthsBetween } from '$lib/utils/closedPeriods';
+	import { closeWarnings } from '$lib/utils/accounting';
 	import { t } from '$lib/i18n';
 
-	/** Allgemein → closed months (issue #57): close a range, reopen one with a reason, the audit log. Admins only. */
-	let { orgSlug, timeZone }: { orgSlug: string; timeZone?: string | null } = $props();
+	/**
+	 * Auswertungen → Monatsabschluss (issue #57): close a range, reopen one with a reason, the audit log.
+	 * Admins and accountants. `statuses` (the year's months from the accounting API) adds a warning when a
+	 * month to close still has failure entries or pending requests.
+	 */
+	let { orgSlug, timeZone, statuses = [], onchanged }: {
+		orgSlug: string;
+		timeZone?: string | null;
+		statuses?: AccountingMonthStatus[];
+		onchanged?: () => void;
+	} = $props();
 
 	const latest = lastClosableMonth(new Date(), untrack(() => timeZone));
 	let data = $state<ClosedPeriodsResponse | null>(null);
@@ -41,10 +51,16 @@
 	async function close(e: Event) {
 		e.preventDefault();
 		if (range.length === 0) return;
+		const warnings = range.flatMap((m) => {
+			const issues = closeWarnings(statuses.find((s) => monthKey(s.month ?? '') === m));
+			return issues.length ? [`${formatMonth(m)}: ${issues.join(', ')}`] : [];
+		});
+		const message = t('closedPeriods.closeMessage', { months: range.map(formatMonth).join(', ') });
 		const ok = await confirmDialog({
 			title: t('closedPeriods.closeTitle'),
-			message: t('closedPeriods.closeMessage', { months: range.map(formatMonth).join(', ') }),
-			confirmLabel: t('closedPeriods.close')
+			message: warnings.length ? `${message} ${t('closedPeriods.openIssues', { issues: warnings.join('; ') })}` : message,
+			confirmLabel: warnings.length ? t('accounting.closing.closeAnyway') : t('closedPeriods.close'),
+			danger: warnings.length > 0
 		});
 		if (!ok) return;
 		busy = true;
@@ -55,6 +71,7 @@
 			note = '';
 			invalidateOrgDetail(orgSlug);
 			toast.success(t('closedPeriods.closedOk'));
+			onchanged?.();
 		} catch (err) {
 			toast.error(err);
 		} finally {
@@ -75,6 +92,7 @@
 			data = (await closedPeriodsApi.apiV1OrganizationsSlugClosedPeriodsReopenPost(orgSlug, { month, reason })).data;
 			invalidateOrgDetail(orgSlug);
 			toast.success(t('closedPeriods.reopened', { month: formatMonth(month) }));
+			onchanged?.();
 		} catch (err) {
 			toast.error(err);
 		} finally {

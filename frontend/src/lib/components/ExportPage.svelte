@@ -15,7 +15,7 @@
 	import { RequestType } from '$lib/api';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { dateKey } from '$lib/utils/dateHelpers';
-	import { csvImportEnabled, canImportCsv, isOrgAdmin, isRequiresApproval, ruleMode } from '$lib/utils/orgRules';
+	import { csvImportEnabled, canImportCsv, isOrgAdmin, isRequiresApproval, ruleMode, seesAllHours } from '$lib/utils/orgRules';
 	import { formatDate, getMonthName } from '$lib/utils/formatters';
 	import { t, tp } from '$lib/i18n';
 	import type { de as exportMessages } from '$lib/i18n/messages/export/de';
@@ -403,12 +403,12 @@
 		}
 	}
 
-	// ── Payroll CSV (org admins, while admins may see members' hours) ──
+	// ── Payroll CSV (accountants; org admins while admins may see members' hours) ──
 	let payrollMonth = $state(now.getMonth() + 1);
 	let payrollYear = $state(now.getFullYear());
 	let payrollDownloading = $state(false);
 	let payrollError = $state('');
-	let canPayroll = $derived(isOrgAdmin(orgContext.selectedOrg?.role) && !!orgDetail?.memberTimeEntryVisibility);
+	let canPayroll = $derived(seesAllHours(orgContext.selectedOrg, orgDetail));
 
 	async function downloadPayroll() {
 		const orgSlug = orgContext.selectedOrgSlug;

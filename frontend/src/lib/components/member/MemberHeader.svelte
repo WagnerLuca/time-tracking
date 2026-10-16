@@ -79,6 +79,7 @@
 			{#if member.email}<p class="text-base-content/70 text-sm mt-0.5 mb-2 break-all">{member.email}</p>{/if}
 			<div class="flex items-center gap-2 flex-wrap">
 				{#if member.role}<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>{/if}
+				{#if member.isAccountant}<span class="badge badge-sm badge-accent uppercase tracking-wide" data-testid="accountant-badge">{t('accounting.role')}</span>{/if}
 				<GroupTags groups={member.groups} size="sm" />
 				{#if member.joinedAt}
 					<span class="text-base-content/70 text-xs">{t('memberDetail.header.joined', { date: formatDateFull(member.joinedAt) })}</span>

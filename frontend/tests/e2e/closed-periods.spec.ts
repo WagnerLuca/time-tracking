@@ -28,7 +28,7 @@ test('closed periods: admin closes last month, member is locked out, admin edits
 	try {
 		// Anna closes last month (the form defaults to it)
 		await login(page, 'anna.schmidt@example.com');
-		await page.goto(`/organizations/${SLUG}/general`);
+		await page.goto(`/organizations/${SLUG}/accounting?tab=closing`);
 		const panel = page.getByTestId('closed-periods');
 		await expect(panel.getByTestId('close-to')).toHaveValue(month);
 		await panel.getByRole('button', { name: 'Abschließen' }).click();
@@ -77,7 +77,7 @@ test('closed periods: admin closes last month, member is locked out, admin edits
 		await details.getByRole('button', { name: 'Abbrechen' }).click();
 
 		// The log lists the admin change with its reason
-		await page.goto(`/organizations/${SLUG}/general`);
+		await page.goto(`/organizations/${SLUG}/accounting?tab=closing`);
 		await expect(page.getByTestId('closed-periods-log').locator('li').first()).toContainText('Admin-Änderung');
 		await expect(page.getByTestId('closed-periods-log').locator('li').first()).toContainText('Nachtrag nach Lohnabrechnung');
 	} finally {
