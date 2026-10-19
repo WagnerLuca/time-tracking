@@ -40,7 +40,8 @@ public class RefreshTokenCleanupService : BackgroundService
         }
     }
 
-    private async Task CleanupTokensAsync(CancellationToken cancellationToken)
+    /// <summary>One cleanup pass (every 6 hours; system work in its own scope). Public so tests can run a pass.</summary>
+    public async Task CleanupTokensAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TimeTrackingDbContext>();
@@ -66,6 +67,11 @@ public class RefreshTokenCleanupService : BackgroundService
             .Where(p => p.ReceivedAt < punchCutoff), cancellationToken);
         if (removed > 0)
             _logger.LogInformation("Retention cleanup removed {Count} old links, notifications and punch protocol rows.", removed);
+
+        // Balance checkpoints that can never be valid again (a newer version or algorithm, a deleted organization)
+        var checkpoints = await DeleteAsync(context, BalanceCheckpoints.Invalid(context), cancellationToken);
+        if (checkpoints > 0)
+            _logger.LogInformation("Removed {Count} outdated balance checkpoint(s).", checkpoints);
     }
 
     /// <summary>

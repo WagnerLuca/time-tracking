@@ -52,8 +52,20 @@ public static class DailyReportAggregator
         // day, not to the previous UTC day)
         var timeZone = await context.Organizations.AsNoTracking()
             .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
-        var clock = OrgClock.For(timeZone);
+        return await BuildAsync(context, OrgClock.For(timeZone), userId, orgId, dateFrom, dateTo, initialOvertimeHours,
+            includeFuture, detailsFrom);
+    }
 
+    /// <summary>
+    /// <see cref="BuildAsync(TimeTrackingDbContext, int, int, DateOnly, DateOnly, double, bool, DateOnly?)"/> with the org's
+    /// clock already known, continuing a running total: the rows' overtime sum starts at <paramref name="startDelta"/> (a
+    /// <see cref="BalanceCheckpoint.OvertimeDelta"/>) and <paramref name="monthEnds"/> collects it at every month's last day.
+    /// </summary>
+    internal static async Task<List<DailyReportRow>> BuildAsync(
+        TimeTrackingDbContext context, OrgClock clock, int userId, int orgId,
+        DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours, bool includeFuture = false, DateOnly? detailsFrom = null,
+        double startDelta = 0, List<(DateOnly Day, double Delta)>? monthEnds = null, List<WorkSchedule>? schedules = null)
+    {
         // Only count days up to today — future days haven't happened yet and
         // would otherwise show as artificial "Missing" time with a misleading target.
         // (includeFuture: only for planned targets; such rows must not feed a balance.)
@@ -70,7 +82,7 @@ public static class DailyReportAggregator
             .OrderBy(e => e.StartTime)
             .ToListAsync();
 
-        var workSchedules = await context.WorkSchedules.AsNoTracking()
+        var workSchedules = schedules ?? await context.WorkSchedules.AsNoTracking()
             .Where(ws => ws.UserId == userId && ws.OrganizationId == orgId)
             .OrderBy(ws => ws.ValidFrom)
             .ToListAsync();
@@ -78,6 +90,8 @@ public static class DailyReportAggregator
         var holidays = await context.Holidays.AsNoTracking()
             .Where(h => h.OrganizationId == orgId
                      && ((h.Date >= dateFrom && h.Date <= dateTo) || h.IsRecurring))
+            // A one-off holiday wins over a recurring one on the same day (BuildRows keeps the first per date)
+            .OrderBy(h => h.IsRecurring).ThenBy(h => h.Id)
             .ToListAsync();
 
         var absences = await context.AbsenceDays.AsNoTracking()
@@ -91,18 +105,26 @@ public static class DailyReportAggregator
             ? await CoreHours.OpenViolationsAsync(context, userId, orgId, detailsStart, dateTo)
             : new Dictionary<DateOnly, CoreHours.Result>();
         return BuildRows(clock, dateFrom, dateTo, initialOvertimeHours, timeEntries, workSchedules, holidays, absences, coreHoursMissed,
-            detailsStart);
+            detailsStart, startDelta, monthEnds);
     }
 
     /// <summary>
-    /// The day loop of <see cref="BuildAsync"/> over already loaded data (entries: the member's finished
+    /// The day loop of <c>BuildAsync</c> over already loaded data (entries: the member's finished
     /// entries in the range; schedules, holidays and absences: theirs/the org's). Shared with
     /// <see cref="BalancesAsync"/>, which loads the data of a whole team at once. Entry summaries are only built from
     /// <paramref name="summariesFrom"/> on (<see cref="DateOnly.MaxValue"/>: none, for callers that only need the figures).
+    /// <para>
+    /// The running total is kept as the overtime sum since the first counted day (<paramref name="startDelta"/> when continuing
+    /// from a <see cref="BalanceCheckpoint"/>, else 0) and each row's <see cref="DailyReportRow.CumulativeOvertime"/> is
+    /// <c>initialOvertimeHours + sum</c> — so a total continued from a checkpoint is bit for bit the one computed from the
+    /// first day (the initial overtime is not part of the checkpoint). <paramref name="monthEnds"/> receives the sum at
+    /// every month's last day (the checkpoints to write).
+    /// </para>
     /// </summary>
     private static List<DailyReportRow> BuildRows(OrgClock clock, DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours,
         IEnumerable<TimeEntry> timeEntries, List<WorkSchedule> workSchedules, IEnumerable<Holiday> holidays,
-        IEnumerable<AbsenceDay> absences, IReadOnlyDictionary<DateOnly, CoreHours.Result> coreHoursMissed, DateOnly summariesFrom)
+        IEnumerable<AbsenceDay> absences, IReadOnlyDictionary<DateOnly, CoreHours.Result> coreHoursMissed, DateOnly summariesFrom,
+        double startDelta = 0, List<(DateOnly Day, double Delta)>? monthEnds = null)
     {
         var entriesByDate = timeEntries
             .OrderBy(e => e.StartTime)
@@ -122,7 +144,7 @@ public static class DailyReportAggregator
         var absencesByDate = absences.ToDictionary(a => a.Date, a => a);
 
         var rows = new List<DailyReportRow>();
-        var cumulativeOvertime = initialOvertimeHours;
+        var overtimeSum = startDelta;
         var currentDate = dateFrom;
 
         while (currentDate <= dateTo)
@@ -158,7 +180,8 @@ public static class DailyReportAggregator
             else { status = "Missing"; }
 
             var overtime = netHours - effectiveTarget;
-            cumulativeOvertime += overtime;
+            overtimeSum += overtime;
+            if (monthEnds != null && currentDate.AddDays(1).Day == 1) monthEnds.Add((currentDate, overtimeSum));
 
             var entrySummary = allDayEntries.Count > 0 && currentDate >= summariesFrom
                 ? string.Join(" | ", allDayEntries.Select(e =>
@@ -169,7 +192,7 @@ public static class DailyReportAggregator
 
             rows.Add(new DailyReportRow(
                 currentDate, dayOfWeek, effectiveTarget, grossMinutes / 60.0, pauseMinutes,
-                netHours, overtime, cumulativeOvertime, status,
+                netHours, overtime, initialOvertimeHours + overtimeSum, status,
                 isHoliday ? holiday!.Name : null,
                 isAbsence ? absence!.Type : null,
                 isAbsence ? absence!.Note : null,
@@ -190,30 +213,41 @@ public static class DailyReportAggregator
     /// never-reset running balance since their very first tracked entry — not just
     /// a total reset at the start of the requested period. Also returns that overall
     /// balance as of the end of the period (or "today" if the period is still ongoing,
-    /// since <see cref="BuildAsync"/> clamps internally). Used by the PDF reports, the balance
-    /// endpoint and the daily CSV, so all of them show the same running total.
+    /// since <see cref="BuildAsync(TimeTrackingDbContext, int, int, DateOnly, DateOnly, double, bool, DateOnly?)"/> clamps
+    /// internally). Used by the PDF reports, the balance endpoint and the daily CSV, so all of them show the same running total.
+    /// The history before <paramref name="dateFrom"/> comes from the latest valid <see cref="BalanceCheckpoint"/> (the
+    /// rows from there on are computed and the months that ended in them stored as new checkpoints), so the cost does not
+    /// grow with the member's years — the figures are exactly those of a computation from the first entry.
     /// </summary>
     public static async Task<(List<DailyReportRow> Rows, double OverallCumulative)> BuildWithRunningTotalAsync(
         TimeTrackingDbContext context, int userId, int orgId,
         DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours)
     {
-        var firstEntry = await context.TimeEntries.AsNoTracking()
-            .Where(e => e.UserId == userId && e.OrganizationId == orgId && !e.IsRunning)
-            .OrderBy(e => e.StartTime)
-            .Select(e => (DateTime?)e.StartTime)
-            .FirstOrDefaultAsync();
+        var timeZone = await context.Organizations.AsNoTracking()
+            .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
+        var clock = OrgClock.For(timeZone);
 
         // The balance runs from the first tracked entry: days before someone started tracking
         // are not "missing" work. Without any entry there is nothing to count yet.
-        if (firstEntry == null)
+        var (members, stamp) = await BalanceCheckpoints.LoadAsync(context, orgId, clock, [userId], dateFrom, NoFailures);
+        if (!members.TryGetValue(userId, out var member))
+        {
+            // Not even a former member (no membership row): no checkpoints, the whole history as before them
+            var firstEntry = await context.TimeEntries.AsNoTracking()
+                .Where(e => e.UserId == userId && e.OrganizationId == orgId && !e.IsRunning)
+                .MinAsync(e => (DateTime?)e.StartTime);
+            if (firstEntry == null) return ([], initialOvertimeHours);
+            var firstDay = clock.LocalDate(firstEntry.Value);
+            member = new BalanceCheckpoints.Member(new BalanceCheckpoints.Start(firstDay, 0, firstDay), null!, 0);
+        }
+        if (member.Start is not { } start)
             return ([], initialOvertimeHours);
 
-        var timeZone = await context.Organizations.AsNoTracking()
-            .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
-        var loopFrom = OrgClock.For(timeZone).LocalDate(firstEntry.Value);
-
         // Rows before dateFrom only feed the running total: no core-hours evaluation or entry summaries for them
-        var allRows = await BuildAsync(context, userId, orgId, loopFrom, dateTo, initialOvertimeHours, detailsFrom: dateFrom);
+        var monthEnds = new List<(DateOnly Day, double Delta)>();
+        var allRows = await BuildAsync(context, clock, userId, orgId, start.From, dateTo, initialOvertimeHours,
+            detailsFrom: dateFrom, startDelta: start.Delta, monthEnds: monthEnds, schedules: member.Schedules);
+        await BalanceCheckpoints.SaveAsync(context, stamp, timeZone, [(userId, member, monthEnds)]);
         var displayRows = allRows.Where(r => r.Date >= dateFrom).ToList();
         var overallCumulative = allRows.Count > 0 ? allRows[^1].CumulativeOvertime : initialOvertimeHours;
 
@@ -222,9 +256,9 @@ public static class DailyReportAggregator
 
     /// <summary>
     /// <see cref="BuildWithRunningTotalAsync"/>'s overall balance (as of today) for several members at once —
-    /// the same number the balance endpoint shows — in four queries for the whole team (entries, schedules,
-    /// holidays, absences) instead of six per member. Also each member's number of failure entries started up to today
-    /// (the team overview's count), taken from the same entries.
+    /// the same number the balance endpoint shows — for the whole team in four queries (memberships with their checkpoint,
+    /// first entry, failure count and schedules; entries; holidays; absences) instead of six per member.
+    /// Also each member's number of failure entries started up to today (the team overview's count).
     /// </summary>
     /// <param name="runningOf">Members whose running timers (started before tomorrow) the caller wants as well — read in the same
     /// query and added to <paramref name="running"/> (the team overview's presence), so presence costs no query of its own.</param>
@@ -232,7 +266,7 @@ public static class DailyReportAggregator
         IReadOnlyDictionary<int, double> initialOvertimeByUser, IReadOnlyCollection<int>? runningOf = null, List<TimeEntry>? running = null)
     {
         var today = OrgClock.For(org).Today();
-        var totals = await TotalsAsync(context, org, initialOvertimeByUser, today, today, runningOf, running);
+        var totals = await TotalsAsync(context, org, initialOvertimeByUser, today, today, runningOf, running, failureCounts: true);
         return totals.ToDictionary(t => t.Key, t => (t.Value.Balance, t.Value.FailureCount));
     }
 
@@ -240,6 +274,9 @@ public static class DailyReportAggregator
     /// Target, net worked and overtime hours of a period and the overtime balance at its end, as summed from the report rows;
     /// <see cref="FailureCount"/>: failure entries started up to the period end (whole history, not only the period).
     /// </summary>
+    /// <summary>A failure-count bound no entry is before (callers that do not need the counts).</summary>
+    private static readonly DateTime NoFailures = DateTime.SpecifyKind(new DateTime(1900, 1, 1), DateTimeKind.Utc);
+
     public readonly record struct PeriodTotals(double Target, double Worked, double Overtime, double Balance, int FailureCount = 0);
 
     /// <summary>
@@ -247,13 +284,14 @@ public static class DailyReportAggregator
     /// and <see cref="DailyReportRow.Overtime"/> over the rows from <paramref name="periodFrom"/> to <paramref name="to"/> (local days,
     /// clamped to today) and the running balance at the last row — exactly what per member
     /// <c>BuildAsync(firstEntryDay, to, initial)</c> gives (rows from the member's first finished entry on; nothing before it counts,
-    /// and without any entry the balance is the initial overtime). Four queries for the whole team (finished entries, schedules,
-    /// holidays, absences — only the columns the figures need), independent of the member count; the history is still read in full
-    /// (balance checkpoints come in Phase 2 of docs/PERFORMANCE_PLAN.md).
+    /// and without any entry the balance is the initial overtime). A fixed number of queries for the whole team, independent of
+    /// the member count; the history before <paramref name="periodFrom"/> comes from each member's latest valid
+    /// <see cref="BalanceCheckpoint"/>, so only the rows since then are computed (and the months that ended in them stored).
+    /// <see cref="PeriodTotals.FailureCount"/> is only counted with <paramref name="failureCounts"/>.
     /// </summary>
     public static async Task<Dictionary<int, PeriodTotals>> TotalsAsync(TimeTrackingDbContext context, Organization org,
         IReadOnlyDictionary<int, double> initialOvertimeByUser, DateOnly periodFrom, DateOnly to,
-        IReadOnlyCollection<int>? runningOf = null, List<TimeEntry>? running = null)
+        IReadOnlyCollection<int>? runningOf = null, List<TimeEntry>? running = null, bool failureCounts = true)
     {
         var userIds = initialOvertimeByUser.Keys.ToList();
         var clock = OrgClock.For(org);
@@ -265,9 +303,22 @@ public static class DailyReportAggregator
         var toUtc = clock.StartOfDayUtc(to.AddDays(1));
         var tomorrowUtc = clock.StartOfDayUtc(today.AddDays(1));
 
-        var loaded = await context.TimeEntries.AsNoTracking()
+        Dictionary<int, BalanceCheckpoints.Member> members = [];
+        BalanceCheckpoints.Stamp? stamp = null;
+        if (userIds.Count > 0)
+            (members, stamp) = await BalanceCheckpoints.LoadAsync(context, org.Id, clock, userIds, periodFrom,
+                failureCounts ? toUtc : NoFailures);
+        foreach (var (userId, member) in members)
+            result[userId] = result[userId] with { FailureCount = member.FailureCount };
+        var starts = members.Where(m => m.Value.Start is { } s && s.From <= to).ToDictionary(m => m.Key, m => m.Value.Start!);
+        var startIds = starts.Keys.ToList();
+        var from = starts.Count > 0 ? starts.Values.Min(s => s.From) : to;
+        var fromUtc = clock.StartOfDayUtc(from);
+
+        // Finished entries from the earliest start on (only of members with rows to build), running timers for presence
+        var loaded = startIds.Count == 0 && runningIds.Count == 0 ? [] : await context.TimeEntries.AsNoTracking()
             .Where(e => e.OrganizationId == org.Id
-                     && ((!e.IsRunning && userIds.Contains(e.UserId) && e.StartTime < toUtc)
+                     && ((!e.IsRunning && startIds.Contains(e.UserId) && e.StartTime >= fromUtc && e.StartTime < toUtc)
                          || (e.IsRunning && runningIds.Contains(e.UserId) && e.StartTime < tomorrowUtc)))
             .Select(e => new TimeEntry
             {
@@ -276,39 +327,35 @@ public static class DailyReportAggregator
             })
             .ToListAsync();
         running?.AddRange(loaded.Where(e => e.IsRunning));
-        var finished = loaded.Where(e => !e.IsRunning).ToLookup(e => e.UserId);
-        var firstDay = finished.ToDictionary(g => g.Key, g => clock.LocalDate(g.Min(e => e.StartTime)));
-        if (firstDay.Count == 0) return result;
-        // Failure entries are never running, so these are all of them up to the end
-        foreach (var g in finished)
-            result[g.Key] = result[g.Key] with { FailureCount = g.Count(e => e.IsFailure) };
-        var from = firstDay.Values.Min();
 
-        var schedules = (await context.WorkSchedules.AsNoTracking()
-                .Where(ws => ws.OrganizationId == org.Id && userIds.Contains(ws.UserId))
-                .OrderBy(ws => ws.ValidFrom)
-                .ToListAsync())
-            .ToLookup(ws => ws.UserId);
+        if (starts.Count == 0) return result;
+        var finished = loaded.Where(e => !e.IsRunning).ToLookup(e => e.UserId);
+
         var holidays = await context.Holidays.AsNoTracking()
             .Where(h => h.OrganizationId == org.Id && ((h.Date >= from && h.Date <= to) || h.IsRecurring))
+            .OrderBy(h => h.IsRecurring).ThenBy(h => h.Id)
             .ToListAsync();
         var absences = (await context.AbsenceDays.AsNoTracking()
                 .Include(a => a.CustomType)
-                .Where(a => a.OrganizationId == org.Id && userIds.Contains(a.UserId) && a.Date >= from && a.Date <= to)
+                .Where(a => a.OrganizationId == org.Id && startIds.Contains(a.UserId) && a.Date >= from && a.Date <= to)
                 .ToListAsync())
             .ToLookup(a => a.UserId);
 
         var noViolations = new Dictionary<DateOnly, CoreHours.Result>();
-        foreach (var (userId, start) in firstDay)
+        var computed = new List<(int UserId, BalanceCheckpoints.Member Member, List<(DateOnly Day, double Delta)> MonthEnds)>();
+        foreach (var (userId, start) in starts)
         {
-            if (start > to) continue;
-            var rows = BuildRows(clock, start, to, initialOvertimeByUser[userId], finished[userId],
-                schedules[userId].ToList(), holidays, absences[userId].Where(a => a.Date >= start), noViolations, DateOnly.MaxValue);
+            var monthEnds = new List<(DateOnly Day, double Delta)>();
+            var rows = BuildRows(clock, start.From, to, initialOvertimeByUser[userId], finished[userId],
+                members[userId].Schedules, holidays, absences[userId].Where(a => a.Date >= start.From), noViolations, DateOnly.MaxValue,
+                start.Delta, monthEnds);
+            computed.Add((userId, members[userId], monthEnds));
             if (rows.Count == 0) continue;
             var period = rows.Where(r => r.Date >= periodFrom).ToList();
             result[userId] = new PeriodTotals(period.Sum(r => r.TargetHours), period.Sum(r => r.NetWorkedHours),
                 period.Sum(r => r.Overtime), rows[^1].CumulativeOvertime, result[userId].FailureCount);
         }
+        await BalanceCheckpoints.SaveAsync(context, stamp!, org.TimeZone, computed);
         return result;
     }
 

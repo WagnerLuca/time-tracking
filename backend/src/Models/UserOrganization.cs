@@ -41,6 +41,13 @@ public class UserOrganization
     /// month closing, vacation overview) and nothing else.
     /// </summary>
     public bool IsAccountant { get; set; }
+
+    /// <summary>
+    /// Overtime balance checkpoints (<c>BalanceCheckpoints</c>): bumped by every save that changes this member's
+    /// entries, absences or schedules in an ended month; a checkpoint is only valid while its
+    /// <see cref="BalanceCheckpoint.Version"/> matches.
+    /// </summary>
+    public int BalanceVersion { get; set; }
     
     // Navigation properties
     [JsonIgnore]

@@ -157,7 +157,7 @@ public static class ClosedPeriods
     }
 
     /// <summary>The days whose target hours a schedule change alters (to null = open-ended).</summary>
-    private static IEnumerable<(DateOnly From, DateOnly? To)> ScheduleRanges(EntityEntry e)
+    internal static IEnumerable<(DateOnly From, DateOnly? To)> ScheduleRanges(EntityEntry e)
     {
         var (from, to) = (e.Property(nameof(WorkSchedule.ValidFrom)), e.Property(nameof(WorkSchedule.ValidTo)));
         if (e.State != EntityState.Modified)

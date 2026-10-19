@@ -113,7 +113,7 @@ public class PayrollExportService(TimeTrackingDbContext context, ILogger<Payroll
 
         // Hours of every member in four queries (not six per member): the same rows as BuildAsync from each member's first entry
         var hours = await DailyReportAggregator.TotalsAsync(context, org,
-            members.ToDictionary(m => m.UserId, m => m.InitialOvertimeHours), from, to);
+            members.ToDictionary(m => m.UserId, m => m.InitialOvertimeHours), from, to, failureCounts: false);
 
         var rows = new List<PayrollRow>();
         foreach (var member in members)

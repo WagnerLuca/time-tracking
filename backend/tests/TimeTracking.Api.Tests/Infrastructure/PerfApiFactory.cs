@@ -22,7 +22,7 @@ public class PerfApiFactory : PostgresApiFactory
 {
     public QueryCounter Queries { get; } = new();
 
-    private static readonly Type[] BackgroundJobs = [typeof(FailureEntryService), typeof(PushDispatcher), typeof(RefreshTokenCleanupService)];
+    private static readonly Type[] BackgroundJobs = [typeof(FailureEntryService), typeof(BalanceCheckpointWarmupService), typeof(PushDispatcher), typeof(RefreshTokenCleanupService)];
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

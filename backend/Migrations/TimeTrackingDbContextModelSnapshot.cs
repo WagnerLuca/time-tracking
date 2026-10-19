@@ -212,6 +212,51 @@ namespace TimeTracking.Api.Migrations
                     b.ToTable("BadgeCards");
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.BalanceCheckpoint", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Algorithm")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ComputedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("FirstDay")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("Month")
+                        .HasColumnType("date");
+
+                    b.Property<int>("OrgVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("OvertimeDelta")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("OrganizationId", "UserId", "Month")
+                        .IsUnique();
+
+                    b.ToTable("BalanceCheckpoints");
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.ClosedPeriod", b =>
                 {
                     b.Property<int>("Id")
@@ -711,6 +756,12 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<bool>("AutoPauseEnabled")
                         .HasColumnType("boolean");
+
+                    b.Property<int>("BalanceVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("BalanceWarmedMonth")
+                        .HasColumnType("date");
 
                     b.Property<TimeOnly>("BusinessDayEnd")
                         .HasColumnType("time without time zone");
@@ -1234,6 +1285,9 @@ namespace TimeTracking.Api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("BalanceVersion")
+                        .HasColumnType("integer");
+
                     b.Property<double>("InitialOvertimeHours")
                         .HasColumnType("double precision");
 
@@ -1430,6 +1484,25 @@ namespace TimeTracking.Api.Migrations
                 });
 
             modelBuilder.Entity("TimeTracking.Api.Models.BadgeCard", b =>
+                {
+                    b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TimeTracking.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TimeTracking.Api.Models.BalanceCheckpoint", b =>
                 {
                     b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
                         .WithMany()

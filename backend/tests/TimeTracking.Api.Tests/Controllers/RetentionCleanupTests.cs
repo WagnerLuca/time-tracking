@@ -1,4 +1,3 @@
-using System.Reflection;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -83,16 +82,14 @@ public static class RetentionScenario
     }
 
     /// <summary>
-    /// One cleanup pass, as the hosted service runs it every 6 hours. The pass is private and the service would only run
-    /// it on start, so the test calls it by reflection with the app's own scope factory (system work, no HttpContext).
+    /// One cleanup pass, as the hosted service runs it every 6 hours (the service would only run it on start), with the
+    /// app's own scope factory (system work, no HttpContext).
     /// </summary>
     public static async Task RunAsync(IServiceProvider services)
     {
         var service = new RefreshTokenCleanupService(services.GetRequiredService<IServiceScopeFactory>(),
             NullLogger<RefreshTokenCleanupService>.Instance);
-        var pass = typeof(RefreshTokenCleanupService).GetMethod("CleanupTokensAsync", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("RefreshTokenCleanupService.CleanupTokensAsync not found — update RetentionScenario.RunAsync");
-        await (Task)pass.Invoke(service, [CancellationToken.None])!;
+        await service.CleanupTokensAsync(CancellationToken.None);
     }
 
     public static async Task AssertAsync(IServiceProvider services, Ids ids)

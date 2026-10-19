@@ -51,6 +51,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<ClosedPeriod> ClosedPeriods { get; set; }
     public DbSet<ClosedPeriodEvent> ClosedPeriodEvents { get; set; }
     public DbSet<PushSubscription> PushSubscriptions { get; set; }
+    public DbSet<BalanceCheckpoint> BalanceCheckpoints { get; set; }
 
     /// <summary>
     /// Saves, and records every change a user made to a finished time entry in
@@ -63,17 +64,46 @@ public class TimeTrackingDbContext : DbContext
         // Every in-app notification is also a push (issue #67): this save is the one place they all pass
         var notifications = _push == null ? [] : ChangeTracker.Entries<Notification>()
             .Where(e => e.State == EntityState.Added).Select(e => e.Entity).ToList();
-        var saved = await SaveWithHistoryAsync(acceptAllChangesOnSuccess, cancellationToken);
+        // Overtime balance checkpoints: every save (system work too) that changes a balance input of an ended month bumps
+        // the version in the same transaction (see BalanceInvalidation)
+        var balance = await Services.BalanceInvalidation.CollectAsync(this, cancellationToken);
+        int saved;
+        if (balance == null)
+            saved = await SaveWithHistoryAsync(acceptAllChangesOnSuccess, cancellationToken);
+        else if (!Database.IsRelational())
+            // After the closed-period guard: a refused save must leave no bump behind in the context
+            saved = await SaveWithHistoryAsync(acceptAllChangesOnSuccess, cancellationToken, balance.ApplyTrackedAsync);
+        else
+        {
+            await using var transaction = Database.CurrentTransaction == null
+                ? await Database.BeginTransactionAsync(cancellationToken)
+                : null;
+            saved = await SaveWithHistoryAsync(acceptAllChangesOnSuccess, cancellationToken);
+            await balance.ApplySqlAsync(this, cancellationToken);
+            if (transaction != null) await transaction.CommitAsync(cancellationToken);
+        }
         if (notifications.Count > 0) _push!.Enqueue(notifications.Select(Services.PushTexts.From));
         return saved;
     }
 
-    private async Task<int> SaveWithHistoryAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken)
+    /// <summary>A plain save without any hook — only for derived data that is not a balance input (balance checkpoints).</summary>
+    internal Task<int> SaveWithoutHooksAsync(CancellationToken cancellationToken) =>
+        base.SaveChangesAsync(true, cancellationToken);
+
+    /// <param name="afterGuard">Staged changes that belong to the save but must only be made once the closed-period guard
+    /// let it through (the InMemory balance bumps).</param>
+    private async Task<int> SaveWithHistoryAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken,
+        Func<TimeTrackingDbContext, CancellationToken, Task>? afterGuard = null)
     {
-        if (_rls is not { IsSystem: false }) return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        if (_rls is not { IsSystem: false })
+        {
+            if (afterGuard != null) await afterGuard(this, cancellationToken);
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
 
         // Closed months (issue #57): throws for members, lets admins through with a reason
         var closed = await Services.ClosedPeriods.GuardAsync(this, _rls.AuthenticatedUserId, _rls.ChangeReason, cancellationToken);
+        if (afterGuard != null) await afterGuard(this, cancellationToken);
         var pending = TimeEntryHistory.Capture(this, EntryChangeKindOverride);
         if (pending.Count == 0) return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
 
@@ -620,6 +650,15 @@ public class TimeTrackingDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasQueryFilter(e => e.Organization.IsActive);
+        });
+
+        // Overtime balance checkpoints (derived data, Services/Common/BalanceCheckpoints.cs; RLS like TimeEntries)
+        modelBuilder.Entity<BalanceCheckpoint>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.OrganizationId, e.UserId, e.Month }).IsUnique();
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ClosedPeriod>(entity =>

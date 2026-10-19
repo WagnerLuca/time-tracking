@@ -184,6 +184,15 @@ public class Organization
     /// the days from here up to the change silently, then clears it.</summary>
     public DateOnly? CoreHoursBackfillFrom { get; set; }
 
+    /// <summary>
+    /// Overtime balance checkpoints (<c>BalanceCheckpoints</c>): bumped by every save that changes an org-wide input of
+    /// the balance in an ended month (holidays, custom absence credit modes, the time zone); a checkpoint is only valid
+    /// while its <see cref="BalanceCheckpoint.OrgVersion"/> matches.
+    /// </summary>
+    public int BalanceVersion { get; set; }
+    /// <summary>First day of the org-local month whose checkpoints the background pre-warm last computed.</summary>
+    public DateOnly? BalanceWarmedMonth { get; set; }
+
     /// <summary>Terminal (docs/TERMINAL.md): a second scan of the same card within this many seconds toggles nothing.</summary>
     public int TerminalDoubleScanSeconds { get; set; } = TerminalLimits.DefaultDoubleScanSeconds;
     /// <summary>Terminal: oldest queued (offline) scan a terminal may still send, in hours.</summary>

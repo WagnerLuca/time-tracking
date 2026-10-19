@@ -192,6 +192,7 @@ builder.Services.AddScoped<IGroupService, GroupService>();
 builder.Services.AddScoped<IPdfReportService, PdfReportService>();
 builder.Services.AddHostedService<RefreshTokenCleanupService>();
 builder.Services.AddHostedService<FailureEntryService>();
+builder.Services.AddHostedService<BalanceCheckpointWarmupService>();
 
 // Web Push (issue #67): keys from WebPush:* (env WebPush__PublicKey/PrivateKey/Subject); in
 // Development a key pair is created once in the gitignored vapid-keys.dev.json. Without keys
