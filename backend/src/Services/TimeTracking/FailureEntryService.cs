@@ -27,16 +27,30 @@ public class FailureEntryService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            // Each pass in its own scope and try/catch: a failing reminder pass must not skip the close or the
+            // core hours check, and a failed pass leaves nothing tracked behind for the next one
+            var now = DateTime.UtcNow;
             try
             {
                 using var scope = _scopeFactory.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<TimeTrackingDbContext>();
                 var email = scope.ServiceProvider.GetRequiredService<IEmailSender>();
                 var frontend = scope.ServiceProvider.GetRequiredService<EmailSettings>().FrontendBaseUrl;
-                var now = DateTime.UtcNow;
                 var reminded = await SendDayEndRemindersAsync(context, now, email, frontend, stoppingToken);
                 if (reminded > 0)
                     _logger.LogInformation("Reminded {Count} member(s) of a timer still running before business day end.", reminded);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Error while reminding of running timers before business day end.");
+            }
+
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<TimeTrackingDbContext>();
+                var email = scope.ServiceProvider.GetRequiredService<IEmailSender>();
+                var frontend = scope.ServiceProvider.GetRequiredService<EmailSettings>().FrontendBaseUrl;
                 var closed = await CloseOverdueEntriesAsync(context, now, stoppingToken, email, frontend);
                 if (closed > 0)
                     _logger.LogInformation("Auto-stopped {Count} timer(s) at business day end.", closed);
@@ -48,8 +62,7 @@ public class FailureEntryService : BackgroundService
 
             try
             {
-                // Same loop and RLS bypass (no HttpContext = system work) for the daily core hours check;
-                // its own scope, so a failed timer pass leaves nothing tracked behind
+                // Same loop and RLS bypass (no HttpContext = system work) for the daily core hours check
                 using var scope = _scopeFactory.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<TimeTrackingDbContext>();
                 var email = scope.ServiceProvider.GetRequiredService<IEmailSender>();
@@ -136,26 +149,7 @@ public class FailureEntryService : BackgroundService
         var closed = 0;
         foreach (var entry in running)
         {
-            var dayEnd = entry.Organization?.BusinessDayEnd ?? TimeOnly.MinValue;
-            var tz = ResolveTimeZone(entry.Organization?.TimeZone);
-            var cutoff = BusinessDayEndUtc(entry.StartTime, dayEnd, tz);
-            if (nowUtc < cutoff) continue;
-
-            entry.EndTime = cutoff;
-            entry.IsRunning = false;
-            entry.IsFailure = true;
-            entry.UpdatedAt = nowUtc;
-
-            context.Notifications.Add(new Notification
-            {
-                UserId = entry.UserId,
-                OrganizationId = entry.OrganizationId,
-                Title = "Timer stopped automatically",
-                Message = $"Your timer started {TimeZoneInfo.ConvertTimeFromUtc(entry.StartTime, tz):dd.MM.yyyy HH:mm} ran past the end of the business day " +
-                          "and was stopped. It does not count until you correct its end time.",
-                Type = "FailureEntry",
-                RelatedEntityId = entry.Id
-            });
+            if (!CloseIfOverdue(context, entry, nowUtc)) continue;
             failed.Add(entry);
             closed++;
         }
@@ -176,6 +170,37 @@ public class FailureEntryService : BackgroundService
                     $"{frontendBaseUrl}/history?date={startLocal:yyyy-MM-dd}&entry={entry.Id}", ct: ct);
             }
         return closed;
+    }
+
+    /// <summary>
+    /// When the running <paramref name="entry"/> (its <see cref="TimeEntry.Organization"/> loaded) has passed its business
+    /// day end by <paramref name="nowUtc"/>: stops it at that day end as a failure entry and adds the owner's in-app notice
+    /// (not saved yet; the save pushes it too). False while its business day is still going. The one rule for every path
+    /// that stops a timer late — the minute loop (<see cref="CloseOverdueEntriesAsync"/>) and a stop or start that comes
+    /// before the loop got to it (e.g. after downtime) — so no entry runs past one business day (<see cref="EntryTimes.LongestEntry"/>).
+    /// </summary>
+    public static bool CloseIfOverdue(TimeTrackingDbContext context, TimeEntry entry, DateTime nowUtc)
+    {
+        var tz = ResolveTimeZone(entry.Organization?.TimeZone);
+        var cutoff = BusinessDayEndUtc(entry.StartTime, entry.Organization?.BusinessDayEnd ?? TimeOnly.MinValue, tz);
+        if (nowUtc < cutoff) return false;
+
+        entry.EndTime = cutoff;
+        entry.IsRunning = false;
+        entry.IsFailure = true;
+        entry.UpdatedAt = nowUtc;
+
+        context.Notifications.Add(new Notification
+        {
+            UserId = entry.UserId,
+            OrganizationId = entry.OrganizationId,
+            Title = "Timer stopped automatically",
+            Message = $"Your timer started {TimeZoneInfo.ConvertTimeFromUtc(entry.StartTime, tz):dd.MM.yyyy HH:mm} ran past the end of the business day " +
+                      "and was stopped. It does not count until you correct its end time.",
+            Type = "FailureEntry",
+            RelatedEntityId = entry.Id
+        });
+        return true;
     }
 
     /// <summary>

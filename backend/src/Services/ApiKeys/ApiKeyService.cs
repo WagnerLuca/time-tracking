@@ -390,8 +390,13 @@ public class ApiKeyService : IApiKeyService
         _rls.ActAsUser(userId);
         var running = await _context.TimeEntries
             .Where(e => e.UserId == userId && e.IsRunning)
-            .Select(e => new { e.OrganizationId })
+            .Select(e => new { e.OrganizationId, e.StartTime, BusinessDayEnd = (TimeOnly?)e.Organization!.BusinessDayEnd, e.Organization.TimeZone })
             .FirstOrDefaultAsync();
+        // A live scan when the timer is already past its business day end (the minute loop has not closed it yet,
+        // e.g. after downtime) does what it would have done after that close: start a new timer — StartAsync
+        // closes the old one as a failure entry at that day end
+        var overdue = running != null && scannedAt == null && DateTime.UtcNow >= FailureEntryService.BusinessDayEndUtc(
+            running.StartTime, running.BusinessDayEnd ?? TimeOnly.MinValue, FailureEntryService.ResolveTimeZone(running.TimeZone));
         // A terminal of organization A must neither stop nor reveal a timer elsewhere
         if (running != null && running.OrganizationId != key.OrganizationId)
             return await RejectAsync(punch, ServiceResult.Conflict<PunchResponse>("A timer is running outside this organization. Stop it in the app first."));
@@ -399,7 +404,7 @@ public class ApiKeyService : IApiKeyService
         ServiceResult<TimeEntryResponse> result;
         try
         {
-            if (running != null)
+            if (running != null && !overdue)
             {
                 punch.Result = PunchResult.Stopped;
                 result = await _timeTracking.StopAsync(userId, null, scannedAt);

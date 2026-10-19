@@ -65,10 +65,15 @@ public class TimeTrackingService : ITimeTrackingService
             .FirstOrDefaultAsync(e => e.UserId == userId && e.IsRunning);
         if (running != null)
         {
-            running.EndTime = startTime;
-            running.IsRunning = false;
-            running.UpdatedAt = DateTime.UtcNow;
-            await ApplyPauseRulesAsync(running);
+            // A timer already past its business day end (the minute loop has not closed it yet, e.g. after downtime)
+            // is closed the way the loop would have: a failure entry ending at that day end
+            if (!FailureEntryService.CloseIfOverdue(_context, running, startTime))
+            {
+                running.EndTime = startTime;
+                running.IsRunning = false;
+                running.UpdatedAt = DateTime.UtcNow;
+                await ApplyPauseRulesAsync(running);
+            }
             await _context.SaveChangesAsync();
         }
 
@@ -114,14 +119,19 @@ public class TimeTrackingService : ITimeTrackingService
         if (atUtc.HasValue && EntryTimes.Validate(running.StartTime, atUtc) is { } timeError)
             return ServiceResult.BadRequest<TimeEntryResponse>(timeError);
 
-        running.EndTime = atUtc ?? DateTime.UtcNow;
-        running.IsRunning = false;
-        running.UpdatedAt = DateTime.UtcNow;
-
         if (request?.Description != null)
             running.Description = request.Description;
 
-        await ApplyPauseRulesAsync(running);
+        // A live stop of a timer past its business day end (the minute loop has not closed it yet, e.g. after
+        // downtime) closes it the way the loop would have: a failure entry ending at that day end, returned as
+        // usual (isFailure, no durations) for the member to correct. A stop with a time is validated (≤ 24 h) above.
+        if (atUtc.HasValue || !FailureEntryService.CloseIfOverdue(_context, running, DateTime.UtcNow))
+        {
+            running.EndTime = atUtc ?? DateTime.UtcNow;
+            running.IsRunning = false;
+            running.UpdatedAt = DateTime.UtcNow;
+            await ApplyPauseRulesAsync(running);
+        }
         await _context.SaveChangesAsync();
         _logger.LogInformation("Time entry {EntryId} stopped by user {UserId}", running.Id, userId);
 

@@ -105,16 +105,20 @@ public class PayrollExportService(TimeTrackingDbContext context, ILogger<Payroll
                 .Where(a => a.OrganizationId == org.Id && a.Date >= from && a.Date <= to)
                 .ToListAsync())
             .ToLookup(a => a.UserId);
-        var failures = (await context.TimeEntries.AsNoTracking()
-                .Where(e => e.OrganizationId == org.Id && e.IsFailure && e.StartTime >= fromUtc && e.StartTime < toUtc)
-                .Select(e => e.UserId)
-                .ToListAsync())
-            .ToLookup(id => id);
+        var failures = await context.TimeEntries.AsNoTracking()
+            .Where(e => e.OrganizationId == org.Id && e.IsFailure && e.StartTime >= fromUtc && e.StartTime < toUtc)
+            .GroupBy(e => e.UserId)
+            .Select(g => new { UserId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(f => f.UserId, f => f.Count);
+
+        // Hours of every member in four queries (not six per member): the same rows as BuildAsync from each member's first entry
+        var hours = await DailyReportAggregator.TotalsAsync(context, org,
+            members.ToDictionary(m => m.UserId, m => m.InitialOvertimeHours), from, to);
 
         var rows = new List<PayrollRow>();
         foreach (var member in members)
         {
-            var (target, worked, overtime, balance) = await HoursAsync(member, org.Id, clock, from, to);
+            var (target, worked, overtime, balance, _) = hours[member.UserId];
             var memberAbsences = absences[member.UserId].ToList();
             static double Days(IEnumerable<AbsenceDay> days) => days.Sum(a => a.IsHalfDay ? 0.5 : 1.0);
             var vacation = Days(memberAbsences.Where(a => a.Type == AbsenceType.Vacation || a.CustomType?.CountsAsVacation == true));
@@ -122,7 +126,7 @@ public class PayrollExportService(TimeTrackingDbContext context, ILogger<Payroll
             var other = Days(memberAbsences) - vacation - sick;
             rows.Add(new PayrollRow(member.UserId, member.PersonnelNumber, $"{member.User.FirstName} {member.User.LastName}", member.User.Email,
                 Math.Round(target, 2), Math.Round(worked, 2), Math.Round(overtime, 2), Math.Round(balance, 2),
-                vacation, sick, other, failures[member.UserId].Count(), IsFormerMember: !activeIds.Contains(member.UserId)));
+                vacation, sick, other, failures.GetValueOrDefault(member.UserId), IsFormerMember: !activeIds.Contains(member.UserId)));
         }
         return rows;
     }
@@ -140,22 +144,6 @@ public class PayrollExportService(TimeTrackingDbContext context, ILogger<Payroll
                 Number(r.VacationDays), Number(r.SickDays), Number(r.OtherAbsenceDays),
                 r.FailureEntryCount.ToString(German)));
         return new UTF8Encoding(false).GetBytes(csv.ToString());
-    }
-
-    /// <summary>Target, net worked and overtime hours of the period, and the overtime balance at its end (since the first entry, as in the balance).</summary>
-    private async Task<(double Target, double Worked, double Overtime, double Balance)> HoursAsync(
-        UserOrganization member, int orgId, OrgClock clock, DateOnly from, DateOnly to)
-    {
-        var firstEntry = await context.TimeEntries.AsNoTracking()
-            .Where(e => e.UserId == member.UserId && e.OrganizationId == orgId && !e.IsRunning)
-            .MinAsync(e => (DateTime?)e.StartTime);
-        if (firstEntry == null) return (0, 0, 0, member.InitialOvertimeHours);
-
-        var rows = await DailyReportAggregator.BuildAsync(context, member.UserId, orgId,
-            clock.LocalDate(firstEntry.Value), to, member.InitialOvertimeHours);
-        var period = rows.Where(r => r.Date >= from).ToList();
-        var balance = rows.Count > 0 ? rows[^1].CumulativeOvertime : member.InitialOvertimeHours;
-        return (period.Sum(r => r.TargetHours), period.Sum(r => r.NetWorkedHours), period.Sum(r => r.Overtime), balance);
     }
 
     private static string Number(double value) => Math.Round(value, 2).ToString("0.00", German);

@@ -652,13 +652,13 @@ public class OrganizationService : IOrganizationService
         var presenceIds = members.Where(m => visibility.Can(m.UserId, MemberInfo.Presence)).Select(m => m.UserId).ToHashSet();
         var clock = OrgClock.For(org);
         var today = clock.Today();
-        var entries = await DailyReportAggregator.LoadEntriesAsync(_context, org.Id,
-            timeIds.Union(presenceIds).ToList(), clock.StartOfDayUtc(today.AddDays(1)));
-        var running = RunningSince(entries);
-        var failures = entries.Where(e => e.IsFailure).GroupBy(e => e.UserId).ToDictionary(g => g.Key, g => g.Count());
+        // Balances and failure counts from the members' finished entries (projected to the columns they need; failure
+        // entries are never running), presence from the running timers only — both in one query
+        var runningEntries = new List<TimeEntry>();
         var balances = await DailyReportAggregator.BalancesAsync(_context, org,
             members.Where(m => timeIds.Contains(m.UserId)).ToDictionary(m => m.UserId, m => m.InitialOvertimeHours),
-            entries.Where(e => timeIds.Contains(e.UserId)));
+            presenceIds, runningEntries);
+        var running = RunningSince(runningEntries);
         var violations = await CoreHours.OpenViolationsAsync(_context, timeIds, org.Id, today, today);
 
         return ServiceResult.Ok(new TeamOverviewResponse
@@ -675,10 +675,10 @@ public class OrganizationService : IOrganizationService
                     LastName = m.LastName,
                     ProfileImageUrl = m.ProfileImageUrl,
                     GroupIds = visibility.GroupsOf(m.UserId).Select(g => g.Id).Where(groupIds.Contains).ToList(),
-                    BalanceHours = times ? Math.Round(balance, 2) : null,
+                    BalanceHours = times ? Math.Round(balance.Balance, 2) : null,
                     Present = present,
                     PresentSince = present == true ? running[m.UserId] : null,
-                    FailureCount = times ? failures.GetValueOrDefault(m.UserId) : null,
+                    FailureCount = times ? balance.FailureCount : null,
                     CoreHoursViolationToday = times ? violations.ContainsKey(m.UserId) : null
                 };
             }).ToList()

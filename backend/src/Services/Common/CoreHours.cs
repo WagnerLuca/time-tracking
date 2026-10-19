@@ -160,7 +160,8 @@ public static class CoreHours
         var open = new Dictionary<int, Dictionary<DateOnly, Result>>();
         foreach (var check in checks)
         {
-            var result = EvaluateDay(covered[check.UserId].ToList(), check.Date, new CoreWindow(check.WindowStart, check.WindowEnd),
+            var window = new CoreWindow(check.WindowStart, check.WindowEnd);
+            var result = EvaluateDay(covered.Reaching(check.UserId, window.Utc(check.Date, clock)), check.Date, window,
                 check.HalfDay, check.ToleranceMinutes, clock);
             if (result.Issues == CoreHoursIssue.None) continue;
             if (!open.TryGetValue(check.UserId, out var days)) open[check.UserId] = days = [];
@@ -392,7 +393,8 @@ public static class CoreHours
             if (halves >= 2) continue;
 
             check.HalfDay = halves == 1;
-            var result = EvaluateDay(covered[check.UserId].ToList(), check.Date, new CoreWindow(check.WindowStart, check.WindowEnd),
+            var window = new CoreWindow(check.WindowStart, check.WindowEnd);
+            var result = EvaluateDay(covered.Reaching(check.UserId, window.Utc(check.Date, clock)), check.Date, window,
                 check.HalfDay, check.ToleranceMinutes, clock);
             check.Issues = result.Issues;
             check.MissingMinutes = result.MissingMinutes;
@@ -400,14 +402,59 @@ public static class CoreHours
     }
 
     /// <summary>The members' covering intervals overlapping [fromUtc, toUtc): finished non-failure entries, running ones up to now.</summary>
-    private static async Task<ILookup<int, (DateTime Start, DateTime End)>> CoveredAsync(TimeTrackingDbContext context,
+    private static async Task<CoveredIntervals> CoveredAsync(TimeTrackingDbContext context,
         IReadOnlyCollection<int> userIds, int orgId, DateTime fromUtc, DateTime toUtc, DateTime nowUtc)
     {
+        // Finished entries are bounded by their length (EntryTimes.LongestEntry), so the query seeks the
+        // (UserId, StartTime) index instead of reading each member's whole history before toUtc
+        var earliestStart = fromUtc - EntryTimes.LongestEntry;
         var entries = await context.TimeEntries.AsNoTracking()
             .Where(e => userIds.Contains(e.UserId) && e.OrganizationId == orgId && !e.IsFailure
-                     && e.StartTime < toUtc && (e.IsRunning || e.EndTime > fromUtc))
+                     && ((e.StartTime < toUtc && e.StartTime > earliestStart && e.EndTime > fromUtc)
+                         || (e.IsRunning && e.StartTime < toUtc)))
             .Select(e => new { e.UserId, e.StartTime, e.EndTime, e.IsRunning })
             .ToListAsync();
-        return entries.ToLookup(e => e.UserId, e => (e.StartTime, e.IsRunning ? nowUtc : e.EndTime ?? e.StartTime));
+        return new CoveredIntervals(entries.ToLookup(e => e.UserId, e => (e.StartTime, e.IsRunning ? nowUtc : e.EndTime ?? e.StartTime)));
+    }
+
+    /// <summary>
+    /// The covering intervals per member, sorted by start, so a check only looks at the intervals that can reach
+    /// its window (start within the member's longest interval before the window, up to its end) instead of all of
+    /// them: O(log n + k) per check rather than O(n). <see cref="Evaluate"/> clips and drops whatever does not
+    /// overlap anyway and its merge does not depend on the input order, so the result is the same as with the full list.
+    /// </summary>
+    private sealed class CoveredIntervals
+    {
+        private readonly Dictionary<int, ((DateTime Start, DateTime End)[] Sorted, TimeSpan Longest)> _byUser;
+
+        public CoveredIntervals(ILookup<int, (DateTime Start, DateTime End)> intervals)
+        {
+            _byUser = intervals.ToDictionary(g => g.Key, g =>
+            {
+                var sorted = g.OrderBy(i => i.Start).ToArray();
+                var longest = TimeSpan.Zero;
+                foreach (var (start, end) in sorted)
+                    if (end - start > longest) longest = end - start;
+                return (sorted, longest);
+            });
+        }
+
+        public List<(DateTime Start, DateTime End)> Reaching(int userId, (DateTime FromUtc, DateTime ToUtc) window)
+        {
+            var found = new List<(DateTime Start, DateTime End)>();
+            if (!_byUser.TryGetValue(userId, out var user)) return found;
+            var (sorted, longest) = user;
+            var earliest = window.FromUtc - longest;
+            // First interval starting at or after `earliest`
+            int lo = 0, hi = sorted.Length;
+            while (lo < hi)
+            {
+                var mid = (lo + hi) / 2;
+                if (sorted[mid].Start < earliest) lo = mid + 1; else hi = mid;
+            }
+            for (var i = lo; i < sorted.Length && sorted[i].Start < window.ToUtc; i++)
+                if (sorted[i].End > window.FromUtc) found.Add(sorted[i]);
+            return found;
+        }
     }
 }

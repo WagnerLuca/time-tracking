@@ -197,6 +197,8 @@ public class TimeTrackingDbContext : DbContext
 
             // Create unique index on Token
             entity.HasIndex(e => e.Token).IsUnique();
+            // Retention cleanup (RefreshTokenCleanupService)
+            entity.HasIndex(e => e.ExpiresAt);
 
             // Configure relationship
             entity.HasOne(e => e.User)
@@ -223,6 +225,8 @@ public class TimeTrackingDbContext : DbContext
             entity.HasIndex(e => e.UserId).IsUnique().HasFilter("\"IsRunning\"");
             entity.HasIndex(e => new { e.UserId, e.StartTime });
             entity.HasIndex(e => new { e.OrganizationId, e.StartTime });
+            // Failure entries: the inbox (GetFailuresAsync) and the failure counts read only these few rows
+            entity.HasIndex(e => e.UserId, "IX_TimeEntries_UserId_Failure").HasFilter("\"IsFailure\"");
 
             // Configure relationships
             entity.HasOne(e => e.User)
@@ -280,6 +284,9 @@ public class TimeTrackingDbContext : DbContext
 
             // Index: user+org+type+status for fast lookups
             entity.HasIndex(e => new { e.UserId, e.OrganizationId, e.Type, e.Status });
+            // An organization's pending requests (approver inbox) and its request lists, newest first
+            entity.HasIndex(e => new { e.OrganizationId, e.Status });
+            entity.HasIndex(e => new { e.OrganizationId, e.CreatedAt });
 
             // Keep dependent rows hidden when the parent organization is soft-deleted.
             entity.HasQueryFilter(e => e.Organization.IsActive);
@@ -443,6 +450,8 @@ public class TimeTrackingDbContext : DbContext
 
             entity.HasIndex(e => new { e.UserId, e.IsRead });
             entity.HasIndex(e => new { e.UserId, e.CreatedAt });
+            // Retention cleanup of old read notifications (RefreshTokenCleanupService)
+            entity.HasIndex(e => new { e.IsRead, e.CreatedAt });
 
             entity.HasOne(e => e.User)
                 .WithMany()
@@ -646,6 +655,8 @@ public class TimeTrackingDbContext : DbContext
             entity.HasIndex(e => new { e.OrganizationId, e.ScannedAt });
             entity.HasIndex(e => new { e.ApiKeyId, e.ReceivedAt });
             entity.HasIndex(e => e.TimeEntryId);
+            // Retention cleanup (400 days, RefreshTokenCleanupService)
+            entity.HasIndex(e => e.ReceivedAt);
             // A terminal's punch id is applied once (idempotent offline replays)
             entity.HasIndex(e => new { e.ApiKeyId, e.ClientPunchId }).IsUnique().HasFilter("\"ClientPunchId\" IS NOT NULL");
 

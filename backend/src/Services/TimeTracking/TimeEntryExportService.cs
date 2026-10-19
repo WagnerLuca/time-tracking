@@ -256,14 +256,19 @@ public class TimeEntryExportService : ITimeEntryExportService
             employeeMatches = string.Equals(employeeName, $"{me.FirstName} {me.LastName}".Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
-        var existingEntries = await _context.TimeEntries.AsNoTracking()
-            .Where(e => e.UserId == userId && e.OrganizationId == org.Id && !e.IsRunning)
-            .Select(e => new { e.StartTime, e.EndTime })
-            .ToListAsync();
-
+        // Duplicates are matched on "yyyy-MM-dd|HH:mm" of the local start, so only entries starting on one of the
+        // file's days can match: load the file's date range (± 1 day) instead of the member's whole history
         var importClock = OrgClock.For(org);
+        var fileDays = parsed.Rows
+            .Select(r => DateOnly.TryParseExact(r.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : (DateOnly?)null)
+            .Where(d => d is { Year: >= 1900 and <= 2200 })
+            .Select(d => d!.Value)
+            .ToList();
+        var existingEntries = fileDays.Count == 0 ? new List<DateTime>() : await ExistingStartsAsync(userId, org.Id,
+            importClock.StartOfDayUtc(fileDays.Min().AddDays(-1)), importClock.StartOfDayUtc(fileDays.Max().AddDays(2)));
+
         var existingSet = existingEntries
-            .Select(e => importClock.ToLocal(e.StartTime))
+            .Select(start => importClock.ToLocal(start))
             .Select(local => $"{local:yyyy-MM-dd}|{local:HH:mm}")
             .ToHashSet();
 
@@ -376,6 +381,13 @@ public class TimeEntryExportService : ITimeEntryExportService
     }
 
     // ── Private helpers ──
+
+    /// <summary>Start times of the member's finished entries in the organization within [fromUtc, toUtc).</summary>
+    private Task<List<DateTime>> ExistingStartsAsync(int userId, int orgId, DateTime fromUtc, DateTime toUtc) =>
+        _context.TimeEntries.AsNoTracking()
+            .Where(e => e.UserId == userId && e.OrganizationId == orgId && !e.IsRunning && e.StartTime >= fromUtc && e.StartTime < toUtc)
+            .Select(e => e.StartTime)
+            .ToListAsync();
 
     /// <summary>
     /// Resolves which user's data to export: the caller themselves by default, or

@@ -46,11 +46,26 @@ public static class EntryTimes
     }
 
     /// <summary>
+    /// How far before a time a finished entry may have started and still reach it — the bound that lets
+    /// "entries overlapping [start, end)" seek the (UserId, StartTime) index instead of reading the whole history.
+    /// Every edit path validates <see cref="MaxDuration"/> (24 h): manual entries, edits, approvals, imports,
+    /// terminal stops/closes with a time. The business-day-end auto-stop closes a timer at most one local day
+    /// (25 h on a DST night) after its start; only a live stop of a timer the auto-stop missed (server down for
+    /// days) could be longer. A week covers all of them with room to spare; a running timer is found by its
+    /// own (partial unique) index whatever its age.
+    /// </summary>
+    public static readonly TimeSpan LongestEntry = TimeSpan.FromDays(7);
+
+    /// <summary>
     /// True when [start, end) overlaps another entry of the user (in any organization, running
     /// timers included), apart from <paramref name="exceptEntryId"/>.
     /// </summary>
-    public static Task<bool> OverlapsAsync(TimeTrackingDbContext context, int userId, DateTime startUtc, DateTime endUtc, int? exceptEntryId = null) =>
-        context.TimeEntries.AsNoTracking()
+    public static Task<bool> OverlapsAsync(TimeTrackingDbContext context, int userId, DateTime startUtc, DateTime endUtc, int? exceptEntryId = null)
+    {
+        var earliestStart = startUtc - LongestEntry;
+        return context.TimeEntries.AsNoTracking()
             .AnyAsync(e => e.UserId == userId && e.Id != exceptEntryId
-                        && e.StartTime < endUtc && (e.IsRunning || e.EndTime > startUtc));
+                        && ((e.StartTime < endUtc && e.StartTime > earliestStart && e.EndTime > startUtc)
+                            || (e.IsRunning && e.StartTime < endUtc)));
+    }
 }

@@ -572,6 +572,8 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasIndex("OrganizationId");
 
+                    b.HasIndex("IsRead", "CreatedAt");
+
                     b.HasIndex("UserId", "CreatedAt");
 
                     b.HasIndex("UserId", "IsRead");
@@ -685,9 +687,11 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasIndex("GroupId");
 
-                    b.HasIndex("OrganizationId");
-
                     b.HasIndex("RespondedByUserId");
+
+                    b.HasIndex("OrganizationId", "CreatedAt");
+
+                    b.HasIndex("OrganizationId", "Status");
 
                     b.HasIndex("UserId", "OrganizationId", "Type", "Status");
 
@@ -940,6 +944,8 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ExpiresAt");
+
                     b.HasIndex("Token")
                         .IsUnique();
 
@@ -997,6 +1003,8 @@ namespace TimeTracking.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BadgeCardId");
+
+                    b.HasIndex("ReceivedAt");
 
                     b.HasIndex("TimeEntryId");
 
@@ -1076,6 +1084,9 @@ namespace TimeTracking.Api.Migrations
                     b.HasIndex("OrganizationId", "StartTime");
 
                     b.HasIndex("UserId", "StartTime");
+
+                    b.HasIndex(new[] { "UserId" }, "IX_TimeEntries_UserId_Failure")
+                        .HasFilter("\"IsFailure\"");
 
                     b.ToTable("TimeEntries");
                 });
