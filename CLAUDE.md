@@ -18,12 +18,14 @@ Full-stack multi-organization time tracking app. ASP.NET Core Web API backend (`
 - Uses in-memory DB by default in Development (`UseInMemoryDatabase: true` in `appsettings.Development.json`), auto-seeded on startup.
 
 ### Backend tests (`cd backend/tests/TimeTracking.Api.Tests`)
-- All tests: `dotnet test`
+- All tests: `dotnet test --filter "Category!=Perf"` (as CI; plain `dotnet test` also runs the long scaling tests)
 - Single test/class: `dotnet test --filter "FullyQualifiedName~AuthControllerTests"` or `--filter "DisplayName~specific test name"`
 - Tests are **integration tests** using `WebApplicationFactory`, xUnit + FluentAssertions, with `ASPNETCORE_ENVIRONMENT=Testing` (rate limiting disabled in that env). Two factories:
   - `Infrastructure/TimeTrackingApiFactory.cs` — EF **InMemory** (fast; one DB per test class). InMemory enforces no unique indexes, transactions, DateTime kinds or RLS.
   - `Infrastructure/PostgresApiFactory.cs` + `[Collection(PostgresCollection.Name)]` (tests under `Postgres/`) — a real **PostgreSQL container via Testcontainers** (needs Docker), connecting as a non-superuser app role so row-level security applies; runs the real migrations + seed. Put anything touching indexes, concurrency, UTC or RLS there.
   - Mails are captured by `CapturingEmailSender` (`factory.Mail.LinkToken(to, "reset-password")`).
+  - Query counts: `Infrastructure/QueryCounter.cs` (EF interceptor; `Count` for a test's own DbContext, `QueryCounter.Begin()` scopes one async flow).
+- **Scaling tests** (`Perf/`, `[Trait("Category", "Perf")]`, own container via `PerfApiFactory`; excluded from CI and from `--filter "Category!=Perf"`): `dotnet test --filter Category=Perf` seeds one `Data/PerfSeeder.cs` history per size (`PERF_SIZES=100x1,100x10,…` employees x years, `PERF_WARMUP`/`PERF_RUNS`), calls ~20 endpoints over HTTP under RLS and writes `TestResults/perf/scaling-<timestamp>.md/.csv` (p50/p95, SQL count, growth, EXPLAIN of the slowest). Baseline: `docs/perf/baseline.md`. Each size gets its own fresh database; the app's background jobs are off (`PerfApiFactory`). The same history for a test database: `dotnet TimeTracking.Api.dll perf-seed --employees 100 --years 10 [--core-hours off]` (prints a random password once; without `--force` only in Development/Testing on a database holding nothing but `perf-…` and the demo org), removed with `perf-seed --drop --org-slug perf-…`; k6 load tests in `loadtest/`.
 - Shared setup: `TestHelpers.OrgWithMemberAsync(factory, prefix, settings)` (fresh org + one member) and `TestHelpers.CreateGroupAsync(...)`.
 - **Coverage**: `bash coverage.sh` (same folder; extra args go to `dotnet test`) — coverlet collector with `coverlet.runsettings` (migrations excluded) → ReportGenerator (local tool, `.config/dotnet-tools.json`, `dotnet tool restore`) → `TestResults/coverage-report/index.html` (+ `SummaryGithub.md`, `Cobertura.xml`; `TestResults/` is gitignored). Fails below `MIN_LINE`/`MIN_BRANCH` at the top of the script (94 / 78 %, measured 94.7 / 79.0 on 2026-10-15) — raise them when coverage grows, never lower them.
 

@@ -1,4 +1,3 @@
-using System.Data.Common;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
@@ -59,17 +58,6 @@ public class CoreHoursPostgresTests
         (await CountAsUserAsync(memberId, orgId)).Should().Be(2);   // own row + the org's
     }
 
-    private sealed class CountingInterceptor : DbCommandInterceptor
-    {
-        public int Count;
-        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData,
-            InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
-        {
-            Count++;
-            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
-        }
-    }
-
     /// <summary>Fails every save that adds a core hours check of one organization.</summary>
     private sealed class FailingOrgInterceptor(int orgId) : SaveChangesInterceptor
     {
@@ -108,7 +96,7 @@ public class CoreHoursPostgresTests
     public async Task NothingDue_CostsOneQueryPerOrganization()
     {
         var (orgId, memberId) = await CoreOrgAsync("pg-core-cheap");
-        var counter = new CountingInterceptor();
+        var counter = new QueryCounter();
         await using var db = Db(counter);
         var org = await db.Organizations.AsNoTracking().SingleAsync(o => o.Id == orgId);
         var tree = await GroupTree.LoadAsync(db, orgId);

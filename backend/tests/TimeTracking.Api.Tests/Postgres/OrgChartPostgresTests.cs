@@ -1,7 +1,5 @@
-using System.Data.Common;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using TimeTracking.Api.Data;
 using TimeTracking.Api.Models;
@@ -27,18 +25,7 @@ public class OrgChartPostgresTests
         _output = output;
     }
 
-    private sealed class CountingInterceptor : DbCommandInterceptor
-    {
-        public int Count;
-        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command, CommandEventData eventData,
-            InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
-        {
-            Count++;
-            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
-        }
-    }
-
-    private TimeTrackingDbContext Db(CountingInterceptor? counter = null)
+    private TimeTrackingDbContext Db(QueryCounter? counter = null)
     {
         var options = new DbContextOptionsBuilder<TimeTrackingDbContext>().UseNpgsql(new Npgsql.NpgsqlConnectionStringBuilder(_factory.SuperuserConnectionString) { Database = "timetracking" }.ConnectionString);
         if (counter != null) options.AddInterceptors(counter);
@@ -99,7 +86,7 @@ public class OrgChartPostgresTests
                     expectedForViewer.Add(users[i].Id);
         }
 
-        var counter = new CountingInterceptor();
+        var counter = new QueryCounter();
         await using (var db = Db(counter))
         {
             var service = new OrganizationService(db, NullLogger<OrganizationService>.Instance);

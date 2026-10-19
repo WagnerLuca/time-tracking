@@ -27,6 +27,14 @@ if (args.Contains("generate-vapid-keys"))
 
 var builder = WebApplication.CreateBuilder(args);
 
+// `dotnet TimeTracking.Api.dll perf-seed --employees 100 --years 10` fills the Postgres database with a
+// synthetic multi-year history for performance measurements (PerfSeeder, docs/PERFORMANCE_PLAN.md)
+if (args.FirstOrDefault() == "perf-seed")
+{
+    Environment.ExitCode = await PerfSeedCommand.RunAsync(args, builder.Configuration, builder.Environment);
+    return;
+}
+
 // QuestPDF is used for generating monthly/yearly member PDF reports.
 // Community license: free for organizations with < $1M USD annual gross revenue.
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
