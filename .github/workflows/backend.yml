@@ -49,7 +49,8 @@ jobs:
         working-directory: backend
 
       # Includes the Postgres suite (Testcontainers; Docker is available on ubuntu-latest), not the scaling
-      # tests (Category=Perf, minutes of seeding; run them with `dotnet test --filter Category=Perf`).
+      # tests (Category=Perf, minutes of seeding; run them with `dotnet test --filter Category=Perf` or the manual
+      # perf.yml workflow). The PerfSmoke query-budget test (Postgres/BalanceQueryBudgetTests) is part of this run.
       # coverage.sh: coverlet (coverlet.runsettings) → ReportGenerator → job summary; fails below its thresholds
       - name: Run tests with coverage
         run: bash coverage.sh --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx" --filter "Category!=Perf"

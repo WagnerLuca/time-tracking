@@ -4,8 +4,8 @@ export const de = {
 		fromLastYear: { one: 'davon {days} Tag aus {year}', other: 'davon {days} Tage aus {year}' },
 		fromLastYearUntil: { one: 'davon {days} Tag aus {year}, verfällt am {date}', other: 'davon {days} Tage aus {year}, verfallen am {date}' },
 		expired: { one: '{days} Tag verfallen', other: '{days} Tage verfallen' },
-		adjustment: 'Korrektur {days} Tage',
-		adjustmentWithNote: 'Korrektur {days} Tage ({note})'
+		adjustment: { one: 'Korrektur {days} Tag', other: 'Korrektur {days} Tage' },
+		adjustmentWithNote: { one: 'Korrektur {days} Tag ({note})', other: 'Korrektur {days} Tage ({note})' }
 	},
 	year: {
 		open: 'Jahre bearbeiten',

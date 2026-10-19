@@ -93,7 +93,8 @@ describe('vacation balance lines', () => {
 		expect(adjustmentLine({ adjustment: 0, adjustmentNote: 'ignored' })).toBeNull();
 		expect(adjustmentLine({ adjustment: 5 })).toBe('Korrektur +5 Tage');
 		expect(adjustmentLine({ adjustment: -2.5, adjustmentNote: 'Altsystem' })).toBe('Korrektur −2,5 Tage (Altsystem)');
-		expect(adjustmentLine({ adjustment: 1, adjustmentNote: null })).toBe('Korrektur +1 Tage');
+		expect(adjustmentLine({ adjustment: 1, adjustmentNote: null })).toBe('Korrektur +1 Tag');
+		expect(adjustmentLine({ adjustment: -1, adjustmentNote: 'Altsystem' })).toBe('Korrektur −1 Tag (Altsystem)');
 		locale.set('en');
 		expect(adjustmentLine({ adjustment: 5 })).toBe('Adjustment +5 days');
 		expect(adjustmentLine({ adjustment: -3, adjustmentNote: 'old system' })).toBe('Adjustment −3 days (old system)');
@@ -101,12 +102,12 @@ describe('vacation balance lines', () => {
 
 	it('puts every detail line together, adjustment last', () => {
 		expect(vacationDetailLines({ carriedIn: 5, carriedUsed: 2, expiresOn: '2027-03-31', adjustment: -1 }, 2027))
-			.toEqual(['davon 3 Tage aus 2026, verfallen am 31.03.2027', 'Korrektur −1 Tage']);
+			.toEqual(['davon 3 Tage aus 2026, verfallen am 31.03.2027', 'Korrektur −1 Tag']);
 		expect(vacationDetailLines({ adjustment: 2, adjustmentNote: 'Gutschrift' }, 2027)).toEqual(['Korrektur +2 Tage (Gutschrift)']);
 		expect(vacationDetailLines({ carriedIn: 3, expired: 3 }, 2027)).toEqual(['3 Tage verfallen']);
 		locale.set('en');
 		expect(vacationDetailLines({ carriedIn: 3, carriedUsed: 1, adjustment: 1 }, 2027))
-			.toEqual(['incl. 2 days from 2026', 'Adjustment +1 days']);
+			.toEqual(['incl. 2 days from 2026', 'Adjustment +1 day']);
 	});
 });
 
@@ -245,7 +246,7 @@ describe('member vacation rows', () => {
 		expect(memberCarryFigures(row)).toEqual({
 			carriedIn: 5, carriedUsed: 2, expired: 3, expiresOn: '2027-03-31', adjustment: -1
 		});
-		expect(vacationDetailLines(memberCarryFigures(row), 2027)).toEqual(['3 Tage verfallen', 'Korrektur −1 Tage']);
+		expect(vacationDetailLines(memberCarryFigures(row), 2027)).toEqual(['3 Tage verfallen', 'Korrektur −1 Tag']);
 		expect(memberCarryFigures({})).toEqual({
 			carriedIn: undefined, carriedUsed: undefined, expired: undefined, expiresOn: undefined, adjustment: undefined
 		});

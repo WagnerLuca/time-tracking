@@ -5,8 +5,8 @@ export const en: typeof de = {
 		fromLastYear: { one: 'incl. {days} day from {year}', other: 'incl. {days} days from {year}' },
 		fromLastYearUntil: { one: 'incl. {days} day from {year}, expires on {date}', other: 'incl. {days} days from {year}, expire on {date}' },
 		expired: { one: '{days} day expired', other: '{days} days expired' },
-		adjustment: 'Adjustment {days} days',
-		adjustmentWithNote: 'Adjustment {days} days ({note})'
+		adjustment: { one: 'Adjustment {days} day', other: 'Adjustment {days} days' },
+		adjustmentWithNote: { one: 'Adjustment {days} day ({note})', other: 'Adjustment {days} days ({note})' }
 	},
 	year: {
 		open: 'Edit years',

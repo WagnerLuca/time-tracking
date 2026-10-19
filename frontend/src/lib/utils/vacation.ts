@@ -58,9 +58,10 @@ export function signedDays(days: number): string {
 export function adjustmentLine(b: CarryFigures): string | null {
 	const days = b.adjustment ?? 0;
 	if (!days) return null;
+	// The sign is part of {days}; the plural follows the amount ("−1 Tag", "+2 Tage")
 	return b.adjustmentNote
-		? t('vacation.carry.adjustmentWithNote', { days: signedDays(days), note: b.adjustmentNote })
-		: t('vacation.carry.adjustment', { days: signedDays(days) });
+		? tp('vacation.carry.adjustmentWithNote', Math.abs(days), { days: signedDays(days), note: b.adjustmentNote })
+		: tp('vacation.carry.adjustment', Math.abs(days), { days: signedDays(days) });
 }
 
 /** Every line describing where a year's figure comes from (carry-over, lapsed, adjustment). */

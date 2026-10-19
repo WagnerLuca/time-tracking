@@ -1,0 +1,69 @@
+name: Backend scaling tests
+
+# The full scaling report of docs/PERFORMANCE.md (Category=Perf): seeds PerfSeeder histories of every size into
+# PostgreSQL 16 (Testcontainers; Docker is available on ubuntu-latest), measures p50/p95 and SQL counts of the
+# history-sensitive endpoints and uploads TestResults/perf (report .md + .csv + progress log). Manual only — the
+# default matrix takes the better part of an hour; the normal backend run has the small PerfSmoke budget test.
+on:
+  workflow_dispatch:
+    inputs:
+      sizes:
+        description: 'Sizes as employees x years, comma separated (PERF_SIZES)'
+        required: false
+        default: '100x1,100x2,100x5,100x10,25x5,50x5,200x5'
+      runs:
+        description: 'Measured calls per endpoint (PERF_RUNS)'
+        required: false
+        default: '15'
+
+permissions:
+  contents: read
+
+jobs:
+  scaling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+        working-directory: backend/tests/TimeTracking.Api.Tests
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+        working-directory: backend/tests/TimeTracking.Api.Tests
+
+      - name: Run scaling tests
+        run: dotnet test --no-build --configuration Release --filter "Category=Perf" --logger "console;verbosity=normal"
+        working-directory: backend/tests/TimeTracking.Api.Tests
+        env:
+          ASPNETCORE_ENVIRONMENT: Testing
+          PERF_SIZES: ${{ inputs.sizes }}
+          PERF_RUNS: ${{ inputs.runs }}
+
+      - name: Job summary
+        if: always()
+        shell: bash
+        run: |
+          report=$(ls -t backend/tests/TimeTracking.Api.Tests/TestResults/perf/scaling-*.md 2>/dev/null | head -1)
+          if [ -n "$report" ]; then
+            # Header + seeded data + summary table (the per-endpoint and EXPLAIN parts stay in the artifact)
+            sed -n '/^# Scaling report/,/^## Per endpoint/p' "$report" | sed '$d' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No scaling report was written." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload perf report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: perf-report
+          path: backend/tests/TimeTracking.Api.Tests/TestResults/perf/
+          retention-days: 14
+          if-no-files-found: ignore
