@@ -30,6 +30,34 @@ export const de = {
 		unit: 'Tage/Jahr',
 		invalid: 'Bitte eine Anzahl Tage zwischen 0 und 365 eingeben.'
 	},
+	carryOver: {
+		label: 'Resturlaub ins Folgejahr',
+		description: 'Was mit Urlaubstagen passiert, die am Jahresende übrig sind. Übertragene Tage werden zuerst genommen. Die Regel gilt sofort für alle Jahre ab dem Startjahr (sie ändert berechnete Zahlen, keine Daten) und unterliegt nicht dem Monatsabschluss.',
+		mode: 'Regel',
+		modes: {
+			UntilDate: 'Übertragen bis Stichtag',
+			Unlimited: 'Unbegrenzt übertragen',
+			None: 'Verfällt zum Jahresende'
+		},
+		modeHints: {
+			UntilDate: 'Gesetzlicher Standard: übertragene Tage verfallen nach dem Stichtag des Folgejahres, wenn sie bis dahin nicht genommen sind.',
+			Unlimited: 'Übertragene Tage verfallen nie.',
+			None: 'Übrige Tage verfallen am 31.12.'
+		},
+		expiry: 'Verfällt nach dem',
+		day: 'Tag',
+		month: 'Monat',
+		maxDays: 'Höchstens übertragen',
+		maxDaysPlaceholder: 'unbegrenzt',
+		unit: 'Tage',
+		since: 'Übertrag ab Jahr',
+		sinceHint: 'Resturlaub dieses und späterer Jahre wird übertragen; frühere Jahre bleiben, wie sie sind.',
+		invalidExpiry: 'Bitte einen gültigen Tag und Monat eingeben.',
+		invalidMax: 'Bitte 0–365 Tage eingeben oder leer lassen.',
+		invalidSince: 'Bitte ein Jahr zwischen 2000 und {year} eingeben.',
+		maxSummary: 'höchstens {days} Tage',
+		summary: '{rule}, Übertrag ab {year}'
+	},
 	businessDayEnd: {
 		label: 'Ende des Arbeitstags',
 		description: 'Ein Timer, der zu dieser Ortszeit noch läuft, wird automatisch gestoppt und als Fehleintrag markiert; er zählt als 0, bis das Mitglied ihn korrigiert. Standard ist Mitternacht (00:00), für Nachtschichten z. B. 04:00.',

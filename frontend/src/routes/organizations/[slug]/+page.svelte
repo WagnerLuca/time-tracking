@@ -184,7 +184,7 @@
 							onsaved={loadSchedule}
 						/>
 					{/if}
-					<MemberVacation {orgSlug} member={myMember} canEdit={isAdmin} onchanged={reloadOrg} />
+					<MemberVacation {orgSlug} timeZone={org?.timeZone} member={myMember} canEdit={isAdmin} onchanged={reloadOrg} />
 					<MemberAbsences
 						{orgSlug}
 						userId={myMember.id!}

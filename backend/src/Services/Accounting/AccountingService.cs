@@ -139,10 +139,10 @@ public class AccountingService(TimeTrackingDbContext context, PayrollExportServi
         var members = await context.UserOrganizations.AsNoTracking()
             .Where(uo => uo.OrganizationId == org.Id && uo.User.IsActive)
             .OrderBy(uo => uo.User.LastName).ThenBy(uo => uo.User.FirstName)
-            .Select(uo => new { uo.UserId, Name = uo.User.FirstName + " " + uo.User.LastName, uo.PersonnelNumber, uo.VacationDaysPerYear })
+            .Select(uo => new { uo.UserId, Name = uo.User.FirstName + " " + uo.User.LastName, uo.PersonnelNumber })
             .ToListAsync();
         var ids = members.Select(m => m.UserId).ToList();
-        var usage = await VacationBalances.UsageAsync(context, org.Id, ids, year, OrgClock.For(org).Today());
+        var balances = await VacationBalances.YearsAsync(context, org, ids, year, OrgClock.For(org).Today());
 
         var (yearStart, yearEnd) = (new DateOnly(year, 1, 1), new DateOnly(year, 12, 31));
         var others = (await context.AbsenceDays.AsNoTracking()
@@ -157,17 +157,21 @@ public class AccountingService(TimeTrackingDbContext context, PayrollExportServi
             Year = year,
             Members = members.Select(m =>
             {
-                var u = usage.GetValueOrDefault(m.UserId);
+                var b = balances[m.UserId];
                 var days = others[m.UserId].ToList();
                 return new VacationOverviewRow
                 {
                     UserId = m.UserId,
                     Name = m.Name,
                     PersonnelNumber = m.PersonnelNumber,
-                    Entitlement = m.VacationDaysPerYear,
-                    Taken = u?.Taken ?? 0,
-                    Planned = u?.Planned ?? 0,
-                    Remaining = VacationBalances.Remaining(m.VacationDaysPerYear, u),
+                    Entitlement = b.Entitlement,
+                    Adjustment = b.Adjustment,
+                    CarriedIn = b.CarriedIn,
+                    Expired = b.Expired,
+                    ExpiresOn = b.ExpiresOn,
+                    Taken = b.Taken,
+                    Planned = b.Planned,
+                    Remaining = b.Remaining,
                     SickDays = days.Where(a => a.Type == AbsenceType.SickDay).Sum(a => a.IsHalfDay ? 0.5 : 1.0),
                     OtherAbsenceDays = days.Where(a => a.Type != AbsenceType.SickDay).Sum(a => a.IsHalfDay ? 0.5 : 1.0)
                 };

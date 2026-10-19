@@ -60,12 +60,16 @@ export const de = {
 	vacation: {
 		heading: 'Urlaub {year}',
 		entitlement: 'Anspruch',
+		carriedIn: 'Übertrag',
+		expired: 'Verfallen',
+		adjustment: 'Anpassung',
+		expiresOn: 'Übertrag verfällt nach dem {date}',
 		taken: 'Genommen',
 		planned: 'Geplant',
 		remaining: 'Rest',
 		sick: 'Krankheitstage',
 		other: 'Sonstige Abwesenheiten',
-		hint: 'Genommen = bis heute, geplant = ab morgen. Urlaub zählt nur an Arbeitstagen, Feiertage ausgenommen.'
+		hint: 'Genommen = bis heute, geplant = ab morgen. Urlaub zählt nur an Arbeitstagen, Feiertage ausgenommen. Übertrag = Resturlaub aus dem Vorjahr (wird zuerst genommen), verfallen = davon nicht rechtzeitig genommen, Anpassung = Korrektur durch Admins.'
 	},
 	member: {
 		title: 'Buchhaltung',

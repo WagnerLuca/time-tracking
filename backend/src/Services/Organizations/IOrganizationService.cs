@@ -37,4 +37,6 @@ public interface IOrganizationService
     Task<ServiceResult<MemberPersonnelNumberResponse>> SetMemberPersonnelNumberAsync(string slug, int callerUserId, int userId, SetPersonnelNumberRequest request);
     Task<ServiceResult<MemberAccountantResponse>> SetMemberAccountantAsync(string slug, int callerUserId, int userId, SetAccountantRequest request);
     Task<ServiceResult<MemberVacationDaysResponse>> SetMemberVacationDaysAsync(string slug, int callerUserId, int userId, SetVacationDaysRequest request);
+    Task<ServiceResult<MemberVacationResponse>> GetMemberVacationAsync(string slug, int callerUserId, int userId, int? year);
+    Task<ServiceResult<MemberVacationResponse>> SetMemberVacationYearAsync(string slug, int callerUserId, int userId, int year, SetMemberVacationYearRequest request);
 }

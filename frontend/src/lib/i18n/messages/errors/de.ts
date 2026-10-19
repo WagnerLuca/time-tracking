@@ -33,7 +33,16 @@ export const de = {
 		enableOwnTwoFactorFirst: 'Aktiviere zuerst die Zwei-Faktor-Authentifizierung für dein eigenes Konto.',
 		unknownTimeZone: 'Unbekannte Zeitzone.',
 		coreHoursOrder: 'Die Kernarbeitszeit braucht eine gültige Start- und Endzeit, die sich unterscheiden (ein Ende vor dem Beginn reicht über Mitternacht).',
-		coreHoursBackfillDays: 'Es lassen sich 1 bis 31 vergangene Tage prüfen.'
+		coreHoursBackfillDays: 'Es lassen sich 1 bis 31 vergangene Tage prüfen.',
+		carryOverExpiry: 'Bitte ein gültiges Verfallsdatum (Tag und Monat) angeben.',
+		carryOverMaxDays: 'Die Obergrenze für den Übertrag muss zwischen 0 und 365 Tagen liegen.',
+		carryOverSince: 'Das Startjahr des Übertrags muss zwischen 2000 und dem aktuellen Jahr liegen.',
+		carryOverMode: 'Unbekannte Übertragsregel.'
+	},
+	vacation: {
+		entitlementRange: 'Der Urlaubsanspruch muss zwischen 0 und 365 Tagen liegen.',
+		adjustmentRange: 'Die Korrektur muss zwischen −365 und 365 Tagen liegen.',
+		noteTooLong: 'Die Notiz darf höchstens 500 Zeichen lang sein.'
 	},
 	user: {
 		notFound: 'Benutzer nicht gefunden.'

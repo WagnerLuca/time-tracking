@@ -21,6 +21,8 @@
 	import VisibilityMatrix from '$lib/components/VisibilityMatrix.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import CoreHoursBackfill from '$lib/components/CoreHoursBackfill.svelte';
+	import VacationCarryOverSettings from '$lib/components/VacationCarryOverSettings.svelte';
+	import { carryOverRuleText } from '$lib/utils/vacation';
 	import type {
 		OrganizationDetailResponse,
 		UpdateOrganizationSettingsRequest,
@@ -659,6 +661,8 @@
 					</div>
 				</div>
 
+				<VacationCarryOverSettings {org} disabled={settingsSaving} save={(patch) => saveSettings(patch)} />
+
 				<!-- Custom Absence Types -->
 				<div class="mt-6">
 					<div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
@@ -913,6 +917,18 @@
 								</div>
 							</li>
 						{/each}
+						{#if topic.id === 'absences'}
+							<li class="flex items-center justify-between gap-4 p-4 border-b border-base-200 last:border-b-0 flex-wrap" data-testid="applied-carry-over">
+								<div class="min-w-0 flex-1 basis-60">
+									<div class="font-semibold text-base-content mb-0.5">{t('orgSettings.carryOver.label')}</div>
+									<div class="text-sm text-base-content/70 max-w-[440px]">{t(`orgSettings.carryOver.modeHints.${org.vacationCarryOverMode === 'None' || org.vacationCarryOverMode === 'Unlimited' ? org.vacationCarryOverMode : 'UntilDate'}`)}</div>
+								</div>
+								<div class="text-sm text-right">
+									<span class="text-base-content/70">{t('orgSettings.topics.appliesToYou')}</span>
+									<span class="badge badge-ghost">{carryOverRuleText(org)}</span>
+								</div>
+							</li>
+						{/if}
 					</ul>
 				</section>
 			{/each}

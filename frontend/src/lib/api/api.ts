@@ -924,6 +924,37 @@ export interface MemberVacationDaysResponse {
     'vacationDaysPerYear'?: number;
 }
 /**
+ * One member\'s vacation balance for one year (VacationBalances).
+ */
+export interface MemberVacationResponse {
+    'userId'?: number;
+    'year'?: number;
+    /**
+     * The year\'s entitlement (own, inherited from an earlier year, or the member\'s allowance).
+     */
+    'entitlement'?: number;
+    /**
+     * Whether this year has its own entitlement (otherwise it is inherited).
+     */
+    'hasOwnEntitlement'?: boolean;
+    'adjustment'?: number;
+    'adjustmentNote'?: string | null;
+    'carriedIn'?: number;
+    'carriedUsed'?: number;
+    'expired'?: number;
+    'expiresOn'?: string | null;
+    'taken'?: number;
+    'planned'?: number;
+    'remaining'?: number;
+    'available'?: number;
+    /**
+     * The member\'s allowance for years without their own entitlement.
+     */
+    'vacationDaysPerYear'?: number;
+    'updatedAt'?: string | null;
+    'updatedByName'?: string | null;
+}
+/**
  * An in-app notification for the current user.
  */
 export interface NotificationResponse {
@@ -1096,6 +1127,22 @@ export interface OrganizationDetailResponse {
     'visibility'?: Array<VisibilityRuleResponse> | null;
     'defaultVacationDays'?: number;
     /**
+     * Vacation carry-over (VacationBalances): None / UntilDate / Unlimited.
+     */
+    'vacationCarryOverMode'?: string | null;
+    /**
+     * Carried-over days lapse after this day of the following year, \"MM-DD\".
+     */
+    'vacationCarryOverExpiry'?: string | null;
+    /**
+     * At most this many days carry over; null = no cap.
+     */
+    'vacationCarryOverMaxDays'?: number | null;
+    /**
+     * First year whose leftover carries into the next one.
+     */
+    'vacationCarryOverSince'?: number;
+    /**
      * Business day end as local \"HH:mm\" in TimeTracking.Api.Models.Dtos.OrganizationDetailResponse.TimeZone.
      */
     'businessDayEnd'?: string | null;
@@ -1154,7 +1201,38 @@ export interface OrganizationMemberResponse {
      * Vacation days planned for the rest of this year (date > today).
      */
     'vacationDaysPlanned'?: number;
+    /**
+     * Remaining vacation days this year (carry-over included, never negative).
+     */
     'vacationDaysRemaining'?: number;
+    /**
+     * This year\'s entitlement (own row, else the latest earlier one, else TimeTracking.Api.Models.Dtos.OrganizationMemberResponse.VacationDaysPerYear).
+     */
+    'vacationEntitlement'?: number;
+    /**
+     * An admin\'s adjustment of this year\'s days (e.g. an opening balance).
+     */
+    'vacationAdjustment'?: number;
+    /**
+     * Days carried over from last year.
+     */
+    'vacationCarriedIn'?: number;
+    /**
+     * Of the carried-over days, how many are already used (taken or planned up to the expiry date).
+     */
+    'vacationCarriedUsed'?: number;
+    /**
+     * Carried-over days that lapsed (expiry date passed unused).
+     */
+    'vacationExpired'?: number;
+    /**
+     * The day after which the carried-over days lapse; null without carry-in or when they never lapse.
+     */
+    'vacationExpiresOn'?: string | null;
+    /**
+     * Days this year offers: entitlement + adjustment + carried in − lapsed.
+     */
+    'vacationAvailable'?: number;
     /**
      * Whether the caller may see this member\'s vacation balance (self, admins, or  per the member visibility matrix, kind VacationBalance). When false, the vacation figures are zeroed.
      */
@@ -1263,6 +1341,10 @@ export interface OrganizationSettingsResponse {
     'terminalDoubleScanSeconds'?: number;
     'terminalOfflineHours'?: number;
     'terminalUnknownCardLimit'?: number;
+    'vacationCarryOverMode'?: string | null;
+    'vacationCarryOverExpiry'?: string | null;
+    'vacationCarryOverMaxDays'?: number | null;
+    'vacationCarryOverSince'?: number;
 }
 /**
  * Automatic pause rule (deduct X minutes after Y hours worked).
@@ -1335,6 +1417,10 @@ export interface PersonalDataExport {
     'terminalPunches': Array<PersonalPunch> | null;
     'timeEntries': Array<PersonalTimeEntry> | null;
     'absences': Array<PersonalAbsence> | null;
+    /**
+     * Per-year vacation entitlements and adjustments set by admins (null entitlement = inherited).
+     */
+    'vacationYears': Array<PersonalVacationYear> | null;
     'requests': Array<PersonalRequest> | null;
     'notifications': Array<PersonalNotification> | null;
     'entryChanges': Array<PersonalEntryChange> | null;
@@ -1402,6 +1488,14 @@ export interface PersonalTimeEntry {
     'pauseMinutes'?: number;
     'description'?: string | null;
     'isFailure'?: boolean;
+}
+export interface PersonalVacationYear {
+    'organization'?: string | null;
+    'year'?: number;
+    'entitlement'?: number | null;
+    'adjustment'?: number;
+    'adjustmentNote'?: string | null;
+    'updatedAt'?: string;
 }
 export interface ProblemDetails {
     [key: string]: any;
@@ -1590,6 +1684,27 @@ export interface SetAccountantRequest {
  */
 export interface SetInitialOvertimeRequest {
     'initialOvertimeHours'?: number;
+}
+/**
+ * Sets a member\'s vacation figures of one year; left-out fields stay as they are.
+ */
+export interface SetMemberVacationYearRequest {
+    /**
+     * The year\'s entitlement (0-365).
+     */
+    'entitlement'?: number | null;
+    /**
+     * True: the year has no entitlement of its own any more and inherits the latest earlier year\'s.
+     */
+    'clearEntitlement'?: boolean | null;
+    /**
+     * Extra (+) or fewer (−) days (−365 to 365).
+     */
+    'adjustment'?: number | null;
+    /**
+     * Why the adjustment (≤ 500 characters); empty clears it.
+     */
+    'note'?: string | null;
 }
 /**
  * Sets a member\'s personnel number; empty or null removes it.
@@ -1983,6 +2098,23 @@ export interface UpdateOrganizationSettingsRequest {
      */
     'visibility'?: Array<VisibilityRuleRequest> | null;
     'defaultVacationDays'?: number | null;
+    'vacationCarryOverMode'?: VacationCarryOverMode;
+    /**
+     * Expiry of carried-over days as \"MM-DD\" (e.g. \"03-31\").
+     */
+    'vacationCarryOverExpiry'?: string | null;
+    /**
+     * Cap on carried-over days (0-365); see TimeTracking.Api.Models.Dtos.UpdateOrganizationSettingsRequest.ClearVacationCarryOverMaxDays to remove it.
+     */
+    'vacationCarryOverMaxDays'?: number | null;
+    /**
+     * True removes the cap.
+     */
+    'clearVacationCarryOverMaxDays'?: boolean | null;
+    /**
+     * First year whose leftover carries (2000 to the current year).
+     */
+    'vacationCarryOverSince'?: number | null;
     /**
      * Business day end as local \"HH:mm\" (e.g. \"04:00\").
      */
@@ -2148,6 +2280,19 @@ export interface UserOrganizationResponse {
     'require2fa'?: boolean;
 }
 /**
+ * What happens to vacation days left at the end of a year (see `VacationBalances`).  None = they lapse; UntilDate = they carry into the next year and lapse after the expiry date  (statutory default: 31 March) unless used; Unlimited = they carry over and never lapse.  The numeric values are persisted.
+ */
+
+export const VacationCarryOverMode = {
+    NUMBER_0: 0,
+    NUMBER_1: 1,
+    NUMBER_2: 2
+} as const;
+
+export type VacationCarryOverMode = typeof VacationCarryOverMode[keyof typeof VacationCarryOverMode];
+
+
+/**
  * Vacation overview of every active member for one year.
  */
 export interface VacationOverviewResponse {
@@ -2159,9 +2304,25 @@ export interface VacationOverviewRow {
     'name': string | null;
     'personnelNumber'?: string | null;
     /**
-     * Vacation days per year (the member\'s allowance).
+     * The year\'s entitlement (own row, an earlier year\'s, else the member\'s allowance).
      */
     'entitlement'?: number;
+    /**
+     * An admin\'s adjustment of the year (+/− days).
+     */
+    'adjustment'?: number;
+    /**
+     * Days carried over from the previous year.
+     */
+    'carriedIn'?: number;
+    /**
+     * Carried-over days that lapsed unused.
+     */
+    'expired'?: number;
+    /**
+     * The day after which carried-over days lapse; null without carry-in or when they never lapse.
+     */
+    'expiresOn'?: string | null;
     /**
      * Vacation days up to today (working days, holidays excluded).
      */
@@ -9719,6 +9880,103 @@ export const OrganizationsApiAxiosParamCreator = function (configuration?: Confi
         },
         /**
          * 
+         * @summary A member\'s vacation balance for one year (default: the current one) with carry-over, lapsed days and the admin\'s  adjustment. Visible like the member list\'s figures (kind VacationBalance of the visibility matrix).
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Member ID.
+         * @param {number} [year] Calendar year (2000-2100).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdVacationGet: async (slug: string, memberId: number, year?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdVacationGet', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdVacationGet', 'memberId', memberId)
+            const localVarPath = `/api/v1/Organizations/{slug}/members/{memberId}/vacation`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (year !== undefined) {
+                localVarQueryParameter['year'] = year;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Set a member\'s vacation entitlement and/or adjustment (+ note) of one year (admin only). Left-out fields stay;  a past year\'s entitlement changes only that year; the current year\'s is the allowance from now on.
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Member ID to update.
+         * @param {number} year Calendar year (2000-2100).
+         * @param {SetMemberVacationYearRequest} [setMemberVacationYearRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdVacationYearPut: async (slug: string, memberId: number, year: number, setMemberVacationYearRequest?: SetMemberVacationYearRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdVacationYearPut', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdVacationYearPut', 'memberId', memberId)
+            // verify required parameter 'year' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdVacationYearPut', 'year', year)
+            const localVarPath = `/api/v1/Organizations/{slug}/members/{memberId}/vacation/{year}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)))
+                .replace(`{${"year"}}`, encodeURIComponent(String(year)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(setMemberVacationYearRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary The Organigramm: the organization\'s groups (with parent ids and whether the caller may manage them) and every  person the caller may see, with direct memberships (leads marked), presence and the visible kinds of information —  per the member visibility matrix, hidden people are left out. Open to every member.
          * @param {string} slug 
          * @param {*} [options] Override http request option.
@@ -10112,6 +10370,37 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary A member\'s vacation balance for one year (default: the current one) with carry-over, lapsed days and the admin\'s  adjustment. Visible like the member list\'s figures (kind VacationBalance of the visibility matrix).
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Member ID.
+         * @param {number} [year] Calendar year (2000-2100).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdVacationGet(slug: string, memberId: number, year?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MemberVacationResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdVacationGet(slug, memberId, year, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['OrganizationsApi.apiV1OrganizationsSlugMembersMemberIdVacationGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Set a member\'s vacation entitlement and/or adjustment (+ note) of one year (admin only). Left-out fields stay;  a past year\'s entitlement changes only that year; the current year\'s is the allowance from now on.
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Member ID to update.
+         * @param {number} year Calendar year (2000-2100).
+         * @param {SetMemberVacationYearRequest} [setMemberVacationYearRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdVacationYearPut(slug: string, memberId: number, year: number, setMemberVacationYearRequest?: SetMemberVacationYearRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MemberVacationResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdVacationYearPut(slug, memberId, year, setMemberVacationYearRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['OrganizationsApi.apiV1OrganizationsSlugMembersMemberIdVacationYearPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary The Organigramm: the organization\'s groups (with parent ids and whether the caller may manage them) and every  person the caller may see, with direct memberships (leads marked), presence and the visible kinds of information —  per the member visibility matrix, hidden people are left out. Open to every member.
          * @param {string} slug 
          * @param {*} [options] Override http request option.
@@ -10326,6 +10615,31 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
         },
         /**
          * 
+         * @summary A member\'s vacation balance for one year (default: the current one) with carry-over, lapsed days and the admin\'s  adjustment. Visible like the member list\'s figures (kind VacationBalance of the visibility matrix).
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Member ID.
+         * @param {number} [year] Calendar year (2000-2100).
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdVacationGet(slug: string, memberId: number, year?: number, options?: RawAxiosRequestConfig): AxiosPromise<MemberVacationResponse> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdVacationGet(slug, memberId, year, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Set a member\'s vacation entitlement and/or adjustment (+ note) of one year (admin only). Left-out fields stay;  a past year\'s entitlement changes only that year; the current year\'s is the allowance from now on.
+         * @param {string} slug Organization URL slug.
+         * @param {number} memberId Member ID to update.
+         * @param {number} year Calendar year (2000-2100).
+         * @param {SetMemberVacationYearRequest} [setMemberVacationYearRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdVacationYearPut(slug: string, memberId: number, year: number, setMemberVacationYearRequest?: SetMemberVacationYearRequest, options?: RawAxiosRequestConfig): AxiosPromise<MemberVacationResponse> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdVacationYearPut(slug, memberId, year, setMemberVacationYearRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary The Organigramm: the organization\'s groups (with parent ids and whether the caller may manage them) and every  person the caller may see, with direct memberships (leads marked), presence and the visible kinds of information —  per the member visibility matrix, hidden people are left out. Open to every member.
          * @param {string} slug 
          * @param {*} [options] Override http request option.
@@ -10531,6 +10845,33 @@ export class OrganizationsApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug: string, memberId: number, setVacationDaysRequest?: SetVacationDaysRequest, options?: RawAxiosRequestConfig) {
         return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdVacationDaysPut(slug, memberId, setVacationDaysRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary A member\'s vacation balance for one year (default: the current one) with carry-over, lapsed days and the admin\'s  adjustment. Visible like the member list\'s figures (kind VacationBalance of the visibility matrix).
+     * @param {string} slug Organization URL slug.
+     * @param {number} memberId Member ID.
+     * @param {number} [year] Calendar year (2000-2100).
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdVacationGet(slug: string, memberId: number, year?: number, options?: RawAxiosRequestConfig) {
+        return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdVacationGet(slug, memberId, year, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Set a member\'s vacation entitlement and/or adjustment (+ note) of one year (admin only). Left-out fields stay;  a past year\'s entitlement changes only that year; the current year\'s is the allowance from now on.
+     * @param {string} slug Organization URL slug.
+     * @param {number} memberId Member ID to update.
+     * @param {number} year Calendar year (2000-2100).
+     * @param {SetMemberVacationYearRequest} [setMemberVacationYearRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdVacationYearPut(slug: string, memberId: number, year: number, setMemberVacationYearRequest?: SetMemberVacationYearRequest, options?: RawAxiosRequestConfig) {
+        return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdVacationYearPut(slug, memberId, year, setMemberVacationYearRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

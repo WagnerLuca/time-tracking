@@ -10,6 +10,7 @@
 	import { holidayApi, absenceDayApi, groupApi } from '$lib/apiClient';
 	import { t, tp } from '$lib/i18n';
 	import { absenceTypeLabel, dayNamesShort, formatDate, formatDateFull, formatDateShort, formatNumber, getInitials } from '$lib/utils/formatters';
+	import { memberCarryFigures, orgYear, vacationDetailLines, vacationTotal } from '$lib/utils/vacation';
 	import { dayPress } from '$lib/utils/dayPress';
 	import { dateKey, expandHolidays } from '$lib/utils/dateHelpers';
 	import { fetchAllPages } from '$lib/utils/pagination';
@@ -782,7 +783,7 @@
 		/>
 
 		<!-- Vacation Days Summary — respects the org/group Vacation Visibility setting -->
-		{@const vacationVisibleMembers = (org.members ?? []).filter((m) => m.vacationVisible && (m.vacationDaysPerYear ?? 0) > 0)}
+		{@const vacationVisibleMembers = (org.members ?? []).filter((m) => m.vacationVisible && vacationTotal(m) > 0)}
 		{#if canEdit || vacationVisibleMembers.length > 0}
 		<section class="mt-8 bg-base-200/30 rounded-lg p-4 sm:p-5 border border-base-300">
 			<div class="flex items-center justify-between flex-wrap gap-2 mb-4">
@@ -803,7 +804,7 @@
 				{:else}
 				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 					{#each membersWithVacation as member (member.id)}
-						{@const total = member.vacationDaysPerYear ?? 0}
+						{@const total = vacationTotal(member)}
 						{@const taken = member.vacationDaysTaken ?? 0}
 						{@const planned = member.vacationDaysPlanned ?? 0}
 						{@const remaining = member.vacationDaysRemaining ?? total}
@@ -827,6 +828,9 @@
 									<span>{t('absences.balance.used', { taken: formatNumber(taken), total: formatNumber(total) })}{planned > 0 ? t('absences.balance.plannedSuffix', { planned: formatNumber(planned) }) : ''}</span>
 									<span class="font-semibold shrink-0 {remaining <= 2 ? 'text-error' : remaining <= 5 ? 'text-warning' : 'text-success'}">{t('absences.balance.left', { remaining: formatNumber(remaining) })}</span>
 								</div>
+								{#each vacationDetailLines(memberCarryFigures(member), orgYear(org?.timeZone)) as line (line)}
+									<div class="text-xs text-base-content/70 mt-0.5">{line}</div>
+								{/each}
 							</div>
 						</a>
 					{/each}

@@ -28,7 +28,16 @@ export const en: typeof de = {
 		enableOwnTwoFactorFirst: 'Enable two-factor authentication for your own account first.',
 		unknownTimeZone: 'Unknown time zone.',
 		coreHoursOrder: 'Core working hours need a valid start and end time that differ (an end before the start runs past midnight).',
-		coreHoursBackfillDays: 'You can check 1 to 31 past days.'
+		coreHoursBackfillDays: 'You can check 1 to 31 past days.',
+		carryOverExpiry: 'Please enter a valid expiry date (day and month).',
+		carryOverMaxDays: 'The carry-over cap must be between 0 and 365 days.',
+		carryOverSince: 'The carry-over start year must be between 2000 and the current year.',
+		carryOverMode: 'Unknown carry-over rule.'
+	},
+	vacation: {
+		entitlementRange: 'The vacation entitlement must be between 0 and 365 days.',
+		adjustmentRange: 'The adjustment must be between −365 and 365 days.',
+		noteTooLong: 'The note may have at most 500 characters.'
 	},
 	user: {
 		notFound: 'User not found.'

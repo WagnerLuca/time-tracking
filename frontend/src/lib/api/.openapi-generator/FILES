@@ -83,6 +83,7 @@ docs/MemberInitialOvertimeResponse.md
 docs/MemberPersonnelNumberResponse.md
 docs/MemberTimeOverviewResponse.md
 docs/MemberVacationDaysResponse.md
+docs/MemberVacationResponse.md
 docs/NotificationResponse.md
 docs/NotificationResponsePaginatedResponse.md
 docs/NotificationsApi.md
@@ -113,6 +114,7 @@ docs/PersonalPunch.md
 docs/PersonalPushDevice.md
 docs/PersonalRequest.md
 docs/PersonalTimeEntry.md
+docs/PersonalVacationYear.md
 docs/ProblemDetails.md
 docs/PunchRequest.md
 docs/PunchResponse.md
@@ -134,6 +136,7 @@ docs/RespondToOrgRequestRequest.md
 docs/RuleMode.md
 docs/SetAccountantRequest.md
 docs/SetInitialOvertimeRequest.md
+docs/SetMemberVacationYearRequest.md
 docs/SetPersonnelNumberRequest.md
 docs/SetVacationDaysRequest.md
 docs/StartTimeEntryRequest.md
@@ -173,6 +176,7 @@ docs/UpsertAbsenceTypeDefinitionRequest.md
 docs/UserInfo.md
 docs/UserNotificationResponse.md
 docs/UserOrganizationResponse.md
+docs/VacationCarryOverMode.md
 docs/VacationOverviewResponse.md
 docs/VacationOverviewRow.md
 docs/VerifyEmailRequest.md

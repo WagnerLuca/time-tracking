@@ -16,6 +16,19 @@ public enum RuleMode
 }
 
 /// <summary>
+/// What happens to vacation days left at the end of a year (see <c>VacationBalances</c>).
+/// None = they lapse; UntilDate = they carry into the next year and lapse after the expiry date
+/// (statutory default: 31 March) unless used; Unlimited = they carry over and never lapse.
+/// The numeric values are persisted.
+/// </summary>
+public enum VacationCarryOverMode
+{
+    None = 0,
+    UntilDate = 1,
+    Unlimited = 2
+}
+
+/// <summary>
 /// The kinds of information about a person that the member visibility matrix governs
 /// (see <c>MemberVisibility</c>). Bit flags: the organization stores one set per column
 /// (in / outside the viewer's groups), a group one allow and one deny set per column.
@@ -154,6 +167,19 @@ public class Organization
     /// Default vacation days per year for new members.
     /// </summary>
     public double DefaultVacationDays { get; set; }
+
+    /// <summary>Vacation carry-over rule (<c>VacationBalances</c>); new organizations: until 31 March.</summary>
+    public VacationCarryOverMode VacationCarryOverMode { get; set; } = VacationCarryOverMode.UntilDate;
+    /// <summary>Carried-over days lapse after this day of the following year (mode UntilDate; clamped to the month's length).</summary>
+    public int VacationCarryOverExpiryMonth { get; set; } = 3;
+    public int VacationCarryOverExpiryDay { get; set; } = 31;
+    /// <summary>At most this many days move into the next year; null = no cap.</summary>
+    public double? VacationCarryOverMaxDays { get; set; }
+    /// <summary>
+    /// First year whose leftover carries into the next one (earlier years have no carry-in, so their figures
+    /// never change). New organizations: their creation year; organizations from before the feature: 2026.
+    /// </summary>
+    public int VacationCarryOverSince { get; set; } = DateTime.UtcNow.Year;
 
     /// <summary>
     /// Local time at which a business day ends. A timer still running then is stopped

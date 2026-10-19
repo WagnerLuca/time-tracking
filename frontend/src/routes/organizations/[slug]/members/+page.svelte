@@ -12,6 +12,7 @@
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import { getWeekRange } from '$lib/utils/dateHelpers';
 	import { formatHours, formatNumber, getInitials, roleLabel } from '$lib/utils/formatters';
+	import { memberCarryFigures, orgYear, vacationDetailLines, vacationTotal } from '$lib/utils/vacation';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
 	import { canSee } from '$lib/utils/visibility';
 	import PresenceDot from '$lib/components/PresenceDot.svelte';
@@ -151,9 +152,9 @@
 								<div class="flex gap-x-3 gap-y-1 mt-1.5 flex-wrap items-center text-xs text-base-content/70">
 									{#if member.role}<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>{/if}
 									{#if member.isAccountant}<span class="badge badge-sm badge-accent uppercase tracking-wide" data-testid="accountant-badge">{t('accounting.role')}</span>{/if}
-									{#if member.vacationVisible !== false && (member.vacationDaysPerYear ?? 0) > 0}
-										{@const left = member.vacationDaysRemaining ?? member.vacationDaysPerYear ?? 0}
-										<span title={t('memberList.vacationTitle', { used: formatNumber(member.vacationDaysUsed ?? 0), total: formatNumber(member.vacationDaysPerYear ?? 0) })}>
+									{#if member.vacationVisible !== false && vacationTotal(member) > 0}
+										{@const left = member.vacationDaysRemaining ?? vacationTotal(member)}
+										<span title={[t('memberList.vacationTitle', { used: formatNumber(member.vacationDaysUsed ?? 0), total: formatNumber(vacationTotal(member)) }), ...vacationDetailLines(memberCarryFigures(member), orgYear(org?.timeZone))].join(' · ')}>
 											{tp('memberList.vacationLeft', left, { days: formatNumber(left) })}
 										</span>
 									{/if}

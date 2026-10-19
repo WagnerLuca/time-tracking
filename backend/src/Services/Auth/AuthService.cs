@@ -337,6 +337,11 @@ public class AuthService : IAuthService
                 .OrderBy(a => a.Date)
                 .Select(a => new PersonalAbsence(a.Organization.Name, a.Date, a.Type.ToString(), a.IsHalfDay, a.Note))
                 .ToListAsync(),
+            VacationYears = await _context.VacationYears.IgnoreQueryFilters().AsNoTracking()
+                .Where(v => v.UserId == userId)
+                .OrderBy(v => v.Organization.Name).ThenBy(v => v.Year)
+                .Select(v => new PersonalVacationYear(v.Organization.Name, v.Year, v.Entitlement, v.Adjustment, v.AdjustmentNote, v.UpdatedAt))
+                .ToListAsync(),
             Requests = await _context.OrgRequests.IgnoreQueryFilters().AsNoTracking()
                 .Where(r => r.UserId == userId)
                 .OrderBy(r => r.CreatedAt)

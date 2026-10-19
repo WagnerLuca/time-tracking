@@ -325,10 +325,11 @@ public class AccountingTests : IClassFixture<TimeTrackingApiFactory>
         var past = await owner.GetFromJsonAsync<JsonElement>($"/api/v1/organizations/{slug}/accounting/vacation?year={lastYear.Year}");
         past.GetProperty("year").GetInt32().Should().Be(lastYear.Year);
         var row = Row(past.GetProperty("members"), memberId);
-        row.GetProperty("entitlement").GetDouble().Should().Be(25);
+        // Setting the allowance (25) changes this year and later ones only: last year keeps the 0 days it had
+        row.GetProperty("entitlement").GetDouble().Should().Be(0);
         row.GetProperty("taken").GetDouble().Should().Be(2);
         row.GetProperty("planned").GetDouble().Should().Be(0);
-        row.GetProperty("remaining").GetDouble().Should().Be(23);
+        row.GetProperty("remaining").GetDouble().Should().Be(0);
         row.GetProperty("sickDays").GetDouble().Should().Be(1);
         row.GetProperty("otherAbsenceDays").GetDouble().Should().Be(1);
         past.GetProperty("members").GetArrayLength().Should().Be(2);
@@ -337,6 +338,9 @@ public class AccountingTests : IClassFixture<TimeTrackingApiFactory>
             .GetProperty("members"), memberId);
         future.GetProperty("taken").GetDouble().Should().Be(0);
         future.GetProperty("planned").GetDouble().Should().Be(1);
-        future.GetProperty("remaining").GetDouble().Should().Be(24);
+        // Carry-over (new orgs: until 31 March from their creation year on): this year's 25 unused days move into next
+        // year, and the planned day in early March uses them first
+        future.GetProperty("carriedIn").GetDouble().Should().Be(25);
+        future.GetProperty("remaining").GetDouble().Should().Be(49);
     }
 }

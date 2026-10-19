@@ -8,6 +8,7 @@
 	import type { OrganizationMemberResponse, WorkScheduleResponse } from '$lib/api';
 	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { formatHours, formatDelta, formatClock, formatNumber, barWidth, getMonthName, dayNamesShort } from '$lib/utils/formatters';
+	import { memberCarryFigures, orgYear, vacationDetailLines, vacationTotal } from '$lib/utils/vacation';
 	import { isToday, isFuture, sumMinutes, dateKey } from '$lib/utils/dateHelpers';
 	import { getDayType, getDayTypeLabel } from '$lib/utils/scheduleHelpers';
 	import { WEEKLY_ENTRY_LIMIT } from '$lib/utils/constants';
@@ -44,10 +45,14 @@
 	let pending = $state(false);
 	/** The caller's own row of the org detail: its vacation figures (allowance, taken, planned, remaining). */
 	let me = $state<OrganizationMemberResponse | null>(null);
+	/** The org's time zone, for the org-local year of the carry-over line. */
+	let meTimeZone = $state<string | null>(null);
 	/** True once TeamOverview has a team to show (org admins, group leads): own figures and team side by side from lg. */
 	let teamShown = $state(false);
-	const vacationTotal = $derived(me?.vacationDaysPerYear ?? 0);
-	const figureCount = $derived(vacationTotal > 0 ? 4 : 3);
+	const vacationAvailable = $derived(me ? vacationTotal(me) : 0);
+	/** Where this year's figure comes from: carried-over days (and when they lapse), lapsed days, an adjustment. */
+	const vacationLines = $derived(me ? vacationDetailLines(memberCarryFigures(me), orgYear(meTimeZone)) : []);
+	const figureCount = $derived(vacationAvailable > 0 ? 4 : 3);
 
 	const selectedSlug = $derived(orgContext.selectedOrgSlug);
 	/** The forgotten day is usually yesterday. */
@@ -111,7 +116,10 @@
 				daysOff = off;
 				// Optional fourth card; the org detail is cached and already carries the vacation figures
 				getOrgDetail(slug)
-					.then((d) => (me = d.members?.find((m) => m.id === userId) ?? null))
+					.then((d) => {
+						meTimeZone = d.timeZone ?? null;
+						me = d.members?.find((m) => m.id === userId) ?? null;
+					})
 					.catch(() => (me = null));
 				stats = {
 					todayMinutes: b.today.worked,
@@ -329,19 +337,23 @@
 					<span class="text-xs text-base-content/70 mt-1">{t('dashboard.needsSchedule')}</span>
 				{/if}
 			</div>
-			{#if me && vacationTotal > 0}
+			{#if me && vacationAvailable > 0}
 				{@const remaining = me.vacationDaysRemaining ?? 0}
 				<a
 					href="/organizations/{selectedSlug}/absences"
 					class="card bg-base-100 border p-4 no-underline text-base-content transition-colors hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {remaining < 0 ? 'border-error/50' : 'border-base-300'}"
-					aria-label={t('dashboard.vacation.open', { remaining: formatNumber(remaining), total: formatNumber(vacationTotal) })}
+					aria-label={[t('dashboard.vacation.open', { remaining: formatNumber(remaining), total: formatNumber(vacationAvailable) }), ...vacationLines].join('. ')}
+					title={vacationLines.length ? vacationLines.join(' · ') : undefined}
 					data-testid="vacation-card"
 				>
 					<span class="text-xs text-base-content/70 uppercase font-semibold tracking-wider">{t('dashboard.vacation.label')}</span>
 					<span class="text-2xl font-bold tabular-nums mt-1 {remaining < 0 ? 'text-error' : ''}">
-						{formatNumber(remaining)}&nbsp;<span class="text-sm font-normal text-base-content/70">{t('dashboard.vacation.ofTotal', { total: formatNumber(vacationTotal) })}</span>
+						{formatNumber(remaining)}&nbsp;<span class="text-sm font-normal text-base-content/70">{t('dashboard.vacation.ofTotal', { total: formatNumber(vacationAvailable) })}</span>
 					</span>
 					<span class="text-xs text-base-content/70 mt-1">{t('dashboard.vacation.details', { taken: formatNumber(me.vacationDaysTaken ?? 0), planned: formatNumber(me.vacationDaysPlanned ?? 0) })}</span>
+					{#each vacationLines as line (line)}
+						<span class="text-xs text-base-content/70" data-testid="vacation-carry-line">{line}</span>
+					{/each}
 				</a>
 			{/if}
 		</div>

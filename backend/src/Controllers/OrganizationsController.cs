@@ -222,6 +222,41 @@ public class OrganizationsController : OrganizationBaseController
         return ToResponse(await _service.SetMemberVacationDaysAsync(slug, userId.Value, memberId, request));
     }
 
+    /// <summary>
+    /// A member's vacation balance for one year (default: the current one) with carry-over, lapsed days and the admin's
+    /// adjustment. Visible like the member list's figures (kind VacationBalance of the visibility matrix).
+    /// </summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID.</param>
+    /// <param name="year">Calendar year (2000-2100).</param>
+    [HttpGet("{slug}/members/{memberId}/vacation")]
+    [RequireOrgRole(OrganizationRole.Member)]
+    [ProducesResponseType(typeof(MemberVacationResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMemberVacation(string slug, int memberId, [FromQuery] int? year = null)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.GetMemberVacationAsync(slug, userId.Value, memberId, year));
+    }
+
+    /// <summary>
+    /// Set a member's vacation entitlement and/or adjustment (+ note) of one year (admin only). Left-out fields stay;
+    /// a past year's entitlement changes only that year; the current year's is the allowance from now on.
+    /// </summary>
+    /// <param name="slug">Organization URL slug.</param>
+    /// <param name="memberId">Member ID to update.</param>
+    /// <param name="year">Calendar year (2000-2100).</param>
+    [HttpPut("{slug}/members/{memberId}/vacation/{year}")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(typeof(MemberVacationResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetMemberVacationYear(
+        string slug, int memberId, int year, [FromBody] SetMemberVacationYearRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.SetMemberVacationYearAsync(slug, userId.Value, memberId, year, request));
+    }
+
     /// <summary>Set or clear a member's personnel number for the payroll export (admin only; unique per organization).</summary>
     /// <param name="slug">Organization URL slug.</param>
     /// <param name="memberId">Member ID to update.</param>

@@ -31,6 +31,34 @@ export const en: typeof de = {
 		unit: 'days/year',
 		invalid: 'Enter a number of days between 0 and 365.'
 	},
+	carryOver: {
+		label: 'Leftover vacation into the next year',
+		description: 'What happens to vacation days left at the end of a year. Carried-over days are used first. The rule applies at once to every year from the start year (it changes computed figures, not data) and is not locked by closed months.',
+		mode: 'Rule',
+		modes: {
+			UntilDate: 'Carry over until a deadline',
+			Unlimited: 'Carry over without limit',
+			None: 'Lapses at year end'
+		},
+		modeHints: {
+			UntilDate: 'Statutory default: carried-over days lapse after the deadline in the following year unless taken by then.',
+			Unlimited: 'Carried-over days never lapse.',
+			None: 'Leftover days lapse on 31 December.'
+		},
+		expiry: 'Lapses after',
+		day: 'Day',
+		month: 'Month',
+		maxDays: 'Carry over at most',
+		maxDaysPlaceholder: 'no limit',
+		unit: 'days',
+		since: 'Carry over from year',
+		sinceHint: 'Leftover days of this and later years carry over; earlier years stay as they are.',
+		invalidExpiry: 'Please enter a valid day and month.',
+		invalidMax: 'Please enter 0–365 days or leave it empty.',
+		invalidSince: 'Please enter a year between 2000 and {year}.',
+		maxSummary: 'at most {days} days',
+		summary: '{rule}, carry-over from {year}'
+	},
 	businessDayEnd: {
 		label: 'Business day end',
 		description: 'A timer still running at this local time is stopped automatically and marked as a failure entry, which counts as 0 until the member corrects it. Midnight (00:00) by default; set e.g. 04:00 for late-night shifts.',

@@ -85,6 +85,10 @@ public class OrganizationService : IOrganizationService
                 CsvImportMode = o.CsvImportMode.ToString(),
                 AbsenceSelfServiceMode = o.AbsenceSelfServiceMode.ToString(),
                 DefaultVacationDays = o.DefaultVacationDays,
+                VacationCarryOverMode = o.VacationCarryOverMode.ToString(),
+                VacationCarryOverExpiry = VacationExpiry(o.VacationCarryOverExpiryMonth, o.VacationCarryOverExpiryDay),
+                VacationCarryOverMaxDays = o.VacationCarryOverMaxDays,
+                VacationCarryOverSince = o.VacationCarryOverSince,
                 BusinessDayEnd = o.BusinessDayEnd.ToString("HH:mm"),
                 TimeZone = o.TimeZone,
                 CoreHoursEnabled = o.CoreHoursEnabled,
@@ -145,10 +149,10 @@ public class OrganizationService : IOrganizationService
         var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId!.Value);
         var visibleMembers = organization.Members.Where(m => visibility.Can(m.Id, MemberInfo.Member)).ToList();
 
-        // Vacation days used for each member (current year, in the org's time zone)
+        // Vacation balance of each member (current year incl. carry-over, in the org's time zone)
         var today = OrgClock.For(organization.TimeZone).Today();
         var memberIds = visibility.Ids(MemberInfo.VacationBalance).ToList();
-        var usageByUser = await VacationBalances.UsageAsync(_context, organization.Id, memberIds, today.Year, today);
+        var vacationByUser = await VacationBalances.YearsAsync(_context, org, memberIds, today.Year, today);
 
         // Group memberships for tag display (e.g. "Frontend Admin"): direct ones, then the
         // ancestors of those groups as inherited memberships ("über Team Küche")
@@ -184,20 +188,24 @@ public class OrganizationService : IOrganizationService
         {
             var can = visibility.Of(m.Id);
             var visible = can.HasFlag(MemberInfo.VacationBalance);
-            var usage = usageByUser.GetValueOrDefault(m.Id);
-            var taken = usage?.Taken ?? 0;
-            var planned = usage?.Planned ?? 0;
-            var used = taken + planned;
+            var vacation = visible ? vacationByUser.GetValueOrDefault(m.Id) : null;
             return m with
             {
                 Email = can.HasFlag(MemberInfo.Email) ? m.Email : null,
                 Role = m.Role,   // the org role is shown whenever the person is (#63)
                 VacationVisible = visible,
                 VacationDaysPerYear = visible ? m.VacationDaysPerYear : 0,
-                VacationDaysUsed = visible ? used : 0,
-                VacationDaysTaken = visible ? taken : 0,
-                VacationDaysPlanned = visible ? planned : 0,
-                VacationDaysRemaining = visible ? VacationBalances.Remaining(m.VacationDaysPerYear, usage) : 0,
+                VacationDaysUsed = vacation?.Used ?? 0,
+                VacationDaysTaken = vacation?.Taken ?? 0,
+                VacationDaysPlanned = vacation?.Planned ?? 0,
+                VacationDaysRemaining = vacation?.Remaining ?? 0,
+                VacationEntitlement = vacation?.Entitlement ?? 0,
+                VacationAdjustment = vacation?.Adjustment ?? 0,
+                VacationCarriedIn = vacation?.CarriedIn ?? 0,
+                VacationCarriedUsed = vacation?.CarriedUsed ?? 0,
+                VacationExpired = vacation?.Expired ?? 0,
+                VacationExpiresOn = vacation?.ExpiresOn,
+                VacationAvailable = vacation?.Available ?? 0,
                 CardCount = callerIsAdmin ? m.CardCount : 0,
                 PersonnelNumber = callerIsAdmin ? m.PersonnelNumber : null,
                 // Starting overtime balance is payroll data: the person and admins only
@@ -268,6 +276,8 @@ public class OrganizationService : IOrganizationService
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
             IsActive = true,
+            // Carry-over applies from the year the organization starts (org-local; new orgs use the default zone)
+            VacationCarryOverSince = OrgClock.For((string?)null).Today().Year,
             // Statutory minimum breaks (§ 4 ArbZG) as a sensible default; admins can change them
             PauseRules =
             {
@@ -477,6 +487,24 @@ public class OrganizationService : IOrganizationService
     //  Settings
     // ────────────────────────────────────────────────────
 
+    public const string CarryOverExpiryMessage = "The carry-over expiry must be a valid day as MM-DD.";
+    public const string CarryOverMaxDaysMessage = "The carry-over cap must be between 0 and 365 days.";
+    public const string CarryOverSinceMessage = "The carry-over start year must be between 2000 and the current year.";
+
+    /// <summary>A carry-over expiry as "MM-DD".</summary>
+    internal static string VacationExpiry(int month, int day) => $"{month:00}-{day:00}";
+
+    /// <summary>Parses "MM-DD" (any day the month can have, 02-29 included: it is clamped in short years).</summary>
+    internal static (int Month, int Day)? ParseVacationExpiry(string value)
+    {
+        var parts = value.Split('-');
+        if (parts.Length != 2 || parts[0].Length != 2 || parts[1].Length != 2
+            || !int.TryParse(parts[0], out var month) || !int.TryParse(parts[1], out var day)
+            || month is < 1 or > 12 || day < 1 || day > DateTime.DaysInMonth(2024, month))
+            return null;
+        return (month, day);
+    }
+
     public const string CoreHoursOrderMessage = "Core working hours need a valid start and a different end.";
     public const string CoreHoursBackfillMessage = "Past days to check must be between 1 and 31.";
 
@@ -526,6 +554,32 @@ public class OrganizationService : IOrganizationService
         if (request.Visibility != null && MemberVisibility.Apply(org, request.Visibility) is { } visibilityError)
             return ServiceResult.BadRequest<OrganizationSettingsResponse>(visibilityError);
         if (request.DefaultVacationDays.HasValue) org.DefaultVacationDays = request.DefaultVacationDays.Value;
+        // Carry-over is a rule, not data: it applies to every year from `since` at once (no closed-month guard)
+        if (request.VacationCarryOverMode is { } carryMode)
+        {
+            if (!Enum.IsDefined(carryMode))
+                return ServiceResult.BadRequest<OrganizationSettingsResponse>("Invalid carry-over mode.");
+            org.VacationCarryOverMode = carryMode;
+        }
+        if (request.VacationCarryOverExpiry != null)
+        {
+            if (ParseVacationExpiry(request.VacationCarryOverExpiry) is not { } expiry)
+                return ServiceResult.BadRequest<OrganizationSettingsResponse>(CarryOverExpiryMessage);
+            (org.VacationCarryOverExpiryMonth, org.VacationCarryOverExpiryDay) = expiry;
+        }
+        if (request.ClearVacationCarryOverMaxDays == true) org.VacationCarryOverMaxDays = null;
+        else if (request.VacationCarryOverMaxDays is { } maxDays)
+        {
+            if (!double.IsFinite(maxDays) || maxDays is < 0 or > 365)
+                return ServiceResult.BadRequest<OrganizationSettingsResponse>(CarryOverMaxDaysMessage);
+            org.VacationCarryOverMaxDays = maxDays;
+        }
+        if (request.VacationCarryOverSince is { } since)
+        {
+            if (since < 2000 || since > OrgClock.For(org).Today().Year)
+                return ServiceResult.BadRequest<OrganizationSettingsResponse>(CarryOverSinceMessage);
+            org.VacationCarryOverSince = since;
+        }
         if (request.BusinessDayEnd != null) org.BusinessDayEnd = TimeOnly.ParseExact(request.BusinessDayEnd, "HH:mm");
         if (request.TimeZone != null)
         {
@@ -612,7 +666,11 @@ public class OrganizationService : IOrganizationService
             CoreHoursToleranceMinutes = org.CoreHoursToleranceMinutes,
             TerminalDoubleScanSeconds = org.TerminalDoubleScanSeconds,
             TerminalOfflineHours = org.TerminalOfflineHours,
-            TerminalUnknownCardLimit = org.TerminalUnknownCardLimit
+            TerminalUnknownCardLimit = org.TerminalUnknownCardLimit,
+            VacationCarryOverMode = org.VacationCarryOverMode.ToString(),
+            VacationCarryOverExpiry = VacationExpiry(org.VacationCarryOverExpiryMonth, org.VacationCarryOverExpiryDay),
+            VacationCarryOverMaxDays = org.VacationCarryOverMaxDays,
+            VacationCarryOverSince = org.VacationCarryOverSince
         });
     }
 
@@ -962,6 +1020,17 @@ public class OrganizationService : IOrganizationService
         if (membership == null)
             return ServiceResult.NotFound<MemberVacationDaysResponse>("Member not found in this organization.");
 
+        // The allowance from now on: this year and every later one change, no earlier year does
+        var currentYear = OrgClock.For(org).Today().Year;
+        var edit = await VacationEditAsync(org, membership, callerUserId);
+        edit.PinEarlierYears(currentYear);
+        edit.Upsert(currentYear).Entitlement = request.Days;
+        foreach (var later in edit.Rows.Where(r => r.Year > currentYear && r.Entitlement != null))
+        {
+            later.Entitlement = null;
+            later.UpdatedAt = DateTime.UtcNow;
+            later.UpdatedByUserId = callerUserId;
+        }
         membership.VacationDaysPerYear = request.Days;
         await _context.SaveChangesAsync();
 
@@ -969,6 +1038,188 @@ public class OrganizationService : IOrganizationService
             request.Days, userId, org.Id, callerUserId);
 
         return ServiceResult.Ok(new MemberVacationDaysResponse { UserId = userId, VacationDaysPerYear = membership.VacationDaysPerYear });
+    }
+
+    /// <summary>
+    /// A member's <see cref="VacationYear"/> rows (tracked) for a write, with the two pins that keep every year a
+    /// write must not touch exactly as it was (VacationBalances: a year without its own entitlement inherits the
+    /// latest earlier row's, else the member's allowance).
+    /// </summary>
+    private sealed class VacationEdit(TimeTrackingDbContext context, int orgId, int userId, int callerUserId,
+        double allowance, int chainStart, List<VacationYear> rows)
+    {
+        public List<VacationYear> Rows => rows;
+
+        /// <summary>The row of <paramref name="year"/>, added (tracked) when missing; stamped as changed.</summary>
+        public VacationYear Upsert(int year)
+        {
+            var row = rows.FirstOrDefault(r => r.Year == year);
+            if (row == null)
+            {
+                row = new VacationYear { OrganizationId = orgId, UserId = userId, Year = year };
+                context.VacationYears.Add(row);
+                rows.Add(row);
+            }
+            row.UpdatedAt = DateTime.UtcNow;
+            row.UpdatedByUserId = callerUserId;
+            return row;
+        }
+
+        /// <summary>Gives <paramref name="year"/> its current effective entitlement as its own (when it has none).</summary>
+        public void Pin(int year)
+        {
+            if (rows.Any(r => r.Year == year && r.Entitlement != null)) return;
+            var before = VacationBalances.EntitlementFor(year, rows, allowance);
+            Upsert(year).Entitlement = before;
+        }
+
+        /// <summary>
+        /// Before changing <paramref name="year"/> (or the allowance, from that year on): the years before it that still
+        /// fall back to the allowance get it as a row at the start of the member's chain (min of join year and
+        /// carry-over start, org-local) — or the year before, when that is earlier — so they never move.
+        /// </summary>
+        public void PinEarlierYears(int year)
+        {
+            var first = Math.Min(chainStart, year - 1);
+            if (!rows.Any(r => r.Year <= first && r.Entitlement != null)) Pin(first);
+        }
+    }
+
+    private async Task<VacationEdit> VacationEditAsync(Organization org, UserOrganization membership, int callerUserId)
+    {
+        var rows = await _context.VacationYears
+            .Where(v => v.OrganizationId == org.Id && v.UserId == membership.UserId)
+            .ToListAsync();
+        var joinYear = OrgClock.For(org).LocalDate(membership.JoinedAt).Year;
+        return new VacationEdit(_context, org.Id, membership.UserId, callerUserId, membership.VacationDaysPerYear,
+            Math.Min(joinYear, org.VacationCarryOverSince), rows);
+    }
+
+    public const string VacationYearMessage = "Year must be between 2000 and 2100.";
+    public const string VacationEntitlementMessage = "The vacation entitlement must be between 0 and 365 days.";
+    public const string VacationAdjustmentMessage = "The vacation adjustment must be between -365 and 365 days.";
+    public const string VacationNoteMessage = "The note may have at most 500 characters.";
+
+    public async Task<ServiceResult<MemberVacationResponse>> GetMemberVacationAsync(string slug, int callerUserId, int userId, int? year)
+    {
+        var org = await _context.FindOrgBySlugAsync(slug);
+        if (org == null)
+            return ServiceResult.NotFound<MemberVacationResponse>("Organization not found");
+        var y = year ?? OrgClock.For(org).Today().Year;
+        if (y is < 2000 or > 2100)
+            return ServiceResult.BadRequest<MemberVacationResponse>(VacationYearMessage);
+
+        // Accountants see everybody's vacation (like the accounting overview); everyone else per the
+        // VacationBalance kind of the visibility matrix, like the member list's figures
+        var caller = await _context.UserOrganizations.AsNoTracking()
+            .Where(uo => uo.OrganizationId == org.Id && uo.UserId == callerUserId)
+            .Select(uo => new { uo.Role, uo.IsAccountant })
+            .FirstOrDefaultAsync();
+        if (caller == null)
+            return ServiceResult.Forbidden<MemberVacationResponse>();
+        if (caller.IsAccountant)
+        {
+            if (!await _context.UserOrganizations.AnyAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId))
+                return ServiceResult.NotFound<MemberVacationResponse>("Member not found in this organization.");
+        }
+        else
+        {
+            var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
+            if (visibility.Check(userId, MemberInfo.VacationBalance) is { } error)
+                return error == ServiceErrorType.NotFound
+                    ? ServiceResult.NotFound<MemberVacationResponse>("Member not found in this organization.")
+                    : ServiceResult.Forbidden<MemberVacationResponse>();
+        }
+
+        // The adjustment note (and who edited) is between the member and the people who keep the figures
+        var seesNote = userId == callerUserId || caller.IsAccountant || caller.Role >= OrganizationRole.Admin;
+        return ServiceResult.Ok(await MemberVacationAsync(org, userId, y, seesNote));
+    }
+
+    public async Task<ServiceResult<MemberVacationResponse>> SetMemberVacationYearAsync(
+        string slug, int callerUserId, int userId, int year, SetMemberVacationYearRequest request)
+    {
+        var org = await _context.FindOrgBySlugAsync(slug);
+        if (org == null)
+            return ServiceResult.NotFound<MemberVacationResponse>("Organization not found");
+        // Like the allowance itself (vacation-days): org admins only
+        if (await _context.GetOrgRoleAsync(callerUserId, org.Id) is not >= OrganizationRole.Admin)
+            return ServiceResult.Forbidden<MemberVacationResponse>();
+        if (year is < 2000 or > 2100)
+            return ServiceResult.BadRequest<MemberVacationResponse>(VacationYearMessage);
+        if (request.Entitlement is { } ent && (!double.IsFinite(ent) || ent is < 0 or > 365))
+            return ServiceResult.BadRequest<MemberVacationResponse>(VacationEntitlementMessage);
+        if (request.Adjustment is { } adj && (!double.IsFinite(adj) || adj is < -365 or > 365))
+            return ServiceResult.BadRequest<MemberVacationResponse>(VacationAdjustmentMessage);
+        var note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim();
+        if (note is { Length: > VacationYear.NoteMaxLength })
+            return ServiceResult.BadRequest<MemberVacationResponse>(VacationNoteMessage);
+
+        var membership = await _context.UserOrganizations
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
+        if (membership == null)
+            return ServiceResult.NotFound<MemberVacationResponse>("Member not found in this organization.");
+
+        // Exactly this year changes — past, current or future: the years before keep theirs (pinned at the start of
+        // the chain when they still fall back to the allowance), the next year keeps its value as its own
+        var edit = await VacationEditAsync(org, membership, callerUserId);
+        if (request.Entitlement != null || request.ClearEntitlement == true)
+        {
+            edit.PinEarlierYears(year);
+            edit.Pin(year + 1);
+            edit.Upsert(year).Entitlement = request.ClearEntitlement == true ? null : request.Entitlement;
+            // "Tage pro Jahr" shows this year's entitlement; the allowance is only the fallback before the chain
+            if (year == OrgClock.For(org).Today().Year)
+                membership.VacationDaysPerYear = VacationBalances.EntitlementFor(year, edit.Rows, membership.VacationDaysPerYear);
+        }
+        if (request.Adjustment != null || request.Note != null)
+        {
+            var row = edit.Upsert(year);
+            if (request.Adjustment is { } adjustment) row.Adjustment = adjustment;
+            if (request.Note != null) row.AdjustmentNote = note;
+        }
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Vacation of {Year} set for user {UserId} in org {OrgId} by user {CallerId}", year, userId, org.Id, callerUserId);
+        return ServiceResult.Ok(await MemberVacationAsync(org, userId, year, seesNote: true));
+    }
+
+    private async Task<MemberVacationResponse> MemberVacationAsync(Organization org, int userId, int year, bool seesNote)
+    {
+        var today = OrgClock.For(org).Today();
+        var balance = (await VacationBalances.YearsAsync(_context, org, new[] { userId }, year, today))[userId];
+        var row = await _context.VacationYears.AsNoTracking()
+            .Where(v => v.OrganizationId == org.Id && v.UserId == userId && v.Year == year)
+            .Select(v => new
+            {
+                v.Entitlement, v.AdjustmentNote, v.UpdatedAt,
+                UpdatedBy = _context.Users.Where(u => u.Id == v.UpdatedByUserId).Select(u => u.FirstName + " " + u.LastName).FirstOrDefault()
+            })
+            .FirstOrDefaultAsync();
+        var allowance = await _context.UserOrganizations.IgnoreQueryFilters()
+            .Where(uo => uo.OrganizationId == org.Id && uo.UserId == userId)
+            .Select(uo => uo.VacationDaysPerYear)
+            .FirstOrDefaultAsync();
+        return new MemberVacationResponse
+        {
+            UserId = userId,
+            Year = year,
+            Entitlement = balance.Entitlement,
+            HasOwnEntitlement = row?.Entitlement != null,
+            Adjustment = balance.Adjustment,
+            AdjustmentNote = seesNote ? row?.AdjustmentNote : null,
+            CarriedIn = balance.CarriedIn,
+            CarriedUsed = balance.CarriedUsed,
+            Expired = balance.Expired,
+            ExpiresOn = balance.ExpiresOn,
+            Taken = balance.Taken,
+            Planned = balance.Planned,
+            Remaining = balance.Remaining,
+            Available = balance.Available,
+            VacationDaysPerYear = allowance,
+            UpdatedAt = seesNote ? row?.UpdatedAt : null,
+            UpdatedByName = seesNote ? row?.UpdatedBy : null
+        };
     }
 
     public async Task<ServiceResult<MemberPersonnelNumberResponse>> SetMemberPersonnelNumberAsync(

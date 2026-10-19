@@ -52,6 +52,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<ClosedPeriodEvent> ClosedPeriodEvents { get; set; }
     public DbSet<PushSubscription> PushSubscriptions { get; set; }
     public DbSet<BalanceCheckpoint> BalanceCheckpoints { get; set; }
+    public DbSet<VacationYear> VacationYears { get; set; }
 
     /// <summary>
     /// Saves, and records every change a user made to a finished time entry in
@@ -659,6 +660,20 @@ public class TimeTrackingDbContext : DbContext
             entity.HasIndex(e => new { e.OrganizationId, e.UserId, e.Month }).IsUnique();
             entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Per-year vacation entitlement/adjustment (Services/Common/VacationBalances.cs; RLS like AbsenceDays).
+        // Kept with the anonymized account like absences; gone with the organization.
+        modelBuilder.Entity<VacationYear>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.AdjustmentNote).HasMaxLength(VacationYear.NoteMaxLength);
+            entity.HasIndex(e => new { e.OrganizationId, e.UserId, e.Year }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.UpdatedByUserId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasQueryFilter(e => e.Organization.IsActive);
         });
 
         modelBuilder.Entity<ClosedPeriod>(entity =>

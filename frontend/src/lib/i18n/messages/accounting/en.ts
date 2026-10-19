@@ -61,12 +61,16 @@ export const en: typeof de = {
 	vacation: {
 		heading: 'Vacation {year}',
 		entitlement: 'Entitlement',
+		carriedIn: 'Carried over',
+		expired: 'Expired',
+		adjustment: 'Adjustment',
+		expiresOn: 'Carry-over lapses after {date}',
 		taken: 'Taken',
 		planned: 'Planned',
 		remaining: 'Remaining',
 		sick: 'Sick days',
 		other: 'Other absences',
-		hint: 'Taken = up to today, planned = from tomorrow. Vacation counts on working days only, holidays excluded.'
+		hint: 'Taken = up to today, planned = from tomorrow. Vacation counts on working days only, holidays excluded. Carried over = leftover days from last year (used first), expired = of those not taken in time, adjustment = correction by admins.'
 	},
 	member: {
 		title: 'Accounting',

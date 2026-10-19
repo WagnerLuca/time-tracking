@@ -14,6 +14,8 @@ public record PersonalDataExport
     public required List<PersonalPunch> TerminalPunches { get; init; }
     public required List<PersonalTimeEntry> TimeEntries { get; init; }
     public required List<PersonalAbsence> Absences { get; init; }
+    /// <summary>Per-year vacation entitlements and adjustments set by admins (null entitlement = inherited).</summary>
+    public required List<PersonalVacationYear> VacationYears { get; init; }
     public required List<PersonalRequest> Requests { get; init; }
     public required List<PersonalNotification> Notifications { get; init; }
     public required List<PersonalEntryChange> EntryChanges { get; init; }
@@ -28,6 +30,7 @@ public record PersonalCard(string Organization, string CardHint, string? Label, 
 public record PersonalPunch(string Organization, DateTime ScannedAt, string? Terminal, string Result, string CardHint);
 public record PersonalTimeEntry(string? Organization, DateTime StartTime, DateTime? EndTime, int PauseMinutes, string? Description, bool IsFailure);
 public record PersonalAbsence(string Organization, DateOnly Date, string Type, bool IsHalfDay, string? Note);
+public record PersonalVacationYear(string Organization, int Year, double? Entitlement, double Adjustment, string? AdjustmentNote, DateTime UpdatedAt);
 public record PersonalRequest(string Organization, string Type, string Status, string? Message, string? RequestData, DateTime CreatedAt, DateTime? RespondedAt);
 /// <summary>Changes is the stored JSON array of {field, oldValue, newValue}.</summary>
 public record PersonalEntryChange(int TimeEntryId, DateTime ChangedAt, string Kind, bool ChangedByYou, string Changes, string? Reason = null);

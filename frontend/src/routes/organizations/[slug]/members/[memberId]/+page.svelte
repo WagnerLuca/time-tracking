@@ -215,7 +215,7 @@
 			<InitialOvertimeEditor class="mb-5" {orgSlug} {memberId} hours={schedule?.initialOvertimeHours ?? 0} editable={isAdmin} onsaved={async () => { await loadSchedule(); await calendar?.reloadBalance(); }} />
 		{/if}
 		{#if canSee(member, 'VacationBalance')}
-			<MemberVacation class="mb-5" {orgSlug} {member} canEdit={isAdmin} onchanged={reloadOrg} />
+			<MemberVacation class="mb-5" {orgSlug} timeZone={org?.timeZone} {member} canEdit={isAdmin} onchanged={reloadOrg} />
 		{/if}
 		{#if isAdmin}
 			<MemberPersonnelNumber {orgSlug} {member} onchanged={reloadOrg} />

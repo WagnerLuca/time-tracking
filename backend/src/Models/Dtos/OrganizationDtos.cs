@@ -39,6 +39,14 @@ public record OrganizationDetailResponse
     /// <summary>The member visibility matrix (org defaults), one row per kind of information.</summary>
     public List<VisibilityRuleResponse> Visibility { get; init; } = new();
     public double DefaultVacationDays { get; init; }
+    /// <summary>Vacation carry-over (VacationBalances): None / UntilDate / Unlimited.</summary>
+    public string VacationCarryOverMode { get; init; } = "UntilDate";
+    /// <summary>Carried-over days lapse after this day of the following year, "MM-DD".</summary>
+    public string VacationCarryOverExpiry { get; init; } = "03-31";
+    /// <summary>At most this many days carry over; null = no cap.</summary>
+    public double? VacationCarryOverMaxDays { get; init; }
+    /// <summary>First year whose leftover carries into the next one.</summary>
+    public int VacationCarryOverSince { get; init; }
     /// <summary>Business day end as local "HH:mm" in <see cref="TimeZone"/>.</summary>
     public string BusinessDayEnd { get; init; } = "00:00";
     public string TimeZone { get; init; } = "Europe/Berlin";
@@ -91,7 +99,22 @@ public record OrganizationMemberResponse
     public double VacationDaysTaken { get; init; }
     /// <summary>Vacation days planned for the rest of this year (date &gt; today).</summary>
     public double VacationDaysPlanned { get; init; }
+    /// <summary>Remaining vacation days this year (carry-over included, never negative).</summary>
     public double VacationDaysRemaining { get; init; }
+    /// <summary>This year's entitlement (own row, else the latest earlier one, else <see cref="VacationDaysPerYear"/>).</summary>
+    public double VacationEntitlement { get; init; }
+    /// <summary>An admin's adjustment of this year's days (e.g. an opening balance).</summary>
+    public double VacationAdjustment { get; init; }
+    /// <summary>Days carried over from last year.</summary>
+    public double VacationCarriedIn { get; init; }
+    /// <summary>Of the carried-over days, how many are already used (taken or planned up to the expiry date).</summary>
+    public double VacationCarriedUsed { get; init; }
+    /// <summary>Carried-over days that lapsed (expiry date passed unused).</summary>
+    public double VacationExpired { get; init; }
+    /// <summary>The day after which the carried-over days lapse; null without carry-in or when they never lapse.</summary>
+    public DateOnly? VacationExpiresOn { get; init; }
+    /// <summary>Days this year offers: entitlement + adjustment + carried in − lapsed.</summary>
+    public double VacationAvailable { get; init; }
     /// <summary>
     /// Whether the caller may see this member's vacation balance (self, admins, or
     /// per the member visibility matrix, kind VacationBalance). When false, the vacation figures are zeroed.
@@ -198,6 +221,16 @@ public record UpdateOrganizationSettingsRequest
     /// <summary>Rows of the member visibility matrix to change (others stay as they are).</summary>
     public List<VisibilityRuleRequest>? Visibility { get; init; }
     public double? DefaultVacationDays { get; init; }
+    /// <summary>Vacation carry-over mode.</summary>
+    public VacationCarryOverMode? VacationCarryOverMode { get; init; }
+    /// <summary>Expiry of carried-over days as "MM-DD" (e.g. "03-31").</summary>
+    public string? VacationCarryOverExpiry { get; init; }
+    /// <summary>Cap on carried-over days (0-365); see <see cref="ClearVacationCarryOverMaxDays"/> to remove it.</summary>
+    public double? VacationCarryOverMaxDays { get; init; }
+    /// <summary>True removes the cap.</summary>
+    public bool? ClearVacationCarryOverMaxDays { get; init; }
+    /// <summary>First year whose leftover carries (2000 to the current year).</summary>
+    public int? VacationCarryOverSince { get; init; }
     /// <summary>Business day end as local "HH:mm" (e.g. "04:00").</summary>
     [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$", ErrorMessage = "Use HH:mm, e.g. 04:00.")]
     public string? BusinessDayEnd { get; init; }
@@ -302,6 +335,10 @@ public record OrganizationSettingsResponse
     public int TerminalDoubleScanSeconds { get; init; }
     public int TerminalOfflineHours { get; init; }
     public int TerminalUnknownCardLimit { get; init; }
+    public string VacationCarryOverMode { get; init; } = "UntilDate";
+    public string VacationCarryOverExpiry { get; init; } = "03-31";
+    public double? VacationCarryOverMaxDays { get; init; }
+    public int VacationCarryOverSince { get; init; }
 }
 
 /// <summary>A member's initial overtime after it was set.</summary>
@@ -316,6 +353,44 @@ public record MemberVacationDaysResponse
 {
     public int UserId { get; init; }
     public double VacationDaysPerYear { get; init; }
+}
+
+/// <summary>One member's vacation balance for one year (VacationBalances).</summary>
+public record MemberVacationResponse
+{
+    public int UserId { get; init; }
+    public int Year { get; init; }
+    /// <summary>The year's entitlement (own, inherited from an earlier year, or the member's allowance).</summary>
+    public double Entitlement { get; init; }
+    /// <summary>Whether this year has its own entitlement (otherwise it is inherited).</summary>
+    public bool HasOwnEntitlement { get; init; }
+    public double Adjustment { get; init; }
+    public string? AdjustmentNote { get; init; }
+    public double CarriedIn { get; init; }
+    public double CarriedUsed { get; init; }
+    public double Expired { get; init; }
+    public DateOnly? ExpiresOn { get; init; }
+    public double Taken { get; init; }
+    public double Planned { get; init; }
+    public double Remaining { get; init; }
+    public double Available { get; init; }
+    /// <summary>The member's allowance for years without their own entitlement.</summary>
+    public double VacationDaysPerYear { get; init; }
+    public DateTime? UpdatedAt { get; init; }
+    public string? UpdatedByName { get; init; }
+}
+
+/// <summary>Sets a member's vacation figures of one year; left-out fields stay as they are.</summary>
+public record SetMemberVacationYearRequest
+{
+    /// <summary>The year's entitlement (0-365).</summary>
+    public double? Entitlement { get; init; }
+    /// <summary>True: the year has no entitlement of its own any more and inherits the latest earlier year's.</summary>
+    public bool? ClearEntitlement { get; init; }
+    /// <summary>Extra (+) or fewer (−) days (−365 to 365).</summary>
+    public double? Adjustment { get; init; }
+    /// <summary>Why the adjustment (≤ 500 characters); empty clears it.</summary>
+    public string? Note { get; init; }
 }
 
 /// <summary>The dashboard's team overview (issue #61): the members the caller leads, with balance and presence.</summary>

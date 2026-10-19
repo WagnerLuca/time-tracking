@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { MemberTimeOverviewResponse, OrganizationMemberResponse } from '$lib/api';
 	import { formatDelta, formatHoursDecimal, formatNumber } from '$lib/utils/formatters';
+	import { vacationTotal } from '$lib/utils/vacation';
 	import type { BalanceMinutes } from '$lib/utils/balance';
 	import { t } from '$lib/i18n';
 
@@ -40,9 +41,9 @@
 				<span class="block text-xl font-bold text-base-content">{t('common.hoursShort', { value: formatNumber(initialOvertimeHours, { signDisplay: 'exceptZero', maximumFractionDigits: 2 }) })}</span>
 				<span class="block text-xs text-base-content/70 mt-0.5">{t('memberDetail.summary.initialOvertime')}</span>
 			</div>
-			{#if (member.vacationDaysPerYear ?? 0) > 0}
+			{#if vacationTotal(member) > 0}
 				<div class="bg-base-200/50 border border-base-200 rounded-lg p-3 text-center">
-					<span class="block text-xl font-bold text-info">{formatNumber(member.vacationDaysRemaining ?? 0)}/{formatNumber(member.vacationDaysPerYear ?? 0)}</span>
+					<span class="block text-xl font-bold text-info">{formatNumber(member.vacationDaysRemaining ?? 0)}/{formatNumber(vacationTotal(member))}</span>
 					<span class="block text-xs text-base-content/70 mt-0.5">{t('memberDetail.summary.vacationLeft')}</span>
 				</div>
 			{/if}

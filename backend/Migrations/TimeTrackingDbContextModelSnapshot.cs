@@ -856,6 +856,21 @@ namespace TimeTracking.Api.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("VacationCarryOverExpiryDay")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VacationCarryOverExpiryMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<double?>("VacationCarryOverMaxDays")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("VacationCarryOverMode")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VacationCarryOverSince")
+                        .HasColumnType("integer");
+
                     b.Property<int>("VisibleInGroups")
                         .HasColumnType("integer");
 
@@ -1376,6 +1391,51 @@ namespace TimeTracking.Api.Migrations
                     b.ToTable("UserTokens");
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.VacationYear", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<double>("Adjustment")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("AdjustmentNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<double?>("Entitlement")
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("OrganizationId", "UserId", "Year")
+                        .IsUnique();
+
+                    b.ToTable("VacationYears");
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.WorkSchedule", b =>
                 {
                     b.Property<int>("Id")
@@ -1825,6 +1885,30 @@ namespace TimeTracking.Api.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TimeTracking.Api.Models.VacationYear", b =>
+                {
+                    b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TimeTracking.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TimeTracking.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Organization");
 
                     b.Navigation("User");
                 });

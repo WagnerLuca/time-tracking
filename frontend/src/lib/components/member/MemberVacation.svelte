@@ -5,24 +5,34 @@
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { t } from '$lib/i18n';
+	import { memberCarryFigures, orgYear, vacationDetailLines, vacationTotal } from '$lib/utils/vacation';
+	import VacationYearEditor from './VacationYearEditor.svelte';
 
-	/** Vacation allowance of one member: remaining / taken / planned / total; admins edit the yearly days. */
+	/**
+	 * Vacation of one member this year: remaining / taken / planned / available (entitlement + adjustment + carried-over
+	 * days − lapsed ones), with the carry-over lines; admins edit the yearly days and each year's entitlement/adjustment.
+	 */
 	interface Props {
 		orgSlug: string;
+		/** The org's time zone: "this year" is the org-local one, like the backend's. */
+		timeZone?: string | null;
 		member: OrganizationMemberResponse;
 		canEdit: boolean;
 		onchanged?: () => void;
 		class?: string;
 	}
-	let { orgSlug, member, canEdit, onchanged, class: className = '' }: Props = $props();
+	let { orgSlug, timeZone = null, member, canEdit, onchanged, class: className = '' }: Props = $props();
 
 	let editing = $state(false);
 	let days = $state<number | null>(0);
 	let submitted = $state(false);
 	let saving = $state(false);
 	let saveError = $state('');
+	let yearsOpen = $state(false);
 
-	let allowed = $derived(member.vacationDaysPerYear ?? 0);
+	let allowed = $derived(vacationTotal(member));
+	let year = $derived(orgYear(timeZone));
+	let detailLines = $derived(vacationDetailLines(memberCarryFigures(member), year));
 	let taken = $derived(member.vacationDaysTaken ?? 0);
 	let planned = $derived(member.vacationDaysPlanned ?? 0);
 	let remaining = $derived(member.vacationDaysRemaining ?? 0);
@@ -33,7 +43,8 @@
 	let daysError = $derived(submitted && (days == null || !Number.isFinite(days) || days < 0 || days > 365) ? t('memberDetail.vacation.range') : '');
 
 	function startEdit() {
-		days = allowed;
+		// "Tage pro Jahr" = this year's entitlement (later years follow it)
+		days = member.vacationEntitlement ?? member.vacationDaysPerYear ?? 0;
 		submitted = false;
 		saveError = '';
 		editing = true;
@@ -62,7 +73,10 @@
 	<div class="flex items-center justify-between gap-2 mb-3">
 		<h2 class="text-base font-bold text-base-content m-0">{t('memberDetail.vacation.title')}</h2>
 		{#if canEdit && !editing}
-			<button type="button" class="btn btn-ghost btn-sm" onclick={startEdit}>{t('common.edit')}</button>
+			<div class="flex gap-1">
+				<button type="button" class="btn btn-ghost btn-sm" onclick={() => (yearsOpen = true)}>{t('vacation.year.open')}</button>
+				<button type="button" class="btn btn-ghost btn-sm" onclick={startEdit}>{t('common.edit')}</button>
+			</div>
 		{/if}
 	</div>
 
@@ -84,6 +98,9 @@
 			<div><span class="text-lg font-semibold text-base-content/70">{formatNumber(planned)}</span> <span class="text-sm text-base-content/70">{t('memberDetail.vacation.planned')}</span></div>
 			<div><span class="text-lg font-semibold text-base-content/70">{formatNumber(allowed)}</span> <span class="text-sm text-base-content/70">{t('memberDetail.vacation.total')}</span></div>
 		</div>
+		{#each detailLines as line (line)}
+			<p class="text-xs text-base-content/70 m-0 mb-2" data-testid="vacation-carry-line">{line}</p>
+		{/each}
 		<div class="w-full bg-base-200 rounded-full h-2.5 overflow-hidden flex" role="img" aria-label={t('memberDetail.vacation.barLabel', { taken: formatNumber(taken), planned: formatNumber(planned), total: formatNumber(allowed) })}>
 			<div class="h-2.5 transition-all {barClass}" style="width: {takenPct}%"></div>
 			<div class="h-2.5 transition-all {barClass} opacity-40" style="width: {plannedPct}%"></div>
@@ -93,6 +110,13 @@
 			<span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm {barClass} opacity-40"></span> {t('memberDetail.vacation.legendPlanned')}</span>
 		</div>
 	{:else}
+		{#each detailLines as line (line)}
+			<p class="text-xs text-base-content/70 m-0 mb-2" data-testid="vacation-carry-line">{line}</p>
+		{/each}
 		<p class="text-sm text-base-content/70 m-0">{t('memberDetail.vacation.none')}{canEdit ? '' : ` ${t('memberDetail.vacation.askAdmin')}`}</p>
 	{/if}
 </section>
+
+{#if canEdit}
+	<VacationYearEditor open={yearsOpen} onclose={() => (yearsOpen = false)} {orgSlug} {timeZone} memberId={member.id!} memberName={`${member.firstName} ${member.lastName}`} onsaved={onchanged} />
+{/if}

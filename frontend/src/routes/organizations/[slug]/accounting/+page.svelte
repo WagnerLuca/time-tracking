@@ -11,6 +11,7 @@
 	import { toast } from '$lib/stores/toast.svelte';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { formatDate, formatNumber, getMonthName } from '$lib/utils/formatters';
+	import { signedDays } from '$lib/utils/vacation';
 	import { formatMonth } from '$lib/utils/closedPeriods';
 	import { downloadBlob } from '$lib/utils/download';
 	import { canUseAccounting, seesAllHours } from '$lib/utils/orgRules';
@@ -316,6 +317,9 @@
 											<th>{t('accounting.reports.personnelNo')}</th>
 											<th>{t('accounting.reports.name')}</th>
 											<th class="text-right">{t('accounting.vacation.entitlement')}</th>
+											<th class="text-right">{t('accounting.vacation.carriedIn')}</th>
+											<th class="text-right">{t('accounting.vacation.expired')}</th>
+											<th class="text-right">{t('accounting.vacation.adjustment')}</th>
 											<th class="text-right">{t('accounting.vacation.taken')}</th>
 											<th class="text-right">{t('accounting.vacation.planned')}</th>
 											<th class="text-right">{t('accounting.vacation.remaining')}</th>
@@ -329,6 +333,9 @@
 												<td class="tabular-nums">{row.personnelNumber ?? ''}</td>
 												<td>{row.name}</td>
 												<td class="text-right tabular-nums">{days(row.entitlement)}</td>
+												<td class="text-right tabular-nums" title={row.expiresOn ? t('accounting.vacation.expiresOn', { date: formatDate(row.expiresOn) }) : undefined}>{days(row.carriedIn)}</td>
+												<td class="text-right tabular-nums">{days(row.expired)}</td>
+												<td class="text-right tabular-nums">{row.adjustment ? signedDays(row.adjustment) : days(0)}</td>
 												<td class="text-right tabular-nums">{days(row.taken)}</td>
 												<td class="text-right tabular-nums">{days(row.planned)}</td>
 												<td class="text-right tabular-nums font-semibold">{days(row.remaining)}</td>

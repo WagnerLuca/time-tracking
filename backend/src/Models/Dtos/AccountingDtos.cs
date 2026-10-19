@@ -64,8 +64,16 @@ public record VacationOverviewRow
     public int UserId { get; init; }
     public required string Name { get; init; }
     public string? PersonnelNumber { get; init; }
-    /// <summary>Vacation days per year (the member's allowance).</summary>
+    /// <summary>The year's entitlement (own row, an earlier year's, else the member's allowance).</summary>
     public double Entitlement { get; init; }
+    /// <summary>An admin's adjustment of the year (+/− days).</summary>
+    public double Adjustment { get; init; }
+    /// <summary>Days carried over from the previous year.</summary>
+    public double CarriedIn { get; init; }
+    /// <summary>Carried-over days that lapsed unused.</summary>
+    public double Expired { get; init; }
+    /// <summary>The day after which carried-over days lapse; null without carry-in or when they never lapse.</summary>
+    public DateOnly? ExpiresOn { get; init; }
     /// <summary>Vacation days up to today (working days, holidays excluded).</summary>
     public double Taken { get; init; }
     /// <summary>Vacation days after today.</summary>
