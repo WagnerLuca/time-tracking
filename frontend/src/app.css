@@ -40,6 +40,13 @@
   --radius-field: 10px;
   --radius-selector: 0.5rem;
 
+  /* Tracking per size (apple-design §15): large text tightens, body text stays at 0 */
+  --text-xl--letter-spacing: -0.01em;
+  --text-2xl--letter-spacing: -0.015em;
+  --text-3xl--letter-spacing: -0.02em;
+  --text-4xl--letter-spacing: -0.025em;
+  --text-5xl--letter-spacing: -0.025em;
+
   --font-sans: 'Inter Variable', Inter, sans-serif;
   --font-display: 'Space Grotesk Variable', 'Space Grotesk', sans-serif;
 
@@ -65,9 +72,15 @@
   color-scheme: dark;
 }
 
+/* Every figure in this app is data that is compared or ticks (durations, balances, clocks,
+   table columns, stats): tabular figures app-wide instead of a tabular-nums class on each. */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tracking comes with the text-* size (see @theme), so a small h2 is not squeezed */
 h1, h2, h3, .card-title {
   font-family: var(--font-display);
-  letter-spacing: -0.01em;
 }
 
 /* Reduced motion means less movement, not none: keyframe animations and smooth

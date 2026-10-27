@@ -220,8 +220,8 @@
 									<tbody>
 										{#each summary.members ?? [] as row (row.userId)}
 											<tr>
-												<td class="tabular-nums">{row.personnelNumber ?? ''}</td>
-												<td>
+												<td class="max-w-36 [overflow-wrap:anywhere]">{row.personnelNumber ?? ''}</td>
+												<td class="min-w-44">
 													{row.name}
 													{#if row.isFormerMember}<span class="badge badge-ghost badge-sm ml-1">{t('accounting.reports.former')}</span>{/if}
 												</td>
@@ -330,8 +330,8 @@
 									<tbody>
 										{#each vacation.members ?? [] as row (row.userId)}
 											<tr>
-												<td class="tabular-nums">{row.personnelNumber ?? ''}</td>
-												<td>{row.name}</td>
+												<td class="max-w-36 [overflow-wrap:anywhere]">{row.personnelNumber ?? ''}</td>
+												<td class="min-w-44">{row.name}</td>
 												<td class="text-right tabular-nums">{days(row.entitlement)}</td>
 												<td class="text-right tabular-nums" title={row.expiresOn ? t('accounting.vacation.expiresOn', { date: formatDate(row.expiresOn) }) : undefined}>{days(row.carriedIn)}</td>
 												<td class="text-right tabular-nums">{days(row.expired)}</td>

@@ -348,8 +348,8 @@
 				{#if node.kind === 'person'}
 					{@render avatar(node.person, 'w-8 h-8 text-xs')}
 					<span class="min-w-0 flex-1">
-						<span class="block font-semibold text-sm truncate">{fullName(node.person)}{#if isYou(node.person.userId)}<span class="text-base-content/70 font-normal">&nbsp;· {t('orgChart.you')}</span>{/if}</span>
-						<span class="flex items-center gap-1 mt-0.5 min-w-0 overflow-hidden">
+						<span class="block font-semibold text-sm truncate" title={fullName(node.person)}>{fullName(node.person)}{#if isYou(node.person.userId)}<span class="text-base-content/70 font-normal">&nbsp;· {t('orgChart.you')}</span>{/if}</span>
+						<span class="flex flex-wrap items-center gap-1 mt-0.5 min-w-0">
 							{#if node.isLead}<span class="badge badge-xs badge-primary shrink-0" data-testid="oc-lead">{t('orgChart.lead')}</span>{/if}
 							{#if node.groupCount > 1}<span class="badge badge-xs badge-outline shrink-0" title={t('orgChart.multiTitle', { count: node.groupCount })} data-testid="oc-multi">{t('orgChart.multi', { count: node.groupCount })}</span>{/if}
 							{#if !node.isLead && node.groupCount <= 1}<span class="text-xs text-base-content/70 truncate">{roleLabel(node.person.role)}</span>{/if}
@@ -368,8 +368,8 @@
 						</span>
 					{/if}
 					<span class="min-w-0 flex-1">
-						<span class="block font-semibold text-sm truncate" class:italic={node.kind === 'none' || node.kind === 'hidden'}>{groupTitle(node)}</span>
-						<span class="flex items-center gap-2 text-xs text-base-content/70 mt-0.5">
+						<span class="block font-semibold text-sm truncate" title={groupTitle(node)} class:italic={node.kind === 'none' || node.kind === 'hidden'}>{groupTitle(node)}</span>
+						<span class="flex flex-wrap items-center gap-x-2 text-xs text-base-content/70 mt-0.5 whitespace-nowrap">
 							<span>{tp('orgChart.people', node.count)}</span>
 							{#if node.present != null}
 								<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full {node.present > 0 ? 'bg-success' : 'bg-base-300'}" aria-hidden="true"></span>{t('orgChart.present', { count: node.present })}</span>
@@ -483,7 +483,7 @@
 		{@render avatar(person, 'w-12 h-12 text-base')}
 		<div class="min-w-0">
 			<span class="badge badge-sm uppercase tracking-wide {person.role === 'Owner' ? 'badge-warning' : person.role === 'Admin' ? 'badge-info' : 'badge-ghost'}">{roleLabel(person.role)}</span>
-			{#if person.email}<a class="block text-sm truncate mt-1" href="mailto:{person.email}" data-testid="oc-email">{person.email}</a>{/if}
+			{#if person.email}<a class="block text-sm truncate mt-1" href="mailto:{person.email}" title={person.email} data-testid="oc-email">{person.email}</a>{/if}
 		</div>
 	</div>
 	<dl class="oc-facts">
@@ -556,7 +556,7 @@
 		<p class="text-base-content/70 text-sm mt-2 mb-4 max-w-3xl">{t('orgChart.intro')}</p>
 
 		<div class="flex flex-wrap items-center gap-2 mb-3">
-			<div class="relative flex-1 min-w-0 sm:flex-none sm:w-72">
+			<div class="relative flex-1 min-w-40 sm:flex-none sm:w-72">
 				<label for="oc-search" class="sr-only">{t('orgChart.search')}</label>
 				<input
 					id="oc-search"
@@ -733,6 +733,7 @@
 	.oc-facts :global(dd) {
 		margin: 0;
 		min-width: 0;
+		overflow-wrap: anywhere;
 	}
 
 	/* Phones: an indented, collapsible list */
