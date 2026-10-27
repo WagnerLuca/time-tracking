@@ -9,6 +9,8 @@
 	import { page } from '$app/state';
 	import { goto, afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { scale } from 'svelte/transition';
+	import { prefersReducedMotion } from 'svelte/motion';
 	import { authApi } from '$lib/apiClient';
 	import { inbox } from '$lib/stores/inbox.svelte';
 	import { getOrgDetail } from '$lib/stores/orgDetail';
@@ -308,9 +310,9 @@
 			</div>
 
 			<div class="ml-auto flex items-center gap-1.5 sm:gap-2">
-				<!-- Running timer indicator -->
+				<!-- Running timer indicator (fades/scales in via .timer-pill, out in 150 ms) -->
 				{#if timer.current}
-					<a href="/time" class="flex min-h-11 items-center gap-1.5 rounded-full bg-success/15 px-2.5 text-xs font-semibold tabular-nums text-success no-underline hover:bg-success/25 lg:min-h-8" title={t('nav.timerRunning', { elapsed: formatClock(timer.elapsedSeconds) })} aria-label={t('nav.timerRunning', { elapsed: formatClock(timer.elapsedSeconds) })}>
+					<a href="/time" out:scale={{ start: prefersReducedMotion.current ? 1 : 0.95, duration: 150 }} class="timer-pill flex min-h-11 items-center gap-1.5 rounded-full bg-success/15 px-2.5 text-xs font-semibold tabular-nums text-success no-underline hover:bg-success/25 lg:min-h-8" title={t('nav.timerRunning', { elapsed: formatClock(timer.elapsedSeconds) })} aria-label={t('nav.timerRunning', { elapsed: formatClock(timer.elapsedSeconds) })}>
 						<span class="h-2 w-2 rounded-full bg-success animate-pulse motion-reduce:animate-none" aria-hidden="true"></span>
 						<span aria-hidden="true">{formatClock(timer.elapsedSeconds)}</span>
 					</a>

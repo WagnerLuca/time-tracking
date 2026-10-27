@@ -8,7 +8,8 @@ const api = vi.hoisted(() => ({
 	list: vi.fn(),
 	read: vi.fn(),
 	failures: vi.fn(),
-	withdraw: vi.fn()
+	withdraw: vi.fn(),
+	respond: vi.fn()
 }));
 vi.mock('$lib/apiClient', () => ({
 	requestsApi: {
@@ -16,7 +17,8 @@ vi.mock('$lib/apiClient', () => ({
 		apiV1OrganizationsUserNotificationsGet: api.user,
 		apiV1OrganizationsMyRequestsGet: api.mine,
 		apiV1OrganizationsUserNotificationsMarkSeenPost: api.seen,
-		apiV1OrganizationsSlugRequestsIdWithdrawPost: api.withdraw
+		apiV1OrganizationsSlugRequestsIdWithdrawPost: api.withdraw,
+		apiV1OrganizationsSlugRequestsIdPut: api.respond
 	},
 	notificationsApi: { apiV1NotificationsGet: api.list, apiV1NotificationsIdReadPut: api.read },
 	timeTrackingApi: { apiV1TimeTrackingFailuresGet: api.failures }
@@ -78,6 +80,17 @@ describe('inbox store', () => {
 		expect(api.seen).toHaveBeenCalledWith([5]);
 		expect(api.read).toHaveBeenCalledWith(12);
 		expect(inbox.decisions).toEqual([]);
+	});
+
+	it('drops a request from the approvals once it is decided, not before', async () => {
+		await inbox.load();
+		api.respond.mockReturnValueOnce(Promise.reject(new Error('409')));
+		await expect(inbox.respond({ id: 1, organizationSlug: 'acme' }, true)).rejects.toThrow('409');
+		expect(inbox.toApprove).toHaveLength(1);
+		api.respond.mockReturnValue(ok({}));
+		await inbox.respond({ id: 1, organizationSlug: 'acme' }, false, 'nope');
+		expect(api.respond).toHaveBeenLastCalledWith('acme', 1, { accept: false, reason: 'nope' });
+		expect(inbox.toApprove).toEqual([]);
 	});
 
 	it('withdraws an own open request and drops it from the list', async () => {
