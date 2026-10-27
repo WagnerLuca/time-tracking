@@ -1106,6 +1106,28 @@
 		}
 	}
 
+	/* Bottom sheet grip (Modal.svelte): only where the modal is a sheet. The drag
+	   zone (grip + title row) takes the touch itself; the content scrolls as usual. */
+	.sheet-handle {
+		display: none;
+	}
+	@media (width < 40rem) {
+		.modal-bottom .sheet-drag {
+			margin: -1.5rem -1.5rem 0;
+			padding: 0.625rem 1.5rem 0;
+			touch-action: none;
+			cursor: grab;
+		}
+		.modal-bottom .sheet-handle {
+			display: block;
+			width: 2.5rem;
+			height: 0.3125rem;
+			margin: 0 auto 0.75rem;
+			border-radius: 9999px;
+			background-color: color-mix(in oklab, var(--color-base-content) 25%, transparent);
+		}
+	}
+
 	/* ---------- Popover (nav menus): grows out of its trigger, closes instantly ----------
 	   Rendered with {#if}, so @starting-style is the entry; set the origin
 	   with origin-top-left / origin-top-right / origin-bottom on the element. */
