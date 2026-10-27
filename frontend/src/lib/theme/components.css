@@ -213,6 +213,12 @@
 		padding: 1.5rem;
 		font-size: 0.875rem;
 	}
+	/* 14 px reads small at arm's length: card copy is 16 px on touch screens (explicit text-* still wins) */
+	@media (pointer: coarse) {
+		.card-body {
+			font-size: 1rem;
+		}
+	}
 	.card-body :where(p) {
 		flex-grow: 1;
 	}
@@ -597,7 +603,10 @@
 		justify-content: center;
 		gap: 0.5rem;
 		width: fit-content;
-		height: var(--size);
+		/* data in a badge (group, terminal name) may be long: grow a line rather than spill out of it */
+		max-width: 100%;
+		min-height: var(--size);
+		overflow-wrap: anywhere;
 		padding-inline: calc(var(--size) / 2 - var(--border));
 		font-size: 0.875rem;
 		vertical-align: middle;
