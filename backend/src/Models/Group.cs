@@ -51,6 +51,8 @@ public class Group
     public TimeOnly? CoreHoursEnd { get; set; }
     /// <summary>Own core hours tolerance in minutes (null = inherit, independent of the window mode).</summary>
     public int? CoreHoursToleranceMinutes { get; set; }
+    /// <summary>Public holiday region of the group's members (<c>HolidayPresets</c> key); null = the parent's, at the top the organization's.</summary>
+    public string? HolidayRegion { get; set; }
 
     // Group Admin capability flags (null = inherit from the parent group; at the top level null = disabled)
     public bool? GroupAdminCanApproveAbsences { get; set; }

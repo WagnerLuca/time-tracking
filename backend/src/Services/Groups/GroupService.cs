@@ -373,7 +373,8 @@ public class GroupService : IGroupService
         group.CoreHoursStart?.ToString("HH:mm"),
         group.CoreHoursEnd?.ToString("HH:mm"),
         group.ParentGroupId,
-        group.CoreHoursToleranceMinutes
+        group.CoreHoursToleranceMinutes,
+        group.HolidayRegion
     );
 
     /// <summary>Resets a capability flag to "inherit", by its request/response property name.</summary>
@@ -470,6 +471,15 @@ public class GroupService : IGroupService
             return ServiceResult.BadRequest<GroupPermissionsResponse>(OrganizationService.CoreHoursBackfillMessage);
         if (coreBefore != (group.CoreHoursMode, group.CoreHoursStart, group.CoreHoursEnd, group.CoreHoursToleranceMinutes) || request.CoreHoursBackfillDays != null)
             OrganizationService.CoreHoursChanged(org, group.CoreHoursMode == CoreHoursMode.Own ? request.CoreHoursBackfillDays : null);
+        if (request.HolidayRegion != null)
+        {
+            if (HolidayPresets.Normalize(request.HolidayRegion) is not { } region)
+                return ServiceResult.BadRequest<GroupPermissionsResponse>(HolidayPresets.UnknownRegionMessage);
+            group.HolidayRegion = region == "" ? null : region;
+            // The calendar reads memberships only while some group names a region
+            org.GroupHolidayRegions = group.HolidayRegion != null
+                || await _context.Groups.AnyAsync(g => g.OrganizationId == org.Id && g.Id != group.Id && g.HolidayRegion != null);
+        }
 
         group.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();

@@ -20,6 +20,12 @@ public class Holiday
     public bool IsHalfDay { get; set; }
 
     /// <summary>
+    /// A company holiday of one group (and its sub-groups) instead of the whole organization: it applies to the days a
+    /// member belonged to the group (<see cref="GroupMembershipPeriod"/>), so moving someone never changes their past.
+    /// </summary>
+    public int? GroupId { get; set; }
+
+    /// <summary>
     /// The date this holiday falls on in <paramref name="year"/>, or null when it does not occur
     /// that year (a one-off holiday of another year, or a recurring 29 February in a non-leap year).
     /// </summary>
@@ -36,4 +42,9 @@ public class Holiday
     // Navigation
     [JsonIgnore]
     public Organization Organization { get; set; } = null!;
+    [JsonIgnore]
+    public Group? Group { get; set; }
+    /// <summary>Members an admin left out of this holiday.</summary>
+    [JsonIgnore]
+    public ICollection<DayOffExclusion> Exclusions { get; set; } = new List<DayOffExclusion>();
 }

@@ -277,7 +277,7 @@ public static class CoreHours
 
         if (due.Count > 0)
         {
-            await EvaluateAsync(context, org.Id, clock, due, nowUtc, ct);
+            await EvaluateAsync(context, org, clock, due, nowUtc, ct);
             context.CoreHoursChecks.AddRange(due);
         }
         await context.SaveChangesAsync(ct);   // stored before notifying: a crash may skip a notice, never repeat one
@@ -364,9 +364,10 @@ public static class CoreHours
     /// one query each). A day off (no working day, full holiday or full-day absence, or a half holiday
     /// plus a half-day absence) stays without issues; one exempt half checks one half of the window.
     /// </summary>
-    private static async Task EvaluateAsync(TimeTrackingDbContext context, int orgId, OrgClock clock,
+    private static async Task EvaluateAsync(TimeTrackingDbContext context, Organization org, OrgClock clock,
         List<CoreHoursCheck> checks, DateTime nowUtc, CancellationToken ct)
     {
+        var orgId = org.Id;
         var userIds = checks.Select(c => c.UserId).Distinct().ToList();
         var first = checks.Min(c => c.Date);
         var last = checks.Max(c => c.Date);
@@ -378,18 +379,16 @@ public static class CoreHours
                 .Where(a => userIds.Contains(a.UserId) && a.OrganizationId == orgId && a.Date >= first && a.Date <= last)
                 .ToListAsync(ct))
             .ToLookup(a => (a.UserId, a.Date));
-        var holidays = await context.Holidays.AsNoTracking()
-            .Where(h => h.OrganizationId == orgId && (h.IsRecurring || (h.Date >= first && h.Date <= last)))
-            .ToListAsync(ct);
+        var holidays = await HolidayCalendar.LoadAsync(context, org, userIds, first, last, ct);
         var covered = await CoveredAsync(context, userIds, orgId,
             clock.StartOfDayUtc(first), clock.StartOfDayUtc(last.AddDays(2)), nowUtc);
 
         foreach (var check in checks)
         {
             if (!WorkingDays.IsWorkingDay(schedules[check.UserId], check.Date)) continue;
-            var holiday = holidays.FirstOrDefault(h => h.DateIn(check.Date.Year) == check.Date);
-            var absence = absences[(check.UserId, check.Date)].FirstOrDefault();
-            var halves = (holiday == null ? 0 : holiday.IsHalfDay ? 1 : 2) + (absence == null ? 0 : absence.IsHalfDay ? 1 : 2);
+            var holiday = holidays.On(check.UserId, check.Date, schedules[check.UserId].ToList());
+            var halves = (holiday == null ? 0 : holiday.IsHalfDay ? 1 : 2)
+                + absences[(check.UserId, check.Date)].Sum(a => a.IsHalfDay ? 1 : 2);
             if (halves >= 2) continue;
 
             check.HalfDay = halves == 1;

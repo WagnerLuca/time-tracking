@@ -29,6 +29,18 @@ public class WorkSchedule
     public double TargetSat { get; set; }
     public double TargetSun { get; set; }
 
+    /// <summary>
+    /// Public holiday region while this schedule applies (the Arbeitsort, <c>HolidayPresets</c> key); null = the member's
+    /// groups', else the organization's. Dated with the schedule, so a move to another state never changes the past.
+    /// </summary>
+    public string? HolidayRegion { get; set; }
+
+    /// <summary>
+    /// Vacation days per year while this schedule applies (e.g. fewer after moving to a 3-day week); null = the year's
+    /// figure (<c>VacationBalances</c>). A year's entitlement is split by these periods.
+    /// </summary>
+    public double? VacationDaysPerYear { get; set; }
+
     /// <summary>Target hours for that weekday.</summary>
     public double TargetFor(DayOfWeek day) => day switch
     {

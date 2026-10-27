@@ -156,7 +156,7 @@ public static class ClosedPeriods
         };
     }
 
-    /// <summary>The days whose target hours a schedule change alters (to null = open-ended).</summary>
+    /// <summary>The days whose target hours (or holidays, by the region) a schedule change alters (to null = open-ended).</summary>
     internal static IEnumerable<(DateOnly From, DateOnly? To)> ScheduleRanges(EntityEntry e)
     {
         var (from, to) = (e.Property(nameof(WorkSchedule.ValidFrom)), e.Property(nameof(WorkSchedule.ValidTo)));
@@ -172,7 +172,8 @@ public static class ClosedPeriods
         DateOnly? Earlier(DateOnly? x, DateOnly? y) => x == null ? y : y == null ? x : (x < y ? x : y);
 
         var targetsChanged = e.Properties.Any(p => p.IsModified
-            && (p.Metadata.Name.StartsWith("Target") || p.Metadata.Name == nameof(WorkSchedule.WeeklyWorkHours)));
+            && (p.Metadata.Name.StartsWith("Target") || p.Metadata.Name == nameof(WorkSchedule.WeeklyWorkHours)
+                || p.Metadata.Name == nameof(WorkSchedule.HolidayRegion)));
         if (targetsChanged)
         {
             yield return (oldFrom < newFrom ? oldFrom : newFrom, Later(oldTo, newTo));

@@ -38,6 +38,15 @@ public static class HolidayPresets
         ("CH", "Schweiz (landesweit)")
     ];
 
+    public const string UnknownRegionMessage = "Unknown holiday region.";
+
+    /// <summary>The region key in its stored form ("de-by" → "DE-BY"), "" for an empty value (no region), null when unknown.</summary>
+    public static string? Normalize(string region)
+    {
+        var key = region.Trim().ToUpperInvariant();
+        return key == "" || Presets.Any(p => p.Key == key) ? key : null;
+    }
+
     public static List<HolidayPresetResponse> All() =>
         Presets.Select(p => new HolidayPresetResponse { Key = p.Key, Name = p.Name }).ToList();
 

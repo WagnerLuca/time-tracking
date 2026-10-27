@@ -223,6 +223,19 @@ public class OrganizationsController : OrganizationBaseController
     }
 
     /// <summary>
+    /// Set a member's employment dates (admin only): the vacation of the first and last year is pro rata (§ 5 BUrlG).
+    /// </summary>
+    [HttpPut("{slug}/members/{memberId}/employment")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(typeof(MemberEmploymentResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetMemberEmployment(string slug, int memberId, [FromBody] SetEmploymentRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.SetMemberEmploymentAsync(slug, userId.Value, memberId, request));
+    }
+
+    /// <summary>
     /// A member's vacation balance for one year (default: the current one) with carry-over, lapsed days and the admin's
     /// adjustment. Visible like the member list's figures (kind VacationBalance of the visibility matrix).
     /// </summary>

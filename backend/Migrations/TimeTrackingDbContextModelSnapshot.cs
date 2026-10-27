@@ -30,6 +30,9 @@ namespace TimeTracking.Api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("CompanyLeaveId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -57,6 +60,9 @@ namespace TimeTracking.Api.Migrations
                     b.Property<int>("OrganizationId")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("SecondHalf")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("Type")
                         .HasColumnType("integer");
 
@@ -65,11 +71,13 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CompanyLeaveId");
+
                     b.HasIndex("CustomTypeId");
 
                     b.HasIndex("OrganizationId", "Date");
 
-                    b.HasIndex("UserId", "OrganizationId", "Date")
+                    b.HasIndex("UserId", "OrganizationId", "Date", "SecondHalf")
                         .IsUnique();
 
                     b.ToTable("AbsenceDays");
@@ -332,6 +340,49 @@ namespace TimeTracking.Api.Migrations
                     b.ToTable("ClosedPeriodEvents");
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.CompanyLeave", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("From")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("GroupId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("To")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GroupId");
+
+                    b.HasIndex("OrganizationId", "From");
+
+                    b.ToTable("CompanyLeaves", t =>
+                        {
+                            t.HasCheckConstraint("CK_CompanyLeaves_Range", "\"From\" <= \"To\"");
+                        });
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.CoreHoursCheck", b =>
                 {
                     b.Property<int>("Id")
@@ -387,6 +438,47 @@ namespace TimeTracking.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("CoreHoursChecks");
+                });
+
+            modelBuilder.Entity("TimeTracking.Api.Models.DayOffExclusion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("CompanyLeaveId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("HolidayId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("CompanyLeaveId", "UserId")
+                        .IsUnique();
+
+                    b.HasIndex("HolidayId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("DayOffExclusions", t =>
+                        {
+                            t.HasCheckConstraint("CK_DayOffExclusions_Target", "(\"HolidayId\" IS NULL) <> (\"CompanyLeaveId\" IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("TimeTracking.Api.Models.Group", b =>
@@ -449,6 +541,10 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<bool?>("GroupAdminCanViewAllTimeEntries")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("HolidayRegion")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<int?>("InitialOvertimeMode")
                         .HasColumnType("integer");
@@ -533,6 +629,40 @@ namespace TimeTracking.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.GroupMembershipPeriod", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("From")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("GroupId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("Until")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("GroupId", "UserId");
+
+                    b.HasIndex("OrganizationId", "UserId");
+
+                    b.ToTable("GroupMembershipPeriods");
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.Holiday", b =>
                 {
                     b.Property<int>("Id")
@@ -548,6 +678,9 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
+
+                    b.Property<int?>("GroupId")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("IsHalfDay")
                         .HasColumnType("boolean");
@@ -565,8 +698,12 @@ namespace TimeTracking.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrganizationId", "Date")
+                    b.HasIndex("GroupId");
+
+                    b.HasIndex("OrganizationId", "GroupId", "Date")
                         .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("OrganizationId", "GroupId", "Date"), false);
 
                     b.ToTable("Holidays");
                 });
@@ -804,6 +941,13 @@ namespace TimeTracking.Api.Migrations
                     b.Property<int>("EditPauseMode")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("GroupHolidayRegions")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("HolidayRegion")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<int>("InitialOvertimeMode")
                         .HasColumnType("integer");
 
@@ -870,6 +1014,9 @@ namespace TimeTracking.Api.Migrations
 
                     b.Property<int>("VacationCarryOverSince")
                         .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("VacationNoticesCheckedOn")
+                        .HasColumnType("date");
 
                     b.Property<int>("VisibleInGroups")
                         .HasColumnType("integer");
@@ -1303,6 +1450,12 @@ namespace TimeTracking.Api.Migrations
                     b.Property<int>("BalanceVersion")
                         .HasColumnType("integer");
 
+                    b.Property<DateOnly?>("EmploymentEnd")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("EmploymentStart")
+                        .HasColumnType("date");
+
                     b.Property<double>("InitialOvertimeHours")
                         .HasColumnType("double precision");
 
@@ -1318,6 +1471,9 @@ namespace TimeTracking.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<DateTime?>("LeftAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("OrganizationId")
                         .HasColumnType("integer");
@@ -1409,6 +1565,15 @@ namespace TimeTracking.Api.Migrations
                     b.Property<double?>("Entitlement")
                         .HasColumnType("double precision");
 
+                    b.Property<DateOnly?>("ExpiresOn")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("ExpiryNoticeAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ExpiryReminderAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("OrganizationId")
                         .HasColumnType("integer");
 
@@ -1449,6 +1614,10 @@ namespace TimeTracking.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<string>("HolidayRegion")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<int>("OrganizationId")
                         .HasColumnType("integer");
 
@@ -1476,6 +1645,9 @@ namespace TimeTracking.Api.Migrations
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
 
+                    b.Property<double?>("VacationDaysPerYear")
+                        .HasColumnType("double precision");
+
                     b.Property<DateOnly>("ValidFrom")
                         .HasColumnType("date");
 
@@ -1497,6 +1669,11 @@ namespace TimeTracking.Api.Migrations
 
             modelBuilder.Entity("TimeTracking.Api.Models.AbsenceDay", b =>
                 {
+                    b.HasOne("TimeTracking.Api.Models.CompanyLeave", "CompanyLeave")
+                        .WithMany()
+                        .HasForeignKey("CompanyLeaveId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("TimeTracking.Api.Models.AbsenceTypeDefinition", "CustomType")
                         .WithMany()
                         .HasForeignKey("CustomTypeId")
@@ -1513,6 +1690,8 @@ namespace TimeTracking.Api.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("CompanyLeave");
 
                     b.Navigation("CustomType");
 
@@ -1622,6 +1801,24 @@ namespace TimeTracking.Api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.CompanyLeave", b =>
+                {
+                    b.HasOne("TimeTracking.Api.Models.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Group");
+
+                    b.Navigation("Organization");
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.CoreHoursCheck", b =>
                 {
                     b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
@@ -1639,6 +1836,35 @@ namespace TimeTracking.Api.Migrations
                     b.Navigation("Organization");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TimeTracking.Api.Models.DayOffExclusion", b =>
+                {
+                    b.HasOne("TimeTracking.Api.Models.CompanyLeave", "CompanyLeave")
+                        .WithMany("Exclusions")
+                        .HasForeignKey("CompanyLeaveId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("TimeTracking.Api.Models.Holiday", "Holiday")
+                        .WithMany("Exclusions")
+                        .HasForeignKey("HolidayId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("TimeTracking.Api.Models.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TimeTracking.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CompanyLeave");
+
+                    b.Navigation("Holiday");
                 });
 
             modelBuilder.Entity("TimeTracking.Api.Models.Group", b =>
@@ -1678,13 +1904,47 @@ namespace TimeTracking.Api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.GroupMembershipPeriod", b =>
+                {
+                    b.HasOne("TimeTracking.Api.Models.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TimeTracking.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Group");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.Holiday", b =>
                 {
+                    b.HasOne("TimeTracking.Api.Models.Group", "Group")
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("TimeTracking.Api.Models.Organization", "Organization")
                         .WithMany("Holidays")
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Group");
 
                     b.Navigation("Organization");
                 });
@@ -1932,9 +2192,19 @@ namespace TimeTracking.Api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("TimeTracking.Api.Models.CompanyLeave", b =>
+                {
+                    b.Navigation("Exclusions");
+                });
+
             modelBuilder.Entity("TimeTracking.Api.Models.Group", b =>
                 {
                     b.Navigation("Members");
+                });
+
+            modelBuilder.Entity("TimeTracking.Api.Models.Holiday", b =>
+                {
+                    b.Navigation("Exclusions");
                 });
 
             modelBuilder.Entity("TimeTracking.Api.Models.Organization", b =>

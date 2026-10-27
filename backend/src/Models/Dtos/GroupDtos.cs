@@ -106,7 +106,9 @@ public record GroupPermissionsResponse(
     string? CoreHoursEnd = null,
     int? ParentGroupId = null,
     // Own core hours tolerance in minutes; null = inherit
-    int? CoreHoursToleranceMinutes = null
+    int? CoreHoursToleranceMinutes = null,
+    // Public holiday region of the members (HolidayPresets key); null = inherit (parent group, else the organization)
+    string? HolidayRegion = null
 );
 
 public record UpdateGroupPermissionsRequest(
@@ -135,7 +137,10 @@ public record UpdateGroupPermissionsRequest(
     int? CoreHoursBackfillDays = null,
     // Capability flags to reset to "inherit" (from the parent group; at the top: disabled), by
     // property name, e.g. ["groupAdminCanApproveAbsences"]
-    IList<string>? InheritCapabilities = null
+    IList<string>? InheritCapabilities = null,
+    // Public holiday region of the members (HolidayPresets key); "" = inherit, left out = unchanged. Applies to the days
+    // members belong to the group (also past ones), not to members whose work schedule names a region.
+    string? HolidayRegion = null
 );
 
 // Resolved effective permissions for a user (combining org + group)

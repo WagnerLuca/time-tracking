@@ -314,7 +314,7 @@ public class AuthService : IAuthService
             Memberships = await _context.UserOrganizations.IgnoreQueryFilters().AsNoTracking()
                 .Where(uo => uo.UserId == userId)
                 .Select(uo => new PersonalMembership(uo.Organization.Name, uo.Role.ToString(), uo.JoinedAt, uo.IsActive,
-                    uo.VacationDaysPerYear, uo.InitialOvertimeHours, uo.PersonnelNumber))
+                    uo.VacationDaysPerYear, uo.InitialOvertimeHours, uo.PersonnelNumber, uo.EmploymentStart, uo.EmploymentEnd))
                 .ToListAsync(),
             Cards = await _context.BadgeCards.IgnoreQueryFilters().AsNoTracking()
                 .Where(c => c.UserId == userId)

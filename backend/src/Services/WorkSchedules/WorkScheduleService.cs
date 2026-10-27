@@ -70,6 +70,7 @@ public class WorkScheduleService : IWorkScheduleService
             return ServiceResult.BadRequest<WorkScheduleResponse>(overlapError);
 
         var schedule = BuildSchedule(userId, org.Id, request);
+        await InheritContractAsync(_context, schedule, null);
         _context.WorkSchedules.Add(schedule);
         await CloseOpenScheduleAsync(_context, userId, org.Id, request.ValidFrom);
         await _context.SaveChangesAsync();
@@ -241,6 +242,8 @@ public class WorkScheduleService : IWorkScheduleService
             return ServiceResult.BadRequest<WorkScheduleResponse>(overlapError);
 
         var schedule = BuildSchedule(memberId, org.Id, request);
+        if (await InheritContractAsync(_context, schedule, request) is { } contractError)
+            return ServiceResult.BadRequest<WorkScheduleResponse>(contractError);
         _context.WorkSchedules.Add(schedule);
         await CloseOpenScheduleAsync(_context, memberId, org.Id, request.ValidFrom);
         await _context.SaveChangesAsync();
@@ -272,6 +275,8 @@ public class WorkScheduleService : IWorkScheduleService
             return ServiceResult.BadRequest<WorkScheduleResponse>(updateError);
 
         ApplyUpdate(schedule, request);
+        if (ApplyContract(schedule, request) is { } contractError)
+            return ServiceResult.BadRequest<WorkScheduleResponse>(contractError);
         await _context.SaveChangesAsync();
 
         return ServiceResult.Ok(MapToResponse(schedule, memberId, org, membership));
@@ -360,6 +365,51 @@ public class WorkScheduleService : IWorkScheduleService
         return schedule;
     }
 
+    public const string VacationDaysRangeMessage = "Vacation days per year must be between 0 and 365.";
+
+    /// <summary>
+    /// A new period keeps the contract terms of the one before it (holiday region, vacation days) unless an admin
+    /// (<paramref name="adminRequest"/>) names them — a member's own schedule change never moves their Arbeitsort.
+    /// </summary>
+    public static async Task<string?> InheritContractAsync(TimeTrackingDbContext db, WorkSchedule schedule, CreateWorkScheduleRequest? adminRequest)
+    {
+        var previous = await db.WorkSchedules.AsNoTracking()
+            .Where(s => s.UserId == schedule.UserId && s.OrganizationId == schedule.OrganizationId && s.ValidFrom < schedule.ValidFrom)
+            .OrderByDescending(s => s.ValidFrom)
+            .Select(s => new { s.HolidayRegion, s.VacationDaysPerYear })
+            .FirstOrDefaultAsync();
+        schedule.HolidayRegion = previous?.HolidayRegion;
+        schedule.VacationDaysPerYear = previous?.VacationDaysPerYear;
+        if (adminRequest?.HolidayRegion is { } region)
+        {
+            if (HolidayPresets.Normalize(region) is not { } key) return HolidayPresets.UnknownRegionMessage;
+            schedule.HolidayRegion = key == "" ? null : key;
+        }
+        if (adminRequest?.VacationDaysPerYear is { } days)
+        {
+            if (!double.IsFinite(days) || days is < 0 or > 365) return VacationDaysRangeMessage;
+            schedule.VacationDaysPerYear = days;
+        }
+        return null;
+    }
+
+    /// <summary>An admin's change of the contract terms (region, vacation days) of an existing period.</summary>
+    private static string? ApplyContract(WorkSchedule schedule, UpdateWorkScheduleRequest request)
+    {
+        if (request.HolidayRegion != null)
+        {
+            if (HolidayPresets.Normalize(request.HolidayRegion) is not { } key) return HolidayPresets.UnknownRegionMessage;
+            schedule.HolidayRegion = key == "" ? null : key;
+        }
+        if (request.ClearVacationDaysPerYear) schedule.VacationDaysPerYear = null;
+        else if (request.VacationDaysPerYear is { } days)
+        {
+            if (!double.IsFinite(days) || days is < 0 or > 365) return VacationDaysRangeMessage;
+            schedule.VacationDaysPerYear = days;
+        }
+        return null;
+    }
+
     private static void ApplyUpdate(WorkSchedule schedule, UpdateWorkScheduleRequest request)
     {
         if (request.ValidFrom.HasValue) schedule.ValidFrom = request.ValidFrom.Value;
@@ -443,6 +493,8 @@ public class WorkScheduleService : IWorkScheduleService
             TargetFri = schedule.TargetFri,
             TargetSat = schedule.TargetSat,
             TargetSun = schedule.TargetSun,
+            HolidayRegion = schedule.HolidayRegion,
+            VacationDaysPerYear = schedule.VacationDaysPerYear,
             InitialOvertimeHours = membership?.InitialOvertimeHours ?? 0,
             InitialOvertimeMode = org.InitialOvertimeMode.ToString(),
             WorkScheduleChangeMode = org.WorkScheduleChangeMode.ToString()

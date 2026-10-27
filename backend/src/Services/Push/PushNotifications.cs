@@ -36,6 +36,7 @@ public static partial class PushTexts
     [GeneratedRegex(@"(\d{2})\.(\d{2})\.(\d{4})")] private static partial Regex DateRx();
     [GeneratedRegex(@"\b(\d{2}:\d{2})\b")] private static partial Regex TimeRx();
     [GeneratedRegex(@"^(.+?) did not keep the core working hours")] private static partial Regex NameRx();
+    [GeneratedRegex(@"^([\d.]+) vacation days left, ([\d.]+) lapse after (\d{2}\.\d{2}\.\d{4})")] private static partial Regex VacationRx();
 
     public static PushMessage From(Notification n)
     {
@@ -71,6 +72,13 @@ public static partial class PushTexts
             case "RequestDeclined":
                 return new(n.UserId, PushCategory.Requests, tag, "/inbox",
                     "Anfrage abgelehnt", "Deine Anfrage wurde abgelehnt.", "Request declined", "Your request was declined.");
+            case VacationNotices.NotificationType:
+                var figures = VacationRx().Match(n.Message);
+                return figures.Success
+                    ? new(n.UserId, PushCategory.Reminders, tag, "/",
+                        "Resturlaub verfällt", $"{figures.Groups[2].Value.Replace('.', ',')} Urlaubstage verfallen nach dem {figures.Groups[3].Value}, wenn du sie nicht nimmst.",
+                        "Vacation days will lapse", $"{figures.Groups[2].Value} vacation days lapse after {figures.Groups[3].Value} unless taken.")
+                    : new(n.UserId, PushCategory.Reminders, tag, "/", "Resturlaub verfällt", n.Message, n.Title, n.Message);
             case "SettingsChanged":
                 return new(n.UserId, PushCategory.Organization, tag, "/inbox",
                     "Regeln aktualisiert", "Ein Administrator hat die Regeln deiner Organisation geändert.",

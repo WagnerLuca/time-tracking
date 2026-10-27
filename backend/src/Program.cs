@@ -185,6 +185,7 @@ builder.Services.AddScoped<ITimeEntryExportService, TimeEntryExportService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IRequestService, RequestService>();
 builder.Services.AddScoped<IHolidayService, HolidayService>();
+builder.Services.AddScoped<CompanyLeaveService>();
 builder.Services.AddScoped<IAbsenceDayService, AbsenceDayService>();
 builder.Services.AddScoped<IWorkScheduleService, WorkScheduleService>();
 builder.Services.AddScoped<IPauseRuleService, PauseRuleService>();

@@ -62,6 +62,12 @@ public class AbsenceDay
     /// <summary>If true, this absence counts as half a day.</summary>
     public bool IsHalfDay { get; set; }
 
+    /// <summary>
+    /// The other half of a day that already has a half-day absence (e.g. half vacation + half sick): a day holds one full
+    /// absence or two halves (unique per member, day and half).
+    /// </summary>
+    public bool SecondHalf { get; set; }
+
     /// <summary>Optional note, e.g. reason.</summary>
     public string? Note { get; set; }
 
@@ -73,6 +79,11 @@ public class AbsenceDay
 
     /// <summary>Audit: the approved OrgRequest this absence originated from, if any.</summary>
     public int? CreatedViaRequestId { get; set; }
+
+    /// <summary>Written by this Betriebsurlaub (<see cref="Models.CompanyLeave"/>); kept in sync with it.</summary>
+    public int? CompanyLeaveId { get; set; }
+    [JsonIgnore]
+    public CompanyLeave? CompanyLeave { get; set; }
 
     // Navigation
     [JsonIgnore]

@@ -642,12 +642,18 @@ public class RequestService : IRequestService
         var requestedDates = data.Dates.Distinct().ToList();
         if (requestedDates.Count > 1)
             requestedDates = await WorkingDays.FilterAsync(_context, orgRequest.UserId, org.Id, requestedDates);
-        var existingDates = (await _context.AbsenceDays
-            .Where(a => a.OrganizationId == org.Id
-                     && a.UserId == orgRequest.UserId
-                     && requestedDates.Contains(a.Date))
-            .Select(a => a.Date)
-            .ToListAsync()).ToHashSet();
+        // A Betriebsurlaub day is replaced by the approved absence; a half day still has room for the other half
+        var existing = (await _context.AbsenceDays.AsNoTracking()
+                .Where(a => a.OrganizationId == org.Id
+                         && a.UserId == orgRequest.UserId
+                         && requestedDates.Contains(a.Date)
+                         && a.CompanyLeaveId == null)
+                .Select(a => new { a.Date, a.IsHalfDay, a.SecondHalf })
+                .ToListAsync())
+            .ToLookup(a => a.Date);
+        bool OtherHalfFree(DateOnly d) => data.IsHalfDay && existing[d].Count() == 1 && existing[d].Single().IsHalfDay;
+        var existingDates = existing.Where(d => !OtherHalfFree(d.Key)).Select(d => d.Key).ToHashSet();
+        await CompanyLeaves.ReplaceGeneratedAsync(_context, org.Id, orgRequest.UserId, requestedDates);
 
         foreach (var date in requestedDates)
         {
@@ -660,6 +666,7 @@ public class RequestService : IRequestService
                 Type = type,
                 CustomTypeId = customTypeId,
                 IsHalfDay = data.IsHalfDay,
+                SecondHalf = OtherHalfFree(date) && !existing[date].Single().SecondHalf,
                 Note = data.Note,
                 CreatedByUserId = orgRequest.RespondedByUserId,
                 CreatedViaRequestId = orgRequest.Id
@@ -705,6 +712,7 @@ public class RequestService : IRequestService
             schedule.TargetSun = data.TargetSun ?? 0;
         }
 
+        await WorkScheduleService.InheritContractAsync(_context, schedule, null);
         await WorkScheduleService.CloseOpenScheduleAsync(_context, userId, orgId, data.ValidFrom);
         _context.WorkSchedules.Add(schedule);
         return null;

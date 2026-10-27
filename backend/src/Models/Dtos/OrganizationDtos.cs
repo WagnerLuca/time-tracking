@@ -47,6 +47,8 @@ public record OrganizationDetailResponse
     public double? VacationCarryOverMaxDays { get; init; }
     /// <summary>First year whose leftover carries into the next one.</summary>
     public int VacationCarryOverSince { get; init; }
+    /// <summary>Public holiday region (HolidayPresets key, e.g. "DE-BW"); null = none.</summary>
+    public string? HolidayRegion { get; init; }
     /// <summary>Business day end as local "HH:mm" in <see cref="TimeZone"/>.</summary>
     public string BusinessDayEnd { get; init; } = "00:00";
     public string TimeZone { get; init; } = "Europe/Berlin";
@@ -231,6 +233,9 @@ public record UpdateOrganizationSettingsRequest
     public bool? ClearVacationCarryOverMaxDays { get; init; }
     /// <summary>First year whose leftover carries (2000 to the current year).</summary>
     public int? VacationCarryOverSince { get; init; }
+    /// <summary>Public holiday region (HolidayPresets key, e.g. "DE-BW"); "" removes it.</summary>
+    [MaxLength(10)]
+    public string? HolidayRegion { get; init; }
     /// <summary>Business day end as local "HH:mm" (e.g. "04:00").</summary>
     [RegularExpression(@"^([01]\d|2[0-3]):[0-5]\d$", ErrorMessage = "Use HH:mm, e.g. 04:00.")]
     public string? BusinessDayEnd { get; init; }
@@ -339,6 +344,7 @@ public record OrganizationSettingsResponse
     public string VacationCarryOverExpiry { get; init; } = "03-31";
     public double? VacationCarryOverMaxDays { get; init; }
     public int VacationCarryOverSince { get; init; }
+    public string? HolidayRegion { get; init; }
 }
 
 /// <summary>A member's initial overtime after it was set.</summary>
@@ -364,6 +370,15 @@ public record MemberVacationResponse
     public double Entitlement { get; init; }
     /// <summary>Whether this year has its own entitlement (otherwise it is inherited).</summary>
     public bool HasOwnEntitlement { get; init; }
+    /// <summary>The full-year figure <see cref="Entitlement"/> was pro-rated from (equal when the whole year counts).</summary>
+    public double AnnualEntitlement { get; init; }
+    /// <summary>This member's own expiry date of the carried-in days (null = the organization's).</summary>
+    public DateOnly? OwnExpiresOn { get; init; }
+    /// <summary>When the member was told the carried-in days will lapse; without it nothing lapses.</summary>
+    public DateTime? ExpiryNoticeAt { get; init; }
+    /// <summary>Employment dates the pro-rata entitlement follows (null = before / still employed).</summary>
+    public DateOnly? EmploymentStart { get; init; }
+    public DateOnly? EmploymentEnd { get; init; }
     public double Adjustment { get; init; }
     public string? AdjustmentNote { get; init; }
     public double CarriedIn { get; init; }
@@ -380,6 +395,17 @@ public record MemberVacationResponse
     public string? UpdatedByName { get; init; }
 }
 
+/// <summary>A member's employment dates (Eintritt/Austritt); left-out fields stay as they are.</summary>
+public record SetEmploymentRequest
+{
+    public DateOnly? Start { get; init; }
+    public DateOnly? End { get; init; }
+    public bool ClearStart { get; init; }
+    public bool ClearEnd { get; init; }
+}
+
+public record MemberEmploymentResponse(int UserId, DateOnly? Start, DateOnly? End);
+
 /// <summary>Sets a member's vacation figures of one year; left-out fields stay as they are.</summary>
 public record SetMemberVacationYearRequest
 {
@@ -391,6 +417,10 @@ public record SetMemberVacationYearRequest
     public double? Adjustment { get; init; }
     /// <summary>Why the adjustment (≤ 500 characters); empty clears it.</summary>
     public string? Note { get; init; }
+    /// <summary>This member's own expiry date of the year's carried-in days (e.g. after a long illness).</summary>
+    public DateOnly? ExpiresOn { get; init; }
+    /// <summary>True: the organization's expiry date again.</summary>
+    public bool? ClearExpiresOn { get; init; }
 }
 
 /// <summary>The dashboard's team overview (issue #61): the members the caller leads, with balance and presence.</summary>

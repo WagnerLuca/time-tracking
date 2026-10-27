@@ -168,8 +168,11 @@ public class Organization
     /// </summary>
     public double DefaultVacationDays { get; set; }
 
-    /// <summary>Vacation carry-over rule (<c>VacationBalances</c>); new organizations: until 31 March.</summary>
-    public VacationCarryOverMode VacationCarryOverMode { get; set; } = VacationCarryOverMode.UntilDate;
+    /// <summary>
+    /// Vacation carry-over rule (<c>VacationBalances</c>); new organizations: unlimited (organizations from before
+    /// 2026-10-27 keep what they had, by the migration until 31 March).
+    /// </summary>
+    public VacationCarryOverMode VacationCarryOverMode { get; set; } = VacationCarryOverMode.Unlimited;
     /// <summary>Carried-over days lapse after this day of the following year (mode UntilDate; clamped to the month's length).</summary>
     public int VacationCarryOverExpiryMonth { get; set; } = 3;
     public int VacationCarryOverExpiryDay { get; set; } = 31;
@@ -180,6 +183,17 @@ public class Organization
     /// never change). New organizations: their creation year; organizations from before the feature: 2026.
     /// </summary>
     public int VacationCarryOverSince { get; set; } = DateTime.UtcNow.Year;
+
+    /// <summary>The org-local day the vacation expiry notices were last looked at (once a day, see <c>VacationNotices</c>).</summary>
+    public DateOnly? VacationNoticesCheckedOn { get; set; }
+
+    /// <summary>
+    /// Region whose public holidays apply (<c>HolidayPresets</c> key, e.g. "DE-BW"); calculated, never stored as rows.
+    /// A group or a member's work schedule can name another one. Null = none (only the organization's own holidays).
+    /// </summary>
+    public string? HolidayRegion { get; set; }
+    /// <summary>Some group names its own holiday region (kept by <c>GroupService</c>), so the calendar must read memberships.</summary>
+    public bool GroupHolidayRegions { get; set; }
 
     /// <summary>
     /// Local time at which a business day ends. A timer still running then is stopped

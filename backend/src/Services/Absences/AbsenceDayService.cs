@@ -193,11 +193,15 @@ public class AbsenceDayService : IAbsenceDayService
         if (!customTypeResult.ok)
             return ServiceResult.BadRequest<List<AbsenceDayResponse>>("Unknown or inactive custom absence type.");
 
-        var taken = await _context.AbsenceDays
-            .Where(a => a.UserId == targetUserId && a.OrganizationId == org.Id && dates.Contains(a.Date))
-            .Select(a => a.Date)
-            .OrderBy(d => d)
-            .ToListAsync();
+        // A Betriebsurlaub day is no obstacle: the member's own absence replaces it. A half day still has room for one
+        // other half day (e.g. half vacation + half sick).
+        var existing = (await _context.AbsenceDays.AsNoTracking()
+                .Where(a => a.UserId == targetUserId && a.OrganizationId == org.Id && dates.Contains(a.Date) && a.CompanyLeaveId == null)
+                .Select(a => new { a.Date, a.IsHalfDay, a.SecondHalf })
+                .ToListAsync())
+            .ToLookup(a => a.Date);
+        bool OtherHalfFree(DateOnly d) => isHalfDay && existing[d].Count() == 1 && existing[d].Single().IsHalfDay;
+        var taken = existing.Select(d => d.Key).Where(d => !OtherHalfFree(d)).Order().ToList();
         if (taken.Count > 0)
             return ServiceResult.Conflict<List<AbsenceDayResponse>>(
                 dates.Count == 1
@@ -212,10 +216,12 @@ public class AbsenceDayService : IAbsenceDayService
             Type = customTypeResult.type != null ? AbsenceType.Other : type,
             CustomTypeId = customTypeResult.type?.Id,
             IsHalfDay = isHalfDay,
+            SecondHalf = OtherHalfFree(date) && !existing[date].Single().SecondHalf,
             Note = note,
             CreatedByUserId = callerUserId
         }).ToList();
 
+        await CompanyLeaves.ReplaceGeneratedAsync(_context, org.Id, targetUserId, dates.ToList());
         _context.AbsenceDays.AddRange(absences);
         await _context.SaveChangesAsync();
         _logger.LogInformation("{Count} absence day(s) created for user {TargetUserId} in org {OrgSlug} by user {CallerId}",
@@ -266,6 +272,9 @@ public class AbsenceDayService : IAbsenceDayService
             .ToListAsync();
         if (absences.Count != ids.Count)
             return ServiceResult.NotFound("Absence not found");
+        // Generated days follow their Betriebsurlaub (they would come back); leaving someone out is the admin's way
+        if (absences.Any(a => a.CompanyLeaveId != null))
+            return ServiceResult.BadRequest(CompanyLeaves.ManagedMessage);
 
         // Members can only delete their own, self-entered absences: one an admin entered or that
         // came from an approved request is part of the approval trail

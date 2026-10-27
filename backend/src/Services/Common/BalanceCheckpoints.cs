@@ -28,7 +28,7 @@ public static class BalanceCheckpoints
     /// Bump whenever the day rules of <c>DailyReportAggregator.BuildRows</c> change (targets, credits, what counts — e.g. #76):
     /// every stored checkpoint then becomes invalid and is recomputed on the next read.
     /// </summary>
-    public const int AlgorithmVersion = 1;
+    public const int AlgorithmVersion = 2; // 2: holidays per member (HolidayCalendar: regions, group holidays)
 
     /// <summary>Rows per upsert statement (9 parameters each, far below Postgres' 65535).</summary>
     private const int UpsertChunk = 1000;
@@ -311,12 +311,13 @@ internal sealed class BalanceInvalidation
     ];
     private static readonly HashSet<string> AbsenceFields =
     [
-        nameof(AbsenceDay.Date), nameof(AbsenceDay.Type), nameof(AbsenceDay.IsHalfDay), nameof(AbsenceDay.CustomTypeId),
+        nameof(AbsenceDay.Date), nameof(AbsenceDay.Type), nameof(AbsenceDay.IsHalfDay), nameof(AbsenceDay.CustomTypeId), nameof(AbsenceDay.SecondHalf),
         nameof(AbsenceDay.OrganizationId), nameof(AbsenceDay.UserId)
     ];
     private static readonly HashSet<string> HolidayFields =
     [
-        nameof(Holiday.Date), nameof(Holiday.IsRecurring), nameof(Holiday.IsHalfDay), nameof(Holiday.OrganizationId)
+        nameof(Holiday.Date), nameof(Holiday.IsRecurring), nameof(Holiday.IsHalfDay), nameof(Holiday.OrganizationId),
+        nameof(Holiday.GroupId)
     ];
 
     /// <summary>The bumps the pending changes need, or null (the common case: nothing in an ended month).</summary>
@@ -366,8 +367,18 @@ internal sealed class BalanceInvalidation
                         orgDays.Add((type.OrganizationId, DateOnly.MinValue));
                     break;
                 case Organization org:
-                    if (e.State == EntityState.Modified && Changed(e, nameof(Organization.TimeZone)))
+                    if (e.State == EntityState.Modified && (Changed(e, nameof(Organization.TimeZone))
+                            || Changed(e, nameof(Organization.HolidayRegion)) || Changed(e, nameof(Organization.GroupHolidayRegions))))
                         orgDays.Add((org.Id, DateOnly.MinValue));
+                    break;
+                case Group group:
+                    // A group's holiday region and its place in the tree decide its members' holidays (also of the past)
+                    if (e.State == EntityState.Modified && (Changed(e, nameof(Group.HolidayRegion))
+                            || Changed(e, nameof(Group.ParentGroupId)) || Changed(e, nameof(Group.IsActive))))
+                        orgDays.Add((group.OrganizationId, DateOnly.MinValue));
+                    break;
+                case DayOffExclusion exclusion when exclusion.HolidayId != null && e.State is EntityState.Added or EntityState.Deleted:
+                    memberDays.Add((exclusion.OrganizationId, exclusion.UserId, DateOnly.MinValue, null));
                     break;
             }
         }

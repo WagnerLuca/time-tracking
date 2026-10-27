@@ -24,7 +24,7 @@ public record PersonalDataExport
 }
 
 public record PersonalMembership(string Organization, string Role, DateTime JoinedAt, bool Active, double VacationDaysPerYear, double InitialOvertimeHours,
-    string? PersonnelNumber);
+    string? PersonnelNumber, DateOnly? EmploymentStart = null, DateOnly? EmploymentEnd = null);
 public record PersonalCard(string Organization, string CardHint, string? Label, bool IsBlocked, DateTime CreatedAt, DateTime? LastUsedAt);
 /// <summary>Terminal is null once its API key has been deleted; Result is Started/Stopped/ClosedFailure/Repeated/Blocked/Rejected.</summary>
 public record PersonalPunch(string Organization, DateTime ScannedAt, string? Terminal, string Result, string CardHint);

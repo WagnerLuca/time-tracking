@@ -26,6 +26,17 @@ public class UserOrganization
     
     public bool IsActive { get; set; } = true;
 
+    /// <summary>When the member left (set by the save hook whenever <see cref="IsActive"/> turns false, cleared on rejoining).</summary>
+    public DateTime? LeftAt { get; set; }
+
+    /// <summary>
+    /// First day of employment (Eintrittsdatum), set by an admin: the vacation of that year is pro rata (§ 5 BUrlG). Null =
+    /// employed before any year shown (joining the app is no employment start).
+    /// </summary>
+    public DateOnly? EmploymentStart { get; set; }
+    /// <summary>Last day of employment (Austrittsdatum), set by an admin; null = still employed.</summary>
+    public DateOnly? EmploymentEnd { get; set; }
+
     // Initial overtime balance in hours (set by user, applied before first tracked entry)
     public double InitialOvertimeHours { get; set; }
     

@@ -45,6 +45,15 @@ public class VacationCarryOverTests : IClassFixture<TimeTrackingApiFactory>
         uo.VacationDaysPerYear = allowance;
     });
 
+    /// <summary>The member was told that <paramref name="year"/>'s carried-in days lapse (VacationNotices); without it nothing lapses.</summary>
+    private Task NoticeAsync(int orgId, int userId, int year) => WithDbAsync(async db =>
+    {
+        var row = await db.VacationYears.SingleOrDefaultAsync(v => v.OrganizationId == orgId && v.UserId == userId && v.Year == year);
+        if (row == null)
+            db.VacationYears.Add(row = new VacationYear { OrganizationId = orgId, UserId = userId, Year = year, UpdatedAt = DateTime.UtcNow });
+        row.ExpiryNoticeAt = new DateTime(year - 1, 10, 1, 8, 0, 0, DateTimeKind.Utc);
+    });
+
     /// <summary>The first <paramref name="count"/> weekdays from <paramref name="from"/>.</summary>
     private static IEnumerable<DateOnly> Weekdays(DateOnly from, int count)
     {
@@ -101,11 +110,11 @@ public class VacationCarryOverTests : IClassFixture<TimeTrackingApiFactory>
     // ── settings ────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task NewOrg_DefaultsToUntil31March_FromItsOwnYear_WithoutCap()
+    public async Task NewOrg_DefaultsToUnlimited_FromItsOwnYear_WithoutCap()
     {
         var (owner, _, slug, _, _) = await TestHelpers.OrgWithMemberAsync(_factory, "vco-def", new { }, "vco.test");
         var detail = await owner.GetFromJsonAsync<JsonElement>($"/api/v1/Organizations/{slug}");
-        detail.GetProperty("vacationCarryOverMode").GetString().Should().Be("UntilDate");
+        detail.GetProperty("vacationCarryOverMode").GetString().Should().Be("Unlimited");
         detail.GetProperty("vacationCarryOverExpiry").GetString().Should().Be("03-31");
         detail.GetProperty("vacationCarryOverMaxDays").ValueKind.Should().Be(JsonValueKind.Null);
         detail.GetProperty("vacationCarryOverSince").GetInt32().Should().Be(Cy);
@@ -469,8 +478,9 @@ public class VacationCarryOverTests : IClassFixture<TimeTrackingApiFactory>
     public async Task OrgDetail_AccountingOverview_AndExport_CarryTheCarryOverFigures()
     {
         var (owner, member, slug, orgId, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, "vco-fig",
-            new { vacationCarryOverSince = Cy - 1 }, "vco.test");
+            new { vacationCarryOverSince = Cy - 1, vacationCarryOverMode = 1 }, "vco.test");
         await MembershipAsync(orgId, memberId, Cy - 1, 30);
+        await NoticeAsync(orgId, memberId, Cy);
         await VacationAsync(orgId, memberId, Weekdays(new DateOnly(Cy - 1, 6, 1), 25));
         // Two days before 31 March use the carry; one in July; the other 3 carried days lapsed (today is past March)
         await VacationAsync(orgId, memberId, Weekdays(new DateOnly(Cy, 2, 2), 2));
@@ -539,8 +549,10 @@ public class VacationCarryOverTests : IClassFixture<TimeTrackingApiFactory>
     public async Task OrgSinceThisYear_NoCarryIntoThisYear_LastYearUnchanged()
     {
         // A new org's `since` is its creation year (= a migrated org's 2026): last year's leftover does not carry in
-        var (owner, _, slug, orgId, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, "vco-since", new { }, "vco.test");
+        var (owner, _, slug, orgId, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, "vco-since",
+            new { vacationCarryOverMode = 1 }, "vco.test");
         await MembershipAsync(orgId, memberId, Cy - 2, 30);
+        await NoticeAsync(orgId, memberId, Cy + 1);
         await VacationAsync(orgId, memberId, Weekdays(new DateOnly(Cy - 1, 6, 1), 5));
         await VacationAsync(orgId, memberId, Weekdays(new DateOnly(Cy, 6, 1), 4));
 

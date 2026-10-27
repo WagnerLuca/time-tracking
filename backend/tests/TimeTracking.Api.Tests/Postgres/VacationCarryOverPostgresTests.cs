@@ -122,7 +122,7 @@ public class VacationCarryOverPostgresTests
         // A new organization: its creation year (org-local), same rule
         var (owner, _, slug, _, _) = await TestHelpers.OrgWithMemberAsync(_factory, "pg-vy-new", new { }, "pg.test");
         var detail = await owner.GetFromJsonAsync<JsonElement>($"/api/v1/Organizations/{slug}");
-        detail.GetProperty("vacationCarryOverMode").GetString().Should().Be("UntilDate");
+        detail.GetProperty("vacationCarryOverMode").GetString().Should().Be("Unlimited");   // new organizations: unlimited (2026-10-27)
         detail.GetProperty("vacationCarryOverExpiry").GetString().Should().Be("03-31");
         detail.GetProperty("vacationCarryOverSince").GetInt32().Should().Be(Cy);
         detail.GetProperty("vacationCarryOverMaxDays").ValueKind.Should().Be(JsonValueKind.Null);

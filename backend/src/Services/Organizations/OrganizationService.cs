@@ -89,6 +89,7 @@ public class OrganizationService : IOrganizationService
                 VacationCarryOverExpiry = VacationExpiry(o.VacationCarryOverExpiryMonth, o.VacationCarryOverExpiryDay),
                 VacationCarryOverMaxDays = o.VacationCarryOverMaxDays,
                 VacationCarryOverSince = o.VacationCarryOverSince,
+                HolidayRegion = o.HolidayRegion,
                 BusinessDayEnd = o.BusinessDayEnd.ToString("HH:mm"),
                 TimeZone = o.TimeZone,
                 CoreHoursEnabled = o.CoreHoursEnabled,
@@ -490,6 +491,8 @@ public class OrganizationService : IOrganizationService
     public const string CarryOverExpiryMessage = "The carry-over expiry must be a valid day as MM-DD.";
     public const string CarryOverMaxDaysMessage = "The carry-over cap must be between 0 and 365 days.";
     public const string CarryOverSinceMessage = "The carry-over start year must be between 2000 and the current year.";
+    public const string EmploymentOrderMessage = "The employment cannot end before it starts.";
+    public const string VacationExpiresOnMessage = "The expiry date must be in the same year.";
 
     /// <summary>A carry-over expiry as "MM-DD".</summary>
     internal static string VacationExpiry(int month, int day) => $"{month:00}-{day:00}";
@@ -579,6 +582,13 @@ public class OrganizationService : IOrganizationService
             if (since < 2000 || since > OrgClock.For(org).Today().Year)
                 return ServiceResult.BadRequest<OrganizationSettingsResponse>(CarryOverSinceMessage);
             org.VacationCarryOverSince = since;
+        }
+        if (request.HolidayRegion != null)
+        {
+            // A rule like the time zone: it applies to every day without a region of its own (balances are recomputed)
+            if (HolidayPresets.Normalize(request.HolidayRegion) is not { } region)
+                return ServiceResult.BadRequest<OrganizationSettingsResponse>(HolidayPresets.UnknownRegionMessage);
+            org.HolidayRegion = region == "" ? null : region;
         }
         if (request.BusinessDayEnd != null) org.BusinessDayEnd = TimeOnly.ParseExact(request.BusinessDayEnd, "HH:mm");
         if (request.TimeZone != null)
@@ -670,7 +680,8 @@ public class OrganizationService : IOrganizationService
             VacationCarryOverMode = org.VacationCarryOverMode.ToString(),
             VacationCarryOverExpiry = VacationExpiry(org.VacationCarryOverExpiryMonth, org.VacationCarryOverExpiryDay),
             VacationCarryOverMaxDays = org.VacationCarryOverMaxDays,
-            VacationCarryOverSince = org.VacationCarryOverSince
+            VacationCarryOverSince = org.VacationCarryOverSince,
+            HolidayRegion = org.HolidayRegion
         });
     }
 
@@ -1172,6 +1183,10 @@ public class OrganizationService : IOrganizationService
             if (year == OrgClock.For(org).Today().Year)
                 membership.VacationDaysPerYear = VacationBalances.EntitlementFor(year, edit.Rows, membership.VacationDaysPerYear);
         }
+        if (request.ExpiresOn is { } expiresOn && (expiresOn.Year != year || expiresOn < new DateOnly(year, 1, 1)))
+            return ServiceResult.BadRequest<MemberVacationResponse>(VacationExpiresOnMessage);
+        if (request.ExpiresOn != null || request.ClearExpiresOn == true)
+            edit.Upsert(year).ExpiresOn = request.ClearExpiresOn == true ? null : request.ExpiresOn;
         if (request.Adjustment != null || request.Note != null)
         {
             var row = edit.Upsert(year);
@@ -1184,6 +1199,29 @@ public class OrganizationService : IOrganizationService
         return ServiceResult.Ok(await MemberVacationAsync(org, userId, year, seesNote: true));
     }
 
+    public async Task<ServiceResult<MemberEmploymentResponse>> SetMemberEmploymentAsync(
+        string slug, int callerUserId, int userId, SetEmploymentRequest request)
+    {
+        var org = await _context.FindOrgBySlugAsync(slug);
+        if (org == null)
+            return ServiceResult.NotFound<MemberEmploymentResponse>("Organization not found");
+        if (await _context.GetOrgRoleAsync(callerUserId, org.Id) is not >= OrganizationRole.Admin)
+            return ServiceResult.Forbidden<MemberEmploymentResponse>();
+        var membership = await _context.UserOrganizations.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(uo => uo.OrganizationId == org.Id && uo.UserId == userId);
+        if (membership == null)
+            return ServiceResult.NotFound<MemberEmploymentResponse>("Member not found in this organization.");
+
+        if (request.ClearStart) membership.EmploymentStart = null;
+        else if (request.Start != null) membership.EmploymentStart = request.Start;
+        if (request.ClearEnd) membership.EmploymentEnd = null;
+        else if (request.End != null) membership.EmploymentEnd = request.End;
+        if (membership.EmploymentEnd < membership.EmploymentStart)
+            return ServiceResult.BadRequest<MemberEmploymentResponse>(EmploymentOrderMessage);
+        await _context.SaveChangesAsync();
+        return ServiceResult.Ok(new MemberEmploymentResponse(userId, membership.EmploymentStart, membership.EmploymentEnd));
+    }
+
     private async Task<MemberVacationResponse> MemberVacationAsync(Organization org, int userId, int year, bool seesNote)
     {
         var today = OrgClock.For(org).Today();
@@ -1192,20 +1230,26 @@ public class OrganizationService : IOrganizationService
             .Where(v => v.OrganizationId == org.Id && v.UserId == userId && v.Year == year)
             .Select(v => new
             {
-                v.Entitlement, v.AdjustmentNote, v.UpdatedAt,
+                v.Entitlement, v.AdjustmentNote, v.UpdatedAt, v.ExpiresOn, v.ExpiryNoticeAt,
                 UpdatedBy = _context.Users.Where(u => u.Id == v.UpdatedByUserId).Select(u => u.FirstName + " " + u.LastName).FirstOrDefault()
             })
             .FirstOrDefaultAsync();
-        var allowance = await _context.UserOrganizations.IgnoreQueryFilters()
+        var membership = await _context.UserOrganizations.IgnoreQueryFilters()
             .Where(uo => uo.OrganizationId == org.Id && uo.UserId == userId)
-            .Select(uo => uo.VacationDaysPerYear)
+            .Select(uo => new { uo.VacationDaysPerYear, uo.EmploymentStart, uo.EmploymentEnd })
             .FirstOrDefaultAsync();
+        var allowance = membership?.VacationDaysPerYear ?? 0;
         return new MemberVacationResponse
         {
             UserId = userId,
             Year = year,
             Entitlement = balance.Entitlement,
             HasOwnEntitlement = row?.Entitlement != null,
+            AnnualEntitlement = balance.AnnualEntitlement,
+            OwnExpiresOn = row?.ExpiresOn,
+            ExpiryNoticeAt = row?.ExpiryNoticeAt,
+            EmploymentStart = membership?.EmploymentStart,
+            EmploymentEnd = membership?.EmploymentEnd,
             Adjustment = balance.Adjustment,
             AdjustmentNote = seesNote ? row?.AdjustmentNote : null,
             CarriedIn = balance.CarriedIn,

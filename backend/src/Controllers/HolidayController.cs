@@ -94,6 +94,52 @@ public class HolidayController : OrganizationBaseController
         return ToResponse(await _service.ImportPresetHolidaysAsync(slug, userId.Value, preset, year, toYear));
     }
 
+    /// <summary>Leave members out of a company holiday (admin only); replaces the list.</summary>
+    [HttpPut("{slug}/holidays/{id}/exclusions")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(typeof(HolidayResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SetHolidayExclusions(string slug, int id, [FromBody] SetExclusionsRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.SetExclusionsAsync(slug, userId.Value, id, request));
+    }
+
+    /// <summary>
+    /// A member's holidays between two days: public ones of their region (schedule, groups, organization) and company
+    /// ones (organization or their groups'). Others' need the work schedule visibility (the region is the Arbeitsort).
+    /// </summary>
+    /// <param name="userId">The member; left out = the caller.</param>
+    [HttpGet("{slug}/holidays/days")]
+    [RequireOrgRole]
+    [ProducesResponseType(typeof(MemberDaysOffResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMemberDaysOff(string slug, [FromQuery] DateOnly from, [FromQuery] DateOnly to, [FromQuery] int? userId = null)
+    {
+        var callerId = GetCurrentUserId();
+        if (callerId == null) return Unauthorized();
+        return ToResponse(await _service.GetMemberDaysOffAsync(slug, callerId.Value, userId, from, to));
+    }
+
+    /// <summary>
+    /// Deletes the organization-wide holidays an earlier preset import copied that its region now covers (admin only);
+    /// returns how many were removed.
+    /// </summary>
+    [HttpPost("{slug}/holidays/remove-covered")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RemoveCoveredHolidays(string slug)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await _service.RemoveCoveredHolidaysAsync(slug, userId.Value));
+    }
+
+    /// <summary>The public holidays of a region in a year (calculated, e.g. for a preview).</summary>
+    [HttpGet("holiday-presets/{region}/dates")]
+    [ProducesResponseType(typeof(List<PublicHolidayResponse>), StatusCodes.Status200OK)]
+    public IActionResult GetPublicHolidays(string region, [FromQuery] int year) =>
+        ToResponse(_service.GetPublicHolidays(region, year));
+
     /// <summary>List available holiday preset codes.</summary>
     [HttpGet("holiday-presets")]
     [ProducesResponseType(typeof(List<HolidayPresetResponse>), StatusCodes.Status200OK)]

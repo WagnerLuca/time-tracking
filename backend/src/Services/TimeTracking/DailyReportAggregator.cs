@@ -50,11 +50,22 @@ public static class DailyReportAggregator
     {
         // Days are the organization's local days (an entry at 00:30 Berlin belongs to that
         // day, not to the previous UTC day)
-        var timeZone = await context.Organizations.AsNoTracking()
-            .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
-        return await BuildAsync(context, OrgClock.For(timeZone), userId, orgId, dateFrom, dateTo, initialOvertimeHours,
+        var org = await OrgDaysAsync(context, orgId);
+        return await BuildAsync(context, org, userId, orgId, dateFrom, dateTo, initialOvertimeHours,
             includeFuture, detailsFrom);
     }
+
+    /// <summary>What the day loop needs of the organization: its clock and holiday region settings.</summary>
+    internal sealed record OrgDays(string? TimeZone, string? HolidayRegion, bool GroupHolidayRegions)
+    {
+        public OrgClock Clock { get; } = OrgClock.For(TimeZone);
+        public static OrgDays Of(Organization org) => new(org.TimeZone, org.HolidayRegion, org.GroupHolidayRegions);
+    }
+
+    internal static async Task<OrgDays> OrgDaysAsync(TimeTrackingDbContext context, int orgId) =>
+        await context.Organizations.AsNoTracking().Where(o => o.Id == orgId)
+            .Select(o => new OrgDays(o.TimeZone, o.HolidayRegion, o.GroupHolidayRegions)).FirstOrDefaultAsync()
+        ?? new OrgDays(null, null, false);
 
     /// <summary>
     /// <see cref="BuildAsync(TimeTrackingDbContext, int, int, DateOnly, DateOnly, double, bool, DateOnly?)"/> with the org's
@@ -62,13 +73,14 @@ public static class DailyReportAggregator
     /// <see cref="BalanceCheckpoint.OvertimeDelta"/>) and <paramref name="monthEnds"/> collects it at every month's last day.
     /// </summary>
     internal static async Task<List<DailyReportRow>> BuildAsync(
-        TimeTrackingDbContext context, OrgClock clock, int userId, int orgId,
+        TimeTrackingDbContext context, OrgDays org, int userId, int orgId,
         DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours, bool includeFuture = false, DateOnly? detailsFrom = null,
         double startDelta = 0, List<(DateOnly Day, double Delta)>? monthEnds = null, List<WorkSchedule>? schedules = null)
     {
         // Only count days up to today — future days haven't happened yet and
         // would otherwise show as artificial "Missing" time with a misleading target.
         // (includeFuture: only for planned targets; such rows must not feed a balance.)
+        var clock = org.Clock;
         var today = clock.Today();
         if (dateTo > today && !includeFuture) dateTo = today;
         if (dateFrom > dateTo) return [];
@@ -87,12 +99,9 @@ public static class DailyReportAggregator
             .OrderBy(ws => ws.ValidFrom)
             .ToListAsync();
 
-        var holidays = await context.Holidays.AsNoTracking()
-            .Where(h => h.OrganizationId == orgId
-                     && ((h.Date >= dateFrom && h.Date <= dateTo) || h.IsRecurring))
-            // A one-off holiday wins over a recurring one on the same day (BuildRows keeps the first per date)
-            .OrderBy(h => h.IsRecurring).ThenBy(h => h.Id)
-            .ToListAsync();
+        var calendar = await HolidayCalendar.LoadAsync(context, orgId, org.HolidayRegion, org.GroupHolidayRegions, clock,
+            [userId], dateFrom, dateTo);
+        var holidays = calendar.Range(userId, dateFrom, dateTo, workSchedules);
 
         var absences = await context.AbsenceDays.AsNoTracking()
             .Include(a => a.CustomType)
@@ -122,7 +131,7 @@ public static class DailyReportAggregator
     /// </para>
     /// </summary>
     private static List<DailyReportRow> BuildRows(OrgClock clock, DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours,
-        IEnumerable<TimeEntry> timeEntries, List<WorkSchedule> workSchedules, IEnumerable<Holiday> holidays,
+        IEnumerable<TimeEntry> timeEntries, List<WorkSchedule> workSchedules, IReadOnlyDictionary<DateOnly, DayOff> holidays,
         IEnumerable<AbsenceDay> absences, IReadOnlyDictionary<DateOnly, CoreHours.Result> coreHoursMissed, DateOnly summariesFrom,
         double startDelta = 0, List<(DateOnly Day, double Delta)>? monthEnds = null)
     {
@@ -131,17 +140,8 @@ public static class DailyReportAggregator
             .GroupBy(e => clock.LocalDate(e.StartTime))
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        var holidaysByDate = new Dictionary<DateOnly, Holiday>();
-        foreach (var h in holidays)
-        {
-            for (var year = dateFrom.Year; year <= dateTo.Year; year++)
-            {
-                if (h.DateIn(year) is { } date && date >= dateFrom && date <= dateTo)
-                    holidaysByDate.TryAdd(date, h);
-            }
-        }
-
-        var absencesByDate = absences.ToDictionary(a => a.Date, a => a);
+        // One full absence or two halves per day (the first half first)
+        var absencesByDate = absences.GroupBy(a => a.Date).ToDictionary(g => g.Key, g => g.OrderBy(a => a.SecondHalf).ToList());
 
         var rows = new List<DailyReportRow>();
         var overtimeSum = startDelta;
@@ -162,11 +162,12 @@ public static class DailyReportAggregator
             var netMinutes = Math.Max(0, grossMinutes - pauseMinutes);
             var netHours = netMinutes / 60.0;
 
-            var isHoliday = holidaysByDate.TryGetValue(currentDate, out var holiday);
-            var isAbsence = absencesByDate.TryGetValue(currentDate, out var absence);
+            var isHoliday = holidays.TryGetValue(currentDate, out var holiday);
+            var isAbsence = absencesByDate.TryGetValue(currentDate, out var dayAbsences);
+            var absence = isAbsence ? dayAbsences![0] : null;
 
             var holidayCredit = isHoliday ? (holiday!.IsHalfDay ? targetHours / 2.0 : targetHours) : 0;
-            var absenceCredit = isAbsence ? AbsenceCredit(absence!, targetHours, netHours) : 0;
+            var absenceCredit = isAbsence ? Math.Min(targetHours, dayAbsences!.Sum(a => AbsenceCredit(a, targetHours, netHours))) : 0;
             var effectiveTarget = Math.Max(0, targetHours - holidayCredit - absenceCredit);
             string status;
 
@@ -197,7 +198,7 @@ public static class DailyReportAggregator
                 isAbsence ? absence!.Type : null,
                 isAbsence ? absence!.Note : null,
                 entrySummary,
-                isAbsence && (absence!.Type == AbsenceType.Vacation || absence.CustomType?.CountsAsVacation == true),
+                isAbsence && dayAbsences!.Any(a => a.Type == AbsenceType.Vacation || a.CustomType?.CountsAsVacation == true),
                 coreHoursMissed.ContainsKey(currentDate)
             ));
 
@@ -223,9 +224,8 @@ public static class DailyReportAggregator
         TimeTrackingDbContext context, int userId, int orgId,
         DateOnly dateFrom, DateOnly dateTo, double initialOvertimeHours)
     {
-        var timeZone = await context.Organizations.AsNoTracking()
-            .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstOrDefaultAsync();
-        var clock = OrgClock.For(timeZone);
+        var org = await OrgDaysAsync(context, orgId);
+        var (clock, timeZone) = (org.Clock, org.TimeZone);
 
         // The balance runs from the first tracked entry: days before someone started tracking
         // are not "missing" work. Without any entry there is nothing to count yet.
@@ -245,7 +245,7 @@ public static class DailyReportAggregator
 
         // Rows before dateFrom only feed the running total: no core-hours evaluation or entry summaries for them
         var monthEnds = new List<(DateOnly Day, double Delta)>();
-        var allRows = await BuildAsync(context, clock, userId, orgId, start.From, dateTo, initialOvertimeHours,
+        var allRows = await BuildAsync(context, org, userId, orgId, start.From, dateTo, initialOvertimeHours,
             detailsFrom: dateFrom, startDelta: start.Delta, monthEnds: monthEnds, schedules: member.Schedules);
         await BalanceCheckpoints.SaveAsync(context, stamp, timeZone, [(userId, member, monthEnds)]);
         var displayRows = allRows.Where(r => r.Date >= dateFrom).ToList();
@@ -331,10 +331,7 @@ public static class DailyReportAggregator
         if (starts.Count == 0) return result;
         var finished = loaded.Where(e => !e.IsRunning).ToLookup(e => e.UserId);
 
-        var holidays = await context.Holidays.AsNoTracking()
-            .Where(h => h.OrganizationId == org.Id && ((h.Date >= from && h.Date <= to) || h.IsRecurring))
-            .OrderBy(h => h.IsRecurring).ThenBy(h => h.Id)
-            .ToListAsync();
+        var calendar = await HolidayCalendar.LoadAsync(context, org, startIds, from, to);
         var absences = (await context.AbsenceDays.AsNoTracking()
                 .Include(a => a.CustomType)
                 .Where(a => a.OrganizationId == org.Id && startIds.Contains(a.UserId) && a.Date >= from && a.Date <= to)
@@ -347,7 +344,7 @@ public static class DailyReportAggregator
         {
             var monthEnds = new List<(DateOnly Day, double Delta)>();
             var rows = BuildRows(clock, start.From, to, initialOvertimeByUser[userId], finished[userId],
-                members[userId].Schedules, holidays, absences[userId].Where(a => a.Date >= start.From), noViolations, DateOnly.MaxValue,
+                members[userId].Schedules, calendar.Range(userId, start.From, to, members[userId].Schedules), absences[userId].Where(a => a.Date >= start.From), noViolations, DateOnly.MaxValue,
                 start.Delta, monthEnds);
             computed.Add((userId, members[userId], monthEnds));
             if (rows.Count == 0) continue;

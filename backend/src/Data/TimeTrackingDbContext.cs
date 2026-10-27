@@ -7,6 +7,7 @@ public class TimeTrackingDbContext : DbContext
 {
     private readonly RlsContext? _rls;
     private readonly Services.PushQueue? _push;
+    private bool _syncingLeaves;
 
     public TimeTrackingDbContext(DbContextOptions<TimeTrackingDbContext> options)
         : base(options)
@@ -53,6 +54,9 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<PushSubscription> PushSubscriptions { get; set; }
     public DbSet<BalanceCheckpoint> BalanceCheckpoints { get; set; }
     public DbSet<VacationYear> VacationYears { get; set; }
+    public DbSet<GroupMembershipPeriod> GroupMembershipPeriods { get; set; }
+    public DbSet<DayOffExclusion> DayOffExclusions { get; set; }
+    public DbSet<CompanyLeave> CompanyLeaves { get; set; }
 
     /// <summary>
     /// Saves, and records every change a user made to a finished time entry in
@@ -62,6 +66,10 @@ public class TimeTrackingDbContext : DbContext
     /// </summary>
     public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
+        // Group membership history (holidays and regions of groups follow it, not today's membership)
+        await Services.MembershipPeriods.StageAsync(this, cancellationToken);
+        // Betriebsurlaub rows that this save moves (memberships, schedules, holidays, a removed sick day): after the save
+        var leaveTriggers = _syncingLeaves ? null : Services.CompanyLeaves.Collect(this);
         // Every in-app notification is also a push (issue #67): this save is the one place they all pass
         var notifications = _push == null ? [] : ChangeTracker.Entries<Notification>()
             .Where(e => e.State == EntityState.Added).Select(e => e.Entity).ToList();
@@ -84,6 +92,12 @@ public class TimeTrackingDbContext : DbContext
             if (transaction != null) await transaction.CommitAsync(cancellationToken);
         }
         if (notifications.Count > 0) _push!.Enqueue(notifications.Select(Services.PushTexts.From));
+        if (leaveTriggers != null)
+        {
+            _syncingLeaves = true;
+            try { await Services.CompanyLeaves.ApplyAsync(this, leaveTriggers, cancellationToken); }
+            finally { _syncingLeaves = false; }
+        }
         return saved;
     }
 
@@ -355,7 +369,8 @@ public class TimeTrackingDbContext : DbContext
             else
                 entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            entity.HasIndex(e => new { e.OrganizationId, e.Date }).IsUnique();
+            // One holiday per day for the organization and one per day and group (NULLs not distinct: one org-wide row)
+            entity.HasIndex(e => new { e.OrganizationId, e.GroupId, e.Date }).IsUnique().AreNullsDistinct(false);
 
             // Keep dependent rows hidden when the parent organization is soft-deleted.
             entity.HasQueryFilter(e => e.Organization.IsActive);
@@ -364,7 +379,49 @@ public class TimeTrackingDbContext : DbContext
                 .WithMany(o => o.Holidays)
                 .HasForeignKey(e => e.OrganizationId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Group)
+                .WithMany()
+                .HasForeignKey(e => e.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.Name).HasMaxLength(200);
         });
+
+        modelBuilder.Entity<Organization>().Property(e => e.HolidayRegion).HasMaxLength(10);
+        modelBuilder.Entity<Group>().Property(e => e.HolidayRegion).HasMaxLength(10);
+        modelBuilder.Entity<WorkSchedule>().Property(e => e.HolidayRegion).HasMaxLength(10);
+
+        modelBuilder.Entity<GroupMembershipPeriod>(entity =>
+        {
+            entity.HasIndex(e => new { e.OrganizationId, e.UserId });
+            entity.HasIndex(e => new { e.GroupId, e.UserId });
+            entity.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(e => e.Group.Organization.IsActive);
+        });
+
+        modelBuilder.Entity<DayOffExclusion>(entity =>
+        {
+            entity.HasIndex(e => new { e.HolidayId, e.UserId }).IsUnique();
+            entity.HasIndex(e => new { e.CompanyLeaveId, e.UserId }).IsUnique();
+            entity.HasOne(e => e.Holiday).WithMany(h => h.Exclusions).HasForeignKey(e => e.HolidayId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.CompanyLeave).WithMany(l => l.Exclusions).HasForeignKey(e => e.CompanyLeaveId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.ToTable(t => t.HasCheckConstraint("CK_DayOffExclusions_Target", "(\"HolidayId\" IS NULL) <> (\"CompanyLeaveId\" IS NULL)"));
+        });
+
+        modelBuilder.Entity<CompanyLeave>(entity =>
+        {
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(CompanyLeave.NameMaxLength);
+            entity.HasIndex(e => new { e.OrganizationId, e.From });
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(e => e.Organization.IsActive);
+            entity.ToTable(t => t.HasCheckConstraint("CK_CompanyLeaves_Range", "\"From\" <= \"To\""));
+        });
+        modelBuilder.Entity<AbsenceDay>()
+            .HasOne(a => a.CompanyLeave).WithMany().HasForeignKey(a => a.CompanyLeaveId).OnDelete(DeleteBehavior.SetNull);
 
         // Configure AbsenceDay entity
         modelBuilder.Entity<AbsenceDay>(entity =>
@@ -379,7 +436,7 @@ public class TimeTrackingDbContext : DbContext
             else
                 entity.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            entity.HasIndex(e => new { e.UserId, e.OrganizationId, e.Date }).IsUnique();
+            entity.HasIndex(e => new { e.UserId, e.OrganizationId, e.Date, e.SecondHalf }).IsUnique();
             entity.HasIndex(e => new { e.OrganizationId, e.Date });
 
             // Keep dependent rows hidden when the parent organization is soft-deleted.

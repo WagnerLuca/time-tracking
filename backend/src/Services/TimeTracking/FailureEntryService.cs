@@ -76,6 +76,20 @@ public class FailureEntryService : BackgroundService
                 _logger.LogError(ex, "Error while checking core working hours.");
             }
 
+            try
+            {
+                // Once per org-local day: notices that carried-over vacation will lapse
+                using var scope = _scopeFactory.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<TimeTrackingDbContext>();
+                var notices = await VacationNotices.SendDueAsync(context, DateTime.UtcNow, stoppingToken);
+                if (notices > 0)
+                    _logger.LogInformation("Sent {Count} vacation expiry notice(s).", notices);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Error while sending vacation expiry notices.");
+            }
+
             await Task.Delay(_interval, stoppingToken);
         }
     }
