@@ -4,7 +4,8 @@ Design note, 2026-10-15. Covers how a member's day is valued (target, holidays,
 absences), where the dates come from (public holidays per Bundesland, company holidays,
 Betriebsurlaub), the vacation account over the years (entitlement, pro rata, contract
 changes, carry-over, expiry) and how all of it stays correct and fast after years of data.
-Section 11 is the order to build it in; step 1 is done (2026-10-27).
+Section 11 is the order it was built in (all steps done 2026-10-27, branch `feature/days-off`); section 11a lists
+where the build differs from the plan.
 
 The legal notes describe German law as generally understood (BUrlG, case law); they are
 not legal advice — every rule that depends on them can be overridden by an admin.
@@ -272,19 +273,32 @@ Each step works on its own and leaves the app consistent.
 
 1. ✅ **Public holiday calculator** — `HolidayPresets.For(region, year)` with start years and
    one-offs, `DE-BY-MH`; `PublicHolidayDatesTests` pins every region's dates for 2025–2027.
-2. **Region on org, group and contract period** + **one resolver**
-   `DaysOff.ForMembers(org, userIds, from, to)` (public + company holidays, full/half) used
-   by all six readers; endpoint `GET organizations/{slug}/members/{id}/days-off?from&to` for
-   the calendars; fix problem 5 (half holiday = 0.5 vacation days).
-3. **Company holidays** — definitions, generated rows, exclusions, membership hooks,
-   migration of today's `Holiday` rows, holidays page rebuilt (org/group, region picker).
-4. **Betriebsurlaub** — `CompanyLeave` kind generating vacation absences, sick replaces.
-5. **Two half-day absences per day** (8.2).
-6. **Vacation account** — `VacationDaysPerYear` on contract periods, § 5 entitlement,
-   overrides, carry-over (unlimited default) and optional expiry with notices, initial
-   vacation days, UI.
-7. **Month-end cache** + invalidation + "Salden prüfen". Can move before step 6 if the
-   balance load gets slow first.
+2. ✅ **Regions + one resolver** — `HolidayCalendar` (org / group / contract-period region),
+   `GET organizations/{slug}/holidays/days`, half holiday = 0.5 vacation days.
+3. ✅ **Company holidays** per org or group, exclusions, holidays page with region picker.
+4. ✅ **Betriebsurlaub** — `CompanyLeave` writing vacation absences, sick replaces.
+5. ✅ **Two half-day absences per day** (`AbsenceDay.SecondHalf`).
+6. ✅ **Vacation account** — § 5 pro rata by employment dates, vacation days per contract period,
+   new orgs carry over without limit, expiry only after a notice (`VacationNotices`), per-member
+   expiry date.
+7. ✅ **Month-end cache** — the balance checkpoints built before (`BalanceCheckpoints`) now also
+   reset on every new input (regions, group tree, exclusions, the second half); algorithm version 2.
+
+## 11a. Where the build differs from the plan
+
+- **Group data by membership history, not generated rows.** Instead of writing per-member rows for
+  group holidays and stamping group regions into work schedules, `GroupMembershipPeriod` records
+  when someone was in a group (written by `SaveChangesAsync`); the calendar reads group holidays
+  and group regions for the days a member belonged. Same guarantee (a move never rewrites the
+  past), no regeneration job. Known limit: moving a group under another parent applies to the
+  past too, and memberships before the migration start at their `JoinedAt`.
+- **Org-wide company holidays stay ordinary `Holiday` rows** (no migration needed); imported
+  preset rows can be removed with "Importierte Feiertage entfernen" once a region is set.
+- **Pro rata uses employment dates** (`UserOrganization.EmploymentStart/End`, set by an admin),
+  not the app join date, and has no "since" setting: without dates nothing changes.
+- **No "Salden prüfen" admin action** — the existing checkpoint property tests compare
+  checkpointed with full computations.
+- **Team calendar** shows the viewer's own holidays (colleagues' may differ by region).
 
 ## 12. Tests to add
 
