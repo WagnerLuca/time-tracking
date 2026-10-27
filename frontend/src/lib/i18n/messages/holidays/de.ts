@@ -27,6 +27,7 @@ export const de = {
 		DE: 'Deutschland (bundesweit)',
 		'DE-BW': 'Baden-Württemberg',
 		'DE-BY': 'Bayern',
+		'DE-BY-MH': 'Bayern (mit Mariä Himmelfahrt)',
 		'DE-BE': 'Berlin',
 		'DE-BB': 'Brandenburg',
 		'DE-HB': 'Bremen',
@@ -42,7 +43,7 @@ export const de = {
 		'DE-SH': 'Schleswig-Holstein',
 		'DE-TH': 'Thüringen',
 		AT: 'Österreich',
-		CH: 'Schweiz'
+		CH: 'Schweiz (landesweit)'
 	},
 	import: {
 		open: 'Gesetzliche Feiertage importieren',

@@ -221,7 +221,7 @@ describe('formatters: domain labels', () => {
 	});
 
 	it('names holiday regions by key in the UI language, falling back to the server name', () => {
-		const keys = ['DE', 'DE-BW', 'DE-BY', 'DE-BE', 'DE-BB', 'DE-HB', 'DE-HH', 'DE-HE', 'DE-MV', 'DE-NI', 'DE-NW', 'DE-RP', 'DE-SL', 'DE-SN', 'DE-ST', 'DE-SH', 'DE-TH', 'AT', 'CH'];
+		const keys = ['DE', 'DE-BW', 'DE-BY', 'DE-BY-MH', 'DE-BE', 'DE-BB', 'DE-HB', 'DE-HH', 'DE-HE', 'DE-MV', 'DE-NI', 'DE-NW', 'DE-RP', 'DE-SL', 'DE-SN', 'DE-ST', 'DE-SH', 'DE-TH', 'AT', 'CH'];
 		expect(holidayRegionLabel('DE-BY', 'x')).toBe('Bayern');
 		locale.set('en');
 		expect(holidayRegionLabel('DE-BY', 'Bayern')).toBe('Bavaria');

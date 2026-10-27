@@ -36,7 +36,7 @@ public class HolidayPresetTests : IClassFixture<TimeTrackingApiFactory>
 
         HolidayPresets.Get("DE", 2026, 2026)!.Should().HaveCount(9);
         HolidayPresets.Get("DE-XX", 2026, 2026).Should().BeNull();
-        HolidayPresets.All().Should().HaveCount(19);
+        HolidayPresets.All().Should().HaveCount(20);
     }
 
     [Fact]

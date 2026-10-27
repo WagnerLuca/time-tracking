@@ -4,10 +4,13 @@ namespace TimeTracking.Api.Services;
 
 /// <summary>
 /// Public holiday presets: Germany nationwide (<c>DE</c>, alias <c>de</c>), each of the 16
-/// states (<c>DE-BW</c> … <c>DE-TH</c>, ISO 3166-2), Austria and Switzerland. Fixed-date
-/// holidays are recurring; Easter-based ones (and Buß- und Bettag) are created as concrete
-/// dates per requested year. Holidays only in some municipalities (Mariä Himmelfahrt in
-/// Bavaria, Fronleichnam in parts of Saxony/Thuringia, Augsburger Friedensfest) are left out.
+/// states (<c>DE-BW</c> … <c>DE-TH</c>, ISO 3166-2), Bavaria with Mariä Himmelfahrt
+/// (<c>DE-BY-MH</c>, the majority of its municipalities), Austria and Switzerland (the four
+/// nationwide days; cantonal ones are left out). Fixed-date holidays that exist in every year
+/// are recurring; Easter-based ones, Buß- und Bettag, one-offs and holidays introduced after
+/// 2000 are concrete dates per requested year, so a recurring row never reaches back before
+/// a holiday existed. Holidays only in some municipalities (Fronleichnam in parts of
+/// Saxony/Thuringia, Augsburger Friedensfest) are left out.
 /// </summary>
 public static class HolidayPresets
 {
@@ -16,6 +19,7 @@ public static class HolidayPresets
         ("DE", "Deutschland (bundesweit)"),
         ("DE-BW", "Baden-Württemberg"),
         ("DE-BY", "Bayern"),
+        ("DE-BY-MH", "Bayern (mit Mariä Himmelfahrt)"),
         ("DE-BE", "Berlin"),
         ("DE-BB", "Brandenburg"),
         ("DE-HB", "Bremen"),
@@ -31,7 +35,7 @@ public static class HolidayPresets
         ("DE-SH", "Schleswig-Holstein"),
         ("DE-TH", "Thüringen"),
         ("AT", "Österreich"),
-        ("CH", "Schweiz")
+        ("CH", "Schweiz (landesweit)")
     ];
 
     public static List<HolidayPresetResponse> All() =>
@@ -49,7 +53,7 @@ public static class HolidayPresets
         var result = new List<(DateOnly, string, bool)>();
         var recurringAdded = new HashSet<string>();
         for (var year = fromYear; year <= toYear; year++)
-            result.AddRange(ForYear(key, year).Where(h => !h.IsRecurring || recurringAdded.Add(h.Name)));
+            result.AddRange(For(key, year)!.Where(h => !h.IsRecurring || recurringAdded.Add(h.Name)));
         return result;
     }
 
@@ -75,17 +79,27 @@ public static class HolidayPresets
         return d;
     }
 
+    /// <summary>The region's public holidays in <paramref name="year"/> (null for an unknown region).</summary>
+    public static List<(DateOnly Date, string Name, bool IsRecurring)>? For(string region, int year)
+    {
+        var key = region.Trim().ToUpperInvariant();
+        return Presets.Any(p => p.Key == key) ? ForYear(key, year).OrderBy(h => h.Date).ToList() : null;
+    }
+
     private static IEnumerable<(DateOnly Date, string Name, bool IsRecurring)> ForYear(string key, int year)
     {
         var easter = Easter(year);
         (DateOnly, string, bool) Fixed(int month, int day, string name) => (new DateOnly(year, month, day), name, true);
         (DateOnly, string, bool) Easterly(int offset, string name) => (easter.AddDays(offset), name, false);
+        // Introduced after 2000 or a one-off: a concrete date, never a recurring row
+        (DateOnly, string, bool) Dated(int month, int day, string name) => (new DateOnly(year, month, day), name, false);
 
         if (key == "AT")
             return
             [
-                Fixed(1, 1, "Neujahr"), Fixed(1, 6, "Heilige Drei Könige"), Easterly(1, "Ostermontag"),
-                Fixed(5, 1, "Staatsfeiertag"), Easterly(39, "Christi Himmelfahrt"), Easterly(50, "Pfingstmontag"),
+                Fixed(1, 1, "Neujahr"), Fixed(1, 6, "Heilige Drei Könige"), Easterly(0, "Ostersonntag"),
+                Easterly(1, "Ostermontag"), Fixed(5, 1, "Staatsfeiertag"), Easterly(39, "Christi Himmelfahrt"),
+                Easterly(49, "Pfingstsonntag"), Easterly(50, "Pfingstmontag"),
                 Easterly(60, "Fronleichnam"), Fixed(8, 15, "Mariä Himmelfahrt"), Fixed(10, 26, "Nationalfeiertag"),
                 Fixed(11, 1, "Allerheiligen"), Fixed(12, 8, "Mariä Empfängnis"), Fixed(12, 25, "Christtag"),
                 Fixed(12, 26, "Stefanitag")
@@ -93,13 +107,10 @@ public static class HolidayPresets
         if (key == "CH")
             return
             [
-                Fixed(1, 1, "Neujahr"), Fixed(1, 2, "Berchtoldstag"), Easterly(-2, "Karfreitag"),
-                Easterly(1, "Ostermontag"), Fixed(5, 1, "Tag der Arbeit"), Easterly(39, "Auffahrt"),
-                Easterly(50, "Pfingstmontag"), Fixed(8, 1, "Bundesfeier"), Fixed(12, 25, "Weihnachten"),
-                Fixed(12, 26, "Stephanstag")
+                Fixed(1, 1, "Neujahr"), Easterly(39, "Auffahrt"), Fixed(8, 1, "Bundesfeier"), Fixed(12, 25, "Weihnachten")
             ];
 
-        var state = key.Length > 3 ? key[3..] : "";
+        var state = key.Length > 3 ? key[3..5] : "";
         bool In(params string[] states) => states.Contains(state);
 
         var list = new List<(DateOnly, string, bool)>
@@ -115,12 +126,14 @@ public static class HolidayPresets
             Fixed(12, 26, "2. Weihnachtstag")
         };
         if (In("BW", "BY", "ST")) list.Add(Fixed(1, 6, "Heilige Drei Könige"));
-        if ((In("BE") && year >= 2019) || (In("MV") && year >= 2023)) list.Add(Fixed(3, 8, "Internationaler Frauentag"));
+        if ((In("BE") && year >= 2019) || (In("MV") && year >= 2023)) list.Add(Dated(3, 8, "Internationaler Frauentag"));
+        if (In("BE") && year is 2020 or 2025) list.Add(Dated(5, 8, "Tag der Befreiung"));
         if (In("BB")) { list.Add(Easterly(0, "Ostersonntag")); list.Add(Easterly(49, "Pfingstsonntag")); }
         if (In("BW", "BY", "HE", "NW", "RP", "SL")) list.Add(Easterly(60, "Fronleichnam"));
-        if (In("SL")) list.Add(Fixed(8, 15, "Mariä Himmelfahrt"));
-        if (In("TH") && year >= 2019) list.Add(Fixed(9, 20, "Weltkindertag"));
-        if (In("BB", "MV", "SN", "ST", "TH") || (In("HB", "HH", "NI", "SH") && year >= 2018)) list.Add(Fixed(10, 31, "Reformationstag"));
+        if (In("SL") || key == "DE-BY-MH") list.Add(Fixed(8, 15, "Mariä Himmelfahrt"));
+        if (In("TH") && year >= 2019) list.Add(Dated(9, 20, "Weltkindertag"));
+        if (In("BB", "MV", "SN", "ST", "TH")) list.Add(Fixed(10, 31, "Reformationstag"));
+        else if (year == 2017 || (In("HB", "HH", "NI", "SH") && year >= 2018)) list.Add(Dated(10, 31, "Reformationstag"));
         if (In("BW", "BY", "NW", "RP", "SL")) list.Add(Fixed(11, 1, "Allerheiligen"));
         if (In("SN")) list.Add((RepentanceDay(year), "Buß- und Bettag", false));
         return list.OrderBy(h => h.Item1);

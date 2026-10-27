@@ -28,6 +28,7 @@ export const en: typeof de = {
 		DE: 'Germany (nationwide)',
 		'DE-BW': 'Baden-Württemberg',
 		'DE-BY': 'Bavaria',
+		'DE-BY-MH': 'Bavaria (with Assumption Day)',
 		'DE-BE': 'Berlin',
 		'DE-BB': 'Brandenburg',
 		'DE-HB': 'Bremen',
@@ -43,7 +44,7 @@ export const en: typeof de = {
 		'DE-SH': 'Schleswig-Holstein',
 		'DE-TH': 'Thuringia',
 		AT: 'Austria',
-		CH: 'Switzerland'
+		CH: 'Switzerland (nationwide)'
 	},
 	import: {
 		open: 'Import public holidays',
