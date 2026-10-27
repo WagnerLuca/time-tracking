@@ -171,7 +171,7 @@
 	}
 
 	function navLinkClass(path: string) {
-		return `whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm xl:px-3 font-medium no-underline transition-colors ${isActive(path) ? 'bg-base-200 text-base-content' : 'text-base-content/70 hover:bg-base-200/60 hover:text-base-content'}`;
+		return `whitespace-nowrap rounded-lg px-2 py-1.5 text-sm xl:px-3 font-medium no-underline transition-colors ${isActive(path) ? 'bg-base-200 text-base-content' : 'text-base-content/70 hover:bg-base-200/60 hover:text-base-content'}`;
 	}
 
 	/** Everyday destinations first; administration sits behind the one "Organisation" entry. */
@@ -268,18 +268,19 @@
 					<rect x="68" y="4" width="20" height="10" rx="5" style="fill: var(--accent-time)" />
 					<polyline points="6,26 24,88 42,30 60,88 78,26 78,88 96,88" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
 				</svg>
-				<span class="font-display text-lg font-bold tracking-tighter max-sm:hidden lg:max-2xl:hidden"><span class="opacity-60">WL</span> {t('nav.brand')}</span>
+				<!-- Only between sm and lg, where the links are in the bottom bar: the nav is max-w-6xl at every width, so from lg the links need the room -->
+				<span class="font-display text-lg font-bold tracking-tighter max-sm:hidden lg:hidden"><span class="opacity-60">WL</span> {t('nav.brand')}</span>
 			</a>
 
-			<!-- Org switcher -->
-			<!-- May shrink (the name truncates) so it never runs into the links at lg -->
-			<div class="relative z-50 min-w-0 max-w-44">
+			<!-- Org switcher: never squeezed by the links; only a name longer than 11rem truncates -->
+			<div class="relative z-50 shrink-0 max-w-44">
 				<button
 					type="button"
 					class="flex min-h-11 max-w-full items-center gap-1 truncate rounded-md bg-base-200 px-2.5 text-xs font-medium text-base-content/80 hover:bg-base-300 lg:min-h-8"
 					aria-haspopup="menu"
 					aria-expanded={openMenu === 'org'}
 					aria-label={orgContext.selectedOrg ? t('nav.org.current', { name: orgContext.selectedOrg.name ?? '' }) : t('nav.org.switch')}
+					title={orgContext.selectedOrg?.name ?? undefined}
 					onclick={() => toggleMenu('org')}
 				>
 					<span class="truncate">{orgContext.selectedOrg?.name ?? t('nav.org.none')}</span>
@@ -302,8 +303,9 @@
 			</div>
 
 			<div class="hidden flex-1 items-center gap-1 lg:flex xl:gap-2">
+				<!-- "Anfragen" only from xl: between lg and xl there is no room next to a running timer, and the bell opens the same page -->
 				{#each navLinks as link (link.href)}
-					<a href={link.href} class={navLinkClass(link.href)} aria-current={isActive(link.href) ? 'page' : undefined}>
+					<a href={link.href} class="{navLinkClass(link.href)} {link.icon === 'inbox' ? 'max-xl:hidden' : ''}" aria-current={isActive(link.href) ? 'page' : undefined}>
 						{link.label}{#if link.icon === 'inbox' && inbox.toApprove.length > 0}<span class="badge badge-error badge-xs ml-1.5">{inbox.toApprove.length}</span>{/if}
 					</a>
 				{/each}
@@ -326,19 +328,20 @@
 					{/if}
 				</a>
 
-				<div class="max-sm:hidden">{@render languageToggle()}</div>
+				<!-- From lg the links need the room: the toggle moves into the user menu (below lg it is also in "Mehr") -->
+				<div class="max-sm:hidden lg:hidden">{@render languageToggle()}</div>
 
 				<!-- User menu -->
 				<div class="relative z-50 max-lg:hidden">
-					<button type="button" class="btn btn-ghost btn-sm max-w-40 truncate font-medium" aria-haspopup="menu" aria-expanded={openMenu === 'user'} aria-label={t('nav.userMenu')} title={`${auth.user?.firstName ?? ''} ${auth.user?.lastName ?? ''}`} onclick={() => toggleMenu('user')}>
-						<!-- The name from xl; an icon between lg and xl keeps room for the links -->
-						<span class="truncate max-xl:hidden">{auth.user?.firstName} {auth.user?.lastName}</span>
-						<span class="xl:hidden"><NavIcon name="user" /></span>
+					<button type="button" class="btn btn-ghost btn-sm btn-square" aria-haspopup="menu" aria-expanded={openMenu === 'user'} aria-label={t('nav.userMenu')} title={`${auth.user?.firstName ?? ''} ${auth.user?.lastName ?? ''}`} onclick={() => toggleMenu('user')}>
+						<!-- An icon, not the name: the bar is max-w-6xl at every width and the links, timer and org name come first -->
+						<NavIcon name="user" />
 					</button>
 					{#if openMenu === 'user'}
 						<ul class="menu popover origin-top-right absolute right-0 top-full mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl" role="menu">
-							<li class="menu-title truncate">{auth.user?.email}</li>
+							<li class="menu-title truncate">{auth.user?.firstName} {auth.user?.lastName}<br /><span class="font-normal">{auth.user?.email}</span></li>
 							<li role="none"><a role="menuitem" href="/settings" class={isActive('/settings') ? 'menu-active' : ''}>{t('nav.settings')}</a></li>
+							<li role="none"><div class="flex items-center justify-between">{t('nav.language')} {@render languageToggle()}</div></li>
 							<li role="none"><button type="button" role="menuitem" onclick={handleLogout}>{t('nav.signOut')}</button></li>
 						</ul>
 					{/if}
