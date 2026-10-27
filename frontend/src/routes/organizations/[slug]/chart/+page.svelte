@@ -342,7 +342,7 @@
 			>
 				{#if hasChildren}
 					<span data-toggle class="oc-toggle" aria-hidden="true" title={open ? t('orgChart.collapse', { name: isBranch ? groupTitle(node) : '' }) : t('orgChart.expand', { name: isBranch ? groupTitle(node) : '' })}>
-						<svg class="w-4 h-4 transition-transform" class:-rotate-90={!open} viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+						<svg class="w-4 h-4" class:-rotate-90={!open} viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
 					</span>
 				{/if}
 				{#if node.kind === 'person'}
