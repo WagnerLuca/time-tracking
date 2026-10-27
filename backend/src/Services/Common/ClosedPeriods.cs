@@ -296,7 +296,7 @@ public static class ClosedPeriods
                     break;
                 case RequestType.WorkScheduleChange when r.RequestData != null:
                     if (JsonSerializer.Deserialize<WorkScheduleChangeRequestData>(r.RequestData, RequestDataJson) is { } schedule)
-                        ranges.Add((schedule.ValidFrom, schedule.ValidTo));
+                        ranges.Add((schedule.ValidFrom, null));
                     break;
                 case RequestType.CsvImport when r.RequestData != null:
                     foreach (var row in JsonSerializer.Deserialize<CsvImportRequestData>(r.RequestData, RequestDataJson)?.Entries ?? [])

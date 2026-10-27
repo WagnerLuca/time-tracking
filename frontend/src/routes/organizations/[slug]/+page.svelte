@@ -9,9 +9,8 @@
 	import { workScheduleApi, absenceDayApi, notificationsApi, groupApi } from '$lib/apiClient';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
 	import { isOrgAdmin, ruleMode } from '$lib/utils/orgRules';
-	import SchedulePeriodEditor from '$lib/components/SchedulePeriodEditor.svelte';
+	import WorkSchedulePlan from '$lib/components/WorkSchedulePlan.svelte';
 	import InitialOvertimeEditor from '$lib/components/InitialOvertimeEditor.svelte';
-	import MemberSchedule from '$lib/components/member/MemberSchedule.svelte';
 	import MemberVacation from '$lib/components/member/MemberVacation.svelte';
 	import MemberAbsences from '$lib/components/member/MemberAbsences.svelte';
 	import type {
@@ -174,7 +173,8 @@
 
 			{#if myMember}
 				<div class="flex flex-col gap-4">
-					<MemberSchedule schedule={workSchedule} error={scheduleError} />
+					{#if scheduleError}<div class="alert alert-error text-sm">{scheduleError}</div>{/if}
+					<WorkSchedulePlan {orgSlug} mode={workSchedule?.workScheduleChangeMode} onchanged={loadSchedule} />
 					{#if workSchedule}
 						<InitialOvertimeEditor
 							{orgSlug}
@@ -196,14 +196,6 @@
 						{absenceTypes}
 						onchanged={reloadOrg}
 					/>
-					{#if workSchedule}
-						<SchedulePeriodEditor
-							{orgSlug}
-							editable={workSchedule.workScheduleChangeMode === 'Allowed'}
-							mode={workSchedule.workScheduleChangeMode}
-							onchanged={loadSchedule}
-						/>
-					{/if}
 				</div>
 			{/if}
 	{/if}

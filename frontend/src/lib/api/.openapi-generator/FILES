@@ -28,12 +28,14 @@ docs/AuthResponse.md
 docs/BadgeCardResponse.md
 docs/BalanceResponse.md
 docs/ChangePasswordRequest.md
+docs/ChangeWorkScheduleRequest.md
 docs/CloseMonthsRequest.md
 docs/ClosedPeriodEventResponse.md
 docs/ClosedPeriodsApi.md
 docs/ClosedPeriodsResponse.md
 docs/ComplianceDayResponse.md
 docs/CoreHoursMode.md
+docs/CorrectWorkScheduleRequest.md
 docs/CreateAbsenceDayRequest.md
 docs/CreateAbsenceRangeRequest.md
 docs/CreateApiKeyRequest.md
@@ -45,7 +47,6 @@ docs/CreateMemberEntryRequest.md
 docs/CreateOrgRequestRequest.md
 docs/CreateOrganizationRequest.md
 docs/CreatePauseRuleRequest.md
-docs/CreateWorkScheduleRequest.md
 docs/CreatedApiKeyResponse.md
 docs/DayBalance.md
 docs/DeleteAbsencesRequest.md
@@ -172,7 +173,6 @@ docs/UpdateOrganizationSettingsRequest.md
 docs/UpdatePauseRuleRequest.md
 docs/UpdateProfileRequest.md
 docs/UpdateTimeEntryRequest.md
-docs/UpdateWorkScheduleRequest.md
 docs/UpsertAbsenceTypeDefinitionRequest.md
 docs/UserInfo.md
 docs/UserNotificationResponse.md
@@ -184,6 +184,7 @@ docs/VerifyEmailRequest.md
 docs/VisibilityRuleRequest.md
 docs/VisibilityRuleResponse.md
 docs/WorkScheduleApi.md
+docs/WorkSchedulePlanResponse.md
 docs/WorkScheduleResponse.md
 git_push.sh
 index.ts

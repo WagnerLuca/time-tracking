@@ -311,6 +311,15 @@ public record WorkScheduleResponseDto
     public string WorkScheduleChangeMode { get; init; } = "";
 }
 
+/// <summary>A member's schedules as current / future / history (issue #82).</summary>
+public record WorkSchedulePlanResponseDto
+{
+    public WorkScheduleResponseDto? Current { get; init; }
+    public WorkScheduleResponseDto? Future { get; init; }
+    public List<WorkScheduleResponseDto> History { get; init; } = [];
+    public bool CurrentInClosedMonth { get; init; }
+}
+
 public record HolidayResponseDto
 {
     public int Id { get; init; }

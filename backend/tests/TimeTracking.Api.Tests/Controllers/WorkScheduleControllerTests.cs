@@ -6,8 +6,8 @@ using TimeTracking.Api.Tests.Infrastructure;
 namespace TimeTracking.Api.Tests.Controllers;
 
 /// <summary>
-/// Integration tests for WorkSchedule controller: self-service CRUD,
-/// admin CRUD, initial overtime, and mode enforcement.
+/// Integration tests for WorkSchedule controller: self-service change / cancel (issue #82),
+/// an admin's change for a member, initial overtime, and mode enforcement.
 /// </summary>
 public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
 {
@@ -41,10 +41,10 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
     }
 
-    // ── Self-service: Create ─────────────────────────────────────────────
+    // ── Self-service: Change ─────────────────────────────────────────────
 
     [Fact]
-    public async Task CreateMyWorkSchedule_WhenAllowed_Returns201()
+    public async Task ChangeMyWorkSchedule_WhenAllowed_ReturnsThePlan()
     {
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
@@ -58,29 +58,29 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
             workScheduleChangeMode = 2 // Allowed
         });
 
-        var response = await client.PostAsJsonAsync("/api/v1/organizations/ws-create-test/work-schedules", new
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/ws-create-test/work-schedule/change", new
         {
             validFrom = "2026-04-01",
             weeklyWorkHours = 40.0,
             distributeEvenly = true
         });
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var schedule = await response.Content.ReadFromJsonAsync<WorkScheduleResponseDto>(TestHelpers.JsonOptions);
+        var schedule = (await response.Content.ReadFromJsonAsync<WorkSchedulePlanResponseDto>(TestHelpers.JsonOptions))!.Current;
         schedule!.WeeklyWorkHours.Should().Be(40.0);
         schedule.TargetMon.Should().Be(8.0);
         schedule.TargetTue.Should().Be(8.0);
     }
 
     [Fact]
-    public async Task CreateMyWorkSchedule_WithManualTargets_Succeeds()
+    public async Task ChangeMyWorkSchedule_WithManualTargets_Succeeds()
     {
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "WS Manual Test", "ws-manual-test");
         await client.PutAsJsonAsync("/api/v1/Organizations/ws-manual-test/settings", new { workScheduleChangeMode = 2 });
 
-        var response = await client.PostAsJsonAsync("/api/v1/organizations/ws-manual-test/work-schedules", new
+        var response = await client.PostAsJsonAsync("/api/v1/organizations/ws-manual-test/work-schedule/change", new
         {
             validFrom = "2026-05-01",
             distributeEvenly = false,
@@ -90,71 +90,69 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
             targetThu = 8.0,
             targetFri = 0.0
         });
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var schedule = await response.Content.ReadFromJsonAsync<WorkScheduleResponseDto>(TestHelpers.JsonOptions);
+        var schedule = (await response.Content.ReadFromJsonAsync<WorkSchedulePlanResponseDto>(TestHelpers.JsonOptions))!.Current;
         schedule!.TargetFri.Should().Be(0.0);
         schedule.TargetMon.Should().Be(8.0);
     }
 
-    // ── Self-service: Update ─────────────────────────────────────────────
+    // ── Self-service: Change again, cancel the future one ────────────────
 
     [Fact]
-    public async Task UpdateMyWorkSchedule_Succeeds()
+    public async Task ChangeMyWorkSchedule_Again_EndsThePreviousOne()
     {
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "WS Update Test", "ws-update-test");
         await client.PutAsJsonAsync("/api/v1/Organizations/ws-update-test/settings", new { workScheduleChangeMode = 2 });
 
-        // Create a schedule
-        var createResp = await client.PostAsJsonAsync("/api/v1/organizations/ws-update-test/work-schedules", new
+        (await client.PostAsJsonAsync("/api/v1/organizations/ws-update-test/work-schedule/change", new
         {
             validFrom = "2026-06-01",
             weeklyWorkHours = 35.0,
             distributeEvenly = true
+        })).EnsureSuccessStatusCode();
+
+        // Without a first day the change starts today
+        var changeResp = await client.PostAsJsonAsync("/api/v1/organizations/ws-update-test/work-schedule/change", new
+        {
+            weeklyWorkHours = 30.0,
+            distributeEvenly = true
         });
-        var created = await createResp.Content.ReadFromJsonAsync<WorkScheduleResponseDto>(TestHelpers.JsonOptions);
+        changeResp.EnsureSuccessStatusCode();
 
-        // Update it
-        var updateResp = await client.PutAsJsonAsync(
-            $"/api/v1/organizations/ws-update-test/work-schedules/{created!.Id}", new
-            {
-                weeklyWorkHours = 30.0,
-                distributeEvenly = true
-            });
-        updateResp.EnsureSuccessStatusCode();
-
-        var updated = await updateResp.Content.ReadFromJsonAsync<WorkScheduleResponseDto>(TestHelpers.JsonOptions);
-        updated!.WeeklyWorkHours.Should().Be(30.0);
+        var plan = await changeResp.Content.ReadFromJsonAsync<WorkSchedulePlanResponseDto>(TestHelpers.JsonOptions);
+        plan!.Current!.WeeklyWorkHours.Should().Be(30.0);
+        plan.History.Should().ContainSingle().Which.WeeklyWorkHours.Should().Be(35.0);
     }
 
-    // ── Self-service: Delete ─────────────────────────────────────────────
-
     [Fact]
-    public async Task DeleteMyWorkSchedule_Returns204()
+    public async Task CancelMyFutureWorkSchedule_ReturnsThePlanWithoutIt()
     {
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
         await TestHelpers.CreateOrganizationAsync(client, "WS Delete Test", "ws-delete-test");
         await client.PutAsJsonAsync("/api/v1/Organizations/ws-delete-test/settings", new { workScheduleChangeMode = 2 });
 
-        var createResp = await client.PostAsJsonAsync("/api/v1/organizations/ws-delete-test/work-schedules", new
+        var createResp = await client.PostAsJsonAsync("/api/v1/organizations/ws-delete-test/work-schedule/change", new
         {
-            validFrom = "2026-07-01",
+            validFrom = DateTime.UtcNow.AddMonths(1).ToString("yyyy-MM-dd"),
             weeklyWorkHours = 40.0,
             distributeEvenly = true
         });
-        var created = await createResp.Content.ReadFromJsonAsync<WorkScheduleResponseDto>(TestHelpers.JsonOptions);
+        createResp.EnsureSuccessStatusCode();
+        (await createResp.Content.ReadFromJsonAsync<WorkSchedulePlanResponseDto>(TestHelpers.JsonOptions))!.Future.Should().NotBeNull();
 
-        var deleteResp = await client.DeleteAsync($"/api/v1/organizations/ws-delete-test/work-schedules/{created!.Id}");
-        deleteResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var deleteResp = await client.DeleteAsync("/api/v1/organizations/ws-delete-test/work-schedule/future");
+        deleteResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await deleteResp.Content.ReadFromJsonAsync<WorkSchedulePlanResponseDto>(TestHelpers.JsonOptions))!.Future.Should().BeNull();
     }
 
     // ── Disabled mode ────────────────────────────────────────────────────
 
     [Fact]
-    public async Task CreateMyWorkSchedule_WhenDisabled_ReturnsForbidden()
+    public async Task ChangeMyWorkSchedule_WhenDisabled_ReturnsForbidden()
     {
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
@@ -172,9 +170,8 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         TestHelpers.SetBearerToken(newClient, newUser.AccessToken);
 
-        var response = await newClient.PostAsJsonAsync("/api/v1/organizations/ws-disabled-test/work-schedules", new
+        var response = await newClient.PostAsJsonAsync("/api/v1/organizations/ws-disabled-test/work-schedule/change", new
         {
-            validFrom = "2026-08-01",
             weeklyWorkHours = 40.0,
             distributeEvenly = true
         });
@@ -185,7 +182,7 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
     // ── Admin: Manage member schedules ───────────────────────────────────
 
     [Fact]
-    public async Task AdminCreateMemberSchedule_Succeeds()
+    public async Task AdminChangeMemberSchedule_Succeeds()
     {
         var client = _factory.CreateClient();
         await TestHelpers.AuthenticateAsync(client, TestHelpers.SeedOwnerEmail, TestHelpers.SeedPassword);
@@ -196,15 +193,15 @@ public class WorkScheduleControllerTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.AddMemberAsync(_factory, client, "admin-ws-test", tomLogin);
 
         var response = await client.PostAsJsonAsync(
-            $"/api/v1/organizations/admin-ws-test/members/{tomLogin.User.Id}/work-schedules", new
+            $"/api/v1/organizations/admin-ws-test/members/{tomLogin.User.Id}/work-schedule/change", new
             {
                 validFrom = "2026-09-01",
                 weeklyWorkHours = 20.0,
                 distributeEvenly = true
             });
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var schedule = await response.Content.ReadFromJsonAsync<WorkScheduleResponseDto>(TestHelpers.JsonOptions);
+        var schedule = (await response.Content.ReadFromJsonAsync<WorkSchedulePlanResponseDto>(TestHelpers.JsonOptions))!.Current;
         schedule!.WeeklyWorkHours.Should().Be(20.0);
         schedule.UserId.Should().Be(tomLogin.User.Id);
     }

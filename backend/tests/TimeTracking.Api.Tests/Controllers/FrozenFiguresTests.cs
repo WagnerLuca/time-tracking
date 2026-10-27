@@ -47,7 +47,7 @@ public class FrozenFiguresTests : IClassFixture<TimeTrackingApiFactory>
         }
     }
 
-    private sealed record Org(HttpClient Owner, HttpClient Member, string Slug, int OrgId, int MemberId, int ScheduleId, int TypeId,
+    private sealed record Org(HttpClient Owner, HttpClient Member, string Slug, int OrgId, int MemberId, int TypeId,
         int EntryId, DateOnly Month, Days D);
 
     /// <summary>All figures of a month as every consumer shows them.</summary>
@@ -82,10 +82,8 @@ public class FrozenFiguresTests : IClassFixture<TimeTrackingApiFactory>
         var (owner, member, slug, orgId, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, prefix,
             new { editPastEntriesMode = Allowed, workScheduleChangeMode = Allowed, memberTimeEntryVisibility = true }, "frozen.test");
 
-        var schedule = await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedules",
-            new { validFrom = Key(month.AddMonths(-1)), weeklyWorkHours = 40.0, distributeEvenly = true });
-        schedule.StatusCode.Should().BeOneOf([HttpStatusCode.OK, HttpStatusCode.Created], await schedule.Content.ReadAsStringAsync());
-        var scheduleId = (await schedule.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+        await OkAsync(await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/change",
+            new { validFrom = Key(month.AddMonths(-1)), weeklyWorkHours = 40.0, distributeEvenly = true }));
 
         var type = await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/absence-types", new { name = "Training", creditMode = FullCredit });
         type.EnsureSuccessStatusCode();
@@ -99,7 +97,7 @@ public class FrozenFiguresTests : IClassFixture<TimeTrackingApiFactory>
         (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/absences/admin",
             new { userId = memberId, date = Key(d.Custom), type = 2, customTypeId = typeId })).EnsureSuccessStatusCode();
 
-        return new Org(owner, member, slug, orgId, memberId, scheduleId, typeId, entryId, month, d);
+        return new Org(owner, member, slug, orgId, memberId, typeId, entryId, month, d);
     }
 
     private static async Task<int> ManualAsync(HttpClient client, int orgId, DateTime start, DateTime end)
@@ -260,16 +258,17 @@ public class FrozenFiguresTests : IClassFixture<TimeTrackingApiFactory>
     {
         var o = await SetupAsync("ff-sched");
         var (before, balance) = await CloseAndSnapshotAsync(o);
-        var url = $"/api/v1/organizations/{o.Slug}/members/{o.MemberId}/work-schedules/{o.ScheduleId}";
-        var body = new { weeklyWorkHours = 20.0, distributeEvenly = true };
+        // Issue #82: a change never starts in a closed month, but one from an open day before it reaches into it
+        var url = $"/api/v1/organizations/{o.Slug}/members/{o.MemberId}/work-schedule/change";
+        var body = new { validFrom = Key(o.Month.AddMonths(-1).AddDays(1)), weeklyWorkHours = 20.0, distributeEvenly = true };
 
-        var refused = await o.Owner.PutAsJsonAsync(url, body);
+        var refused = await o.Owner.PostAsJsonAsync(url, body);
         refused.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await refused.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("period.reasonRequired");
         (await FiguresAsync(o, o.Month)).Should().BeEquivalentTo(before);
         (await BalanceAsync(o)).Should().BeApproximately(balance, 0.001);
 
-        await OkAsync(await o.Owner.SendAsync(WithReason(HttpMethod.Put, url, body, "Vertrag rückwirkend")));
+        await OkAsync(await o.Owner.SendAsync(WithReason(HttpMethod.Post, url, body, "Vertrag rückwirkend")));
 
         // The month's frozen figures follow the change (4 h per day instead of 8)
         var after = await FiguresAsync(o, o.Month);

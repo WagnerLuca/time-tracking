@@ -70,10 +70,10 @@ public class RequestPathsTests : IClassFixture<TimeTrackingApiFactory>
         (await AskAsync(member, slug, EditPause, "30", a)).StatusCode.Should().Be(HttpStatusCode.Conflict);   // same entry, other value
         await IdOf(await AskAsync(member, slug, EditPause, "15", b));                                          // other entry
 
-        var schedule = JsonSerializer.Serialize(new { validFrom = "2026-01-01", weeklyWorkHours = 20 });
+        var schedule = JsonSerializer.Serialize(new { validFrom = "2099-01-01", weeklyWorkHours = 20 });
         await IdOf(await AskAsync(member, slug, WorkScheduleChange, schedule));
         (await AskAsync(member, slug, WorkScheduleChange, schedule)).StatusCode.Should().Be(HttpStatusCode.Conflict);
-        await IdOf(await AskAsync(member, slug, WorkScheduleChange, JsonSerializer.Serialize(new { validFrom = "2026-02-01", weeklyWorkHours = 20 })));
+        await IdOf(await AskAsync(member, slug, WorkScheduleChange, JsonSerializer.Serialize(new { validFrom = "2099-02-01", weeklyWorkHours = 20 })));
     }
 
     [Fact]

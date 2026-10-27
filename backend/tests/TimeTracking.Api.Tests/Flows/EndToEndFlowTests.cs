@@ -151,13 +151,13 @@ public class EndToEndFlowTests : IClassFixture<TimeTrackingApiFactory>
         // Owner creates work schedule for employee
 
         var scheduleResp = await ownerClient.PostAsJsonAsync(
-            $"/api/v1/organizations/multi-user-org/members/{empLogin.User.Id}/work-schedules", new
+            $"/api/v1/organizations/multi-user-org/members/{empLogin.User.Id}/work-schedule/change", new
             {
                 validFrom = "2026-01-01",
                 weeklyWorkHours = 40.0,
                 distributeEvenly = true
             });
-        scheduleResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        scheduleResp.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     /// <summary>

@@ -41,7 +41,7 @@ public class FrozenFiguresPostgresTests
     {
         var (owner, member, slug, orgId, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, prefix,
             new { editPastEntriesMode = 2, memberTimeEntryVisibility = adminsSeeHours }, "pg.test");
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/change",
             new { validFrom = Key(LastMonth.AddMonths(-1)), weeklyWorkHours = 40.0, distributeEvenly = true })).EnsureSuccessStatusCode();
         var worked = Weekdays[1];
         var manual = await member.PostAsJsonAsync("/api/v1/TimeTracking/manual",

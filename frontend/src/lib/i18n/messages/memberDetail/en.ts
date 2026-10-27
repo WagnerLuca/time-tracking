@@ -10,7 +10,6 @@ export const en: typeof de = {
 	absenceTypesFailed: 'Could not load the absence types.',
 	permissionsFailed: 'Could not load the permissions.',
 	overviewFailed: 'Could not load the time overview.',
-	scheduleFailed: 'Could not load the work schedule.',
 	header: {
 		joined: 'Joined {date}',
 		you: 'You',

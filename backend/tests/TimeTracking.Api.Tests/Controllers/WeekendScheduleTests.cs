@@ -19,13 +19,13 @@ public class WeekendScheduleTests : IClassFixture<TimeTrackingApiFactory>
         var (owner, login) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "weekend@test.com");
         var org = await TestHelpers.CreateOrganizationAsync(owner, "Weekend Shop", "weekend-shop");
 
-        var schedule = await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedules", new
+        var schedule = await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedule/change", new
         {
             validFrom = "2026-01-01", weeklyWorkHours = 40, distributeEvenly = false,
             targetMon = 0, targetTue = 8, targetWed = 8, targetThu = 8, targetFri = 8, targetSat = 8, targetSun = 0
         });
         schedule.EnsureSuccessStatusCode();
-        (await schedule.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("targetSat").GetDouble().Should().Be(8);
+        (await schedule.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("current").GetProperty("targetSat").GetDouble().Should().Be(8);
 
         (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/holidays",
             new { date = "2026-03-11", name = "Betriebsfeier", isRecurring = false })).EnsureSuccessStatusCode();

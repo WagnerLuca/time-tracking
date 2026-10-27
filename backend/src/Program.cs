@@ -357,6 +357,9 @@ using (var scope = app.Services.CreateScope())
 
         // Issue #81: months closed before frozen figures existed are frozen once, from the data as it is now
         await FrozenFigures.FreezeUnfrozenAsync(context, services.GetRequiredService<ILogger<Program>>());
+        // Issue #82: work schedules in the model (contiguous periods, one future one at most) — after the freeze, so closed
+        // months keep their figures; idempotent, logs what it changed
+        await WorkSchedulePlan.NormalizeAllAsync(context, services.GetRequiredService<ILogger<Program>>());
     }
     catch (Exception ex)
     {

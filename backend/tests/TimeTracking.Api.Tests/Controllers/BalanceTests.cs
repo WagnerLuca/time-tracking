@@ -26,7 +26,7 @@ public class BalanceTests : IClassFixture<TimeTrackingApiFactory>
 
         var today = OrgClock.For("Europe/Berlin").Today();
         var monthStart = new DateOnly(today.Year, today.Month, 1);
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedule/change",
             new { validFrom = monthStart.AddMonths(-1).ToString("yyyy-MM-dd"), weeklyWorkHours = 40, distributeEvenly = true })).EnsureSuccessStatusCode();
         var rows = new List<object> { new { date = today.ToString("yyyy-MM-dd"), startTime = "08:00", endTime = "12:00", pauseMinutes = 0, description = "today" } };
         if (monthStart < today)   // on the 1st, "today" already is the month start
@@ -80,7 +80,7 @@ public class BalanceTests : IClassFixture<TimeTrackingApiFactory>
         (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/members/{login.User.Id}/initial-overtime",
             new { initialOvertimeHours = 2 })).EnsureSuccessStatusCode();
         var today = OrgClock.For("Europe/Berlin").Today();
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedule/change",
             new { validFrom = today.AddMonths(-3).ToString("yyyy-MM-dd"), weeklyWorkHours = 40, distributeEvenly = true })).EnsureSuccessStatusCode();
         // Tracking started six weeks ago with a long day; the export only asks for today
         (await owner.PostAsJsonAsync($"/api/v1/ExportImport/import/confirm?orgSlug={org.Slug}", new[]
@@ -128,7 +128,7 @@ public class BalanceTests : IClassFixture<TimeTrackingApiFactory>
         var org = await TestHelpers.CreateOrganizationAsync(owner, "Balance Org 3", "balance-org-3");
         (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/settings", new { csvImportMode = 2 })).EnsureSuccessStatusCode();
         var today = OrgClock.For("Europe/Berlin").Today();
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedule/change",
             new { validFrom = today.AddMonths(-2).ToString("yyyy-MM-dd"), weeklyWorkHours = 40, distributeEvenly = true })).EnsureSuccessStatusCode();
         (await owner.PostAsJsonAsync($"/api/v1/ExportImport/import/confirm?orgSlug={org.Slug}",
             new[] { new { date = today.ToString("yyyy-MM-dd"), startTime = "08:00", endTime = "10:00", pauseMinutes = 0, description = "first ever" } })).EnsureSuccessStatusCode();

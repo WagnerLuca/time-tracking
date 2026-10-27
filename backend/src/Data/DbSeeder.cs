@@ -499,7 +499,18 @@ public static class DbSeeder
                 CreatedAt = DateTime.UtcNow.AddMonths(-4)
             }
         );
-        // Tom: 40h/week
+        // Tom: 30h/week (Mon-Fri 6h) before, 40h/week since 3 months (the earlier one is his schedule history)
+        context.WorkSchedules.Add(
+            new WorkSchedule
+            {
+                UserId = tom.Id, OrganizationId = org.Id,
+                ValidFrom = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-12)),
+                ValidTo = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-3)).AddDays(-1),
+                WeeklyWorkHours = 30,
+                TargetMon = 6, TargetTue = 6, TargetWed = 6, TargetThu = 6, TargetFri = 6,
+                CreatedAt = DateTime.UtcNow.AddMonths(-12)
+            }
+        );
         context.WorkSchedules.Add(
             new WorkSchedule
             {

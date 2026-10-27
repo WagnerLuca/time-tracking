@@ -5,8 +5,15 @@ using TimeTracking.Api.Models.Dtos;
 
 namespace TimeTracking.Api.Services;
 
+/// <summary>
+/// Work schedules of a member (issue #82, <see cref="WorkSchedulePlan"/>): read the current one, all periods (calendars) or the
+/// plan (current / future / history); change from a day, cancel the future one; admins also correct the current one.
+/// </summary>
 public class WorkScheduleService : IWorkScheduleService
 {
+    public const string StartBeforeToday = "A new schedule can start today at the earliest.";
+    public const string StartInClosedMonth = "The new schedule would start in a closed month.";
+
     private readonly TimeTrackingDbContext _context;
     private readonly ILogger<WorkScheduleService> _logger;
 
@@ -45,95 +52,58 @@ public class WorkScheduleService : IWorkScheduleService
             return ServiceResult.Forbidden<List<WorkScheduleResponse>>();
 
         var schedules = await GetAllSchedulesAsync(userId, org.Id);
-        var result = schedules.Select(s => MapToResponse(s, userId, org, membership)).ToList();
-        return ServiceResult.Ok(result);
+        return ServiceResult.Ok(schedules.Select(s => MapToResponse(s, userId, org, membership)).ToList());
     }
 
-    public async Task<ServiceResult<WorkScheduleResponse>> CreateMyWorkScheduleAsync(
-        string slug, int userId, CreateWorkScheduleRequest request)
+    public async Task<ServiceResult<WorkSchedulePlanResponse>> GetMyPlanAsync(string slug, int userId)
     {
         var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound<WorkScheduleResponse>("Organization not found");
-
+            return ServiceResult.NotFound<WorkSchedulePlanResponse>("Organization not found");
         var membership = await GetMembershipAsync(userId, org.Id);
         if (membership == null)
-            return ServiceResult.Forbidden<WorkScheduleResponse>();
-
-        var ruleModeError = CheckRuleMode(
-            await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.WorkScheduleChange), "Schedule changes");
-        if (ruleModeError != null)
-            return ServiceResult.Fail<WorkScheduleResponse>(ruleModeError.Value.Type, ruleModeError.Value.Message);
-
-        var overlapError = await CheckOverlapAsync(_context, userId, org.Id, request.ValidFrom, request.ValidTo);
-        if (overlapError != null)
-            return ServiceResult.BadRequest<WorkScheduleResponse>(overlapError);
-
-        var schedule = BuildSchedule(userId, org.Id, request);
-        _context.WorkSchedules.Add(schedule);
-        await CloseOpenScheduleAsync(_context, userId, org.Id, request.ValidFrom);
-        await _context.SaveChangesAsync();
-        _logger.LogInformation("Work schedule {ScheduleId} created by user {UserId} in org {OrgSlug}", schedule.Id, userId, slug);
-
-        return ServiceResult.Ok(MapToResponse(schedule, userId, org, membership));
+            return ServiceResult.Forbidden<WorkSchedulePlanResponse>();
+        return ServiceResult.Ok(await PlanAsync(userId, org, membership));
     }
 
-    public async Task<ServiceResult<WorkScheduleResponse>> UpdateMyWorkScheduleAsync(
-        string slug, int userId, int scheduleId, UpdateWorkScheduleRequest request)
+    /// <summary>"Ändern ab …" for oneself: only while the effective rule allows it (else 403 / request); members from today on,
+    /// admins from any open day.</summary>
+    public async Task<ServiceResult<WorkSchedulePlanResponse>> ChangeMyWorkScheduleAsync(string slug, int userId, ChangeWorkScheduleRequest request)
     {
         var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound<WorkScheduleResponse>("Organization not found");
-
+            return ServiceResult.NotFound<WorkSchedulePlanResponse>("Organization not found");
         var membership = await GetMembershipAsync(userId, org.Id);
         if (membership == null)
-            return ServiceResult.Forbidden<WorkScheduleResponse>();
+            return ServiceResult.Forbidden<WorkSchedulePlanResponse>();
+        if (await RuleErrorAsync(org, userId) is { } ruleError)
+            return ServiceResult.Fail<WorkSchedulePlanResponse>(ruleError.Type, ruleError.Message);
 
-        var ruleModeError = CheckRuleMode(
-            await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.WorkScheduleChange), "Schedule changes");
-        if (ruleModeError != null)
-            return ServiceResult.Fail<WorkScheduleResponse>(ruleModeError.Value.Type, ruleModeError.Value.Message);
-
-        var schedule = await _context.WorkSchedules
-            .FirstOrDefaultAsync(s => s.Id == scheduleId && s.UserId == userId && s.OrganizationId == org.Id);
-        if (schedule == null)
-            return ServiceResult.NotFound<WorkScheduleResponse>("Work schedule not found");
-
-        var updateError = await CheckUpdateAsync(schedule, request);
-        if (updateError != null)
-            return ServiceResult.BadRequest<WorkScheduleResponse>(updateError);
-
-        ApplyUpdate(schedule, request);
-        await _context.SaveChangesAsync();
-        _logger.LogInformation("Work schedule {ScheduleId} updated by user {UserId}", scheduleId, userId);
-
-        return ServiceResult.Ok(MapToResponse(schedule, userId, org, membership));
+        var today = OrgClock.For(org).Today();
+        var from = request.ValidFrom ?? today;
+        // Admins start their own on any open day too, members today at the earliest
+        if (membership.Role >= OrganizationRole.Admin)
+        {
+            if (ClosedPeriods.FirstClosed(await ClosedPeriods.MonthsAsync(_context, org.Id), from, from) != null)
+                return ServiceResult.Conflict<WorkSchedulePlanResponse>(StartInClosedMonth, "schedule.startInClosedMonth");
+        }
+        else if (from < today)
+            return ServiceResult.BadRequest<WorkSchedulePlanResponse>(StartBeforeToday, "schedule.startBeforeToday");
+        return await ChangeAsync(org, userId, membership, from, request, request.ReplaceFuture, today, $"by user {userId}");
     }
 
-    public async Task<ServiceResult> DeleteMyWorkScheduleAsync(string slug, int userId, int scheduleId)
+    /// <summary>Cancels one's own future schedule (only while the rule allows changes).</summary>
+    public async Task<ServiceResult<WorkSchedulePlanResponse>> CancelMyFutureAsync(string slug, int userId)
     {
         var org = await _context.FindOrgBySlugAsync(slug);
         if (org == null)
-            return ServiceResult.NotFound("Organization not found");
-
+            return ServiceResult.NotFound<WorkSchedulePlanResponse>("Organization not found");
         var membership = await GetMembershipAsync(userId, org.Id);
         if (membership == null)
-            return ServiceResult.Forbidden("You are not a member of this organization.");
-
-        var ruleModeError = CheckRuleMode(
-            await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.WorkScheduleChange), "Schedule changes");
-        if (ruleModeError != null)
-            return ServiceResult.Fail(ruleModeError.Value.Type, ruleModeError.Value.Message);
-
-        var schedule = await _context.WorkSchedules
-            .FirstOrDefaultAsync(s => s.Id == scheduleId && s.UserId == userId && s.OrganizationId == org.Id);
-        if (schedule == null)
-            return ServiceResult.NotFound("Work schedule not found");
-
-        await RemoveScheduleAsync(schedule);
-        await _context.SaveChangesAsync();
-        _logger.LogInformation("Work schedule {ScheduleId} deleted by user {UserId}", scheduleId, userId);
-        return ServiceResult.Ok();
+            return ServiceResult.Forbidden<WorkSchedulePlanResponse>();
+        if (await RuleErrorAsync(org, userId) is { } ruleError)
+            return ServiceResult.Fail<WorkSchedulePlanResponse>(ruleError.Type, ruleError.Message);
+        return await CancelFutureAsync(org, userId, membership);
     }
 
     public async Task<ServiceResult<MemberInitialOvertimeResponse>> UpdateMyInitialOvertimeAsync(
@@ -164,252 +134,143 @@ public class WorkScheduleService : IWorkScheduleService
     //  Admin-managed endpoints
     // ────────────────────────────────────────────────────
 
-    public async Task<ServiceResult<WorkScheduleResponse>> GetMemberWorkScheduleAsync(
-        string slug, int callerUserId, int memberId)
+    public async Task<ServiceResult<WorkScheduleResponse>> GetMemberWorkScheduleAsync(string slug, int callerUserId, int memberId)
     {
-        var org = await _context.FindOrgBySlugAsync(slug);
-        if (org == null)
-            return ServiceResult.NotFound<WorkScheduleResponse>("Organization not found");
-
-        // Admins, the member, group admin rights and the visibility matrix (kind WorkSchedule)
-        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
-        switch (visibility.Check(memberId, MemberInfo.WorkSchedule))
-        {
-            case ServiceErrorType.NotFound:
-                return ServiceResult.NotFound<WorkScheduleResponse>("Member not found in this organization.");
-            case ServiceErrorType.Forbidden:
-                return ServiceResult.Forbidden<WorkScheduleResponse>();
-        }
-
-        var membership = await GetMembershipAsync(memberId, org.Id);
-        if (membership == null)
-            return ServiceResult.NotFound<WorkScheduleResponse>("Member not found in this organization.");
-        // The starting overtime balance is payroll data: the person and admins only
-        if (!visibility.CallerIsOrgAdmin && memberId != callerUserId)
-            membership = null;
-
-        var schedule = await GetCurrentScheduleAsync(memberId, org);
-        return ServiceResult.Ok(MapToResponse(schedule, memberId, org, membership));
+        var (org, membership, error) = await VisibleMemberAsync(slug, callerUserId, memberId);
+        if (error != null) return ServiceResult.Fail<WorkScheduleResponse>(error.Value.Type, error.Value.Message);
+        var schedule = await GetCurrentScheduleAsync(memberId, org!);
+        return ServiceResult.Ok(MapToResponse(schedule, memberId, org!, membership));
     }
 
-    public async Task<ServiceResult<List<WorkScheduleResponse>>> GetMemberWorkSchedulesAsync(
-        string slug, int callerUserId, int memberId)
+    public async Task<ServiceResult<List<WorkScheduleResponse>>> GetMemberWorkSchedulesAsync(string slug, int callerUserId, int memberId)
     {
-        var org = await _context.FindOrgBySlugAsync(slug);
-        if (org == null)
-            return ServiceResult.NotFound<List<WorkScheduleResponse>>("Organization not found");
-
-        // Admins, the member, group admin rights and the visibility matrix (kind WorkSchedule)
-        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
-        switch (visibility.Check(memberId, MemberInfo.WorkSchedule))
-        {
-            case ServiceErrorType.NotFound:
-                return ServiceResult.NotFound<List<WorkScheduleResponse>>("Member not found in this organization.");
-            case ServiceErrorType.Forbidden:
-                return ServiceResult.Forbidden<List<WorkScheduleResponse>>();
-        }
-
-        var membership = await GetMembershipAsync(memberId, org.Id);
-        if (membership == null)
-            return ServiceResult.NotFound<List<WorkScheduleResponse>>("Member not found in this organization.");
-        // The starting overtime balance is payroll data: the person and admins only
-        if (!visibility.CallerIsOrgAdmin && memberId != callerUserId)
-            membership = null;
-
-        var schedules = await GetAllSchedulesAsync(memberId, org.Id);
-        var result = schedules.Select(s => MapToResponse(s, memberId, org, membership)).ToList();
-        return ServiceResult.Ok(result);
+        var (org, membership, error) = await VisibleMemberAsync(slug, callerUserId, memberId);
+        if (error != null) return ServiceResult.Fail<List<WorkScheduleResponse>>(error.Value.Type, error.Value.Message);
+        var schedules = await GetAllSchedulesAsync(memberId, org!.Id);
+        return ServiceResult.Ok(schedules.Select(s => MapToResponse(s, memberId, org, membership)).ToList());
     }
 
-    public async Task<ServiceResult<WorkScheduleResponse>> CreateMemberWorkScheduleAsync(
-        string slug, int callerUserId, int memberId, CreateWorkScheduleRequest request)
+    public async Task<ServiceResult<WorkSchedulePlanResponse>> GetMemberPlanAsync(string slug, int callerUserId, int memberId)
     {
-        var org = await _context.FindOrgBySlugAsync(slug);
-        if (org == null)
-            return ServiceResult.NotFound<WorkScheduleResponse>("Organization not found");
+        var (org, membership, error) = await VisibleMemberAsync(slug, callerUserId, memberId);
+        if (error != null) return ServiceResult.Fail<WorkSchedulePlanResponse>(error.Value.Type, error.Value.Message);
+        return ServiceResult.Ok(await PlanAsync(memberId, org!, membership));
+    }
 
-        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
-        if (callerRole == null || callerRole < OrganizationRole.Admin)
-            return ServiceResult.Forbidden<WorkScheduleResponse>();
+    /// <summary>An admin's "Ändern ab …": from any open day (not in a closed month).</summary>
+    public async Task<ServiceResult<WorkSchedulePlanResponse>> ChangeMemberWorkScheduleAsync(
+        string slug, int callerUserId, int memberId, ChangeWorkScheduleRequest request)
+    {
+        var (org, membership, error) = await AdministeredMemberAsync(slug, callerUserId, memberId);
+        if (error != null) return ServiceResult.Fail<WorkSchedulePlanResponse>(error.Value.Type, error.Value.Message);
+        var today = OrgClock.For(org).Today();
+        var from = request.ValidFrom ?? today;
+        if (ClosedPeriods.FirstClosed(await ClosedPeriods.MonthsAsync(_context, org!.Id), from, from) != null)
+            return ServiceResult.Conflict<WorkSchedulePlanResponse>(StartInClosedMonth, "schedule.startInClosedMonth");
+        return await ChangeAsync(org, memberId, membership!, from, request, request.ReplaceFuture, today, $"by admin {callerUserId}");
+    }
 
-        var membership = await GetMembershipAsync(memberId, org.Id);
-        if (membership == null)
-            return ServiceResult.NotFound<WorkScheduleResponse>("Member not found");
-
-        var overlapError = await CheckOverlapAsync(_context, memberId, org.Id, request.ValidFrom, request.ValidTo);
-        if (overlapError != null)
-            return ServiceResult.BadRequest<WorkScheduleResponse>(overlapError);
-
-        var schedule = BuildSchedule(memberId, org.Id, request);
-        _context.WorkSchedules.Add(schedule);
-        await CloseOpenScheduleAsync(_context, memberId, org.Id, request.ValidFrom);
+    /// <summary>An admin's correction of the current schedule (typos): never into a closed month.</summary>
+    public async Task<ServiceResult<WorkSchedulePlanResponse>> CorrectMemberWorkScheduleAsync(
+        string slug, int callerUserId, int memberId, CorrectWorkScheduleRequest request)
+    {
+        var (org, membership, error) = await AdministeredMemberAsync(slug, callerUserId, memberId);
+        if (error != null) return ServiceResult.Fail<WorkSchedulePlanResponse>(error.Value.Type, error.Value.Message);
+        var refusal = await WorkSchedulePlan.StageCorrectionAsync(_context, memberId, org!.Id, request.ValidFrom, request,
+            OrgClock.For(org).Today(), await ClosedPeriods.MonthsAsync(_context, org.Id));
+        if (refusal != null) return ServiceResult.Fail<WorkSchedulePlanResponse>(refusal.Type, refusal.Message, refusal.Code);
         await _context.SaveChangesAsync();
-        _logger.LogInformation("Work schedule set for member {MemberId} in org {OrgSlug} by admin {CallerId}", memberId, slug, callerUserId);
-
-        return ServiceResult.Ok(MapToResponse(schedule, memberId, org, membership));
+        _logger.LogInformation("Current work schedule of member {MemberId} in org {OrgId} corrected by admin {CallerId}", memberId, org.Id, callerUserId);
+        return ServiceResult.Ok(await PlanAsync(memberId, org, membership!));
     }
 
-    public async Task<ServiceResult<WorkScheduleResponse>> UpdateMemberWorkScheduleAsync(
-        string slug, int callerUserId, int memberId, int scheduleId, UpdateWorkScheduleRequest request)
+    public async Task<ServiceResult<WorkSchedulePlanResponse>> CancelMemberFutureAsync(string slug, int callerUserId, int memberId)
     {
-        var org = await _context.FindOrgBySlugAsync(slug);
-        if (org == null)
-            return ServiceResult.NotFound<WorkScheduleResponse>("Organization not found");
-
-        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
-        if (callerRole == null || callerRole < OrganizationRole.Admin)
-            return ServiceResult.Forbidden<WorkScheduleResponse>();
-
-        var schedule = await _context.WorkSchedules
-            .FirstOrDefaultAsync(s => s.Id == scheduleId && s.UserId == memberId && s.OrganizationId == org.Id);
-        if (schedule == null)
-            return ServiceResult.NotFound<WorkScheduleResponse>("Work schedule not found");
-
-        var membership = await GetMembershipAsync(memberId, org.Id);
-
-        var updateError = await CheckUpdateAsync(schedule, request);
-        if (updateError != null)
-            return ServiceResult.BadRequest<WorkScheduleResponse>(updateError);
-
-        ApplyUpdate(schedule, request);
-        await _context.SaveChangesAsync();
-
-        return ServiceResult.Ok(MapToResponse(schedule, memberId, org, membership));
-    }
-
-    public async Task<ServiceResult> DeleteMemberWorkScheduleAsync(
-        string slug, int callerUserId, int memberId, int scheduleId)
-    {
-        var org = await _context.FindOrgBySlugAsync(slug);
-        if (org == null)
-            return ServiceResult.NotFound("Organization not found");
-
-        var callerRole = await _context.GetOrgRoleAsync(callerUserId, org.Id);
-        if (callerRole == null || callerRole < OrganizationRole.Admin)
-            return ServiceResult.Forbidden();
-
-        var schedule = await _context.WorkSchedules
-            .FirstOrDefaultAsync(s => s.Id == scheduleId && s.UserId == memberId && s.OrganizationId == org.Id);
-        if (schedule == null)
-            return ServiceResult.NotFound("Work schedule not found");
-
-        await RemoveScheduleAsync(schedule);
-        await _context.SaveChangesAsync();
-        return ServiceResult.Ok();
+        var (org, membership, error) = await AdministeredMemberAsync(slug, callerUserId, memberId);
+        if (error != null) return ServiceResult.Fail<WorkSchedulePlanResponse>(error.Value.Type, error.Value.Message);
+        return await CancelFutureAsync(org!, memberId, membership!);
     }
 
     // ────────────────────────────────────────────────────
     //  Private helpers
     // ────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Removes a period. Adding it had closed the period right before it, so that one now runs
-    /// over the removed range again (open-ended if the removed period was) — no silent gap.
-    /// </summary>
-    private async Task RemoveScheduleAsync(WorkSchedule schedule)
+    private async Task<ServiceResult<WorkSchedulePlanResponse>> ChangeAsync(Organization org, int userId, UserOrganization membership,
+        DateOnly from, ScheduleTargets targets, bool replaceFuture, DateOnly today, string by)
     {
-        var dayBefore = schedule.ValidFrom.AddDays(-1);
-        var predecessor = await _context.WorkSchedules.FirstOrDefaultAsync(s =>
-            s.UserId == schedule.UserId && s.OrganizationId == schedule.OrganizationId && s.ValidTo == dayBefore);
-        if (predecessor != null)
-            predecessor.ValidTo = schedule.ValidTo;
-        _context.WorkSchedules.Remove(schedule);
+        var refusal = await WorkSchedulePlan.StageChangeAsync(_context, userId, org.Id, from, targets, replaceFuture, today);
+        if (refusal != null) return ServiceResult.Fail<WorkSchedulePlanResponse>(refusal.Type, refusal.Message, refusal.Code);
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Work schedule of user {UserId} in org {OrgId} changed from {From} {By}", userId, org.Id, from, by);
+        return ServiceResult.Ok(await PlanAsync(userId, org, membership));
     }
 
-    private static (ServiceErrorType Type, string Message)? CheckRuleMode(RuleMode mode, string featureName)
+    private async Task<ServiceResult<WorkSchedulePlanResponse>> CancelFutureAsync(Organization org, int userId, UserOrganization membership)
     {
-        return mode switch
+        var refusal = await WorkSchedulePlan.StageCancelFutureAsync(_context, userId, org.Id, OrgClock.For(org).Today());
+        if (refusal != null) return ServiceResult.Fail<WorkSchedulePlanResponse>(refusal.Type, refusal.Message, refusal.Code);
+        await _context.SaveChangesAsync();
+        return ServiceResult.Ok(await PlanAsync(userId, org, membership));
+    }
+
+    private async Task<WorkSchedulePlanResponse> PlanAsync(int userId, Organization org, UserOrganization? membership)
+    {
+        var today = OrgClock.For(org).Today();
+        var state = WorkSchedulePlan.Split(await GetAllSchedulesAsync(userId, org.Id), today);
+        var closedMonths = state.Current == null ? [] : await ClosedPeriods.MonthsAsync(_context, org.Id);
+        return new WorkSchedulePlanResponse
         {
-            RuleMode.Disabled         => (ServiceErrorType.Forbidden, $"{featureName} are disabled for this organization."),
-            RuleMode.RequiresApproval => (ServiceErrorType.BadRequest, $"{featureName} require admin approval. Please submit a WorkScheduleChange request via the organization requests endpoint."),
-            _                         => null
+            Current = state.Current == null ? null : MapToResponse(state.Current, userId, org, membership),
+            Future = state.Future == null ? null : MapToResponse(state.Future, userId, org, membership),
+            History = state.History.Select(s => MapToResponse(s, userId, org, membership)).ToList(),
+            CurrentInClosedMonth = state.Current != null
+                && ClosedPeriods.FirstClosed(closedMonths, state.Current.ValidFrom, state.Current.ValidTo) != null,
+            InitialOvertimeHours = membership?.InitialOvertimeHours ?? 0,
+            InitialOvertimeMode = org.InitialOvertimeMode.ToString(),
+            WorkScheduleChangeMode = org.WorkScheduleChangeMode.ToString()
         };
     }
 
-    private static WorkSchedule BuildSchedule(int userId, int orgId, CreateWorkScheduleRequest request)
-    {
-        var schedule = new WorkSchedule
+    private async Task<(ServiceErrorType Type, string Message)?> RuleErrorAsync(Organization org, int userId) =>
+        await EffectiveRuleResolver.ResolveAsync(_context, org, userId, RequestType.WorkScheduleChange) switch
         {
-            UserId    = userId,
-            OrganizationId = orgId,
-            ValidFrom = request.ValidFrom,
-            ValidTo   = request.ValidTo,
-            WeeklyWorkHours = request.WeeklyWorkHours
+            RuleMode.Disabled => (ServiceErrorType.Forbidden, "Schedule changes are disabled for this organization."),
+            RuleMode.RequiresApproval => (ServiceErrorType.BadRequest, "Schedule changes require admin approval. Please submit a WorkScheduleChange request via the organization requests endpoint."),
+            _ => null
         };
 
-        if (request.WeeklyWorkHours.HasValue && request.DistributeEvenly)
-        {
-            var daily = Math.Round(request.WeeklyWorkHours.Value / 5.0, 2);
-            schedule.TargetMon = daily;
-            schedule.TargetTue = daily;
-            schedule.TargetWed = daily;
-            schedule.TargetThu = daily;
-            schedule.TargetFri = daily;
-        }
-        else
-        {
-            schedule.TargetMon = request.TargetMon ?? 0;
-            schedule.TargetTue = request.TargetTue ?? 0;
-            schedule.TargetWed = request.TargetWed ?? 0;
-            schedule.TargetThu = request.TargetThu ?? 0;
-            schedule.TargetFri = request.TargetFri ?? 0;
-            schedule.TargetSat = request.TargetSat ?? 0;
-            schedule.TargetSun = request.TargetSun ?? 0;
-        }
-
-        return schedule;
-    }
-
-    private static void ApplyUpdate(WorkSchedule schedule, UpdateWorkScheduleRequest request)
+    /// <summary>Org, membership (null for callers who may not see the initial overtime) — admins, the member, group admin rights and the visibility matrix (kind WorkSchedule).</summary>
+    private async Task<(Organization? Org, UserOrganization? Membership, (ServiceErrorType Type, string Message)? Error)> VisibleMemberAsync(
+        string slug, int callerUserId, int memberId)
     {
-        if (request.ValidFrom.HasValue) schedule.ValidFrom = request.ValidFrom.Value;
-        schedule.ValidTo = NewValidTo(schedule, request);
-
-        if (request.WeeklyWorkHours.HasValue)
+        var org = await _context.FindOrgBySlugAsync(slug);
+        if (org == null) return (null, null, (ServiceErrorType.NotFound, "Organization not found"));
+        var visibility = await MemberVisibility.ForCallerAsync(_context, org, callerUserId);
+        switch (visibility.Check(memberId, MemberInfo.WorkSchedule))
         {
-            schedule.WeeklyWorkHours = request.WeeklyWorkHours.Value;
-
-            if (request.DistributeEvenly)
-            {
-                var daily = Math.Round(request.WeeklyWorkHours.Value / 5.0, 2);
-                schedule.TargetMon = daily;
-                schedule.TargetTue = daily;
-                schedule.TargetWed = daily;
-                schedule.TargetThu = daily;
-                schedule.TargetFri = daily;
-                schedule.TargetSat = 0;
-                schedule.TargetSun = 0;
-            }
-            else
-            {
-                schedule.TargetMon = request.TargetMon ?? schedule.TargetMon;
-                schedule.TargetTue = request.TargetTue ?? schedule.TargetTue;
-                schedule.TargetWed = request.TargetWed ?? schedule.TargetWed;
-                schedule.TargetThu = request.TargetThu ?? schedule.TargetThu;
-                schedule.TargetFri = request.TargetFri ?? schedule.TargetFri;
-                schedule.TargetSat = request.TargetSat ?? schedule.TargetSat;
-                schedule.TargetSun = request.TargetSun ?? schedule.TargetSun;
-            }
+            case ServiceErrorType.NotFound:
+                return (org, null, (ServiceErrorType.NotFound, "Member not found in this organization."));
+            case ServiceErrorType.Forbidden:
+                return (org, null, (ServiceErrorType.Forbidden, "Forbidden"));
         }
+        var membership = await GetMembershipAsync(memberId, org.Id);
+        if (membership == null) return (org, null, (ServiceErrorType.NotFound, "Member not found in this organization."));
+        // The starting overtime balance is payroll data: the person and admins only
+        return (org, !visibility.CallerIsOrgAdmin && memberId != callerUserId ? null : membership, null);
     }
 
-    /// <summary>A missing <c>validTo</c> keeps the end; <c>clearValidTo</c> makes the period open-ended.</summary>
-    private static DateOnly? NewValidTo(WorkSchedule schedule, UpdateWorkScheduleRequest request) =>
-        request.ClearValidTo ? null : request.ValidTo ?? schedule.ValidTo;
-
-    /// <summary>The edited period must still end after it starts and fit between its neighbours.</summary>
-    private async Task<string?> CheckUpdateAsync(WorkSchedule schedule, UpdateWorkScheduleRequest request)
+    private async Task<(Organization? Org, UserOrganization? Membership, (ServiceErrorType Type, string Message)? Error)> AdministeredMemberAsync(
+        string slug, int callerUserId, int memberId)
     {
-        var from = request.ValidFrom ?? schedule.ValidFrom;
-        var to = NewValidTo(schedule, request);
-        if (to < from)
-            return "The end date must not be before the start date.";
-        // An edit closes nothing automatically, so an open neighbour counts as an overlap too
-        return await CheckOverlapAsync(_context, schedule.UserId, schedule.OrganizationId, from, to, schedule.Id, autoClose: false);
+        var org = await _context.FindOrgBySlugAsync(slug);
+        if (org == null) return (null, null, (ServiceErrorType.NotFound, "Organization not found"));
+        if (await _context.GetOrgRoleAsync(callerUserId, org.Id) is not >= OrganizationRole.Admin)
+            return (org, null, (ServiceErrorType.Forbidden, "Forbidden"));
+        var membership = await GetMembershipAsync(memberId, org.Id);
+        return membership == null ? (org, null, (ServiceErrorType.NotFound, "Member not found")) : (org, membership, null);
     }
 
-    private static WorkScheduleResponse MapToResponse(
-        WorkSchedule? schedule, int userId, Organization org, UserOrganization? membership)
+    private static WorkScheduleResponse MapToResponse(WorkSchedule? schedule, int userId, Organization org, UserOrganization? membership)
     {
         if (schedule == null)
         {
@@ -461,66 +322,13 @@ public class WorkScheduleService : IWorkScheduleService
             .FirstOrDefaultAsync();
     }
 
-    private async Task<List<WorkSchedule>> GetAllSchedulesAsync(int userId, int orgId)
-    {
-        return await _context.WorkSchedules
+    private async Task<List<WorkSchedule>> GetAllSchedulesAsync(int userId, int orgId) =>
+        await _context.WorkSchedules
             .AsNoTracking()
             .Where(s => s.UserId == userId && s.OrganizationId == orgId)
             .OrderBy(s => s.ValidFrom)
             .ToListAsync();
-    }
 
-    /// <summary>Closes the open-ended predecessor of a new period starting on <paramref name="newFrom"/> (no save). Shared with approved schedule-change requests.</summary>
-    internal static async Task CloseOpenScheduleAsync(TimeTrackingDbContext context, int userId, int orgId, DateOnly newFrom)
-    {
-        var openSchedule = await context.WorkSchedules
-            .Where(s => s.UserId == userId && s.OrganizationId == orgId
-                     && s.ValidTo == null && s.ValidFrom < newFrom)
-            .OrderByDescending(s => s.ValidFrom)
-            .FirstOrDefaultAsync();
-
-        if (openSchedule != null)
-            openSchedule.ValidTo = newFrom.AddDays(-1);
-    }
-
-    /// <summary>
-    /// Why a period [from, to] would overlap another of the member's periods, or null. Both ends are
-    /// inclusive (a shared boundary day overlaps); with <paramref name="autoClose"/> an open-ended
-    /// predecessor that <see cref="CloseOpenScheduleAsync"/> will close is no overlap.
-    /// Shared with approved schedule-change requests.
-    /// </summary>
-    internal static async Task<string?> CheckOverlapAsync(TimeTrackingDbContext context,
-        int userId, int orgId, DateOnly from, DateOnly? to, int? excludeId = null, bool autoClose = true)
-    {
-        var existing = await context.WorkSchedules
-            .AsNoTracking()
-            .Where(s => s.UserId == userId && s.OrganizationId == orgId
-                     && (excludeId == null || s.Id != excludeId))
-            .ToListAsync();
-
-        foreach (var s in existing)
-        {
-            var sEnd = s.ValidTo ?? DateOnly.MaxValue;
-            var newEnd = to ?? DateOnly.MaxValue;
-
-            // Inclusive on both ends: one period ending on the day the next starts would give that day two targets
-            if (from <= sEnd && s.ValidFrom <= newEnd)
-            {
-                if (autoClose && s.ValidTo == null && s.ValidFrom < from)
-                    continue; // Will be auto-closed
-
-                return $"This schedule overlaps with an existing one ({s.ValidFrom:yyyy-MM-dd} – " +
-                       $"{(s.ValidTo.HasValue ? s.ValidTo.Value.ToString("yyyy-MM-dd") : "ongoing")}). " +
-                       "Only one schedule at a time is allowed.";
-            }
-        }
-        return null;
-    }
-
-    private async Task<UserOrganization?> GetMembershipAsync(int userId, int orgId)
-    {
-        return await _context.UserOrganizations
-            .FirstOrDefaultAsync(uo => uo.OrganizationId == orgId && uo.UserId == userId);
-    }
-
+    private async Task<UserOrganization?> GetMembershipAsync(int userId, int orgId) =>
+        await _context.UserOrganizations.FirstOrDefaultAsync(uo => uo.OrganizationId == orgId && uo.UserId == userId);
 }

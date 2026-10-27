@@ -10,8 +10,8 @@ using TimeTracking.Api.Services;
 namespace TimeTracking.Api.Controllers;
 
 /// <summary>
-/// Manages work schedules and initial overtime for organization members.
-/// Includes self-service endpoints and admin endpoints for managing other members.
+/// Work schedules (issue #82: current, at most one future one, read-only history) and initial overtime: self-service and a
+/// member's (admins). Past periods are never edited or deleted; see <see cref="WorkSchedulePlan"/>.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
@@ -21,161 +21,101 @@ namespace TimeTracking.Api.Controllers;
 public class WorkScheduleController : OrganizationBaseController
 {
     private readonly IWorkScheduleService _service;
-    private readonly ILogger<WorkScheduleController> _logger;
 
-    public WorkScheduleController(IWorkScheduleService service, ILogger<WorkScheduleController> logger)
-    {
-        _service = service;
-        _logger = logger;
-    }
+    public WorkScheduleController(IWorkScheduleService service) => _service = service;
 
-    // ── Self endpoints (members only) ──
+    // ── Self endpoints ──
 
-    /// <summary>Get the current user's active work schedule.</summary>
-    /// <param name="slug">Organization URL slug.</param>
+    /// <summary>The current user's current work schedule (an empty one with id 0 without).</summary>
     [HttpGet("{slug}/work-schedule")]
     [RequireOrgRole]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMyWorkSchedule(string slug)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized();
-        return ToResponse(await _service.GetMyWorkScheduleAsync(slug, userId.Value));
-    }
+    public async Task<IActionResult> GetMyWorkSchedule(string slug) =>
+        GetCurrentUserId() is int userId ? ToResponse(await _service.GetMyWorkScheduleAsync(slug, userId)) : Unauthorized();
 
-    /// <summary>List all work schedules for the current user.</summary>
-    /// <param name="slug">Organization URL slug.</param>
+    /// <summary>Every period of the current user's work schedule (read-only; the calendars' targets).</summary>
     [HttpGet("{slug}/work-schedules")]
     [RequireOrgRole]
     [ProducesResponseType(typeof(List<WorkScheduleResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMyWorkSchedules(string slug)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized();
-        return ToResponse(await _service.GetMyWorkSchedulesAsync(slug, userId.Value));
-    }
+    public async Task<IActionResult> GetMyWorkSchedules(string slug) =>
+        GetCurrentUserId() is int userId ? ToResponse(await _service.GetMyWorkSchedulesAsync(slug, userId)) : Unauthorized();
 
-    /// <summary>Create a new work schedule for the current user.</summary>
-    /// <param name="slug">Organization URL slug.</param>
-    [HttpPost("{slug}/work-schedules")]
+    /// <summary>The current user's schedule as current / future / history (issue #82).</summary>
+    [HttpGet("{slug}/work-schedule/plan")]
     [RequireOrgRole]
-    [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status201Created)]
-    public async Task<IActionResult> CreateMyWorkSchedule(
-        string slug, [FromBody] CreateWorkScheduleRequest request)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized();
-        return ToCreatedResponse(await _service.CreateMyWorkScheduleAsync(slug, userId.Value, request));
-    }
+    [ProducesResponseType(typeof(WorkSchedulePlanResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMyPlan(string slug) =>
+        GetCurrentUserId() is int userId ? ToResponse(await _service.GetMyPlanAsync(slug, userId)) : Unauthorized();
 
-    /// <summary>Update a work schedule for the current user.</summary>
-    /// <param name="slug">Organization URL slug.</param>
-    /// <param name="id">Work schedule ID.</param>
-    [HttpPut("{slug}/work-schedules/{id}")]
+    /// <summary>
+    /// A new schedule from a day (default today; members today or later, admins any open day): the period before it ends the
+    /// day before; an existing future one is replaced only with <c>replaceFuture</c> (else 409 <c>schedule.futureExists</c>).
+    /// Only while the effective rule allows schedule changes (RequiresApproval: send a WorkScheduleChange request).
+    /// </summary>
+    [HttpPost("{slug}/work-schedule/change")]
     [RequireOrgRole]
-    [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> UpdateMyWorkSchedule(
-        string slug, int id, [FromBody] UpdateWorkScheduleRequest request)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized();
-        return ToResponse(await _service.UpdateMyWorkScheduleAsync(slug, userId.Value, id, request));
-    }
+    [ProducesResponseType(typeof(WorkSchedulePlanResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ChangeMyWorkSchedule(string slug, [FromBody] ChangeWorkScheduleRequest request) =>
+        GetCurrentUserId() is int userId ? ToResponse(await _service.ChangeMyWorkScheduleAsync(slug, userId, request)) : Unauthorized();
 
-    /// <summary>Delete a work schedule for the current user.</summary>
-    /// <param name="slug">Organization URL slug.</param>
-    /// <param name="id">Work schedule ID.</param>
-    [HttpDelete("{slug}/work-schedules/{id}")]
+    /// <summary>Cancels the current user's future schedule (the current one runs on); only while the rule allows changes.</summary>
+    [HttpDelete("{slug}/work-schedule/future")]
     [RequireOrgRole]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> DeleteMyWorkSchedule(string slug, int id)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized();
-        return ToResponse(await _service.DeleteMyWorkScheduleAsync(slug, userId.Value, id));
-    }
+    [ProducesResponseType(typeof(WorkSchedulePlanResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CancelMyFuture(string slug) =>
+        GetCurrentUserId() is int userId ? ToResponse(await _service.CancelMyFutureAsync(slug, userId)) : Unauthorized();
 
     /// <summary>Update the current user's initial overtime hours.</summary>
-    /// <param name="slug">Organization URL slug.</param>
     [HttpPut("{slug}/initial-overtime")]
     [RequireOrgRole]
     [ProducesResponseType(typeof(MemberInitialOvertimeResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> UpdateMyInitialOvertime(
-        string slug, [FromBody] SetInitialOvertimeRequest request)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized();
-        return ToResponse(await _service.UpdateMyInitialOvertimeAsync(slug, userId.Value, request));
-    }
+    public async Task<IActionResult> UpdateMyInitialOvertime(string slug, [FromBody] SetInitialOvertimeRequest request) =>
+        GetCurrentUserId() is int userId ? ToResponse(await _service.UpdateMyInitialOvertimeAsync(slug, userId, request)) : Unauthorized();
 
-    // ── Admin endpoints ──
+    // ── A member's (reading: admins, or per the member visibility matrix; writing: admins) ──
 
-    /// <summary>Get a specific member's active work schedule (admins, or per the member visibility matrix).</summary>
-    /// <param name="slug">Organization URL slug.</param>
-    /// <param name="memberId">Member ID.</param>
+    /// <summary>A member's current work schedule (admins, or per the member visibility matrix).</summary>
     [HttpGet("{slug}/members/{memberId}/work-schedule")]
     [RequireOrgRole]
     [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMemberWorkSchedule(string slug, int memberId)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized();
-        return ToResponse(await _service.GetMemberWorkScheduleAsync(slug, userId.Value, memberId));
-    }
+    public async Task<IActionResult> GetMemberWorkSchedule(string slug, int memberId) =>
+        GetCurrentUserId() is int userId ? ToResponse(await _service.GetMemberWorkScheduleAsync(slug, userId, memberId)) : Unauthorized();
 
-    /// <summary>List all work schedules for a specific member (admins, or per the member visibility matrix).</summary>
-    /// <param name="slug">Organization URL slug.</param>
-    /// <param name="memberId">Member ID.</param>
+    /// <summary>Every period of a member's work schedule (read-only; admins, or per the member visibility matrix).</summary>
     [HttpGet("{slug}/members/{memberId}/work-schedules")]
     [RequireOrgRole]
     [ProducesResponseType(typeof(List<WorkScheduleResponse>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetMemberWorkSchedules(string slug, int memberId)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized();
-        return ToResponse(await _service.GetMemberWorkSchedulesAsync(slug, userId.Value, memberId));
-    }
+    public async Task<IActionResult> GetMemberWorkSchedules(string slug, int memberId) =>
+        GetCurrentUserId() is int userId ? ToResponse(await _service.GetMemberWorkSchedulesAsync(slug, userId, memberId)) : Unauthorized();
 
-    /// <summary>Create a work schedule for a specific member (admin only).</summary>
-    /// <param name="slug">Organization URL slug.</param>
-    /// <param name="memberId">Member ID.</param>
-    [HttpPost("{slug}/members/{memberId}/work-schedules")]
-    [RequireOrgRole(OrganizationRole.Admin)]
-    [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status201Created)]
-    public async Task<IActionResult> CreateMemberWorkSchedule(
-        string slug, int memberId, [FromBody] CreateWorkScheduleRequest request)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized();
-        return ToCreatedResponse(await _service.CreateMemberWorkScheduleAsync(slug, userId.Value, memberId, request));
-    }
+    /// <summary>A member's schedule as current / future / history (same access as reading it).</summary>
+    [HttpGet("{slug}/members/{memberId}/work-schedule/plan")]
+    [RequireOrgRole]
+    [ProducesResponseType(typeof(WorkSchedulePlanResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMemberPlan(string slug, int memberId) =>
+        GetCurrentUserId() is int userId ? ToResponse(await _service.GetMemberPlanAsync(slug, userId, memberId)) : Unauthorized();
 
-    /// <summary>Update a work schedule for a specific member (admin only).</summary>
-    /// <param name="slug">Organization URL slug.</param>
-    /// <param name="memberId">Member ID.</param>
-    /// <param name="id">Work schedule ID.</param>
-    [HttpPut("{slug}/members/{memberId}/work-schedules/{id}")]
+    /// <summary>An admin's "change from a day" for a member: any open day (409 <c>schedule.startInClosedMonth</c> in a closed month).</summary>
+    [HttpPost("{slug}/members/{memberId}/work-schedule/change")]
     [RequireOrgRole(OrganizationRole.Admin)]
-    [ProducesResponseType(typeof(WorkScheduleResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> UpdateMemberWorkSchedule(
-        string slug, int memberId, int id, [FromBody] UpdateWorkScheduleRequest request)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized();
-        return ToResponse(await _service.UpdateMemberWorkScheduleAsync(slug, userId.Value, memberId, id, request));
-    }
+    [ProducesResponseType(typeof(WorkSchedulePlanResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ChangeMemberWorkSchedule(string slug, int memberId, [FromBody] ChangeWorkScheduleRequest request) =>
+        GetCurrentUserId() is int userId ? ToResponse(await _service.ChangeMemberWorkScheduleAsync(slug, userId, memberId, request)) : Unauthorized();
 
-    /// <summary>Delete a work schedule for a specific member (admin only).</summary>
-    /// <param name="slug">Organization URL slug.</param>
-    /// <param name="memberId">Member ID.</param>
-    /// <param name="id">Work schedule ID.</param>
-    [HttpDelete("{slug}/members/{memberId}/work-schedules/{id}")]
+    /// <summary>
+    /// An admin's correction of a member's current schedule (typos): targets and optionally its first day, retroactively —
+    /// never into a closed month (409 <c>schedule.correctionClosed</c>).
+    /// </summary>
+    [HttpPut("{slug}/members/{memberId}/work-schedule/current")]
     [RequireOrgRole(OrganizationRole.Admin)]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public async Task<IActionResult> DeleteMemberWorkSchedule(string slug, int memberId, int id)
-    {
-        var userId = GetCurrentUserId();
-        if (userId == null) return Unauthorized();
-        return ToResponse(await _service.DeleteMemberWorkScheduleAsync(slug, userId.Value, memberId, id));
-    }
+    [ProducesResponseType(typeof(WorkSchedulePlanResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CorrectMemberWorkSchedule(string slug, int memberId, [FromBody] CorrectWorkScheduleRequest request) =>
+        GetCurrentUserId() is int userId ? ToResponse(await _service.CorrectMemberWorkScheduleAsync(slug, userId, memberId, request)) : Unauthorized();
+
+    /// <summary>An admin cancels a member's future schedule.</summary>
+    [HttpDelete("{slug}/members/{memberId}/work-schedule/future")]
+    [RequireOrgRole(OrganizationRole.Admin)]
+    [ProducesResponseType(typeof(WorkSchedulePlanResponse), StatusCodes.Status200OK)]
+    public async Task<IActionResult> CancelMemberFuture(string slug, int memberId) =>
+        GetCurrentUserId() is int userId ? ToResponse(await _service.CancelMemberFutureAsync(slug, userId, memberId)) : Unauthorized();
 }

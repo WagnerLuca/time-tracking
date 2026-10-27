@@ -25,25 +25,26 @@ public class WorkScheduleRuleTests : IClassFixture<TimeTrackingApiFactory>
         return (owner, member, org.Slug, m.User.Id);
     }
 
-    private static object Schedule(string validFrom = "2026-01-01") => new { validFrom, weeklyWorkHours = 32, distributeEvenly = true };
+    /// <summary>A change from a future day (members start today at the earliest).</summary>
+    private static object Schedule() =>
+        new { validFrom = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(7).ToString("yyyy-MM-dd"), weeklyWorkHours = 32, distributeEvenly = true };
 
     [Fact]
     public async Task RequiresApproval_RejectsDirectChanges_WithAHintToRequest()
     {
         var (owner, member, slug, memberId) = await SetupAsync("ws-approval", new { workScheduleChangeMode = RequiresApproval });
 
-        var create = await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedules", Schedule());
+        var create = await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedule/change", Schedule());
         create.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await create.Content.ReadAsStringAsync()).Should().Contain("request");
 
         // An admin can still set it for the member
-        var byAdmin = await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedules", Schedule());
-        byAdmin.IsSuccessStatusCode.Should().BeTrue();
-        var id = (await byAdmin.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+        var byAdmin = await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/change", Schedule());
+        byAdmin.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await byAdmin.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("future").GetProperty("weeklyWorkHours").GetDouble().Should().Be(32);
 
-        (await member.PutAsJsonAsync($"/api/v1/organizations/{slug}/work-schedules/{id}", new { weeklyWorkHours = 20 }))
-            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await member.DeleteAsync($"/api/v1/organizations/{slug}/work-schedules/{id}"))
+        // Cancelling that future one is a change too
+        (await member.DeleteAsync($"/api/v1/organizations/{slug}/work-schedule/future"))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -51,7 +52,7 @@ public class WorkScheduleRuleTests : IClassFixture<TimeTrackingApiFactory>
     public async Task GroupOverride_AllowsScheduleChanges_WhenOrgDisablesThem()
     {
         var (owner, member, slug, memberId) = await SetupAsync("ws-group", new { workScheduleChangeMode = Disabled });
-        (await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedules", Schedule()))
+        (await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedule/change", Schedule()))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         var groupId = (await (await owner.PostAsJsonAsync($"/api/v1/Organizations/{slug}/groups", new { name = "Flex" }))
@@ -59,7 +60,7 @@ public class WorkScheduleRuleTests : IClassFixture<TimeTrackingApiFactory>
         (await owner.PostAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/members", new { userId = memberId })).EnsureSuccessStatusCode();
         (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/groups/{groupId}/permissions", new { workScheduleChangeMode = Allowed })).EnsureSuccessStatusCode();
 
-        (await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedules", Schedule())).IsSuccessStatusCode.Should().BeTrue();
+        (await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedule/change", Schedule())).IsSuccessStatusCode.Should().BeTrue();
     }
 
     [Theory]
@@ -79,9 +80,11 @@ public class WorkScheduleRuleTests : IClassFixture<TimeTrackingApiFactory>
         var (owner, member, slug, memberId) = await SetupAsync("ws-others", new { workScheduleChangeMode = Allowed });
         var (_, other) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "ws-others-x@ws.test");
 
-        (await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedules", Schedule()))
+        (await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/change", Schedule()))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{other.User.Id}/work-schedules", Schedule()))
-            .IsSuccessStatusCode.Should().BeFalse();
+        (await member.DeleteAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/future"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{other.User.Id}/work-schedule/change", Schedule()))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 }

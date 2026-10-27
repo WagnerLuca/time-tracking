@@ -145,7 +145,7 @@ public class AccountingTests : IClassFixture<TimeTrackingApiFactory>
         (await TestHelpers.AddMemberAsync(_factory, owner, slug, accLogin)).EnsureSuccessStatusCode();
         (await SetAccountantAsync(owner, slug, accLogin.User.Id, true)).EnsureSuccessStatusCode();
 
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/change",
             new { validFrom = LastMonth.AddMonths(-1).ToString("yyyy-MM-dd"), weeklyWorkHours = 40 })).EnsureSuccessStatusCode();
         var workDay = Weekday(LastMonth, 3);
         var created = await member.PostAsJsonAsync("/api/v1/TimeTracking/manual",

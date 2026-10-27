@@ -150,8 +150,17 @@ export const de = {
 		wrongEmail: 'Diese Einladung wurde an eine andere E-Mail-Adresse geschickt. Melde dich mit dieser Adresse an, um sie anzunehmen.'
 	},
 	schedule: {
-		notFound: 'Arbeitszeitmodell nicht gefunden.',
-		overlap: 'Dieser Zeitraum überschneidet sich mit einem bestehenden Arbeitszeitmodell. Es darf immer nur eines gelten.'
+		beforeCurrent: 'Eine Änderung muss nach dem ersten Tag des aktuellen Arbeitszeitmodells beginnen. Korrigiere sonst das aktuelle.',
+		futureExists: 'Es gibt schon ein geplantes Arbeitszeitmodell. Ersetze oder verwirf es zuerst.',
+		correctionClosed: 'Das aktuelle Arbeitszeitmodell reicht in einen abgeschlossenen Monat. Ändere es stattdessen ab einem späteren Tag.',
+		startBeforeToday: 'Ein neues Arbeitszeitmodell kann frühestens heute beginnen.',
+		startInClosedMonth: 'Das neue Arbeitszeitmodell würde in einem abgeschlossenen Monat beginnen.',
+		startAfterToday: 'Das aktuelle Arbeitszeitmodell kann nicht nach heute beginnen.',
+		beforePrevious: 'Das aktuelle Arbeitszeitmodell muss nach dem ersten Tag des vorherigen beginnen.',
+		noCurrent: 'Es gibt kein aktuelles Arbeitszeitmodell.',
+		noFuture: 'Es gibt kein geplantes Arbeitszeitmodell.',
+		weeklyRange: 'Die Wochenstunden müssen zwischen 0 und 80 liegen.',
+		dailyRange: 'Das Soll pro Tag muss zwischen 0 und 24 Stunden liegen.'
 	},
 	overtime: {
 		initialDisabled: 'Anfangsüberstunden sind in dieser Organisation deaktiviert.',
