@@ -162,15 +162,16 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ITotpService, TotpService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-// Email: SMTP when Email:Smtp:Host is set, otherwise mails (with their links) go to the log
+// Email: SMTP when configured; otherwise either log or discard mail according to configuration.
 var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>() ?? new EmailSettings();
-// The log fallback writes whole mails — reset and invitation links included — so it is
-// development-only; a real deployment must configure SMTP
-if (string.IsNullOrWhiteSpace(emailSettings.Smtp.Host) && !isDevOrTest)
-    throw new InvalidOperationException("Email:Smtp:Host is not configured. Set Email__Smtp__Host (and credentials) so password reset and invitation mails can be sent.");
 builder.Services.AddSingleton(emailSettings);
 if (string.IsNullOrWhiteSpace(emailSettings.Smtp.Host))
-    builder.Services.AddSingleton<IEmailSender, LogEmailSender>();
+{
+    if (emailSettings.LogWhenSmtpUnconfigured)
+        builder.Services.AddSingleton<IEmailSender, LogEmailSender>();
+    else
+        builder.Services.AddSingleton<IEmailSender, DiscardEmailSender>();
+}
 else
     builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
