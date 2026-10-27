@@ -83,6 +83,31 @@ describe('toast store', () => {
 		expect(toast.items).toEqual([]);
 	});
 
+	it('keeps at most three, dropping the oldest', () => {
+		const first = toast.info('1');
+		toast.info('2');
+		toast.info('3');
+		toast.info('4');
+		expect(toast.items.map((t) => t.message)).toEqual(['2', '3', '4']);
+		expect(toast.items.some((t) => t.id === first)).toBe(false);
+	});
+
+	it('pausing holds the remaining time until every reason resumed', () => {
+		toast.success('ok');
+		vi.advanceTimersByTime(3000);
+		toast.pause('hover');
+		toast.pause('hidden');
+		vi.advanceTimersByTime(60_000);
+		toast.resume('hover');
+		vi.advanceTimersByTime(60_000);
+		expect(toast.items).toHaveLength(1);
+		toast.resume('hidden');
+		vi.advanceTimersByTime(999);
+		expect(toast.items).toHaveLength(1);
+		vi.advanceTimersByTime(1);
+		expect(toast.items).toEqual([]);
+	});
+
 	it('error() takes a string or extracts the message from a caught error', () => {
 		toast.error('plain');
 		toast.error({ response: { status: 400, data: { message: 'Vom Server' } } });

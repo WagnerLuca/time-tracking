@@ -35,7 +35,7 @@
 </script>
 
 <dialog bind:this={dialog} class="modal modal-bottom sm:modal-middle" aria-modal="true" aria-labelledby={title ? titleId : undefined} onclose={handleClose}>
-	<div class="modal-box max-h-[90vh]" style="max-width: {maxWidth}">
+	<div class="modal-box max-h-[90dvh]" style="max-width: {maxWidth}">
 		{#if open}
 			{#if title}
 				<div class="flex items-start justify-between gap-3 mb-4">

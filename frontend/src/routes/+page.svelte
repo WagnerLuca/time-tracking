@@ -234,7 +234,7 @@
 			<div class="min-w-0 flex-1">
 				{#if timer.current}
 					<div class="flex items-center gap-2 text-sm font-semibold text-success">
-						<span class="w-2.5 h-2.5 bg-success rounded-full animate-pulse" aria-hidden="true"></span>
+						<span class="w-2.5 h-2.5 bg-success rounded-full animate-pulse motion-reduce:animate-none" aria-hidden="true"></span>
 						{t('dashboard.running')}
 					</div>
 					<div class="text-4xl sm:text-5xl font-bold tabular-nums text-base-content tracking-wide mt-1" role="timer" aria-live="off">{formatClock(timer.elapsedSeconds)}</div>
@@ -373,7 +373,7 @@
 						<span class="text-sm text-base-content/70">{day.label}</span>
 						<span class="w-2 h-2 rounded-full {dt.dot}" title={dayType ? getDayTypeLabel(day.date, daysOff.holidayDates, daysOff.sickDayDates, daysOff.vacationDates, daysOff.otherAbsenceDates, daysOff.halfDayHolidays, daysOff.halfDayAbsences) : undefined}></span>
 						<div class="h-2 bg-base-200 rounded-full overflow-hidden">
-							<div class="h-full rounded-full transition-all duration-300 {worked > day.target && day.target > 0 ? 'bg-success' : 'bg-primary'}" style="width: {barWidth(worked, day.target)}%"></div>
+							<div class="h-full rounded-full transition-[width] duration-300 ease-out {worked > day.target && day.target > 0 ? 'bg-success' : 'bg-primary'}" style="width: {barWidth(worked, day.target)}%"></div>
 						</div>
 						<span class="text-sm tabular-nums text-right whitespace-nowrap">
 							{formatHours(worked)}{#if day.target > 0}<span class="text-xs text-base-content/70"> / {formatHours(day.target)}</span>{/if}
@@ -395,7 +395,7 @@
 					<div class="grid grid-cols-[3.5rem_1fr_auto] items-center gap-2">
 						<span class="text-sm text-base-content/70 tabular-nums">{wk.label}</span>
 						<div class="h-2 bg-base-200 rounded-full overflow-hidden">
-							<div class="h-full rounded-full transition-all duration-300 {wk.worked > wk.target && wk.target > 0 ? 'bg-success' : 'bg-secondary'}" style="width: {barWidth(wk.worked, wk.target)}%"></div>
+							<div class="h-full rounded-full transition-[width] duration-300 ease-out {wk.worked > wk.target && wk.target > 0 ? 'bg-success' : 'bg-secondary'}" style="width: {barWidth(wk.worked, wk.target)}%"></div>
 						</div>
 						<span class="text-sm tabular-nums text-right whitespace-nowrap">
 							{formatHours(wk.worked)}{#if wk.target > 0}<span class="text-xs text-base-content/70"> / {formatHours(wk.target)}</span>{/if}

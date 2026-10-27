@@ -769,7 +769,7 @@
 		}
 		.oc-canvas {
 			overflow: auto;
-			height: max(24rem, calc(100vh - 17rem));
+			height: max(24rem, calc(100dvh - 17rem));
 			padding: 1rem;
 			border: 1px solid var(--color-base-300);
 			border-radius: 1rem;
@@ -834,7 +834,7 @@
 		.oc-panel {
 			position: sticky;
 			top: 5rem;
-			max-height: calc(100vh - 6rem);
+			max-height: calc(100dvh - 6rem);
 			overflow-y: auto;
 			padding: 1.25rem;
 			outline: none;

@@ -349,7 +349,7 @@
 							{#if targetPct > 0}
 								<div class="absolute top-0 bottom-0 w-0.5 bg-base-content/30 z-[1]" style="left: {targetPct}%"></div>
 							{/if}
-							<div class="h-full {isToday(day.date) ? 'bg-success' : 'bg-primary'} rounded transition-all duration-300" style="width: {pct}%"></div>
+							<div class="h-full {isToday(day.date) ? 'bg-success' : 'bg-primary'} rounded transition-[width] duration-300 ease-out" style="width: {pct}%"></div>
 						</div>
 						<span class="text-right text-sm text-base-content/70 tabular-nums whitespace-nowrap">
 							{formatHoursDecimal(day.minutes)}{#if day.targetMinutes > 0}<span class="text-base-content/70 font-normal text-xs"> / {formatHoursDecimal(day.targetMinutes)}</span>{/if}

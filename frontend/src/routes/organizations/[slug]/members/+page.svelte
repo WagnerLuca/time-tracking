@@ -131,7 +131,7 @@
 					{@const overview = overviewByUser.get(member.id!)}
 					<li>
 						<a
-							class="group flex items-center gap-3 sm:gap-4 p-3.5 bg-base-100 border border-base-300 rounded-xl transition-all hover:border-primary/30 hover:shadow-md no-underline text-base-content"
+							class="group flex items-center gap-3 sm:gap-4 p-3.5 bg-base-100 border border-base-300 rounded-xl transition-[border-color,box-shadow,background-color] hover:border-primary/30 hover:shadow-md no-underline text-base-content"
 							href="/organizations/{orgSlug}/members/{member.id}"
 						>
 							<div class="relative shrink-0">

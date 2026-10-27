@@ -42,11 +42,23 @@
 
   --font-sans: 'Inter Variable', Inter, sans-serif;
   --font-display: 'Space Grotesk Variable', 'Space Grotesk', sans-serif;
+
+  /* Motion: the only curves in the app (also the ease-out / ease-in-out utilities).
+     Built-in curves are too soft; nothing else may hard-code a cubic-bezier. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 :root {
   --border: 1px;
   color-scheme: light;
+  /* Durations: press feedback, popovers/menus, modals in, anything leaving (exits are faster) */
+  --dur-press: 160ms;
+  --dur-pop: 150ms;
+  --dur-modal: 220ms;
+  --dur-exit: 150ms;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .dark {
@@ -58,12 +70,13 @@ h1, h2, h3, .card-title {
   letter-spacing: -0.01em;
 }
 
-/* Reduced motion: no pulsing, sliding or smooth scrolling anywhere (components.css handles its own cases too) */
+/* Reduced motion means less movement, not none: keyframe animations and smooth
+   scrolling stop everywhere, colour/opacity fades stay. Moving transitions
+   (scale/translate) are switched off per component in components.css. */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
 }

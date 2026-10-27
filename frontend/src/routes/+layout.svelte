@@ -284,7 +284,7 @@
 					<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
 				</button>
 				{#if openMenu === 'org'}
-					<ul class="menu absolute left-0 top-full mt-2 w-64 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl" role="menu">
+					<ul class="menu popover origin-top-left absolute left-0 top-full mt-2 w-64 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl" role="menu">
 						<li class="menu-title">{t('nav.org.switch')}</li>
 						{#each orgContext.organizations as org (org.organizationId)}
 							<li role="none">
@@ -334,7 +334,7 @@
 						<span class="xl:hidden"><NavIcon name="user" /></span>
 					</button>
 					{#if openMenu === 'user'}
-						<ul class="menu absolute right-0 top-full mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl" role="menu">
+						<ul class="menu popover origin-top-right absolute right-0 top-full mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl" role="menu">
 							<li class="menu-title truncate">{auth.user?.email}</li>
 							<li role="none"><a role="menuitem" href="/settings" class={isActive('/settings') ? 'menu-active' : ''}>{t('nav.settings')}</a></li>
 							<li role="none"><button type="button" role="menuitem" onclick={handleLogout}>{t('nav.signOut')}</button></li>
@@ -347,7 +347,7 @@
 
 	<!-- Phone: bottom navigation within thumb reach; "Mehr" opens the rest right above it -->
 	{#if openMenu === 'more'}
-		<div id="more-menu" class="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 border-t border-base-300 bg-base-100 px-4 py-2 shadow-xl lg:hidden">
+		<div id="more-menu" class="popover origin-bottom fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 border-t border-base-300 bg-base-100 px-4 py-2 shadow-xl lg:hidden">
 			<p class="m-0 px-3 pt-1 text-xs text-base-content/70 truncate">{auth.user?.firstName} {auth.user?.lastName} · {auth.user?.email}</p>
 			<ul class="menu w-full">
 				{#each moreLinks as link (link.href)}
