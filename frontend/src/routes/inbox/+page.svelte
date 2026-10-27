@@ -8,9 +8,9 @@
 	import { invalidateOrgDetail } from '$lib/stores/orgDetail';
 	import { requestsApi } from '$lib/apiClient';
 	import type { NotificationResponse, OrgRequestResponse } from '$lib/api';
-	import { coreHoursNotice, notificationTarget } from '$lib/utils/notifications';
+	import { coreHoursNotice, notificationTarget, vacationExpiryNotice } from '$lib/utils/notifications';
 	import { dateKey } from '$lib/utils/dateHelpers';
-	import { formatDate, formatDateTime, formatRequestStatus, formatRequestType, formatTimeAgo, parseRequestData, statusBadgeClass } from '$lib/utils/formatters';
+	import { formatDate, formatDateTime, formatNumber, formatRequestStatus, formatRequestType, formatTimeAgo, parseRequestData, statusBadgeClass } from '$lib/utils/formatters';
 	import { t } from '$lib/i18n';
 	import DeclineForm from '$lib/components/DeclineForm.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
@@ -91,6 +91,7 @@
 			case 'TimerReminder': return t('nav.notifications.reminderTitle');
 			case 'SettingsChanged': return t('nav.notifications.settingsTitle');
 			case 'CoreHoursViolation': return t('nav.notifications.coreHoursTitle');
+			case 'VacationExpiry': return t('nav.notifications.vacationExpiryTitle');
 			default: return n.title ?? '';
 		}
 	}
@@ -103,6 +104,10 @@
 			const d = day ? formatDate(day) : '';
 			const text = name ? t('nav.notifications.coreHoursOther', { name, date: d }) : t('nav.notifications.coreHoursOwn', { date: d });
 			return late ? `${text} ${t('nav.notifications.coreHoursLate')}` : text;
+		}
+		if (n.type === 'VacationExpiry') {
+			const v = vacationExpiryNotice(n.message);
+			if (v) return t('nav.notifications.vacationExpiryText', { left: formatNumber(v.left), lapsing: formatNumber(v.lapsing), date: formatDate(v.date) });
 		}
 		return n.message ?? '';
 	}

@@ -44,6 +44,8 @@ export const de = {
 		coreHoursOwn: 'Deine erfassten Zeiten am {date} decken die Kernarbeitszeit nicht ab.',
 		coreHoursOther: '{name} hat am {date} die Kernarbeitszeit nicht eingehalten.',
 		coreHoursLate: '(nachträglich geprüft)',
+		vacationExpiryTitle: 'Resturlaub verfällt',
+		vacationExpiryText: 'Du hast noch {left} Urlaubstage. {lapsing} davon verfallen nach dem {date}, wenn du sie nicht nimmst.',
 		dismissAll: 'Alle ausblenden',
 		pending: 'Offene Anträge',
 		empty: 'Keine Benachrichtigungen',

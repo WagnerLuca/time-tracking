@@ -39,6 +39,15 @@ export function coreHoursNotice(
  * running timer, so it leads to the timer page. A CoreHoursViolation leads to the day in
  * History for the member themselves, to the member's page (in `orgSlug(organizationId)`) for admins.
  */
+/**
+ * A VacationExpiry notice's figures, read from the server's sentence
+ * ("5 vacation days left, 3 lapse after 31.03.2027 unless taken."); null when it does not match.
+ */
+export function vacationExpiryNotice(message: string | null | undefined): { left: number; lapsing: number; date: string } | null {
+	const m = /^([\d.]+) vacation days left, ([\d.]+) lapse after (\d{2})\.(\d{2})\.(\d{4})/.exec(message ?? '');
+	return m ? { left: Number(m[1]), lapsing: Number(m[2]), date: `${m[5]}-${m[4]}-${m[3]}` } : null;
+}
+
 export function notificationTarget(
 	n: NotificationLike & { organizationId?: number | null },
 	entries: { id?: number; startTime?: string }[],

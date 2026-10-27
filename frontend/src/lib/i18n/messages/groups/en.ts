@@ -89,6 +89,12 @@ export const en: typeof de = {
 			toleranceValue: '{minutes} min',
 			toleranceInput: 'Tolerance in minutes'
 		},
+		holidayRegion: {
+			title: 'State (public holidays)',
+			description: 'Applies to the days someone is in the group (or a sub-group) – not to members whose working time model names a state of its own.',
+			label: 'State of the group',
+			none: 'none'
+		},
 		disabled: 'Off',
 		enabled: 'On',
 		loading: 'Loading permissions…',

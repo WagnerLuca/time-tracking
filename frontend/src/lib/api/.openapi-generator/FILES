@@ -32,11 +32,14 @@ docs/CloseMonthsRequest.md
 docs/ClosedPeriodEventResponse.md
 docs/ClosedPeriodsApi.md
 docs/ClosedPeriodsResponse.md
+docs/CompanyLeaveApi.md
+docs/CompanyLeaveResponse.md
 docs/ComplianceDayResponse.md
 docs/CoreHoursMode.md
 docs/CreateAbsenceDayRequest.md
 docs/CreateAbsenceRangeRequest.md
 docs/CreateApiKeyRequest.md
+docs/CreateCompanyLeaveRequest.md
 docs/CreateGroupRequest.md
 docs/CreateHolidayRequest.md
 docs/CreateInvitationRequest.md
@@ -48,6 +51,7 @@ docs/CreatePauseRuleRequest.md
 docs/CreateWorkScheduleRequest.md
 docs/CreatedApiKeyResponse.md
 docs/DayBalance.md
+docs/DayOffResponse.md
 docs/DeleteAbsencesRequest.md
 docs/DeleteAccountRequest.md
 docs/DisableTwoFactorRequest.md
@@ -77,6 +81,8 @@ docs/LoginResult.md
 docs/ManualEntryResponse.md
 docs/MarkedSeenResponse.md
 docs/MemberAccountantResponse.md
+docs/MemberDaysOffResponse.md
+docs/MemberEmploymentResponse.md
 docs/MemberEntriesApi.md
 docs/MemberGroupResponse.md
 docs/MemberInitialOvertimeResponse.md
@@ -116,6 +122,7 @@ docs/PersonalRequest.md
 docs/PersonalTimeEntry.md
 docs/PersonalVacationYear.md
 docs/ProblemDetails.md
+docs/PublicHolidayResponse.md
 docs/PunchRequest.md
 docs/PunchResponse.md
 docs/PushApi.md
@@ -135,6 +142,8 @@ docs/ResetPasswordRequest.md
 docs/RespondToOrgRequestRequest.md
 docs/RuleMode.md
 docs/SetAccountantRequest.md
+docs/SetEmploymentRequest.md
+docs/SetExclusionsRequest.md
 docs/SetInitialOvertimeRequest.md
 docs/SetMemberVacationYearRequest.md
 docs/SetPersonnelNumberRequest.md
@@ -160,6 +169,7 @@ docs/UnknownCardResponse.md
 docs/UnreadCountResponse.md
 docs/UpdateApiKeyRequest.md
 docs/UpdateBadgeCardRequest.md
+docs/UpdateCompanyLeaveRequest.md
 docs/UpdateGroupMemberRoleRequest.md
 docs/UpdateGroupPermissionsRequest.md
 docs/UpdateGroupRequest.md

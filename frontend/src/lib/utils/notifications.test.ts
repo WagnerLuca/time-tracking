@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { bellNotifications, coreHoursNotice, decisionNotificationIds, inboxNotices, notificationTarget, openOwnRequests } from './notifications';
+import { bellNotifications, coreHoursNotice, decisionNotificationIds, inboxNotices, notificationTarget, openOwnRequests, vacationExpiryNotice } from './notifications';
+
+describe('vacationExpiryNotice', () => {
+	it('reads the figures of the server sentence', () => {
+		expect(vacationExpiryNotice('5.5 vacation days left, 3 lapse after 31.03.2027 unless taken.'))
+			.toEqual({ left: 5.5, lapsing: 3, date: '2027-03-31' });
+		expect(vacationExpiryNotice('something else')).toBeNull();
+		expect(vacationExpiryNotice(null)).toBeNull();
+	});
+});
 
 describe('notificationTarget', () => {
 	const message = 'Your timer started 30.09.2026 08:15 ran past the end of the business day and was stopped.';

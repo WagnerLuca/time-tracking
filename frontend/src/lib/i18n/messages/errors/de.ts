@@ -15,6 +15,7 @@ export const de = {
 		unexpected: 'Ein unerwarteter Fehler ist aufgetreten.'
 	},
 	org: {
+		employmentOrder: 'Der Austritt kann nicht vor dem Eintritt liegen.',
 		notFound: 'Organisation nicht gefunden.',
 		notMember: 'Du bist kein Mitglied dieser Organisation.',
 		personnelNumberTaken: 'Diese Personalnummer hat bereits ein anderes Mitglied.',
@@ -40,6 +41,7 @@ export const de = {
 		carryOverMode: 'Unbekannte Übertragsregel.'
 	},
 	vacation: {
+		expiresOn: 'Der Verfallstag muss im selben Jahr liegen.',
 		entitlementRange: 'Der Urlaubsanspruch muss zwischen 0 und 365 Tagen liegen.',
 		adjustmentRange: 'Die Korrektur muss zwischen −365 und 365 Tagen liegen.',
 		noteTooLong: 'Die Notiz darf höchstens 500 Zeichen lang sein.'
@@ -150,6 +152,7 @@ export const de = {
 		wrongEmail: 'Diese Einladung wurde an eine andere E-Mail-Adresse geschickt. Melde dich mit dieser Adresse an, um sie anzunehmen.'
 	},
 	schedule: {
+		vacationDaysRange: 'Urlaubstage pro Jahr: 0 bis 365.',
 		notFound: 'Arbeitszeitmodell nicht gefunden.',
 		overlap: 'Dieser Zeitraum überschneidet sich mit einem bestehenden Arbeitszeitmodell. Es darf immer nur eines gelten.'
 	},
@@ -158,6 +161,8 @@ export const de = {
 		initialRequiresApproval: 'Anfangsüberstunden müssen genehmigt werden. Bitte stelle eine Anfrage.'
 	},
 	holiday: {
+		unknownRegion: 'Unbekanntes Bundesland bzw. unbekannte Region.',
+		noRegion: 'Die Organisation hat kein Bundesland gewählt.',
 		exists: 'An diesem Tag gibt es bereits einen Feiertag.',
 		notFound: 'Feiertag nicht gefunden.'
 	},
@@ -218,5 +223,13 @@ export const de = {
 	accounting: {
 		invalidYear: 'Das Jahr muss zwischen 2000 und 2100 liegen.',
 		ownerOnly: 'Die Rolle Buchhaltung von Admins oder dir selbst kann nur der Inhaber ändern.'
+	},
+	dayOff: {
+		notMembers: 'Nur Mitglieder der Organisation können ausgenommen werden.'
+	},
+	companyLeave: {
+		notFound: 'Betriebsurlaub nicht gefunden.',
+		range: 'Ein Betriebsurlaub dauert 1 bis 92 Tage.',
+		managed: 'Dieser Urlaubstag gehört zu einem Betriebsurlaub; ein Admin kann dich davon ausnehmen.'
 	}
 };

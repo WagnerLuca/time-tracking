@@ -45,6 +45,8 @@ export const en: typeof de = {
 		coreHoursOwn: 'Your tracked time on {date} does not cover the core working hours.',
 		coreHoursOther: '{name} did not keep the core working hours on {date}.',
 		coreHoursLate: '(checked late)',
+		vacationExpiryTitle: 'Vacation days will lapse',
+		vacationExpiryText: 'You have {left} vacation days left. {lapsing} of them lapse after {date} unless you take them.',
 		dismissAll: 'Dismiss all',
 		pending: 'Pending requests',
 		empty: 'No notifications',

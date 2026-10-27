@@ -88,6 +88,12 @@ export const de = {
 			toleranceValue: '{minutes} min',
 			toleranceInput: 'Toleranz in Minuten'
 		},
+		holidayRegion: {
+			title: 'Bundesland (gesetzliche Feiertage)',
+			description: 'Gilt für die Tage, an denen jemand in der Gruppe (oder einer Untergruppe) ist – nicht für Mitglieder, deren Arbeitszeitmodell ein eigenes Bundesland nennt.',
+			label: 'Bundesland der Gruppe',
+			none: 'keines'
+		},
 		disabled: 'Aus',
 		enabled: 'An',
 		loading: 'Berechtigungen werden geladen…',

@@ -12,7 +12,7 @@
 	import { absenceTypeLabel, dayNamesShort, formatDate, formatDateFull, formatDateShort, formatNumber, getInitials } from '$lib/utils/formatters';
 	import { memberCarryFigures, orgYear, vacationDetailLines, vacationTotal } from '$lib/utils/vacation';
 	import { dayPress } from '$lib/utils/dayPress';
-	import { dateKey, expandHolidays } from '$lib/utils/dateHelpers';
+	import { dateKey } from '$lib/utils/dateHelpers';
 	import { fetchAllPages } from '$lib/utils/pagination';
 	import { DAY_TYPE_CLASSES, dayTypeClasses, personChipStyle, personDotStyle, tintStyle } from '$lib/utils/colors';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
@@ -157,10 +157,17 @@
 		}
 	}
 
-	async function loadHolidays() {
+	/**
+	 * The viewer's own holidays (their region and groups, as the server resolves them) around the shown year — colleagues
+	 * in another Bundesland may have others, their own calendars show those.
+	 */
+	let holidaysYear = $state<number | null>(null);
+	async function loadHolidays(year = calendarYear) {
+		holidaysYear = year;
 		try {
-			const { data } = await holidayApi.apiV1OrganizationsSlugHolidaysGet(orgSlug);
-			holidays = [...data].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
+			const { data } = await holidayApi.apiV1OrganizationsSlugHolidaysDaysGet(orgSlug, `${year - 1}-12-01`, `${year + 1}-01-31`);
+			if (holidaysYear !== year) return;
+			holidays = (data.days ?? []).map((d, i) => ({ id: i + 1, organizationId: 0, date: d.date ?? '', name: d.name ?? '', isRecurring: false, isHalfDay: d.isHalfDay ?? false }));
 		} catch (err) {
 			holidays = [];
 			toast.error(err, t('absences.loadHolidaysFailed'));
@@ -452,8 +459,16 @@
 	let calendarAbsences = $derived(calendarUserFilter === null ? absences : absences.filter((a) => a.userId === calendarUserFilter));
 	let calendarSpans = $derived(buildAbsenceSpans(calendarAbsences));
 	let spanMap = $derived(buildSpanMap(calendarSpans, calendarAbsences));
-	// Recurring holidays repeat every year; ±1 year for the grid's overflow days
-	let holidayMap = $derived(expandHolidays(holidays, calendarYear - 1, calendarYear + 1));
+	// Reload when the shown year changes (the grid's overflow days are in the loaded range)
+	$effect(() => {
+		const year = calendarYear;
+		if (org && holidaysYear !== null && year !== holidaysYear) untrack(() => loadHolidays(year));
+	});
+	let holidayMap = $derived.by(() => {
+		const map = new Map<string, HolidayResponse[]>();
+		for (const h of holidays) if (h.date) map.set(h.date, [...(map.get(h.date) ?? []), h]);
+		return map;
+	});
 	let monthStart = $derived(dateKey(new Date(calendarYear, calendarMonth, 1)));
 	let monthEnd = $derived(dateKey(new Date(calendarYear, calendarMonth + 1, 0)));
 

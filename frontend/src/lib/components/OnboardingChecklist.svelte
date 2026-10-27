@@ -36,7 +36,7 @@
 					invitationsApi.apiV1OrganizationsSlugInvitationsGet(s).then((r) => r.data.length).catch(() => 0),
 					holidayApi.apiV1OrganizationsSlugHolidaysGet(s).then((r) => r.data.length)
 				]);
-				steps = adminSteps(s, { hasInvited: (org.members?.length ?? 0) > 1 || invites > 0, sawRules: wasSeen(userId, s, 'rules'), hasHolidays: holidays > 0 });
+				steps = adminSteps(s, { hasInvited: (org.members?.length ?? 0) > 1 || invites > 0, sawRules: wasSeen(userId, s, 'rules'), hasHolidays: holidays > 0 || !!org.holidayRegion });
 			}
 			hidden = steps.every((st) => st.done);
 		} catch {

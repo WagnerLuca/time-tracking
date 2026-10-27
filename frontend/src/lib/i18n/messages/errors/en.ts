@@ -10,6 +10,7 @@ export const en: typeof de = {
 		unexpected: 'An unexpected error occurred.'
 	},
 	org: {
+		employmentOrder: 'The employment cannot end before it starts.',
 		notFound: 'Organization not found.',
 		notMember: 'You are not a member of this organization.',
 		personnelNumberTaken: 'Another member already has this personnel number.',
@@ -35,6 +36,7 @@ export const en: typeof de = {
 		carryOverMode: 'Unknown carry-over rule.'
 	},
 	vacation: {
+		expiresOn: 'The expiry date must be in the same year.',
 		entitlementRange: 'The vacation entitlement must be between 0 and 365 days.',
 		adjustmentRange: 'The adjustment must be between −365 and 365 days.',
 		noteTooLong: 'The note may have at most 500 characters.'
@@ -145,6 +147,7 @@ export const en: typeof de = {
 		wrongEmail: 'This invitation was sent to a different email address. Sign in with that address to accept it.'
 	},
 	schedule: {
+		vacationDaysRange: 'Vacation days per year: 0 to 365.',
 		notFound: 'Work schedule not found.',
 		overlap: 'This period overlaps an existing work schedule. Only one may apply at a time.'
 	},
@@ -153,6 +156,8 @@ export const en: typeof de = {
 		initialRequiresApproval: 'Initial overtime needs approval. Please submit a request.'
 	},
 	holiday: {
+		unknownRegion: 'Unknown state or region.',
+		noRegion: 'The organization has no state chosen.',
 		exists: 'A holiday already exists on this date.',
 		notFound: 'Holiday not found.'
 	},
@@ -213,5 +218,13 @@ export const en: typeof de = {
 	accounting: {
 		invalidYear: 'The year must be between 2000 and 2100.',
 		ownerOnly: 'Only the owner can change the accounting role of admins or of yourself.'
+	},
+	dayOff: {
+		notMembers: 'Only members of the organization can be left out.'
+	},
+	companyLeave: {
+		notFound: 'Company shutdown not found.',
+		range: 'A company shutdown lasts 1 to 92 days.',
+		managed: 'This vacation day belongs to a company shutdown; an admin can leave you out of it.'
 	}
 };

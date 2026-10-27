@@ -1,7 +1,7 @@
 import { holidayApi, absenceDayApi } from '$lib/apiClient';
 import { toast } from '$lib/stores/toast.svelte';
 import { t } from '$lib/i18n';
-import { dateKey, expandHolidays } from '$lib/utils/dateHelpers';
+import { dateKey } from '$lib/utils/dateHelpers';
 import { fetchAllPages } from '$lib/utils/pagination';
 
 export interface DaysOffData {
@@ -36,9 +36,9 @@ export function emptyDaysOff(): DaysOffData {
 }
 
 /**
- * Holidays and absences between `from` and `to` (inclusive, local days). Recurring
- * holidays are expanded into every year of the range; absences are paged through,
- * so the API's 200-item cap never hides any.
+ * Holidays and absences between `from` and `to` (inclusive, local days). The holidays are the member's own (the server
+ * resolves their region and groups: `GET holidays/days`); absences are paged through, so the API's 200-item cap never
+ * hides any. A day can hold two half-day absences (e.g. half vacation + half sick): it is then in both sets.
  */
 export async function loadDaysOff(orgSlug: string | null | undefined, userId: number | undefined, from: Date, to: Date): Promise<DaysOffData> {
 	if (!orgSlug) return emptyDaysOff();
@@ -47,7 +47,7 @@ export async function loadDaysOff(orgSlug: string | null | undefined, userId: nu
 		const fromKey = dateKey(from);
 		const toKey = dateKey(to);
 		const [holRes, absences] = await Promise.all([
-			holidayApi.apiV1OrganizationsSlugHolidaysGet(orgSlug),
+			holidayApi.apiV1OrganizationsSlugHolidaysDaysGet(orgSlug, fromKey, toKey, userId),
 			fetchAllPages((limit, offset) =>
 				absenceDayApi.apiV1OrganizationsSlugAbsencesGet(orgSlug, userId, fromKey, toKey, limit, offset).then((r) => r.data))
 		]);
@@ -58,20 +58,26 @@ export async function loadDaysOff(orgSlug: string | null | undefined, userId: nu
 			otherAbsenceDates, halfDayAbsences, customTypeDates, customNoCreditDates, customTopUpDates
 		} = result;
 
-		for (const [date, list] of expandHolidays(holRes.data, from.getFullYear(), to.getFullYear())) {
-			if (date < fromKey || date > toKey) continue;
-			daysOffSet.add(date);
-			holidayDates.set(date, list[0].name ?? ''); // '' → getDayTypeLabel() shows the localized "Holiday"
-			if (list.every((h) => h.isHalfDay)) halfDayHolidays.add(date);
+		for (const h of holRes.data.days ?? []) {
+			if (!h.date) continue;
+			daysOffSet.add(h.date);
+			holidayDates.set(h.date, h.name ?? ''); // '' → getDayTypeLabel() shows the localized "Holiday"
+			if (h.isHalfDay) halfDayHolidays.add(h.date);
 		}
 
+		const halvesSeen = new Set<string>();
 		for (const a of absences) {
 			if (!a.date) continue;
 			daysOffSet.add(a.date);
 			if (a.type === 'SickDay') sickDayDates.add(a.date);
 			else if (a.type === 'Vacation') vacationDates.add(a.date);
 			else otherAbsenceDates.add(a.date);
-			if (a.isHalfDay) halfDayAbsences.add(a.date);
+			// Two half-day absences (e.g. half vacation + half sick) make a whole day off
+			if (a.isHalfDay) {
+				if (halvesSeen.has(a.date)) halfDayAbsences.delete(a.date);
+				else halfDayAbsences.add(a.date);
+				halvesSeen.add(a.date);
+			}
 
 			if (a.customTypeName) {
 				customTypeDates.set(a.date, {

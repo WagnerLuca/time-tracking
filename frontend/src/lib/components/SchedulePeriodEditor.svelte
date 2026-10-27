@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { workScheduleApi } from '$lib/apiClient';
+	import { holidayApi, workScheduleApi } from '$lib/apiClient';
 	import type { CreateWorkScheduleRequest, UpdateWorkScheduleRequest, WorkScheduleResponse } from '$lib/api';
 	import { dateKey } from '$lib/utils/dateHelpers';
-	import { dayNamesShort, formatDateFull, formatNumber } from '$lib/utils/formatters';
+	import { dayNamesShort, formatDateFull, formatNumber, holidayRegionLabel } from '$lib/utils/formatters';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
@@ -49,6 +49,17 @@
 	let saveError = $state('');
 	let deletingId = $state<number | null>(null);
 
+	// Contract terms only admins set (member endpoints): the Arbeitsort's state and vacation days per year
+	let contract = $derived(memberId != null);
+	let region = $state('');
+	let vacationDays = $state<number | null>(null);
+	let presets = $state<{ key?: string | null; name?: string | null }[]>([]);
+	$effect(() => {
+		if (contract && showForm && presets.length === 0)
+			holidayApi.apiV1OrganizationsHolidayPresetsGet().then((r) => (presets = r.data)).catch(() => {});
+	});
+	let vacationDaysError = $derived(submitted && outOfRange(vacationDays, 365) ? t('schedule.periods.vacationDaysRange') : '');
+
 	const today = dateKey(new Date());
 
 	$effect(() => {
@@ -92,19 +103,22 @@
 		weekly = null;
 		distribute = true;
 		days = [0, 0, 0, 0, 0, 0, 0];
+		// A new period starts with the latest one's contract terms
+		region = periods[0]?.holidayRegion ?? '';
+		vacationDays = periods[0]?.vacationDaysPerYear ?? null;
 		submitted = false;
 		saveError = '';
 	}
 
 	function toggleForm() {
 		showForm = !showForm;
-		if (!showForm) resetForm();
+		resetForm();
 	}
 
 	async function save(e: Event) {
 		e.preventDefault();
 		submitted = true;
-		if (fromError || toError || weeklyError || daysError) return;
+		if (fromError || toError || weeklyError || daysError || vacationDaysError) return;
 		saving = true;
 		saveError = '';
 		const [mon, tue, wed, thu, fri, sat, sun] = days.map((d) => d ?? 0);
@@ -119,11 +133,12 @@
 			targetThu: distribute ? undefined : thu,
 			targetFri: distribute ? undefined : fri,
 			targetSat: distribute ? undefined : sat,
-			targetSun: distribute ? undefined : sun
+			targetSun: distribute ? undefined : sun,
+			...(contract ? { holidayRegion: region, vacationDaysPerYear: vacationDays ?? undefined } : {})
 		};
 		const existingId = replacing?.id;
 		// An emptied end date has to be cleared explicitly; a missing validTo keeps the old one
-		const update: UpdateWorkScheduleRequest = { ...payload, clearValidTo: !to };
+		const update: UpdateWorkScheduleRequest = { ...payload, clearValidTo: !to, clearVacationDaysPerYear: contract && vacationDays == null };
 		try {
 			if (memberId) {
 				if (existingId) await workScheduleApi.apiV1OrganizationsSlugMembersMemberIdWorkSchedulesIdPut(orgSlug, memberId, existingId, update);
@@ -224,6 +239,24 @@
 					{#if daysError}<p class="text-error text-xs mt-1">{daysError}</p>{/if}
 				</fieldset>
 			{/if}
+			{#if contract}
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+					<div>
+						<label for="sp-region-{memberId}" class="block text-sm font-medium text-base-content/80 mb-1">{t('schedule.periods.region')}</label>
+						<select id="sp-region-{memberId}" class="select select-sm w-full" bind:value={region} disabled={saving} aria-describedby="sp-region-hint-{memberId}">
+							<option value="">{t('schedule.periods.regionDefault')}</option>
+							{#each presets as p (p.key)}<option value={p.key}>{holidayRegionLabel(p.key ?? '', p.name ?? '')}</option>{/each}
+						</select>
+						<p id="sp-region-hint-{memberId}" class="text-xs text-base-content/70 mt-1 m-0">{t('schedule.periods.regionHint')}</p>
+					</div>
+					<div>
+						<label for="sp-vac-{memberId}" class="block text-sm font-medium text-base-content/80 mb-1">{t('schedule.periods.vacationDays')} <span class="text-base-content/70">({t('common.optional')})</span></label>
+						<input id="sp-vac-{memberId}" type="number" step="0.5" min="0" max="365" class="input input-sm w-32" class:input-error={vacationDaysError}
+							bind:value={vacationDays} disabled={saving} aria-describedby="sp-vac-hint-{memberId}" />
+						<p id="sp-vac-hint-{memberId}" class="text-xs text-base-content/70 mt-1 m-0">{vacationDaysError || t('schedule.periods.vacationDaysHint')}</p>
+					</div>
+				</div>
+			{/if}
 			{#if replacing}
 				<p class="text-xs text-warning m-0">{t('schedule.periods.replaceHint')}</p>
 			{/if}
@@ -254,6 +287,8 @@
 						{p.validTo ? formatDateFull(p.validTo) : t('common.ongoing')}
 					</span>
 					{#if active}<span class="badge badge-success badge-xs font-semibold">{t('schedule.periods.active')}</span>{/if}
+					{#if p.holidayRegion}<span class="badge badge-outline badge-xs">{holidayRegionLabel(p.holidayRegion)}</span>{/if}
+					{#if p.vacationDaysPerYear != null}<span class="text-xs text-base-content/70">{t('schedule.periods.vacationDaysValue', { days: formatNumber(p.vacationDaysPerYear) })}</span>{/if}
 					<span class="font-semibold text-base-content ml-auto whitespace-nowrap">
 						{p.weeklyWorkHours != null ? t('common.perWeek', { value: formatNumber(p.weeklyWorkHours) }) : '—'}
 					</span>

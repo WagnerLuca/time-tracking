@@ -325,6 +325,23 @@ export interface ClosedPeriodsResponse {
     'events': Array<ClosedPeriodEventResponse> | null;
 }
 /**
+ * A Betriebsurlaub: enforced vacation of the organization or one group, written as vacation days.
+ */
+export interface CompanyLeaveResponse {
+    'id'?: number;
+    'name': string | null;
+    'from'?: string;
+    'to'?: string;
+    /**
+     * The group (and its sub-groups); null = the whole organization.
+     */
+    'groupId'?: number | null;
+    /**
+     * Members left out (org admins only; null for others).
+     */
+    'excludedUserIds'?: Array<number> | null;
+}
+/**
  * A day that breaks the Working Time Act (see WorkingTimeAct) or misses the core working hours (see CoreHours).
  */
 export interface ComplianceDayResponse {
@@ -410,6 +427,12 @@ export interface CreateAbsenceRangeRequest {
 export interface CreateApiKeyRequest {
     'name': string;
 }
+export interface CreateCompanyLeaveRequest {
+    'name': string;
+    'from'?: string;
+    'to'?: string;
+    'groupId'?: number | null;
+}
 export interface CreateGroupRequest {
     'name'?: string | null;
     'description'?: string | null;
@@ -424,6 +447,10 @@ export interface CreateHolidayRequest {
     'name': string;
     'isRecurring'?: boolean;
     'isHalfDay'?: boolean;
+    /**
+     * Only for this group and its sub-groups; null = the whole organization.
+     */
+    'groupId'?: number | null;
 }
 /**
  * Invite an email address into the organization.
@@ -523,6 +550,14 @@ export interface CreateWorkScheduleRequest {
     'targetFri'?: number | null;
     'targetSat'?: number | null;
     'targetSun'?: number | null;
+    /**
+     * Admins only: holiday region (HolidayPresets key, \"\" = none). Left out (or set by a member): the previous period\'s.
+     */
+    'holidayRegion'?: string | null;
+    /**
+     * Admins only: vacation days per year of this period. Left out (or set by a member): the previous period\'s.
+     */
+    'vacationDaysPerYear'?: number | null;
 }
 /**
  * Returned once when a key is created — the only time the plaintext key is visible.
@@ -556,6 +591,15 @@ export interface DayBalance {
      * The day is in the balance: not in the future and not before the first tracked entry.
      */
     'isCounted'?: boolean;
+}
+/**
+ * A holiday on one member\'s day: \"Public\" (their region) or \"Company\" (organization or group).
+ */
+export interface DayOffResponse {
+    'date'?: string;
+    'name'?: string | null;
+    'isHalfDay'?: boolean;
+    'source'?: string | null;
 }
 /**
  * Absence days to delete together (a span), all or nothing.
@@ -671,6 +715,7 @@ export interface GroupPermissionsResponse {
     'coreHoursEnd'?: string | null;
     'parentGroupId'?: number | null;
     'coreHoursToleranceMinutes'?: number | null;
+    'holidayRegion'?: string | null;
 }
 export interface GroupResponse {
     'id'?: number;
@@ -715,7 +760,7 @@ export interface HolidayPresetResponse {
     'name': string | null;
 }
 /**
- * Organization holiday entry.
+ * A company holiday of the organization or of one group (public holidays come from the region, see TimeTracking.Api.Models.Dtos.DayOffResponse).
  */
 export interface HolidayResponse {
     'id'?: number;
@@ -724,6 +769,14 @@ export interface HolidayResponse {
     'name': string | null;
     'isRecurring'?: boolean;
     'isHalfDay'?: boolean;
+    /**
+     * The group (and its sub-groups) it applies to; null = the whole organization.
+     */
+    'groupId'?: number | null;
+    /**
+     * Members left out of it (org admins only; null for others).
+     */
+    'excludedUserIds'?: Array<number> | null;
 }
 /**
  * Request payload to confirm and execute a CSV import.
@@ -872,6 +925,26 @@ export interface MemberAccountantResponse {
     'isAccountant'?: boolean;
 }
 /**
+ * A member\'s holidays in a range, with the region that applies today.
+ */
+export interface MemberDaysOffResponse {
+    'userId'?: number;
+    /**
+     * Public holiday region today (schedule, groups or organization); null = none.
+     */
+    'region'?: string | null;
+    /**
+     * The member\'s groups name different regions (and the schedule none), so the organization\'s applies.
+     */
+    'regionConflict'?: boolean;
+    'days'?: Array<DayOffResponse> | null;
+}
+export interface MemberEmploymentResponse {
+    'userId'?: number;
+    'start'?: string | null;
+    'end'?: string | null;
+}
+/**
  * A group a member belongs to, for tag display (e.g. \"Frontend Admin\").
  */
 export interface MemberGroupResponse {
@@ -937,6 +1010,23 @@ export interface MemberVacationResponse {
      * Whether this year has its own entitlement (otherwise it is inherited).
      */
     'hasOwnEntitlement'?: boolean;
+    /**
+     * The full-year figure TimeTracking.Api.Models.Dtos.MemberVacationResponse.Entitlement was pro-rated from (equal when the whole year counts).
+     */
+    'annualEntitlement'?: number;
+    /**
+     * This member\'s own expiry date of the carried-in days (null = the organization\'s).
+     */
+    'ownExpiresOn'?: string | null;
+    /**
+     * When the member was told the carried-in days will lapse; without it nothing lapses.
+     */
+    'expiryNoticeAt'?: string | null;
+    /**
+     * Employment dates the pro-rata entitlement follows (null = before / still employed).
+     */
+    'employmentStart'?: string | null;
+    'employmentEnd'?: string | null;
     'adjustment'?: number;
     'adjustmentNote'?: string | null;
     'carriedIn'?: number;
@@ -1143,6 +1233,10 @@ export interface OrganizationDetailResponse {
      */
     'vacationCarryOverSince'?: number;
     /**
+     * Public holiday region (HolidayPresets key, e.g. \"DE-BW\"); null = none.
+     */
+    'holidayRegion'?: string | null;
+    /**
      * Business day end as local \"HH:mm\" in TimeTracking.Api.Models.Dtos.OrganizationDetailResponse.TimeZone.
      */
     'businessDayEnd'?: string | null;
@@ -1345,6 +1439,7 @@ export interface OrganizationSettingsResponse {
     'vacationCarryOverExpiry'?: string | null;
     'vacationCarryOverMaxDays'?: number | null;
     'vacationCarryOverSince'?: number;
+    'holidayRegion'?: string | null;
 }
 /**
  * Automatic pause rule (deduct X minutes after Y hours worked).
@@ -1448,6 +1543,8 @@ export interface PersonalMembership {
     'vacationDaysPerYear'?: number;
     'initialOvertimeHours'?: number;
     'personnelNumber'?: string | null;
+    'employmentStart'?: string | null;
+    'employmentEnd'?: string | null;
 }
 export interface PersonalNotification {
     'title'?: string | null;
@@ -1505,6 +1602,13 @@ export interface ProblemDetails {
     'status'?: number | null;
     'detail'?: string | null;
     'instance'?: string | null;
+}
+/**
+ * A public holiday of a region (calculated).
+ */
+export interface PublicHolidayResponse {
+    'date'?: string;
+    'name'?: string | null;
 }
 /**
  * A card scan from a terminal.
@@ -1680,6 +1784,21 @@ export interface SetAccountantRequest {
     'isAccountant'?: boolean;
 }
 /**
+ * A member\'s employment dates (Eintritt/Austritt); left-out fields stay as they are.
+ */
+export interface SetEmploymentRequest {
+    'start'?: string | null;
+    'end'?: string | null;
+    'clearStart'?: boolean;
+    'clearEnd'?: boolean;
+}
+/**
+ * The members to leave out of a company holiday or a Betriebsurlaub (replaces the list).
+ */
+export interface SetExclusionsRequest {
+    'userIds'?: Array<number> | null;
+}
+/**
  * Request payload for setting a member\'s initial overtime hours.
  */
 export interface SetInitialOvertimeRequest {
@@ -1705,6 +1824,14 @@ export interface SetMemberVacationYearRequest {
      * Why the adjustment (≤ 500 characters); empty clears it.
      */
     'note'?: string | null;
+    /**
+     * This member\'s own expiry date of the year\'s carried-in days (e.g. after a long illness).
+     */
+    'expiresOn'?: string | null;
+    /**
+     * True: the organization\'s expiry date again.
+     */
+    'clearExpiresOn'?: boolean | null;
 }
 /**
  * Sets a member\'s personnel number; empty or null removes it.
@@ -2010,6 +2137,16 @@ export interface UpdateBadgeCardRequest {
     'label'?: string | null;
     'isBlocked'?: boolean | null;
 }
+export interface UpdateCompanyLeaveRequest {
+    'name'?: string | null;
+    'from'?: string | null;
+    'to'?: string | null;
+    /**
+     * Move it to this group; left out = unchanged (the whole organization: TimeTracking.Api.Models.Dtos.UpdateCompanyLeaveRequest.ForWholeOrganization).
+     */
+    'groupId'?: number | null;
+    'forWholeOrganization'?: boolean;
+}
 export interface UpdateGroupMemberRoleRequest {
     'role'?: string | null;
 }
@@ -2033,6 +2170,7 @@ export interface UpdateGroupPermissionsRequest {
     'coreHoursToleranceMinutes'?: number | null;
     'coreHoursBackfillDays'?: number | null;
     'inheritCapabilities'?: Array<string> | null;
+    'holidayRegion'?: string | null;
 }
 
 
@@ -2051,6 +2189,11 @@ export interface UpdateHolidayRequest {
     'name'?: string | null;
     'isRecurring'?: boolean | null;
     'isHalfDay'?: boolean | null;
+    /**
+     * Move it to this group; left out = unchanged (the whole organization: TimeTracking.Api.Models.Dtos.UpdateHolidayRequest.ForWholeOrganization).
+     */
+    'groupId'?: number | null;
+    'forWholeOrganization'?: boolean;
 }
 /**
  * An admin corrects a member\'s entry; unset fields stay. Setting the end time resolves a failure entry.
@@ -2115,6 +2258,10 @@ export interface UpdateOrganizationSettingsRequest {
      * First year whose leftover carries (2000 to the current year).
      */
     'vacationCarryOverSince'?: number | null;
+    /**
+     * Public holiday region (HolidayPresets key, e.g. \"DE-BW\"); \"\" removes it.
+     */
+    'holidayRegion'?: string | null;
     /**
      * Business day end as local \"HH:mm\" (e.g. \"04:00\").
      */
@@ -2218,6 +2365,18 @@ export interface UpdateWorkScheduleRequest {
      * True removes the end date (the period runs open-ended); wins over TimeTracking.Api.Models.Dtos.UpdateWorkScheduleRequest.ValidTo.
      */
     'clearValidTo'?: boolean;
+    /**
+     * Admins only: holiday region (HolidayPresets key); \"\" = none (the groups\' or the organization\'s); left out = unchanged.
+     */
+    'holidayRegion'?: string | null;
+    /**
+     * Admins only: vacation days per year of this period; see TimeTracking.Api.Models.Dtos.UpdateWorkScheduleRequest.ClearVacationDaysPerYear.
+     */
+    'vacationDaysPerYear'?: number | null;
+    /**
+     * Admins only: true = the year\'s figure again.
+     */
+    'clearVacationDaysPerYear'?: boolean;
     'weeklyWorkHours'?: number | null;
     'distributeEvenly'?: boolean;
     'targetMon'?: number | null;
@@ -2374,6 +2533,14 @@ export interface WorkScheduleResponse {
     'targetFri'?: number;
     'targetSat'?: number;
     'targetSun'?: number;
+    /**
+     * Public holiday region of this period (the Arbeitsort); null = the groups\' or the organization\'s.
+     */
+    'holidayRegion'?: string | null;
+    /**
+     * Vacation days per year while this period applies; null = the year\'s figure.
+     */
+    'vacationDaysPerYear'?: number | null;
     'initialOvertimeHours'?: number;
     'initialOvertimeMode': string | null;
     'workScheduleChangeMode': string | null;
@@ -6339,6 +6506,441 @@ export class ClosedPeriodsApi extends BaseAPI {
 
 
 /**
+ * CompanyLeaveApi - axios parameter creator
+ */
+export const CompanyLeaveApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary Every Betriebsurlaub of the organization, newest first (members; exclusions for admins).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugCompanyLeavesGet: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugCompanyLeavesGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/company-leaves`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Delete one (admin) with its vacation days.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugCompanyLeavesIdDelete: async (slug: string, id: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugCompanyLeavesIdDelete', 'slug', slug)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugCompanyLeavesIdDelete', 'id', id)
+            const localVarPath = `/api/v1/organizations/{slug}/company-leaves/{id}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Leave members out (admin); replaces the list, their vacation days are removed or written again.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {SetExclusionsRequest} [setExclusionsRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugCompanyLeavesIdExclusionsPut: async (slug: string, id: number, setExclusionsRequest?: SetExclusionsRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugCompanyLeavesIdExclusionsPut', 'slug', slug)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugCompanyLeavesIdExclusionsPut', 'id', id)
+            const localVarPath = `/api/v1/organizations/{slug}/company-leaves/{id}/exclusions`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(setExclusionsRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Change one (admin): the generated vacation days follow.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {UpdateCompanyLeaveRequest} [updateCompanyLeaveRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugCompanyLeavesIdPut: async (slug: string, id: number, updateCompanyLeaveRequest?: UpdateCompanyLeaveRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugCompanyLeavesIdPut', 'slug', slug)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugCompanyLeavesIdPut', 'id', id)
+            const localVarPath = `/api/v1/organizations/{slug}/company-leaves/{id}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(updateCompanyLeaveRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Create one (admin): writes a vacation day on every member\'s working day in the range.
+         * @param {string} slug 
+         * @param {CreateCompanyLeaveRequest} [createCompanyLeaveRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugCompanyLeavesPost: async (slug: string, createCompanyLeaveRequest?: CreateCompanyLeaveRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugCompanyLeavesPost', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/company-leaves`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(createCompanyLeaveRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * CompanyLeaveApi - functional programming interface
+ */
+export const CompanyLeaveApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = CompanyLeaveApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Every Betriebsurlaub of the organization, newest first (members; exclusions for admins).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugCompanyLeavesGet(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<CompanyLeaveResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugCompanyLeavesGet(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['CompanyLeaveApi.apiV1OrganizationsSlugCompanyLeavesGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Delete one (admin) with its vacation days.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugCompanyLeavesIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugCompanyLeavesIdDelete(slug, id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['CompanyLeaveApi.apiV1OrganizationsSlugCompanyLeavesIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Leave members out (admin); replaces the list, their vacation days are removed or written again.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {SetExclusionsRequest} [setExclusionsRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugCompanyLeavesIdExclusionsPut(slug: string, id: number, setExclusionsRequest?: SetExclusionsRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CompanyLeaveResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugCompanyLeavesIdExclusionsPut(slug, id, setExclusionsRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['CompanyLeaveApi.apiV1OrganizationsSlugCompanyLeavesIdExclusionsPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Change one (admin): the generated vacation days follow.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {UpdateCompanyLeaveRequest} [updateCompanyLeaveRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugCompanyLeavesIdPut(slug: string, id: number, updateCompanyLeaveRequest?: UpdateCompanyLeaveRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CompanyLeaveResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugCompanyLeavesIdPut(slug, id, updateCompanyLeaveRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['CompanyLeaveApi.apiV1OrganizationsSlugCompanyLeavesIdPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Create one (admin): writes a vacation day on every member\'s working day in the range.
+         * @param {string} slug 
+         * @param {CreateCompanyLeaveRequest} [createCompanyLeaveRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugCompanyLeavesPost(slug: string, createCompanyLeaveRequest?: CreateCompanyLeaveRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CompanyLeaveResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugCompanyLeavesPost(slug, createCompanyLeaveRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['CompanyLeaveApi.apiV1OrganizationsSlugCompanyLeavesPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * CompanyLeaveApi - factory interface
+ */
+export const CompanyLeaveApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = CompanyLeaveApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Every Betriebsurlaub of the organization, newest first (members; exclusions for admins).
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugCompanyLeavesGet(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<Array<CompanyLeaveResponse>> {
+            return localVarFp.apiV1OrganizationsSlugCompanyLeavesGet(slug, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Delete one (admin) with its vacation days.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugCompanyLeavesIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugCompanyLeavesIdDelete(slug, id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Leave members out (admin); replaces the list, their vacation days are removed or written again.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {SetExclusionsRequest} [setExclusionsRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugCompanyLeavesIdExclusionsPut(slug: string, id: number, setExclusionsRequest?: SetExclusionsRequest, options?: RawAxiosRequestConfig): AxiosPromise<CompanyLeaveResponse> {
+            return localVarFp.apiV1OrganizationsSlugCompanyLeavesIdExclusionsPut(slug, id, setExclusionsRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Change one (admin): the generated vacation days follow.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {UpdateCompanyLeaveRequest} [updateCompanyLeaveRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugCompanyLeavesIdPut(slug: string, id: number, updateCompanyLeaveRequest?: UpdateCompanyLeaveRequest, options?: RawAxiosRequestConfig): AxiosPromise<CompanyLeaveResponse> {
+            return localVarFp.apiV1OrganizationsSlugCompanyLeavesIdPut(slug, id, updateCompanyLeaveRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Create one (admin): writes a vacation day on every member\'s working day in the range.
+         * @param {string} slug 
+         * @param {CreateCompanyLeaveRequest} [createCompanyLeaveRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugCompanyLeavesPost(slug: string, createCompanyLeaveRequest?: CreateCompanyLeaveRequest, options?: RawAxiosRequestConfig): AxiosPromise<CompanyLeaveResponse> {
+            return localVarFp.apiV1OrganizationsSlugCompanyLeavesPost(slug, createCompanyLeaveRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * CompanyLeaveApi - object-oriented interface
+ */
+export class CompanyLeaveApi extends BaseAPI {
+    /**
+     * 
+     * @summary Every Betriebsurlaub of the organization, newest first (members; exclusions for admins).
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugCompanyLeavesGet(slug: string, options?: RawAxiosRequestConfig) {
+        return CompanyLeaveApiFp(this.configuration).apiV1OrganizationsSlugCompanyLeavesGet(slug, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Delete one (admin) with its vacation days.
+     * @param {string} slug 
+     * @param {number} id 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugCompanyLeavesIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig) {
+        return CompanyLeaveApiFp(this.configuration).apiV1OrganizationsSlugCompanyLeavesIdDelete(slug, id, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Leave members out (admin); replaces the list, their vacation days are removed or written again.
+     * @param {string} slug 
+     * @param {number} id 
+     * @param {SetExclusionsRequest} [setExclusionsRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugCompanyLeavesIdExclusionsPut(slug: string, id: number, setExclusionsRequest?: SetExclusionsRequest, options?: RawAxiosRequestConfig) {
+        return CompanyLeaveApiFp(this.configuration).apiV1OrganizationsSlugCompanyLeavesIdExclusionsPut(slug, id, setExclusionsRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Change one (admin): the generated vacation days follow.
+     * @param {string} slug 
+     * @param {number} id 
+     * @param {UpdateCompanyLeaveRequest} [updateCompanyLeaveRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugCompanyLeavesIdPut(slug: string, id: number, updateCompanyLeaveRequest?: UpdateCompanyLeaveRequest, options?: RawAxiosRequestConfig) {
+        return CompanyLeaveApiFp(this.configuration).apiV1OrganizationsSlugCompanyLeavesIdPut(slug, id, updateCompanyLeaveRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Create one (admin): writes a vacation day on every member\'s working day in the range.
+     * @param {string} slug 
+     * @param {CreateCompanyLeaveRequest} [createCompanyLeaveRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugCompanyLeavesPost(slug: string, createCompanyLeaveRequest?: CreateCompanyLeaveRequest, options?: RawAxiosRequestConfig) {
+        return CompanyLeaveApiFp(this.configuration).apiV1OrganizationsSlugCompanyLeavesPost(slug, createCompanyLeaveRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
  * ExportImportApi - axios parameter creator
  */
 export const ExportImportApiAxiosParamCreator = function (configuration?: Configuration) {
@@ -7818,6 +8420,106 @@ export const HolidayApiAxiosParamCreator = function (configuration?: Configurati
         },
         /**
          * 
+         * @summary The public holidays of a region in a year (calculated, e.g. for a preview).
+         * @param {string} region 
+         * @param {number} [year] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsHolidayPresetsRegionDatesGet: async (region: string, year?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'region' is not null or undefined
+            assertParamExists('apiV1OrganizationsHolidayPresetsRegionDatesGet', 'region', region)
+            const localVarPath = `/api/v1/organizations/holiday-presets/{region}/dates`
+                .replace(`{${"region"}}`, encodeURIComponent(String(region)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (year !== undefined) {
+                localVarQueryParameter['year'] = year;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary A member\'s holidays between two days: public ones of their region (schedule, groups, organization) and company  ones (organization or their groups\'). Others\' need the work schedule visibility (the region is the Arbeitsort).
+         * @param {string} slug 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {number} [userId] The member; left out &#x3D; the caller.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugHolidaysDaysGet: async (slug: string, from?: string, to?: string, userId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugHolidaysDaysGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/holidays/days`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (from !== undefined) {
+                localVarQueryParameter['from'] = (from as any instanceof Date) ?
+                    (from as any).toISOString().substring(0,10) :
+                    from;
+            }
+
+            if (to !== undefined) {
+                localVarQueryParameter['to'] = (to as any instanceof Date) ?
+                    (to as any).toISOString().substring(0,10) :
+                    to;
+            }
+
+            if (userId !== undefined) {
+                localVarQueryParameter['userId'] = userId;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary List all holidays for an organization (members only).
          * @param {string} slug Organization URL slug.
          * @param {*} [options] Override http request option.
@@ -7890,6 +8592,52 @@ export const HolidayApiAxiosParamCreator = function (configuration?: Configurati
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Leave members out of a company holiday (admin only); replaces the list.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {SetExclusionsRequest} [setExclusionsRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugHolidaysIdExclusionsPut: async (slug: string, id: number, setExclusionsRequest?: SetExclusionsRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugHolidaysIdExclusionsPut', 'slug', slug)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugHolidaysIdExclusionsPut', 'id', id)
+            const localVarPath = `/api/v1/organizations/{slug}/holidays/{id}/exclusions`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(setExclusionsRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -8037,6 +8785,44 @@ export const HolidayApiAxiosParamCreator = function (configuration?: Configurati
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @summary Deletes the organization-wide holidays an earlier preset import copied that its region now covers (admin only);  returns how many were removed.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugHolidaysRemoveCoveredPost: async (slug: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugHolidaysRemoveCoveredPost', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/holidays/remove-covered`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -8056,6 +8842,36 @@ export const HolidayApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsHolidayPresetsGet(options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiV1OrganizationsHolidayPresetsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary The public holidays of a region in a year (calculated, e.g. for a preview).
+         * @param {string} region 
+         * @param {number} [year] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsHolidayPresetsRegionDatesGet(region: string, year?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<PublicHolidayResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsHolidayPresetsRegionDatesGet(region, year, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiV1OrganizationsHolidayPresetsRegionDatesGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary A member\'s holidays between two days: public ones of their region (schedule, groups, organization) and company  ones (organization or their groups\'). Others\' need the work schedule visibility (the region is the Arbeitsort).
+         * @param {string} slug 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {number} [userId] The member; left out &#x3D; the caller.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugHolidaysDaysGet(slug: string, from?: string, to?: string, userId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MemberDaysOffResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugHolidaysDaysGet(slug, from, to, userId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiV1OrganizationsSlugHolidaysDaysGet']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -8083,6 +8899,21 @@ export const HolidayApiFp = function(configuration?: Configuration) {
             const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugHolidaysIdDelete(slug, id, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiV1OrganizationsSlugHolidaysIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Leave members out of a company holiday (admin only); replaces the list.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {SetExclusionsRequest} [setExclusionsRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugHolidaysIdExclusionsPut(slug: string, id: number, setExclusionsRequest?: SetExclusionsRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<HolidayResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugHolidaysIdExclusionsPut(slug, id, setExclusionsRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiV1OrganizationsSlugHolidaysIdExclusionsPut']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
         /**
@@ -8130,6 +8961,19 @@ export const HolidayApiFp = function(configuration?: Configuration) {
             const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiV1OrganizationsSlugHolidaysPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * 
+         * @summary Deletes the organization-wide holidays an earlier preset import copied that its region now covers (admin only);  returns how many were removed.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugHolidaysRemoveCoveredPost(slug: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<number>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugHolidaysRemoveCoveredPost(slug, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['HolidayApi.apiV1OrganizationsSlugHolidaysRemoveCoveredPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -8147,6 +8991,30 @@ export const HolidayApiFactory = function (configuration?: Configuration, basePa
          */
         apiV1OrganizationsHolidayPresetsGet(options?: RawAxiosRequestConfig): AxiosPromise<Array<HolidayPresetResponse>> {
             return localVarFp.apiV1OrganizationsHolidayPresetsGet(options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary The public holidays of a region in a year (calculated, e.g. for a preview).
+         * @param {string} region 
+         * @param {number} [year] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsHolidayPresetsRegionDatesGet(region: string, year?: number, options?: RawAxiosRequestConfig): AxiosPromise<Array<PublicHolidayResponse>> {
+            return localVarFp.apiV1OrganizationsHolidayPresetsRegionDatesGet(region, year, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary A member\'s holidays between two days: public ones of their region (schedule, groups, organization) and company  ones (organization or their groups\'). Others\' need the work schedule visibility (the region is the Arbeitsort).
+         * @param {string} slug 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {number} [userId] The member; left out &#x3D; the caller.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugHolidaysDaysGet(slug: string, from?: string, to?: string, userId?: number, options?: RawAxiosRequestConfig): AxiosPromise<MemberDaysOffResponse> {
+            return localVarFp.apiV1OrganizationsSlugHolidaysDaysGet(slug, from, to, userId, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -8168,6 +9036,18 @@ export const HolidayApiFactory = function (configuration?: Configuration, basePa
          */
         apiV1OrganizationsSlugHolidaysIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
             return localVarFp.apiV1OrganizationsSlugHolidaysIdDelete(slug, id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Leave members out of a company holiday (admin only); replaces the list.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {SetExclusionsRequest} [setExclusionsRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugHolidaysIdExclusionsPut(slug: string, id: number, setExclusionsRequest?: SetExclusionsRequest, options?: RawAxiosRequestConfig): AxiosPromise<HolidayResponse> {
+            return localVarFp.apiV1OrganizationsSlugHolidaysIdExclusionsPut(slug, id, setExclusionsRequest, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -8205,6 +9085,16 @@ export const HolidayApiFactory = function (configuration?: Configuration, basePa
         apiV1OrganizationsSlugHolidaysPost(slug: string, createHolidayRequest?: CreateHolidayRequest, options?: RawAxiosRequestConfig): AxiosPromise<HolidayResponse> {
             return localVarFp.apiV1OrganizationsSlugHolidaysPost(slug, createHolidayRequest, options).then((request) => request(axios, basePath));
         },
+        /**
+         * 
+         * @summary Deletes the organization-wide holidays an earlier preset import copied that its region now covers (admin only);  returns how many were removed.
+         * @param {string} slug 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugHolidaysRemoveCoveredPost(slug: string, options?: RawAxiosRequestConfig): AxiosPromise<number> {
+            return localVarFp.apiV1OrganizationsSlugHolidaysRemoveCoveredPost(slug, options).then((request) => request(axios, basePath));
+        },
     };
 };
 
@@ -8220,6 +9110,32 @@ export class HolidayApi extends BaseAPI {
      */
     public apiV1OrganizationsHolidayPresetsGet(options?: RawAxiosRequestConfig) {
         return HolidayApiFp(this.configuration).apiV1OrganizationsHolidayPresetsGet(options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary The public holidays of a region in a year (calculated, e.g. for a preview).
+     * @param {string} region 
+     * @param {number} [year] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsHolidayPresetsRegionDatesGet(region: string, year?: number, options?: RawAxiosRequestConfig) {
+        return HolidayApiFp(this.configuration).apiV1OrganizationsHolidayPresetsRegionDatesGet(region, year, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary A member\'s holidays between two days: public ones of their region (schedule, groups, organization) and company  ones (organization or their groups\'). Others\' need the work schedule visibility (the region is the Arbeitsort).
+     * @param {string} slug 
+     * @param {string} [from] 
+     * @param {string} [to] 
+     * @param {number} [userId] The member; left out &#x3D; the caller.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugHolidaysDaysGet(slug: string, from?: string, to?: string, userId?: number, options?: RawAxiosRequestConfig) {
+        return HolidayApiFp(this.configuration).apiV1OrganizationsSlugHolidaysDaysGet(slug, from, to, userId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -8243,6 +9159,19 @@ export class HolidayApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugHolidaysIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig) {
         return HolidayApiFp(this.configuration).apiV1OrganizationsSlugHolidaysIdDelete(slug, id, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Leave members out of a company holiday (admin only); replaces the list.
+     * @param {string} slug 
+     * @param {number} id 
+     * @param {SetExclusionsRequest} [setExclusionsRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugHolidaysIdExclusionsPut(slug: string, id: number, setExclusionsRequest?: SetExclusionsRequest, options?: RawAxiosRequestConfig) {
+        return HolidayApiFp(this.configuration).apiV1OrganizationsSlugHolidaysIdExclusionsPut(slug, id, setExclusionsRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -8282,6 +9211,17 @@ export class HolidayApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugHolidaysPost(slug: string, createHolidayRequest?: CreateHolidayRequest, options?: RawAxiosRequestConfig) {
         return HolidayApiFp(this.configuration).apiV1OrganizationsSlugHolidaysPost(slug, createHolidayRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Deletes the organization-wide holidays an earlier preset import copied that its region now covers (admin only);  returns how many were removed.
+     * @param {string} slug 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugHolidaysRemoveCoveredPost(slug: string, options?: RawAxiosRequestConfig) {
+        return HolidayApiFp(this.configuration).apiV1OrganizationsSlugHolidaysRemoveCoveredPost(slug, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -9696,6 +10636,52 @@ export const OrganizationsApiAxiosParamCreator = function (configuration?: Confi
         },
         /**
          * 
+         * @summary Set a member\'s employment dates (admin only): the vacation of the first and last year is pro rata (§ 5 BUrlG).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {SetEmploymentRequest} [setEmploymentRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdEmploymentPut: async (slug: string, memberId: number, setEmploymentRequest?: SetEmploymentRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdEmploymentPut', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdEmploymentPut', 'memberId', memberId)
+            const localVarPath = `/api/v1/Organizations/{slug}/members/{memberId}/employment`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(setEmploymentRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @summary Set a member\'s initial overtime hours (admin only).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID to update.
@@ -10310,6 +11296,21 @@ export const OrganizationsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @summary Set a member\'s employment dates (admin only): the vacation of the first and last year is pro rata (§ 5 BUrlG).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {SetEmploymentRequest} [setEmploymentRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdEmploymentPut(slug: string, memberId: number, setEmploymentRequest?: SetEmploymentRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<MemberEmploymentResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdEmploymentPut(slug, memberId, setEmploymentRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['OrganizationsApi.apiV1OrganizationsSlugMembersMemberIdEmploymentPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @summary Set a member\'s initial overtime hours (admin only).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID to update.
@@ -10567,6 +11568,18 @@ export const OrganizationsApiFactory = function (configuration?: Configuration, 
         },
         /**
          * 
+         * @summary Set a member\'s employment dates (admin only): the vacation of the first and last year is pro rata (§ 5 BUrlG).
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {SetEmploymentRequest} [setEmploymentRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdEmploymentPut(slug: string, memberId: number, setEmploymentRequest?: SetEmploymentRequest, options?: RawAxiosRequestConfig): AxiosPromise<MemberEmploymentResponse> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdEmploymentPut(slug, memberId, setEmploymentRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @summary Set a member\'s initial overtime hours (admin only).
          * @param {string} slug Organization URL slug.
          * @param {number} memberId Member ID to update.
@@ -10793,6 +11806,19 @@ export class OrganizationsApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugMembersMemberIdDelete(slug: string, memberId: number, options?: RawAxiosRequestConfig) {
         return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdDelete(slug, memberId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Set a member\'s employment dates (admin only): the vacation of the first and last year is pro rata (§ 5 BUrlG).
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {SetEmploymentRequest} [setEmploymentRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdEmploymentPut(slug: string, memberId: number, setEmploymentRequest?: SetEmploymentRequest, options?: RawAxiosRequestConfig) {
+        return OrganizationsApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdEmploymentPut(slug, memberId, setEmploymentRequest, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

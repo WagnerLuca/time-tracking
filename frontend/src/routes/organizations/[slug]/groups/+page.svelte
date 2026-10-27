@@ -4,12 +4,12 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
-	import { groupApi } from '$lib/apiClient';
+	import { groupApi, holidayApi } from '$lib/apiClient';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
 	import { t } from '$lib/i18n';
-	import { getInitials } from '$lib/utils/formatters';
+	import { getInitials, holidayRegionLabel } from '$lib/utils/formatters';
 	import { DEFAULT_GROUP_COLOR, GROUP_COLOR_PRESETS, safeColor } from '$lib/utils/colors';
 	import ModeSelector from '$lib/components/ModeSelector.svelte';
 	import Modal from '$lib/components/Modal.svelte';
@@ -411,6 +411,20 @@
 			return;
 		}
 		return setPermValue('coreHoursToleranceMinutes', minutes);
+	}
+
+	/** Public holiday regions for the group's own one (loaded with the first group opened). */
+	let regionPresets = $state<{ key?: string | null; name?: string | null }[]>([]);
+	$effect(() => {
+		if (selectedGroup?.id != null && regionPresets.length === 0)
+			holidayApi.apiV1OrganizationsHolidayPresetsGet().then((r) => (regionPresets = r.data)).catch(() => {});
+	});
+
+	function regionHint(): string {
+		const id = selectedGroup?.id;
+		if (id == null) return '';
+		return inheritText(inheritedFrom(permGroups, id, (g) => g.holidayRegion ?? null), orgDetail?.holidayRegion ?? null,
+			(r) => (r ? holidayRegionLabel(r) : t('groups.perm.holidayRegion.none')));
 	}
 
 	/** "Auch die letzten N Tage prüfen", sent when the group switches to its own window. */
@@ -827,6 +841,19 @@
 							<span class="text-sm text-base-content/70">{t('orgSettings.coreHours.minutes')}</span>
 						{/if}
 					</div>
+				</div>
+
+				<div class="flex items-center justify-between gap-3 p-3 border-b border-base-200 flex-wrap" data-testid="group-holiday-region">
+					<div>
+						<div class="text-sm font-medium text-base-content">{t('groups.perm.holidayRegion.title')}</div>
+						<div class="text-xs text-base-content/70">{t('groups.perm.holidayRegion.description')}</div>
+						{#if !permissions.holidayRegion}{@render hint(regionHint())}{/if}
+					</div>
+					<select class="select select-xs w-56" aria-label={t('groups.perm.holidayRegion.label')} value={permissions.holidayRegion ?? ''}
+						onchange={(e) => savePermissions({ holidayRegion: e.currentTarget.value })} disabled={permissionsSaving}>
+						<option value="">{t('holidays.region.inherit')}</option>
+						{#each regionPresets as p (p.key)}<option value={p.key}>{holidayRegionLabel(p.key ?? '', p.name ?? '')}</option>{/each}
+					</select>
 				</div>
 
 				<!-- Group Admin capability flags -->

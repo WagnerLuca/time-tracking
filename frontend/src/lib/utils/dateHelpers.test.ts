@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { dateKey, expandHolidays, getWeekRange, holidayDateIn, isFuture, isToday, sumMinutes, toLocalDateTimeInput } from './dateHelpers';
+import { dateKey, getWeekRange, isFuture, isToday, sumMinutes, toLocalDateTimeInput } from './dateHelpers';
 
 describe('dateHelpers (TZ=Europe/Berlin)', () => {
 	afterEach(() => vi.useRealTimers());
@@ -90,26 +90,5 @@ describe('dateHelpers (TZ=Europe/Berlin)', () => {
 				{ netDurationMinutes: null, durationMinutes: null }
 			])
 		).toBe(480);
-	});
-});
-
-describe('recurring holidays', () => {
-	const newYear = { date: '2025-01-01', name: 'Neujahr', isRecurring: true };
-	const goodFriday = { date: '2025-04-18', name: 'Karfreitag', isRecurring: false };
-	const leap = { date: '2024-02-29', name: 'Schalttag', isRecurring: true };
-
-	it('holidayDateIn repeats recurring holidays and keeps one-off ones in their year', () => {
-		expect(holidayDateIn(newYear, 2027)).toBe('2027-01-01');
-		expect(holidayDateIn(newYear, 2020)).toBe('2020-01-01');
-		expect(holidayDateIn(goodFriday, 2025)).toBe('2025-04-18');
-		expect(holidayDateIn(goodFriday, 2026)).toBeNull();
-		expect(holidayDateIn(leap, 2028)).toBe('2028-02-29');
-		expect(holidayDateIn(leap, 2026)).toBeNull();
-	});
-
-	it('expandHolidays covers every displayed year', () => {
-		const map = expandHolidays([newYear, goodFriday], 2025, 2027);
-		expect([...map.keys()].sort()).toEqual(['2025-01-01', '2025-04-18', '2026-01-01', '2027-01-01']);
-		expect(map.get('2026-01-01')).toEqual([newYear]);
 	});
 });

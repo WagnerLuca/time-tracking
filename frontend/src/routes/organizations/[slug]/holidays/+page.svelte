@@ -6,12 +6,15 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { confirmDialog } from '$lib/stores/confirm.svelte';
-	import { holidayApi } from '$lib/apiClient';
+	import { holidayApi, groupApi } from '$lib/apiClient';
+	import ExclusionsDialog from '$lib/components/ExclusionsDialog.svelte';
+	import CompanyLeavesPanel from '$lib/components/CompanyLeavesPanel.svelte';
 	import { t, tp } from '$lib/i18n';
-	import { formatDate, holidayRegionLabel } from '$lib/utils/formatters';
+	import HolidayRegionPanel from '$lib/components/HolidayRegionPanel.svelte';
+	import { formatDate } from '$lib/utils/formatters';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
 	import { extractErrorMessage, getErrorStatus } from '$lib/utils/errorHandler';
-	import type { OrganizationDetailResponse, HolidayResponse, HolidayPresetResponse } from '$lib/api';
+	import type { OrganizationDetailResponse, HolidayResponse, GroupResponse } from '$lib/api';
 
 	let org = $state<OrganizationDetailResponse | null>(null);
 	let loading = $state(true);
@@ -46,52 +49,40 @@
 
 	let deletingId = $state<number | null>(null);
 
-	// Import public holidays from a preset (Germany nationwide or a state, Austria, Switzerland)
-	const MAX_IMPORT_YEARS = 10;
-	let showImport = $state(false);
-	let presets = $state<HolidayPresetResponse[]>([]);
-	let importPreset = $state('DE');
-	let importFromYear = $state(new Date().getFullYear());
-	let importToYear = $state(new Date().getFullYear());
-	let importing = $state(false);
-	let importError = $state('');
-	let importRangeError = $derived(
-		!Number.isInteger(importFromYear) || !Number.isInteger(importToYear) || importFromYear < 2000 || importToYear > 2100 || importToYear < importFromYear
-			? t('holidays.import.rangeInvalid')
-			: importToYear - importFromYear >= MAX_IMPORT_YEARS
-				? t('holidays.import.rangeTooLong', { max: MAX_IMPORT_YEARS })
-				: ''
-	);
+	// Company holidays of a group (and its sub-groups); members an admin leaves out
+	let groups = $state<GroupResponse[]>([]);
+	let newHolidayGroup = $state('');
+	let editHolidayGroup = $state('');
+	let excluding = $state<HolidayResponse | null>(null);
+	let savingExclusions = $state(false);
+	let members = $derived((org?.members ?? []).map((m) => ({ id: m.id ?? 0, name: `${m.firstName ?? ''} ${m.lastName ?? ''}`.trim() }))
+		.sort((a, b) => a.name.localeCompare(b.name)));
 
-	async function toggleImport() {
-		showImport = !showImport;
-		importError = '';
-		if (showImport && presets.length === 0) {
-			try {
-				const { data } = await holidayApi.apiV1OrganizationsHolidayPresetsGet();
-				presets = data;
-			} catch (err) {
-				importError = extractErrorMessage(err, t('holidays.import.presetsFailed'));
-			}
+	function groupName(id: number | null | undefined): string | null {
+		return id == null ? null : groups.find((g) => g.id === id)?.name ?? `#${id}`;
+	}
+
+	async function loadGroups() {
+		try {
+			groups = (await groupApi.apiV1OrganizationsSlugGroupsGet(orgSlug)).data;
+		} catch {
+			groups = [];
 		}
 	}
 
-	async function importHolidays(e: Event) {
-		e.preventDefault();
-		if (importRangeError || !importPreset) return;
-		importing = true;
-		importError = '';
+	async function saveExclusions(userIds: number[]) {
+		if (!excluding?.id) return;
+		savingExclusions = true;
 		try {
-			const { data } = await holidayApi.apiV1OrganizationsSlugHolidaysImportPresetPost(orgSlug, importPreset, importFromYear, importToYear);
 			invalidateOrgDetail(orgSlug);
-			toast.success(tp('holidays.import.done', data.length));
-			showImport = false;
-			selectedYear = importFromYear;
+			await holidayApi.apiV1OrganizationsSlugHolidaysIdExclusionsPut(orgSlug, excluding.id, { userIds });
+			toast.success(t('holidays.exclusions.saved'));
+			excluding = null;
 			await loadHolidays();
 		} catch (err) {
-			importError = extractErrorMessage(err, t('holidays.import.failed'));
+			toast.error(err, t('holidays.exclusions.failed'));
 		} finally {
-			importing = false;
+			savingExclusions = false;
 		}
 	}
 
@@ -126,6 +117,7 @@
 			const data = await getOrgDetail(orgSlug);
 			org = data;
 			loadHolidays();
+			if (isOrgAdmin(data.members?.find((m) => m.id === auth.user?.id)?.role ?? null)) loadGroups();
 		} catch (err) {
 			error = getErrorStatus(err) === 404 ? t('holidays.notFound') : extractErrorMessage(err, t('holidays.loadOrgFailed'));
 		} finally {
@@ -161,7 +153,8 @@
 				date: newHolidayDate,
 				name: newHolidayName.trim(),
 				isRecurring: newHolidayRecurring,
-				isHalfDay: newHolidayHalfDay
+				isHalfDay: newHolidayHalfDay,
+				groupId: newHolidayGroup ? Number(newHolidayGroup) : null
 			});
 			toast.success(t('holidays.added'));
 			showAddHoliday = false;
@@ -169,6 +162,7 @@
 			newHolidayDate = '';
 			newHolidayRecurring = false;
 			newHolidayHalfDay = false;
+			newHolidayGroup = '';
 			addSubmitted = false;
 			await loadHolidays();
 		} catch (err) {
@@ -184,6 +178,7 @@
 		editHolidayDate = h.date ?? '';
 		editHolidayRecurring = h.isRecurring ?? false;
 		editHolidayHalfDay = h.isHalfDay ?? false;
+		editHolidayGroup = h.groupId != null ? String(h.groupId) : '';
 		editSubmitted = false;
 		editError = '';
 	}
@@ -200,7 +195,9 @@
 				date: editHolidayDate,
 				name: editHolidayName.trim(),
 				isRecurring: editHolidayRecurring,
-				isHalfDay: editHolidayHalfDay
+				isHalfDay: editHolidayHalfDay,
+				groupId: editHolidayGroup ? Number(editHolidayGroup) : null,
+				forWholeOrganization: !editHolidayGroup
 			});
 			toast.success(t('holidays.saved'));
 			editingHolidayId = null;
@@ -252,10 +249,12 @@
 		<div class="alert alert-error">{error}</div>
 	{:else if org}
 		<div class="pt-4">
+			<HolidayRegionPanel slug={orgSlug} region={org.holidayRegion} year={selectedYear} {canEdit}
+				onchange={async () => { org = await getOrgDetail(orgSlug); await loadHolidays(); }} />
 			<section>
 				<div class="flex items-center justify-between gap-3 mb-4 flex-wrap">
 					<div class="flex items-center gap-3">
-						<h2 class="text-xl font-bold text-base-content m-0">{t('holidays.title')}</h2>
+						<h2 class="text-lg font-semibold text-base-content m-0">{t('holidays.company.title')}</h2>
 						<select class="select select-sm w-auto" bind:value={selectedYear} aria-label={t('holidays.year')}>
 							{#each availableYears as year (year)}
 								<option value={year}>{year}</option>
@@ -264,9 +263,6 @@
 					</div>
 					{#if canEdit}
 						<div class="flex gap-2 flex-wrap">
-							<button class="btn btn-outline btn-sm" onclick={toggleImport} aria-expanded={showImport}>
-								{showImport ? t('common.cancel') : t('holidays.import.open')}
-							</button>
 							<button class="btn btn-primary btn-sm" onclick={toggleAddForm} aria-expanded={showAddHoliday}>
 								{showAddHoliday ? t('common.cancel') : t('holidays.add')}
 							</button>
@@ -274,6 +270,7 @@
 					{/if}
 				</div>
 
+				<p class="text-sm text-base-content/70 mt-0 mb-3">{t('holidays.company.intro')}</p>
 				{#if holidaysError}
 					<div class="alert alert-error mb-4 text-sm" role="alert">
 						<span>{holidaysError}</span>
@@ -281,36 +278,6 @@
 					</div>
 				{/if}
 
-				{#if showImport && canEdit}
-					<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
-						<p class="text-sm text-base-content/70 mb-3">{t('holidays.import.intro')}</p>
-						{#if importError}
-							<div class="alert alert-error mb-3 text-sm" role="alert">{importError}</div>
-						{/if}
-						<form onsubmit={importHolidays} class="flex gap-3 items-end flex-wrap" novalidate>
-							<div class="form-control w-full sm:w-auto">
-								<label for="holidayPreset" class="label text-xs">{t('holidays.import.region')}</label>
-								<select id="holidayPreset" class="select select-sm w-full sm:w-64" bind:value={importPreset} disabled={importing || presets.length === 0}>
-									{#each presets as p (p.key)}
-										<option value={p.key}>{holidayRegionLabel(p.key, p.name)}</option>
-									{/each}
-								</select>
-							</div>
-							<div class="form-control">
-								<label for="importFrom" class="label text-xs">{t('holidays.import.fromYear')}</label>
-								<input id="importFrom" type="number" min="2000" max="2100" class="input input-sm w-24" class:input-error={importRangeError} bind:value={importFromYear} disabled={importing} aria-describedby={importRangeError ? 'importRangeError' : undefined} />
-							</div>
-							<div class="form-control">
-								<label for="importTo" class="label text-xs">{t('holidays.import.toYear')}</label>
-								<input id="importTo" type="number" min="2000" max="2100" class="input input-sm w-24" class:input-error={importRangeError} bind:value={importToYear} disabled={importing} aria-describedby={importRangeError ? 'importRangeError' : undefined} />
-							</div>
-							<button type="submit" class="btn btn-primary btn-sm" disabled={importing || !!importRangeError || presets.length === 0}>
-								{importing ? t('holidays.import.importing') : t('holidays.import.submit')}
-							</button>
-						</form>
-						{#if importRangeError}<p id="importRangeError" class="text-xs text-error mt-2 m-0">{importRangeError}</p>{/if}
-					</div>
-				{/if}
 
 				{#if showAddHoliday && canEdit}
 					<div class="bg-base-200/50 p-4 rounded-lg mb-4 border border-base-300">
@@ -327,6 +294,13 @@
 								<label for="holidayDate" class="label text-xs">{t('holidays.date')}</label>
 								<input id="holidayDate" type="date" class="input input-sm w-full" class:input-error={addSubmitted && !newHolidayDate} bind:value={newHolidayDate} required disabled={addingHoliday} />
 								{#if addSubmitted && !newHolidayDate}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
+							</div>
+							<div class="form-control w-full sm:w-auto">
+								<label for="holidayGroup" class="label text-xs">{t('holidays.company.scope')}</label>
+								<select id="holidayGroup" class="select select-sm w-full sm:w-56" bind:value={newHolidayGroup} disabled={addingHoliday}>
+									<option value="">{t('holidays.company.wholeOrg')}</option>
+									{#each groups as g (g.id)}<option value={String(g.id)}>{g.name}</option>{/each}
+								</select>
 							</div>
 							<label class="label cursor-pointer flex items-center gap-2 text-sm">
 								<input type="checkbox" class="checkbox checkbox-sm" bind:checked={newHolidayRecurring} disabled={addingHoliday} />
@@ -364,6 +338,13 @@
 											<input id="editHolidayDate" type="date" class="input input-sm w-full" class:input-error={editSubmitted && !editHolidayDate} bind:value={editHolidayDate} required disabled={editHolidaySaving} />
 											{#if editSubmitted && !editHolidayDate}<span class="text-xs text-error mt-1">{t('common.required')}</span>{/if}
 										</div>
+										<div class="form-control w-full sm:w-auto">
+											<label for="editHolidayGroup" class="label text-xs">{t('holidays.company.scope')}</label>
+											<select id="editHolidayGroup" class="select select-sm w-full sm:w-56" bind:value={editHolidayGroup} disabled={editHolidaySaving}>
+												<option value="">{t('holidays.company.wholeOrg')}</option>
+												{#each groups as g (g.id)}<option value={String(g.id)}>{g.name}</option>{/each}
+											</select>
+										</div>
 										<label class="label cursor-pointer flex items-center gap-2 text-sm">
 											<input type="checkbox" class="checkbox checkbox-sm" bind:checked={editHolidayRecurring} disabled={editHolidaySaving} />
 											{t('holidays.recurringEveryYear')}
@@ -387,9 +368,16 @@
 										{#if h.isHalfDay}
 											<span class="badge badge-sm badge-outline">{t('holidays.halfDayBadge')}</span>
 										{/if}
+										{#if h.groupId != null}
+											<span class="badge badge-sm badge-outline">{groupName(h.groupId)}</span>
+										{/if}
+										{#if (h.excludedUserIds?.length ?? 0) > 0}
+											<span class="badge badge-sm badge-outline">{tp('holidays.company.excluded', h.excludedUserIds!.length)}</span>
+										{/if}
 									</div>
 									{#if canEdit}
 										<div class="flex items-center gap-1.5 ml-auto">
+											<button class="btn btn-ghost btn-sm" onclick={() => (excluding = h)}>{t('holidays.company.exclude')}</button>
 											<button class="btn btn-ghost btn-sm" onclick={() => startEditHoliday(h)}>{t('common.edit')}</button>
 											<button class="btn btn-ghost btn-xs text-error" aria-label={t('holidays.deleteLabel', { name: h.name ?? '' })} title={t('holidays.deleteLabel', { name: h.name ?? '' })} disabled={deletingId === h.id} onclick={() => deleteHoliday(h)}>&times;</button>
 										</div>
@@ -400,6 +388,9 @@
 					</ul>
 				{/if}
 			</section>
+			<CompanyLeavesPanel slug={orgSlug} {canEdit} {groups} {members} />
 		</div>
+		<ExclusionsDialog open={excluding !== null} name={excluding?.name ?? ''} {members} selected={excluding?.excludedUserIds ?? []}
+			saving={savingExclusions} onclose={() => (excluding = null)} onsave={saveExclusions} />
 	{/if}
 </div>

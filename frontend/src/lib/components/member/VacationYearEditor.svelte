@@ -5,7 +5,7 @@
 	import { t } from '$lib/i18n';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { extractErrorMessage } from '$lib/utils/errorHandler';
-	import { formatDateTime, formatNumber } from '$lib/utils/formatters';
+	import { formatDate, formatDateTime, formatNumber } from '$lib/utils/formatters';
 	import { orgYear, vacationDetailLines } from '$lib/utils/vacation';
 
 	/** Admin: a member's vacation entitlement and adjustment (+ note) of one year, with that year's balance. */
@@ -30,6 +30,9 @@
 	let entitlement = $state<number | null>(null);
 	let adjustment = $state<number | null>(0);
 	let note = $state('');
+	let employmentStart = $state('');
+	let employmentEnd = $state('');
+	let expiresOn = $state('');
 	let submitted = $state(false);
 	let saving = $state(false);
 	let saveError = $state('');
@@ -52,6 +55,9 @@
 			entitlement = d.hasOwnEntitlement ? (d.entitlement ?? 0) : null;
 			adjustment = d.adjustment ?? 0;
 			note = d.adjustmentNote ?? '';
+			employmentStart = d.employmentStart ?? '';
+			employmentEnd = d.employmentEnd ?? '';
+			expiresOn = d.ownExpiresOn ?? '';
 			submitted = false;
 			saveError = '';
 		} catch (err) {
@@ -74,7 +80,7 @@
 	});
 
 	/** Sends one change for the shown year; ignores the answer when another year is shown by then. */
-	async function put(body: { entitlement?: number; clearEntitlement?: boolean; adjustment?: number; note?: string }, success: string) {
+	async function put(body: { entitlement?: number; clearEntitlement?: boolean; adjustment?: number; note?: string; expiresOn?: string; clearExpiresOn?: boolean }, success: string) {
 		const target = year;
 		saving = true;
 		saveError = '';
@@ -101,8 +107,23 @@
 		e.preventDefault();
 		submitted = true;
 		if (yearError || entitlementError || adjustmentError || noteError || !data) return;
+		// Employment dates first: the year's figures below follow them
+		if (employmentStart !== (data.employmentStart ?? '') || employmentEnd !== (data.employmentEnd ?? '')) {
+			try {
+				await organizationsApi.apiV1OrganizationsSlugMembersMemberIdEmploymentPut(orgSlug, memberId, {
+					start: employmentStart || undefined, end: employmentEnd || undefined,
+					clearStart: !employmentStart, clearEnd: !employmentEnd
+				});
+			} catch (err) {
+				saveError = extractErrorMessage(err, t('vacation.year.saveFailed'));
+				return;
+			}
+		}
 		// An empty entitlement leaves it as it is; only the button resets it to inherited
-		await put({ entitlement: entitlement ?? undefined, adjustment: adjustment ?? 0, note: note.trim() }, t('vacation.year.saved', { year }));
+		await put({
+			entitlement: entitlement ?? undefined, adjustment: adjustment ?? 0, note: note.trim(),
+			...(expiresOn !== (data.ownExpiresOn ?? '') ? (expiresOn ? { expiresOn } : { clearExpiresOn: true }) : {})
+		}, t('vacation.year.saved', { year }));
 	}
 </script>
 
@@ -128,6 +149,12 @@
 					<dt class="text-base-content/70">{t('vacation.year.used')}</dt><dd class="m-0 text-right tabular-nums">{formatNumber((data.taken ?? 0) + (data.planned ?? 0))}</dd>
 					<dt class="font-semibold">{t('vacation.year.remaining')}</dt><dd class="m-0 text-right tabular-nums font-semibold">{formatNumber(data.remaining ?? 0)}</dd>
 				</dl>
+				{#if (data.annualEntitlement ?? data.entitlement) !== data.entitlement}
+					<p class="text-xs text-base-content/70 m-0 mt-1">{t('vacation.year.proRata', { days: formatNumber(data.entitlement ?? 0), annual: formatNumber(data.annualEntitlement ?? 0) })}</p>
+				{/if}
+				{#if (data.carriedIn ?? 0) > 0}
+					<p class="text-xs text-base-content/70 m-0 mt-1">{data.expiryNoticeAt ? t('vacation.year.noticeSent', { date: formatDate(data.expiryNoticeAt) }) : t('vacation.year.noNotice')}</p>
+				{/if}
 				{#each vacationDetailLines(data, data.year ?? year) as line (line)}
 					<p class="text-xs text-base-content/70 m-0 mt-1">{line}</p>
 				{/each}
@@ -155,6 +182,21 @@
 				<input id="vac-year-adjustment" type="number" step="0.5" min="-365" max="365" class="input input-sm w-28" class:input-error={adjustmentError} aria-invalid={!!adjustmentError} bind:value={adjustment} disabled={saving || loading} />
 				<p class="text-xs text-base-content/70 m-0">{t('vacation.year.adjustmentHint')}</p>
 				{#if adjustmentError}<p class="text-error text-xs m-0">{adjustmentError}</p>{/if}
+			</div>
+
+			<fieldset class="flex flex-col gap-1">
+				<legend class="text-sm font-medium text-base-content/80">{t('vacation.year.employmentStart')} / {t('vacation.year.employmentEnd')}</legend>
+				<div class="flex gap-2 flex-wrap">
+					<input type="date" class="input input-sm" aria-label={t('vacation.year.employmentStart')} bind:value={employmentStart} disabled={saving || loading} />
+					<input type="date" class="input input-sm" aria-label={t('vacation.year.employmentEnd')} bind:value={employmentEnd} min={employmentStart || undefined} disabled={saving || loading} />
+				</div>
+				<p class="text-xs text-base-content/70 m-0">{t('vacation.year.employmentHint')}</p>
+			</fieldset>
+
+			<div class="flex flex-col gap-1">
+				<label for="vac-year-expires" class="text-sm font-medium text-base-content/80">{t('vacation.year.expiresOn')}</label>
+				<input id="vac-year-expires" type="date" class="input input-sm w-44" min="{data.year ?? year}-01-01" max="{data.year ?? year}-12-31" bind:value={expiresOn} disabled={saving || loading} />
+				<p class="text-xs text-base-content/70 m-0">{t('vacation.year.expiresOnHint')}</p>
 			</div>
 
 			<div class="flex flex-col gap-1">
