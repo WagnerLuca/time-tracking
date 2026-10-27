@@ -53,6 +53,7 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<PushSubscription> PushSubscriptions { get; set; }
     public DbSet<BalanceCheckpoint> BalanceCheckpoints { get; set; }
     public DbSet<VacationYear> VacationYears { get; set; }
+    public DbSet<Appointment> Appointments { get; set; }
 
     /// <summary>
     /// Saves, and records every change a user made to a finished time entry in
@@ -673,6 +674,20 @@ public class TimeTrackingDbContext : DbContext
             entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<User>().WithMany().HasForeignKey(e => e.UpdatedByUserId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasQueryFilter(e => e.Organization.IsActive);
+        });
+
+        // Planned appointments (#83, information only; RLS like TimeEntries). Gone with the organization;
+        // account deletion removes them.
+        modelBuilder.Entity<Appointment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Note).HasMaxLength(Appointment.NoteMaxLength);
+            entity.HasIndex(e => new { e.OrganizationId, e.Date });
+            entity.HasIndex(e => new { e.UserId, e.Date });
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.CreatedByUserId).OnDelete(DeleteBehavior.SetNull);
             entity.HasQueryFilter(e => e.Organization.IsActive);
         });
 

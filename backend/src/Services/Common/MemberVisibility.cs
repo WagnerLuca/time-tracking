@@ -24,7 +24,7 @@ namespace TimeTracking.Api.Services;
 /// <item>Group admins (org admins too, which matters for tracked times) keep their capability-based
 /// rights over the members of the groups they administer and of all their sub-groups (per the administered
 /// group's effective capabilities), on top of the matrix: they always see them (name, email, groups);
-/// <c>GroupAdminCanApproveAbsences</c> adds all absence kinds, notes and the vacation balance;
+/// <c>GroupAdminCanApproveAbsences</c> adds all absence kinds, notes, the vacation balance and appointments with their notes;
 /// <c>GroupAdminCanViewAllTimeEntries</c> adds tracked times, work schedule and presence;
 /// <c>GroupAdminCanExportData</c> adds tracked times and work schedule; and
 /// <c>GroupAdminCanManageMembers</c> lets them see every org member (to pick whom to add).</item>
@@ -38,7 +38,8 @@ public sealed class MemberVisibility
     public static readonly MemberInfo AllKinds = Kinds.Aggregate(MemberInfo.None, (a, k) => a | k);
 
     private const MemberInfo Absences = MemberInfo.Vacation | MemberInfo.SickDays | MemberInfo.OtherAbsences
-                                        | MemberInfo.AbsenceNotes | MemberInfo.VacationBalance;
+                                        | MemberInfo.AbsenceNotes | MemberInfo.VacationBalance
+                                        | MemberInfo.Appointments | MemberInfo.AppointmentNotes;
 
     private readonly Dictionary<int, MemberInfo> _visible;
 

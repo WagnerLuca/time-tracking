@@ -25,7 +25,8 @@ public class MemberVisibilityPostgresTests
     public MemberVisibilityPostgresTests(PostgresApiFactory factory) => _factory = factory;
 
     private const MemberInfo Base = MemberInfo.Member | MemberInfo.Email | MemberInfo.Groups | MemberInfo.AbsenceNotes;
-    private const MemberInfo VacationKinds = MemberInfo.Vacation | MemberInfo.VacationBalance;
+    // The migration of #83 (Appointments) then makes the appointment slot visible (or hidden) wherever vacations are
+    private const MemberInfo VacationKinds = MemberInfo.Vacation | MemberInfo.VacationBalance | MemberInfo.Appointments;
 
     [Fact]
     public async Task Migration_MapsOldVisibilitySettings_IntoTheMatrix()

@@ -44,7 +44,11 @@ public record CoreWindow(TimeOnly Start, TimeOnly End)
 /// holiday exempts one half of the window: whichever half the member covered better, so it does not matter
 /// whether they took the morning or the afternoon off. Two halves (half holiday + half absence) exempt the day.</item>
 /// <item>Covering time is the member's finished entries in that organization plus a running timer up to now.
-/// Failure entries do not cover (they have to be corrected anyway). Pauses inside an entry are not gaps.</item>
+/// Failure entries do not cover (they have to be corrected anyway). Pauses inside an entry are not gaps.
+/// Planned appointments (<see cref="Appointment"/>, #83) cover their time as well (a doctor's appointment
+/// 10–12 is no late start); an all-day appointment on the window's (start) day exempts the day. The
+/// appointments that touched a window are reported (<see cref="Result.Appointments"/>: "Termin 10–12 berücksichtigt").
+/// Applies to on-time checks, the catch-up, backfills and the re-evaluation of stored violations alike.</item>
 /// <item>Violations: <see cref="CoreHoursIssue.Late"/> (first covered minute later than start + tolerance),
 /// <see cref="CoreHoursIssue.Early"/> (last earlier than end − tolerance), <see cref="CoreHoursIssue.Gap"/>
 /// (a gap longer than the tolerance), <see cref="CoreHoursIssue.Missing"/> (nothing covered).</item>
@@ -65,7 +69,12 @@ public static class CoreHours
     /// <summary>Appended to the English notification message of a late check (the frontend looks for it).</summary>
     public const string CheckedLateMarker = "(checked late)";
 
-    public record Result(CoreHoursIssue Issues, int MissingMinutes, CoreWindow Window, bool Backfilled = false);
+    /// <param name="Appointments">The appointments that touched the window, "HH:mm-HH:mm" or <see cref="AllDay"/>.</param>
+    public record Result(CoreHoursIssue Issues, int MissingMinutes, CoreWindow Window, bool Backfilled = false,
+        IReadOnlyList<string>? Appointments = null);
+
+    /// <summary>The label of an all-day appointment in <see cref="Result.Appointments"/>.</summary>
+    public const string AllDay = "allDay";
 
     /// <summary>Checks [fromUtc, toUtc) against the covered intervals.</summary>
     public static (CoreHoursIssue Issues, int MissingMinutes) Evaluate(
@@ -154,15 +163,12 @@ public static class CoreHours
         var clock = OrgClock.For(timeZone);
         var checkedUsers = checks.Select(c => c.UserId).Distinct().ToList();
         // Up to the end of the day after `to`: a night window ends there
-        var covered = await CoveredAsync(context, checkedUsers, orgId,
-            clock.StartOfDayUtc(from), clock.StartOfDayUtc(to.AddDays(2)), nowUtc ?? DateTime.UtcNow);
+        var covered = await CoveredAsync(context, checkedUsers, orgId, clock, from, to, nowUtc ?? DateTime.UtcNow);
 
         var open = new Dictionary<int, Dictionary<DateOnly, Result>>();
         foreach (var check in checks)
         {
-            var window = new CoreWindow(check.WindowStart, check.WindowEnd);
-            var result = EvaluateDay(covered.Reaching(check.UserId, window.Utc(check.Date, clock)), check.Date, window,
-                check.HalfDay, check.ToleranceMinutes, clock);
+            var result = Check(covered, check, clock);
             if (result.Issues == CoreHoursIssue.None) continue;
             if (!open.TryGetValue(check.UserId, out var days)) open[check.UserId] = days = [];
             days[check.Date] = result with { Backfilled = check.Backfilled };
@@ -275,9 +281,10 @@ public static class CoreHours
         }
         else if (due.Count == 0) return 0;
 
+        var results = new Dictionary<CoreHoursCheck, Result>();
         if (due.Count > 0)
         {
-            await EvaluateAsync(context, org.Id, clock, due, nowUtc, ct);
+            results = await EvaluateAsync(context, org.Id, clock, due, nowUtc, ct);
             context.CoreHoursChecks.AddRange(due);
         }
         await context.SaveChangesAsync(ct);   // stored before notifying: a crash may skip a notice, never repeat one
@@ -316,7 +323,8 @@ public static class CoreHours
             var name = $"{member.FirstName} {member.LastName}".Trim();
             var (issuesDe, issuesEn) = IssueTexts(check.Issues);
             var (lateDe, lateEn) = check.CheckedLate ? (" (nachträglich geprüft)", " " + CheckedLateMarker) : ("", "");
-            var textEn = $"{name} did not keep the core working hours on {date} ({window}): {issuesEn}, {check.MissingMinutes} min not covered{lateEn}.";
+            var (appointmentsDe, appointmentsEn) = AppointmentTexts(results.GetValueOrDefault(check)?.Appointments);
+            var textEn = $"{name} did not keep the core working hours on {date} ({window}): {issuesEn}, {check.MissingMinutes} min not covered{lateEn}.{appointmentsEn}";
             check.NotifiedAt = nowUtc;
 
             foreach (var userId in recipients[i])
@@ -336,7 +344,7 @@ public static class CoreHours
                     : $"{frontendBaseUrl}/organizations/{org.Slug}/members/{check.UserId}";
                 mails.Add((user.Email,
                     "Kernarbeitszeit nicht eingehalten / Core working hours missed",
-                    $"{name} hat die Kernarbeitszeit am {date} ({window}) nicht eingehalten: {issuesDe}, {check.MissingMinutes} min nicht abgedeckt{lateDe}. / " +
+                    $"{name} hat die Kernarbeitszeit am {date} ({window}) nicht eingehalten: {issuesDe}, {check.MissingMinutes} min nicht abgedeckt{lateDe}.{appointmentsDe} / " +
                     $"{textEn}\n\n{link}"));
             }
         }
@@ -346,6 +354,14 @@ public static class CoreHours
             foreach (var (to, subject, body) in mails)
                 await NotificationMails.TrySendAsync(email, to, subject, body, ct: ct);
         return violations.Count;
+    }
+
+    /// <summary>" Termin 10:00-12:00 berücksichtigt." / " Appointment 10:00-12:00 considered." (empty without appointments).</summary>
+    private static (string De, string En) AppointmentTexts(IReadOnlyList<string>? labels)
+    {
+        if (labels is not { Count: > 0 }) return ("", "");
+        string Join(string allDay) => string.Join(", ", labels.Select(l => l == AllDay ? allDay : l));
+        return ($" Termin {Join("ganztägig")} berücksichtigt.", $" Appointment {Join("all day")} considered.");
     }
 
     private static (string De, string En) IssueTexts(CoreHoursIssue issues)
@@ -364,7 +380,7 @@ public static class CoreHours
     /// one query each). A day off (no working day, full holiday or full-day absence, or a half holiday
     /// plus a half-day absence) stays without issues; one exempt half checks one half of the window.
     /// </summary>
-    private static async Task EvaluateAsync(TimeTrackingDbContext context, int orgId, OrgClock clock,
+    private static async Task<Dictionary<CoreHoursCheck, Result>> EvaluateAsync(TimeTrackingDbContext context, int orgId, OrgClock clock,
         List<CoreHoursCheck> checks, DateTime nowUtc, CancellationToken ct)
     {
         var userIds = checks.Select(c => c.UserId).Distinct().ToList();
@@ -381,9 +397,9 @@ public static class CoreHours
         var holidays = await context.Holidays.AsNoTracking()
             .Where(h => h.OrganizationId == orgId && (h.IsRecurring || (h.Date >= first && h.Date <= last)))
             .ToListAsync(ct);
-        var covered = await CoveredAsync(context, userIds, orgId,
-            clock.StartOfDayUtc(first), clock.StartOfDayUtc(last.AddDays(2)), nowUtc);
+        var covered = await CoveredAsync(context, userIds, orgId, clock, first, last, nowUtc);
 
+        var results = new Dictionary<CoreHoursCheck, Result>();
         foreach (var check in checks)
         {
             if (!WorkingDays.IsWorkingDay(schedules[check.UserId], check.Date)) continue;
@@ -393,18 +409,35 @@ public static class CoreHours
             if (halves >= 2) continue;
 
             check.HalfDay = halves == 1;
-            var window = new CoreWindow(check.WindowStart, check.WindowEnd);
-            var result = EvaluateDay(covered.Reaching(check.UserId, window.Utc(check.Date, clock)), check.Date, window,
-                check.HalfDay, check.ToleranceMinutes, clock);
+            var result = results[check] = Check(covered, check, clock);
             check.Issues = result.Issues;
             check.MissingMinutes = result.MissingMinutes;
         }
+        return results;
     }
 
-    /// <summary>The members' covering intervals overlapping [fromUtc, toUtc): finished non-failure entries, running ones up to now.</summary>
-    private static async Task<CoveredIntervals> CoveredAsync(TimeTrackingDbContext context,
-        IReadOnlyCollection<int> userIds, int orgId, DateTime fromUtc, DateTime toUtc, DateTime nowUtc)
+    /// <summary>One stored or new check against the covered time: an all-day appointment on its day exempts it.</summary>
+    private static Result Check(CoveredIntervals covered, CoreHoursCheck check, OrgClock clock)
     {
+        var window = new CoreWindow(check.WindowStart, check.WindowEnd);
+        var utc = window.Utc(check.Date, clock);
+        var appointments = covered.AppointmentsReaching(check.UserId, utc);
+        List<string>? labels = appointments.Count > 0 ? appointments.Select(a => a.Label).ToList() : null;
+        if (appointments.Any(a => a.Label == AllDay && a.Date == check.Date))
+            return new Result(CoreHoursIssue.None, 0, window, Appointments: labels);
+        return EvaluateDay(covered.Reaching(check.UserId, utc), check.Date, window, check.HalfDay, check.ToleranceMinutes, clock)
+            with { Appointments = labels };
+    }
+
+    /// <summary>
+    /// The members' covering intervals for the windows of the local days [first, last] (night windows end the
+    /// day after): finished non-failure entries, running ones up to now, and planned appointments.
+    /// </summary>
+    private static async Task<CoveredIntervals> CoveredAsync(TimeTrackingDbContext context,
+        IReadOnlyCollection<int> userIds, int orgId, OrgClock clock, DateOnly first, DateOnly last, DateTime nowUtc)
+    {
+        var fromUtc = clock.StartOfDayUtc(first);
+        var toUtc = clock.StartOfDayUtc(last.AddDays(2));
         // Finished entries are bounded by their length (EntryTimes.LongestEntry), so the query seeks the
         // (UserId, StartTime) index instead of reading each member's whole history before toUtc
         var earliestStart = fromUtc - EntryTimes.LongestEntry;
@@ -414,8 +447,19 @@ public static class CoreHours
                          || (e.IsRunning && e.StartTime < toUtc)))
             .Select(e => new { e.UserId, e.StartTime, e.EndTime, e.IsRunning })
             .ToListAsync();
-        return new CoveredIntervals(entries.ToLookup(e => e.UserId, e => (e.StartTime, e.IsRunning ? nowUtc : e.EndTime ?? e.StartTime)));
+        var appointments = (await context.Appointments.AsNoTracking()
+                .Where(a => userIds.Contains(a.UserId) && a.OrganizationId == orgId && a.Date >= first && a.Date <= last.AddDays(1))
+                .Select(a => new { a.UserId, a.Date, a.StartTime, a.EndTime })
+                .ToListAsync())
+            .ToLookup(a => a.UserId, a => a.StartTime is { } start && a.EndTime is { } end
+                ? new CoveringAppointment(a.Date, $"{start:HH:mm}-{end:HH:mm}",
+                    clock.ToUtc(a.Date.ToDateTime(start)), clock.ToUtc(a.Date.ToDateTime(end)))
+                : new CoveringAppointment(a.Date, AllDay, clock.StartOfDayUtc(a.Date), clock.StartOfDayUtc(a.Date.AddDays(1))));
+        return new CoveredIntervals(entries.ToLookup(e => e.UserId, e => (e.StartTime, e.IsRunning ? nowUtc : e.EndTime ?? e.StartTime)),
+            appointments);
     }
+
+    private sealed record CoveringAppointment(DateOnly Date, string Label, DateTime FromUtc, DateTime ToUtc);
 
     /// <summary>
     /// The covering intervals per member, sorted by start, so a check only looks at the intervals that can reach
@@ -426,9 +470,11 @@ public static class CoreHours
     private sealed class CoveredIntervals
     {
         private readonly Dictionary<int, ((DateTime Start, DateTime End)[] Sorted, TimeSpan Longest)> _byUser;
+        private readonly ILookup<int, CoveringAppointment> _appointments;
 
-        public CoveredIntervals(ILookup<int, (DateTime Start, DateTime End)> intervals)
+        public CoveredIntervals(ILookup<int, (DateTime Start, DateTime End)> intervals, ILookup<int, CoveringAppointment> appointments)
         {
+            _appointments = appointments;
             _byUser = intervals.ToDictionary(g => g.Key, g =>
             {
                 var sorted = g.OrderBy(i => i.Start).ToArray();
@@ -439,9 +485,13 @@ public static class CoreHours
             });
         }
 
+        /// <summary>The member's appointments overlapping the window (few per member, so a plain scan).</summary>
+        public List<CoveringAppointment> AppointmentsReaching(int userId, (DateTime FromUtc, DateTime ToUtc) window) =>
+            _appointments[userId].Where(a => a.FromUtc < window.ToUtc && a.ToUtc > window.FromUtc).OrderBy(a => a.FromUtc).ToList();
+
         public List<(DateTime Start, DateTime End)> Reaching(int userId, (DateTime FromUtc, DateTime ToUtc) window)
         {
-            var found = new List<(DateTime Start, DateTime End)>();
+            var found = AppointmentsReaching(userId, window).Select(a => (a.FromUtc, a.ToUtc)).ToList();
             if (!_byUser.TryGetValue(userId, out var user)) return found;
             var (sorted, longest) = user;
             var earliest = window.FromUtc - longest;
