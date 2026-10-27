@@ -176,13 +176,14 @@
 		pending = true;
 		try {
 			await action();
-			await loadWeek();
-			loadBalance();
 		} catch (err) {
 			toast.error(err, fallback);
+			return;
 		} finally {
-			pending = false;
+			pending = false; // before reloading, so the button morphs right away
 		}
+		await loadWeek();
+		loadBalance();
 	}
 
 	function handleStart() {
@@ -270,15 +271,11 @@
 		{/if}
 
 		<div class="mb-4">
-			{#if timer.current}
-				<button type="button" class="btn btn-error btn-lg min-w-40 text-lg font-bold" onclick={handleStop} disabled={pending}>
-					{pending ? t('timer.stopping') : t('timer.stop')}
-				</button>
-			{:else}
-				<button type="button" class="btn btn-success btn-lg min-w-40 text-lg font-bold" onclick={handleStart} disabled={pending || !timer.loaded}>
-					{pending ? t('timer.starting') : t('timer.start')}
-				</button>
-			{/if}
+			<!-- One button that morphs Start ↔ Stop (timer-toggle in components.css) -->
+			<button type="button" class="btn btn-lg min-w-40 text-lg font-bold timer-toggle {timer.current ? 'btn-error' : 'btn-success'}" onclick={timer.current ? handleStop : handleStart} disabled={pending || !timer.loaded}>
+				<span aria-hidden={!!timer.current}>{pending ? t('timer.starting') : t('timer.start')}</span>
+				<span aria-hidden={!timer.current}>{pending ? t('timer.stopping') : t('timer.stop')}</span>
+			</button>
 		</div>
 
 		<div class="w-full max-w-[360px] mx-auto">

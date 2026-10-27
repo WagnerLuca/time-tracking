@@ -1213,3 +1213,65 @@
 		}
 	}
 }
+
+/* Signature moments (Phase 4): the few places allowed a little more motion */
+@layer components {
+	/* Timer: one button that morphs Start ↔ Stop — colour and label crossfade with a blur bridge */
+	.timer-toggle {
+		display: inline-grid;
+		place-items: center;
+		transition:
+			color 200ms var(--ease-out),
+			background-color 200ms var(--ease-out),
+			border-color 200ms var(--ease-out),
+			scale var(--dur-press) var(--ease-out);
+	}
+	.timer-toggle > * {
+		grid-area: 1 / 1;
+		transition: opacity 200ms var(--ease-out), filter 200ms var(--ease-out);
+	}
+	.timer-toggle > [aria-hidden='true'] {
+		opacity: 0;
+		filter: blur(2px);
+	}
+
+	/* Nav pill of the running timer: fades/scales in (it leaves via a 150 ms Svelte fade) */
+	.timer-pill {
+		transition: opacity 200ms var(--ease-out), scale 200ms var(--ease-out), background-color var(--dur-pop) ease;
+		@starting-style {
+			opacity: 0;
+			scale: 0.95;
+		}
+	}
+
+	/* Onboarding finished: the check pops once (rare, so it may overshoot) */
+	.onboarding-done {
+		transition: opacity 250ms var(--ease-out);
+		animation: onboarding-pop 500ms var(--ease-out);
+		@starting-style {
+			opacity: 0;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.timer-toggle > * {
+			filter: none !important;
+		}
+		.timer-pill {
+			@starting-style {
+				scale: none;
+			}
+		}
+	}
+}
+@keyframes onboarding-pop {
+	0% {
+		scale: 0.5;
+	}
+	60% {
+		scale: 1.12;
+	}
+	100% {
+		scale: 1;
+	}
+}

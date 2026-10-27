@@ -3,6 +3,7 @@ export const de = {
 	memberTitle: 'Erste Schritte',
 	adminTitle: 'Organisation einrichten',
 	progress: '{done} von {total} erledigt',
+	complete: 'Alles erledigt – viel Spaß!',
 	dismiss: 'Checkliste ausblenden',
 	done: 'erledigt',
 	steps: {

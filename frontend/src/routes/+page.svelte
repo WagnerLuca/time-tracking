@@ -202,12 +202,13 @@
 		pending = true;
 		try {
 			await timer.stop();
-			await loadStats(selectedSlug);
 		} catch (err) {
 			toast.error(err, t('timer.stopFailed'));
+			return;
 		} finally {
-			pending = false;
+			pending = false; // before reloading, so the button morphs right away
 		}
+		await loadStats(selectedSlug);
 	}
 
 	function deltaClass(delta: number): string {
@@ -248,11 +249,10 @@
 				{/if}
 			</div>
 			<div class="flex flex-col items-stretch gap-2 max-sm:w-full">
-				{#if timer.current}
-					<button type="button" class="btn btn-error btn-lg min-w-40" onclick={handleStop} disabled={pending}>{pending ? t('timer.stopping') : t('timer.stop')}</button>
-				{:else}
-					<button type="button" class="btn btn-success btn-lg min-w-40" onclick={handleStart} disabled={pending || !timer.loaded}>{pending ? t('timer.starting') : t('timer.start')}</button>
-				{/if}
+				<button type="button" class="btn btn-lg min-w-40 timer-toggle {timer.current ? 'btn-error' : 'btn-success'}" onclick={timer.current ? handleStop : handleStart} disabled={pending || !timer.loaded}>
+					<span aria-hidden={!!timer.current}>{pending ? t('timer.starting') : t('timer.start')}</span>
+					<span aria-hidden={!timer.current}>{pending ? t('timer.stopping') : t('timer.stop')}</span>
+				</button>
 				<a href="/time" class="btn btn-ghost btn-sm">{t('dashboard.noteAndWeek')}</a>
 			</div>
 		</div>
