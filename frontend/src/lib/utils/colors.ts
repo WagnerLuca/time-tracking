@@ -77,6 +77,28 @@ export function absenceTypeClasses(type: string | null | undefined): DayTypeClas
 	return DAY_TYPE_CLASSES['other-absence'];
 }
 
+interface AbsenceLike {
+	userId?: number | null;
+	type?: string | null;
+	customTypeName?: string | null;
+	customTypeColor?: string | null;
+}
+
+/**
+ * Team calendar chip colours: vacation gets a per-person accent (tells people apart),
+ * custom types their own colour, sick/other the shared day-type colours (`absenceChipClass`).
+ */
+export function absenceChipStyle(a: AbsenceLike): string {
+	if (a.customTypeName) return tintStyle(a.customTypeColor, 25);
+	if (a.type === 'Vacation') return personChipStyle(a.userId ?? 0);
+	return '';
+}
+
+export function absenceChipClass(a: AbsenceLike): string {
+	if (a.customTypeName || a.type === 'Vacation') return '';
+	return `${dayTypeClasses(a.type === 'SickDay' ? 'sick' : 'other-absence').soft} border-base-content/20`;
+}
+
 /** Heat colour for a calendar cell based on the worked/target ratio (theme tokens, dark-mode aware). */
 export function heatColor(minutes: number, target: number): string {
 	if (minutes === 0) return 'transparent';

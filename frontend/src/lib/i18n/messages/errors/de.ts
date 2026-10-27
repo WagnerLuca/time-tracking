@@ -137,6 +137,13 @@ export const de = {
 		requiresApproval: 'Abwesenheiten müssen in dieser Organisation genehmigt werden. Bitte stelle eine Anfrage.',
 		unknownType: 'Unbekannte oder inaktive Abwesenheitsart.'
 	},
+	appointment: {
+		times: 'Gib Beginn und Ende an (Ende nach dem Beginn) oder wähle „Ganztägig“.',
+		noteTooLong: 'Die Notiz darf höchstens 200 Zeichen lang sein.',
+		date: 'Das Datum ist ungültig.',
+		notFound: 'Termin nicht gefunden.',
+		forbidden: 'Diesen Termin darfst du nicht bearbeiten.'
+	},
 	absenceType: {
 		nameTaken: 'Eine Abwesenheitsart mit diesem Namen gibt es bereits.',
 		notFound: 'Abwesenheitsart nicht gefunden.'

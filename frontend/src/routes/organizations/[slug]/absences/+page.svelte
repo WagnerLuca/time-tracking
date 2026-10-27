@@ -14,13 +14,14 @@
 	import { dayPress } from '$lib/utils/dayPress';
 	import { dateKey, expandHolidays } from '$lib/utils/dateHelpers';
 	import { fetchAllPages } from '$lib/utils/pagination';
-	import { DAY_TYPE_CLASSES, dayTypeClasses, personChipStyle, personDotStyle, tintStyle } from '$lib/utils/colors';
+	import { DAY_TYPE_CLASSES, absenceChipClass, absenceChipStyle, personDotStyle } from '$lib/utils/colors';
 	import { isOrgAdmin } from '$lib/utils/orgRules';
 	import { canSee } from '$lib/utils/visibility';
 	import { markSeen } from '$lib/utils/onboarding';
 	import { buildGroupTree, flattenGroupTree } from '$lib/utils/groupTree';
 	import { deleteAbsences } from '$lib/utils/absences';
 	import AbsenceDialog from '$lib/components/AbsenceDialog.svelte';
+	import TeamWeekView from '$lib/components/TeamWeekView.svelte';
 	import LockIcon from '$lib/components/LockIcon.svelte';
 	import { closedMonthSet, isClosedDay, lockText } from '$lib/utils/closedPeriods';
 	import AbsenceTypeBadge from '$lib/components/AbsenceTypeBadge.svelte';
@@ -272,11 +273,36 @@
 		return { onselect: () => (selectedDayKey = key), onopen: canOpenDayDialog ? () => openDayDialog(key) : undefined };
 	}
 
-	/** Mobile "add" button: today in the current month, otherwise the 1st of the visible month. */
-	function openDialogForVisibleMonth() {
+	/** Today in the current month, otherwise the 1st of the visible month. */
+	function visibleMonthDay(): Date {
 		const now = new Date();
-		openDayDialog(now.getMonth() === calendarMonth && now.getFullYear() === calendarYear ? dateKey(now) : dateKey(new Date(calendarYear, calendarMonth, 1)));
+		return now.getMonth() === calendarMonth && now.getFullYear() === calendarYear ? now : new Date(calendarYear, calendarMonth, 1);
 	}
+
+	/** Mobile "add" button (in the week view on every size). */
+	function openDialogForVisibleMonth() {
+		openDayDialog(dateKey(visibleMonthDay()));
+	}
+
+	// Month or week view (#83) and the week's weekend toggle, remembered per user
+	const viewKey = `wl-teamcal-view-${auth.user?.id ?? ''}`;
+	const savedView = (() => {
+		try {
+			return JSON.parse(localStorage.getItem(viewKey) ?? '{}') as { view?: string; hideWeekend?: boolean };
+		} catch {
+			return {};
+		}
+	})();
+	let view = $state<'month' | 'week'>(savedView.view === 'week' ? 'week' : 'month');
+	let hideWeekend = $state(savedView.hideWeekend === true);
+	$effect(() => {
+		const value = JSON.stringify({ view, hideWeekend });
+		try {
+			localStorage.setItem(viewKey, value);
+		} catch {
+			// private mode / blocked storage: the choice just is not remembered
+		}
+	});
 
 	async function onAbsenceSaved(requestMessage?: string) {
 		if (requestMessage) {
@@ -377,21 +403,6 @@
 			}
 		}
 		return map;
-	}
-
-	/**
-	 * Chip colours: vacation gets a per-person accent (tells people apart),
-	 * custom types their own colour, sick/other the shared day-type colours.
-	 */
-	function chipStyle(span: AbsenceSpan): string {
-		if (span.customTypeName) return tintStyle(span.customTypeColor, 25);
-		if (span.type === 'Vacation') return personChipStyle(span.userId);
-		return '';
-	}
-
-	function chipClass(span: AbsenceSpan): string {
-		if (span.customTypeName || span.type === 'Vacation') return '';
-		return `${dayTypeClasses(span.type === 'SickDay' ? 'sick' : 'other-absence').soft} border-base-content/20`;
 	}
 
 	function spanTitle(span: AbsenceSpan): string {
@@ -531,6 +542,19 @@
 		{@const monthLabel = formatDate(new Date(calendarYear, calendarMonth, 1), { month: 'long', year: 'numeric' })}
 
 		<section aria-labelledby="calendar-heading">
+			<div class="join mb-4" role="group" aria-label={t('appointments.view.label')}>
+				{#each [{ v: 'month', label: t('appointments.view.month') }, { v: 'week', label: t('appointments.view.week') }] as opt (opt.v)}
+					<button
+						type="button"
+						class="btn btn-sm join-item {view === opt.v ? 'btn-neutral' : 'btn-ghost border-base-300'}"
+						aria-pressed={view === opt.v}
+						data-testid="view-toggle-{opt.v}"
+						onclick={() => (view = opt.v as 'month' | 'week')}
+					>{opt.label}</button>
+				{/each}
+			</div>
+
+			{#if view === 'month'}
 			<!-- Calendar navigation -->
 			<div class="flex items-center justify-between gap-2 mb-4">
 				<button class="btn btn-ghost btn-sm" aria-label={t('absences.prevMonth')} title={t('absences.prevMonth')} onclick={() => navigateMonth(-1)}>
@@ -544,6 +568,7 @@
 					<svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
 				</button>
 			</div>
+			{/if}
 
 			<!-- Calendar member filter + mobile add -->
 			<div class="flex items-center justify-end gap-2 mb-3 flex-wrap">
@@ -569,12 +594,28 @@
 					{/if}
 				{/if}
 				{#if canOpenDayDialog}
-					<button class="btn btn-primary btn-sm sm:hidden" onclick={openDialogForVisibleMonth}>
+					<button class="btn btn-primary btn-sm {view === 'week' ? '' : 'sm:hidden'}" onclick={openDialogForVisibleMonth}>
 						{mustRequest ? t('absences.requestAbsence') : t('absences.addAbsence')}
 					</button>
 				{/if}
 			</div>
 
+			{#if view === 'week'}
+			<TeamWeekView
+				{orgSlug}
+				members={org.members ?? []}
+				me={auth.user?.id}
+				isAdmin={canEdit}
+				{absences}
+				{holidayMap}
+				groupId={groupFilter}
+				userFilter={calendarUserFilter}
+				initialDate={visibleMonthDay()}
+				bind:hideWeekend
+				onweekchange={(monday) => { calendarYear = monday.getFullYear(); calendarMonth = monday.getMonth(); }}
+				onabsence={canOpenDayDialog ? openDayDialog : undefined}
+			/>
+			{:else}
 			<!-- Mobile: agenda list for the visible month -->
 			<div class="sm:hidden">
 				{#if absencesLoading}
@@ -689,14 +730,14 @@
 															href="/organizations/{orgSlug}/members/{entry.span.userId}"
 															onclick={(e) => e.stopPropagation()}
 															onkeydown={(e) => e.stopPropagation()}
-															class="h-[16px] flex items-center text-[9px] leading-none px-1 border truncate no-underline text-base-content hover:brightness-95 transition-all {chipClass(entry.span)} {shape}"
-															style={chipStyle(entry.span)}
+															class="h-[16px] flex items-center text-[9px] leading-none px-1 border truncate no-underline text-base-content hover:brightness-95 transition-all {absenceChipClass(entry.span)} {shape}"
+															style={absenceChipStyle(entry.span)}
 															title={spanTitle(entry.span)}
 														>{@render chipLabel()}</a>
 													{:else}
 														<div
-															class="h-[16px] flex items-center text-[9px] leading-none px-1 border truncate text-base-content {chipClass(entry.span)} {shape}"
-															style={chipStyle(entry.span)}
+															class="h-[16px] flex items-center text-[9px] leading-none px-1 border truncate text-base-content {absenceChipClass(entry.span)} {shape}"
+															style={absenceChipStyle(entry.span)}
 															title={spanTitle(entry.span)}
 														>{@render chipLabel()}</div>
 													{/if}
@@ -757,6 +798,8 @@
 						</ul>
 					{/if}
 				</section>
+			{/if}
+
 			{/if}
 
 			<!-- Legend -->

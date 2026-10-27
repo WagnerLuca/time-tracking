@@ -23,6 +23,8 @@ docs/AdminCreateAbsenceDayRequest.md
 docs/AdminNotificationResponse.md
 docs/ApiKeyResponse.md
 docs/ApiKeysApi.md
+docs/AppointmentResponse.md
+docs/AppointmentsApi.md
 docs/AuthApi.md
 docs/AuthResponse.md
 docs/BadgeCardResponse.md
@@ -105,6 +107,7 @@ docs/PauseRulesApi.md
 docs/PayrollExportRequest.md
 docs/PeriodBalance.md
 docs/PersonalAbsence.md
+docs/PersonalAppointment.md
 docs/PersonalCard.md
 docs/PersonalDataExport.md
 docs/PersonalEntryChange.md
@@ -134,6 +137,7 @@ docs/RequestsApi.md
 docs/ResetPasswordRequest.md
 docs/RespondToOrgRequestRequest.md
 docs/RuleMode.md
+docs/SaveAppointmentRequest.md
 docs/SetAccountantRequest.md
 docs/SetInitialOvertimeRequest.md
 docs/SetMemberVacationYearRequest.md
