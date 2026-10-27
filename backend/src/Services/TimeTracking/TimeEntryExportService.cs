@@ -153,18 +153,11 @@ public class TimeEntryExportService : ITimeEntryExportService
         var rangeError = EntryTimes.ValidateRange(dateFrom, dateTo);
         if (rangeError != null) return ServiceResult.BadRequest<byte[]>(rangeError);
 
-        var rows = await DailyReportAggregator.BuildAsync(
-            _context, userId, org.Id, dateFrom, dateTo, membership.InitialOvertimeHours);
-        // Cumulative overtime is the same running total as the balance and the PDF (from the first
-        // tracked entry plus initial overtime), not one restarted at dateFrom. Days before the first
-        // entry are listed but do not move the balance yet.
-        var (running, _) = await DailyReportAggregator.BuildWithRunningTotalAsync(
-            _context, userId, org.Id, dateFrom, dateTo, membership.InitialOvertimeHours);
-        var runningByDate = running.ToDictionary(r => r.Date, r => r.CumulativeOvertime);
-        rows = rows.Select(r => r with
-        {
-            CumulativeOvertime = runningByDate.TryGetValue(r.Date, out var c) ? c : membership.InitialOvertimeHours
-        }).ToList();
+        // Every day of the range; the cumulative overtime is the same running total as the balance and the PDF (from the first
+        // tracked entry plus initial overtime), not one restarted at dateFrom — days before the first entry carry the initial
+        // overtime. Days of closed months as frozen.
+        var (rows, _) = await DailyReportAggregator.BuildWithRunningTotalAsync(
+            _context, userId, org.Id, dateFrom, dateTo, membership.InitialOvertimeHours, allDays: true);
 
         var columns = ResolveColumns(request.Columns, AllDailyColumns);
         var text = ReportText.For(request.Lang);

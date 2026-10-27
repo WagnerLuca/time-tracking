@@ -349,7 +349,7 @@ public abstract class BalanceInvalidationScenarios
         var stamp = Activator.CreateInstance(stampType, w.OrgId, orgVersion,
             (IReadOnlyDictionary<int, int>)new Dictionary<int, int> { [w.UserId] = memberVersion }, w.Clock.Today(), zone)!;
         var start = Activator.CreateInstance(startType, month.AddMonths(-4), 0.0, month.AddMonths(-4))!;
-        var member = Activator.CreateInstance(memberType, start, new List<WorkSchedule>(), 0, null)!;
+        var member = Activator.CreateInstance(memberType, start, new List<WorkSchedule>(), 0, null, null)!;
         var monthEnds = new List<(DateOnly Day, double Delta)> { (month.AddMonths(1).AddDays(-1), delta) };
         var tupleType = typeof(ValueTuple<,,>).MakeGenericType(typeof(int), memberType, typeof(List<(DateOnly, double)>));
         var list = (System.Collections.IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(tupleType))!;

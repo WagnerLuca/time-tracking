@@ -630,6 +630,34 @@ export interface ExportRequest {
 export interface ForgotPasswordRequest {
     'email': string;
 }
+/**
+ * A day of a closed month as frozen when it was closed (issue #81): what the calendar shows for it.
+ */
+export interface FrozenDayResponse {
+    'date'?: string;
+    /**
+     * The schedule\'s target less the holiday credit.
+     */
+    'targetHours'?: number;
+    /**
+     * Hours an absence took off the target.
+     */
+    'creditHours'?: number;
+    /**
+     * Net worked hours.
+     */
+    'workedHours'?: number;
+    /**
+     * Report status (Worked, Missing, Holiday, Half Holiday, Vacation, Sick, a custom type\'s name, Weekend, Day Off, Needs Correction).
+     */
+    'status': string | null;
+    'holidayName'?: string | null;
+    /**
+     * SickDay, Vacation or Other.
+     */
+    'absenceType'?: string | null;
+    'absenceHalfDay'?: boolean;
+}
 export interface GroupDetailResponse {
     'id'?: number;
     'organizationId'?: number;
@@ -8825,6 +8853,62 @@ export const MemberEntriesApiAxiosParamCreator = function (configuration?: Confi
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @summary The member\'s days of closed months in [from, to] (default: current month) as frozen when the month was closed (issue #81):  the calendar shows these targets/credits instead of computing them. Open days are not listed. Same access as compliance.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdFrozenDaysGet: async (slug: string, memberId: number, from?: string, to?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdFrozenDaysGet', 'slug', slug)
+            // verify required parameter 'memberId' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugMembersMemberIdFrozenDaysGet', 'memberId', memberId)
+            const localVarPath = `/api/v1/organizations/{slug}/members/{memberId}/frozen-days`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"memberId"}}`, encodeURIComponent(String(memberId)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (from !== undefined) {
+                localVarQueryParameter['from'] = (from as any instanceof Date) ?
+                    (from as any).toISOString().substring(0,10) :
+                    from;
+            }
+
+            if (to !== undefined) {
+                localVarQueryParameter['to'] = (to as any instanceof Date) ?
+                    (to as any).toISOString().substring(0,10) :
+                    to;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -8896,6 +8980,22 @@ export const MemberEntriesApiFp = function(configuration?: Configuration) {
             const localVarOperationServerBasePath = operationServerMap['MemberEntriesApi.apiV1OrganizationsSlugMembersMemberIdEntriesPost']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * 
+         * @summary The member\'s days of closed months in [from, to] (default: current month) as frozen when the month was closed (issue #81):  the calendar shows these targets/credits instead of computing them. Open days are not listed. Same access as compliance.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugMembersMemberIdFrozenDaysGet(slug: string, memberId: number, from?: string, to?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<FrozenDayResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugMembersMemberIdFrozenDaysGet(slug, memberId, from, to, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['MemberEntriesApi.apiV1OrganizationsSlugMembersMemberIdFrozenDaysGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -8954,6 +9054,19 @@ export const MemberEntriesApiFactory = function (configuration?: Configuration, 
          */
         apiV1OrganizationsSlugMembersMemberIdEntriesPost(slug: string, memberId: number, createMemberEntryRequest?: CreateMemberEntryRequest, options?: RawAxiosRequestConfig): AxiosPromise<TimeEntryResponse> {
             return localVarFp.apiV1OrganizationsSlugMembersMemberIdEntriesPost(slug, memberId, createMemberEntryRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary The member\'s days of closed months in [from, to] (default: current month) as frozen when the month was closed (issue #81):  the calendar shows these targets/credits instead of computing them. Open days are not listed. Same access as compliance.
+         * @param {string} slug 
+         * @param {number} memberId 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugMembersMemberIdFrozenDaysGet(slug: string, memberId: number, from?: string, to?: string, options?: RawAxiosRequestConfig): AxiosPromise<Array<FrozenDayResponse>> {
+            return localVarFp.apiV1OrganizationsSlugMembersMemberIdFrozenDaysGet(slug, memberId, from, to, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -9014,6 +9127,20 @@ export class MemberEntriesApi extends BaseAPI {
      */
     public apiV1OrganizationsSlugMembersMemberIdEntriesPost(slug: string, memberId: number, createMemberEntryRequest?: CreateMemberEntryRequest, options?: RawAxiosRequestConfig) {
         return MemberEntriesApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdEntriesPost(slug, memberId, createMemberEntryRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary The member\'s days of closed months in [from, to] (default: current month) as frozen when the month was closed (issue #81):  the calendar shows these targets/credits instead of computing them. Open days are not listed. Same access as compliance.
+     * @param {string} slug 
+     * @param {number} memberId 
+     * @param {string} [from] 
+     * @param {string} [to] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugMembersMemberIdFrozenDaysGet(slug: string, memberId: number, from?: string, to?: string, options?: RawAxiosRequestConfig) {
+        return MemberEntriesApiFp(this.configuration).apiV1OrganizationsSlugMembersMemberIdFrozenDaysGet(slug, memberId, from, to, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

@@ -5,7 +5,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { organizationsApi, timeTrackingApi, workScheduleApi, absenceDayApi, groupApi, reportsApi, memberEntriesApi } from '$lib/apiClient';
-	import type { TimeEntryResponse, WorkScheduleResponse, OrganizationDetailResponse, AbsenceTypeDefinitionResponse, EffectivePermissionsResponse, ComplianceDayResponse } from '$lib/api';
+	import type { TimeEntryResponse, WorkScheduleResponse, OrganizationDetailResponse, AbsenceTypeDefinitionResponse, EffectivePermissionsResponse, ComplianceDayResponse, FrozenDayResponse } from '$lib/api';
 	import { formatHours, formatDelta, formatDate, formatDateFull, formatNumber, getMonthName, dayNamesShort, barWidth } from '$lib/utils/formatters';
 	import { dateKey } from '$lib/utils/dateHelpers';
 	import { getDayTarget, getAbsenceCredit, getDayType, getDayTypeLabel, type CustomCreditSets } from '$lib/utils/scheduleHelpers';
@@ -23,7 +23,7 @@
 	import RequestModal from '$lib/components/RequestModal.svelte';
 	import AbsenceDialog from '$lib/components/AbsenceDialog.svelte';
 	import LockIcon from '$lib/components/LockIcon.svelte';
-	import { closedMonthSet, formatMonth, isClosedDay, lockText } from '$lib/utils/closedPeriods';
+	import { closedMonthSet, formatMonth, frozenDayLabel, frozenDayType, isClosedDay, lockText } from '$lib/utils/closedPeriods';
 	import { t, tp } from '$lib/i18n';
 
 	/**
@@ -134,6 +134,8 @@
 
 	/** Working Time Act and core working hours violations of the shown month, by day ('YYYY-MM-DD'). */
 	let compliance = $state(new Map<string, ComplianceDayResponse>());
+	/** Days of closed months as frozen when they were closed (issue #81): their targets, credits and day types are shown as stored. */
+	let frozenDays = $state(new Map<string, FrozenDayResponse>());
 
 	function complianceText(day: ComplianceDayResponse): string {
 		const parts: string[] = [];
@@ -222,6 +224,7 @@
 	async function loadAll() {
 		loading = true;
 		loadError = '';
+		frozenDays = new Map();
 		await Promise.all([
 			loadDaysOff(), // first: marks the year as loaded, so loadEntries doesn't fetch it again
 			loadEntries(),
@@ -252,6 +255,7 @@
 		const to = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999);
 		if (daysOffYear !== currentYear) loadDaysOff();
 		loadCompliance(from, to);
+		loadFrozenDays(from, to);
 		entries = await fetchEntriesRange(from, to);
 		ensureSelectedDayForCurrentMonth();
 	}
@@ -266,11 +270,24 @@
 		}
 	}
 
+	async function loadFrozenDays(from: Date, to: Date) {
+		try {
+			const { data } = await memberEntriesApi.apiV1OrganizationsSlugMembersMemberIdFrozenDaysGet(orgSlug, userId, dateKey(from), dateKey(to));
+			// Kept per day, so a month and the year view share them
+			const next = new Map(frozenDays);
+			for (const d of data) if (d.date) next.set(d.date, d);
+			frozenDays = next;
+		} catch {
+			// 403: not visible to the caller; the calendar computes every day then
+		}
+	}
+
 	async function loadYearEntries() {
 		yearLoading = true;
 		const from = new Date(currentYear, 0, 1);
 		const to = new Date(currentYear, 11, 31, 23, 59, 59, 999);
 		if (daysOffYear !== currentYear) loadDaysOff();
+		loadFrozenDays(from, to);
 		yearEntries = await fetchEntriesRange(from, to);
 		yearLoading = false;
 	}
@@ -480,8 +497,13 @@
 			const key = dateKey(cursor);
 			const isCurrentMonth = cursor.getMonth() === month;
 			const entryData = entryMap.get(key) ?? { minutes: 0, count: 0, failure: false };
-			const targetMinutes = isCurrentMonth ? getDayTarget(new Date(cursor), workSchedule, holidayDates, schedulePeriods, halfDayHolidays) : 0;
-			const absCredit = isCurrentMonth ? getAbsenceCredit(new Date(cursor), workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods, halfDayAbsences, halfDayHolidays, customCredits, entryData.minutes) : 0;
+			// A closed month's day as frozen; every other day from the schedule, holidays and absences
+			const frozen = isCurrentMonth ? frozenDays.get(key) : undefined;
+			if (frozen) entryData.minutes = Math.round((frozen.workedHours ?? 0) * 60);
+			const targetMinutes = frozen ? (frozen.targetHours ?? 0) * 60
+				: isCurrentMonth ? getDayTarget(new Date(cursor), workSchedule, holidayDates, schedulePeriods, halfDayHolidays) : 0;
+			const absCredit = frozen ? (frozen.creditHours ?? 0) * 60
+				: isCurrentMonth ? getAbsenceCredit(new Date(cursor), workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods, halfDayAbsences, halfDayHolidays, customCredits, entryData.minutes) : 0;
 
 			days.push({
 				date: new Date(cursor),
@@ -495,8 +517,8 @@
 				targetMinutes,
 				entryCount: entryData.count,
 				hasFailure: entryData.failure,
-				dayType: getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays),
-				dayTypeLabel: getDayTypeLabel(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays, halfDayAbsences, customTypeDates),
+				dayType: frozen ? frozenDayType(frozen) : getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays),
+				dayTypeLabel: frozen ? frozenDayLabel(frozen) : getDayTypeLabel(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays, halfDayAbsences, customTypeDates),
 				delta: entryData.minutes + absCredit - targetMinutes
 			});
 
@@ -558,15 +580,16 @@
 			const cursor = new Date(firstDay);
 			while (cursor <= lastDay && cursor <= today) {
 				const key = dateKey(cursor);
-				const dt = getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays);
+				const frozen = frozenDays.get(key);
+				const dt = frozen ? frozenDayType(frozen) : getDayType(key, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, halfDayHolidays);
 				if (dt === 'holiday') holidays++;
 				else if (dt === 'sick') sickDays++;
 				else if (dt === 'vacation') vacationDays++;
 
-				const worked = dailyWorked.get(key) ?? 0;
+				const worked = frozen ? Math.round((frozen.workedHours ?? 0) * 60) : dailyWorked.get(key) ?? 0;
 				workedMinutes += worked;
-				targetMinutes += getDayTarget(new Date(cursor), workSchedule, holidayDates, schedulePeriods, halfDayHolidays);
-				absenceCredits += getAbsenceCredit(new Date(cursor), workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods, halfDayAbsences, halfDayHolidays, customCredits, worked);
+				targetMinutes += frozen ? (frozen.targetHours ?? 0) * 60 : getDayTarget(new Date(cursor), workSchedule, holidayDates, schedulePeriods, halfDayHolidays);
+				absenceCredits += frozen ? (frozen.creditHours ?? 0) * 60 : getAbsenceCredit(new Date(cursor), workSchedule, holidayDates, sickDayDates, vacationDates, otherAbsenceDates, schedulePeriods, halfDayAbsences, halfDayHolidays, customCredits, worked);
 
 				cursor.setDate(cursor.getDate() + 1);
 			}

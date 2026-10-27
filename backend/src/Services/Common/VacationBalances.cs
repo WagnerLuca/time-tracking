@@ -111,11 +111,12 @@ public static class VacationBalances
 
     /// <summary>
     /// Every given member's balance for <paramref name="year"/> (members without data get their entitlement).
-    /// Five queries however many members and years: memberships, holidays, schedules, vacation days of
-    /// [since, year], vacation rows.
+    /// Six queries however many members and years: memberships, holidays, schedules, frozen days of closed months (not when
+    /// the caller knows there is no closed month: <paramref name="anyClosedMonth"/>), vacation days of [since, year], vacation rows.
     /// </summary>
     public static async Task<Dictionary<int, Balance>> YearsAsync(
-        TimeTrackingDbContext context, Organization org, IReadOnlyCollection<int> memberIds, int year, DateOnly today)
+        TimeTrackingDbContext context, Organization org, IReadOnlyCollection<int> memberIds, int year, DateOnly today,
+        bool anyClosedMonth = true)
     {
         var rule = Rule.Of(org);
         var clock = OrgClock.For(org);
@@ -145,6 +146,8 @@ public static class VacationBalances
                 .ToListAsync())
             .ToLookup(ws => ws.UserId);
 
+        // Closed months count as frozen (FrozenFigures): their used days as when they were closed
+        var frozen = anyClosedMonth ? await FrozenFigures.AbsencesAsync(context, org.Id, ids, from, to) : ([], []);
         var daysByUser = (await context.AbsenceDays.AsNoTracking()
                 .Where(a => a.OrganizationId == org.Id
                          && ids.Contains(a.UserId)
@@ -152,8 +155,11 @@ public static class VacationBalances
                          && a.Date >= from && a.Date <= to)
                 .Select(a => new { a.UserId, a.Date, a.IsHalfDay })
                 .ToListAsync())
-            .Where(a => !holidayDates.Contains(a.Date) && WorkingDays.IsWorkingDay(schedulesByUser[a.UserId], a.Date))
-            .ToLookup(a => a.UserId, a => new Day(a.Date, a.IsHalfDay ? 0.5 : 1.0));
+            .Where(a => !frozen.Months.Contains((a.UserId, ClosedPeriods.MonthOf(a.Date)))
+                        && !holidayDates.Contains(a.Date) && WorkingDays.IsWorkingDay(schedulesByUser[a.UserId], a.Date))
+            .Select(a => (a.UserId, Day: new Day(a.Date, a.IsHalfDay ? 0.5 : 1.0)))
+            .Concat(frozen.Absences.Where(a => a.VacationUsed > 0).Select(a => (a.UserId, Day: new Day(a.Date, a.VacationUsed))))
+            .ToLookup(a => a.UserId, a => a.Day);
 
         var rowsByUser = (await context.VacationYears.AsNoTracking()
                 .Where(v => v.OrganizationId == org.Id && ids.Contains(v.UserId) && v.Year <= year)

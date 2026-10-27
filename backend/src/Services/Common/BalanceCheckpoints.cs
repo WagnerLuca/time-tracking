@@ -56,12 +56,16 @@ public static class BalanceCheckpoints
     /// <summary>What <see cref="LoadAsync"/> reads per member: where its rows start (null: no finished entry, no balance yet),
     /// its work schedules (ordered by <see cref="WorkSchedule.ValidFrom"/>), its failure entries before the given instant and its
     /// latest valid checkpoint of any month (<see cref="SaveAsync"/> does not write those again).</summary>
-    internal sealed record Member(Start? Start, List<WorkSchedule> Schedules, int FailureCount, DateOnly? LatestCheckpoint = null);
+    /// <param name="FrozenFrom">The member's first frozen month from <c>before</c>'s month on (<see cref="FrozenFigures"/>): only then
+    /// does a caller need the frozen days of its range.</param>
+    internal sealed record Member(Start? Start, List<WorkSchedule> Schedules, int FailureCount, DateOnly? LatestCheckpoint = null,
+        DateOnly? FrozenFrom = null);
 
     /// <summary>
     /// For each of <paramref name="userIds"/> (members of the organization, also former ones): where its rows for days from
-    /// <paramref name="before"/> on start — the day after its latest valid checkpoint ending before <paramref name="before"/>,
-    /// else its first tracked day with sum 0 — plus its schedules and number of failure entries started before
+    /// <paramref name="before"/> on start — the day after the later of its latest valid checkpoint and its latest frozen month
+    /// (closed months, <see cref="FrozenFigures"/>: always valid, so a closed month is never recomputed) ending before
+    /// <paramref name="before"/>, else its first tracked day with sum 0 — plus its schedules and number of failure entries started before
     /// <paramref name="failuresBeforeUtc"/>. One query (versions, checkpoint, first entry, failure count and schedules per
     /// membership), so the versions in the returned <see cref="Stamp"/> are read in the same snapshot as, and so not after,
     /// anything they cover.
@@ -75,6 +79,8 @@ public static class BalanceCheckpoints
         // backwards): EF turns a FirstOrDefault of several columns into a window over all of the organization's checkpoints
         var valid = db.BalanceCheckpoints.Where(c => c.OrganizationId == orgId && c.Algorithm == AlgorithmVersion);
         var checkpoints = valid.Where(c => c.Month < bound);
+        var frozen = db.FrozenMonths.Where(f => f.OrganizationId == orgId);
+        var frozenBefore = frozen.Where(f => f.Month < bound);
         var rows = await db.UserOrganizations.IgnoreQueryFilters().AsNoTracking()
             .Where(uo => uo.OrganizationId == orgId && ids.Contains(uo.UserId))
             .Select(uo => new
@@ -95,6 +101,13 @@ public static class BalanceCheckpoints
                 LatestCheckpoint = valid
                     .Where(c => c.UserId == uo.UserId && c.Version == uo.BalanceVersion && c.OrgVersion == uo.Organization.BalanceVersion)
                     .Max(c => (DateOnly?)c.Month),
+                FrozenMonth = frozenBefore.Where(f => f.UserId == uo.UserId)
+                    .OrderByDescending(f => f.Month).Select(f => (DateOnly?)f.Month).FirstOrDefault(),
+                FrozenDelta = frozenBefore.Where(f => f.UserId == uo.UserId)
+                    .OrderByDescending(f => f.Month).Select(f => (double?)f.OvertimeDelta).FirstOrDefault(),
+                FrozenFirstDay = frozenBefore.Where(f => f.UserId == uo.UserId)
+                    .OrderByDescending(f => f.Month).Select(f => f.FirstDay).FirstOrDefault(),
+                FrozenFrom = frozen.Where(f => f.UserId == uo.UserId && f.Month >= bound).Min(f => (DateOnly?)f.Month),
                 FirstEntry = db.TimeEntries
                     .Where(e => e.OrganizationId == orgId && e.UserId == uo.UserId && !e.IsRunning)
                     .Min(e => (DateTime?)e.StartTime),
@@ -113,14 +126,23 @@ public static class BalanceCheckpoints
         foreach (var r in rows)
         {
             Start? start = null;
-            if (r.CheckpointMonth is { } month)
-                start = new Start(month.AddMonths(1), r.CheckpointDelta!.Value, r.CheckpointFirstDay!.Value);
-            else if (r.FirstEntry is { } first)
+            DateOnly? firstEntryDay = r.FirstEntry is { } firstEntry ? clock.LocalDate(firstEntry) : null;
+            if (r.FrozenMonth is { } frozenMonth && !(r.CheckpointMonth > frozenMonth))
             {
-                var day = clock.LocalDate(first);
-                start = new Start(day, 0, day);
+                // A closed month's frozen balance is where the next month continues
+                var next = frozenMonth.AddMonths(1);
+                if (r.FrozenFirstDay is { } firstDay)
+                    start = new Start(next, r.FrozenDelta!.Value, firstDay);
+                else if (firstEntryDay is { } day)
+                    // No balance yet when the month was frozen: it starts with the first entry after it (an earlier one,
+                    // added later in an open month, restarts at the closed month's end)
+                    start = day >= next ? new Start(day, 0, day) : new Start(next, 0, next);
             }
-            members[r.UserId] = new Member(start, r.Schedules, r.Failures, r.LatestCheckpoint);
+            else if (r.CheckpointMonth is { } month)
+                start = new Start(month.AddMonths(1), r.CheckpointDelta!.Value, r.CheckpointFirstDay!.Value);
+            else if (firstEntryDay is { } day)
+                start = new Start(day, 0, day);
+            members[r.UserId] = new Member(start, r.Schedules, r.Failures, r.LatestCheckpoint, r.FrozenFrom);
         }
         return (members, stamp);
     }
@@ -295,7 +317,7 @@ public static class BalanceCheckpoints
 /// <see cref="BalanceCheckpoints.Storable"/> for the margin against readers) bumps the
 /// version in the same save — per member for time entries (also a pure stop of a running timer and the auto-stop's failure
 /// entries), absences and schedules (old and new owner/org); per organization for holidays, a custom absence type's credit
-/// mode (or its deletion) and the time zone — and first carries the still valid checkpoints of earlier months over to the new
+/// mode (or its deletion), the time zone, and closing/reopening a month — and first carries the still valid checkpoints of earlier months over to the new
 /// version, so only the months from the earliest touched one on are recomputed. A change in a month that has not ended
 /// cannot touch a checkpoint (readers store a month only from the 2nd of the next one) and bumps nothing.
 /// </summary>
@@ -368,6 +390,12 @@ internal sealed class BalanceInvalidation
                 case Organization org:
                     if (e.State == EntityState.Modified && Changed(e, nameof(Organization.TimeZone)))
                         orgDays.Add((org.Id, DateOnly.MinValue));
+                    break;
+                case ClosedPeriod period:
+                    // Closing freezes the month, reopening unfreezes it (FrozenFigures): later months continue from the frozen
+                    // figures, so their checkpoints are recomputed (also against a write racing the close)
+                    if (e.State is EntityState.Added or EntityState.Deleted)
+                        orgDays.Add((period.OrganizationId, period.Month));
                     break;
             }
         }

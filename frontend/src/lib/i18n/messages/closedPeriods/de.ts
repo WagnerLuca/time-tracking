@@ -1,7 +1,7 @@
 /** Closed periods (issue #57): the Allgemein section, calendar locks, history and inbox hints, the reason prompt. */
 export const de = {
 	title: 'Abgeschlossene Zeiträume',
-	intro: 'Schließe Monate ab, z. B. nach der Lohnabrechnung. Danach können Mitglieder und Gruppenleitungen dort nichts mehr ändern – weder Einträge noch Abwesenheiten, Importe, Arbeitszeitmodelle oder Terminal-Stempel. Admins können weiter korrigieren, müssen aber einen Grund angeben; jede solche Änderung steht im Verlauf und im Protokoll.',
+	intro: 'Schließe Monate ab, z. B. nach der Lohnabrechnung. Danach können Mitglieder und Gruppenleitungen dort nichts mehr ändern – weder Einträge noch Abwesenheiten, Importe, Arbeitszeitmodelle oder Terminal-Stempel. Admins können weiter korrigieren, müssen aber einen Grund angeben; jede solche Änderung steht im Verlauf und im Protokoll. Die Zahlen des Monats (Soll, Ist, Überstunden, Saldo, Abwesenheiten) werden beim Abschließen eingefroren: Spätere Änderungen an Feiertagen, Abwesenheitsarten, der Zeitzone, Arbeitszeitmodellen oder dem Anfangssaldo ändern sie nicht mehr – nur offene Monate. Eine Admin-Korrektur mit Grund aktualisiert die eingefrorenen Zahlen.',
 	rules: 'Abschließen lassen sich nur Monate, die schon vorbei sind. Der automatische Stopp vergessener Timer zum Geschäftstagsende und die Kernzeit-Prüfung laufen weiter.',
 	closed: 'Abgeschlossen',
 	none: 'Noch kein Monat abgeschlossen.',
@@ -18,7 +18,7 @@ export const de = {
 	movedLink: 'Zum Monatsabschluss',
 	reopen: 'Wieder öffnen',
 	reopenTitle: '{month} wieder öffnen?',
-	reopenMessage: 'Mitglieder und Gruppenleitungen können dort danach wieder ändern. Das Wiederöffnen wird mit Grund protokolliert.',
+	reopenMessage: 'Mitglieder und Gruppenleitungen können dort danach wieder ändern. Das Wiederöffnen wird mit Grund protokolliert. Die eingefrorenen Zahlen werden verworfen und wieder aus den aktuellen Daten berechnet.',
 	reopenLabel: 'Grund',
 	reopened: '{month} ist wieder offen.',
 	audit: 'Protokoll',

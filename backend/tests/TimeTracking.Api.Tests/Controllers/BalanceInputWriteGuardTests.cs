@@ -22,6 +22,7 @@ public class BalanceInputWriteGuardTests
     {
         ["Services/Common/BalanceCheckpoints.cs"] = "the checkpoint upsert and the version bump/carry (checked below)",
         ["Services/Auth/RefreshTokenCleanupService.cs"] = "retention deletes of tokens, links, notifications, punches and invalid checkpoints (checked below)",
+        ["Services/Common/FrozenFigures.cs"] = "the frozen figures of closed months (derived data, not a balance input): replaced per member-month in bulk",
         ["Data/RowLevelSecurity.cs"] = "the RLS session stamp (set_config, no table)",
         ["Data/PerfSeeder.cs"] = "the perf-test history generator: COPY into a fresh perf organization, drop of such an organization (never real data)"
     };
@@ -82,6 +83,15 @@ public class BalanceInputWriteGuardTests
                                           || ((u.Item1 == "UserOrganizations" || u.Item1 == "Organizations") && u.Item2 == "BalanceVersion"));
         Regex.Matches(source, @"INSERT\s+INTO\s+""(\w+)""").Select(m => m.Groups[1].Value).Should().OnlyContain(t => t == "BalanceCheckpoints");
         Regex.IsMatch(source, @"DELETE\s+FROM", RegexOptions.IgnoreCase).Should().BeFalse();
+    }
+
+    [Fact]
+    public void TheFrozenFiguresCode_WritesOnlyItsOwnTables()
+    {
+        var source = File.ReadAllText(Path.Combine(SrcDir(), "Services", "Common", "FrozenFigures.cs"));
+        var writes = Regex.Matches(source, @"(INSERT\s+INTO|DELETE\s+FROM|UPDATE)\s+""(\w+)""").Select(m => m.Groups[2].Value).ToList();
+        writes.Should().NotBeEmpty();
+        writes.Should().OnlyContain(t => t == "FrozenDays" || t == "FrozenMonths");
     }
 
     [Fact]

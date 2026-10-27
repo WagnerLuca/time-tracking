@@ -93,7 +93,11 @@ first tracked day to the month's last day, **without** the initial overtime. RLS
    closed-period guard needs the same.
 6. **Exactness**: checkpointed balances equal the full recompute to the last bit (`BalanceCheckpointPropertyTests` +
    `BalanceCheckpointPropertyPostgresTests`, `TeamOverviewPostgresTests`).
-7. **Pre-warm**: `BalanceCheckpointWarmupService` computes every org's checkpoints once per org-local month (on the 2nd,
+7. **Closed months (#81)**: frozen month-ends (`FrozenMonths.OvertimeDelta`) are always-valid starts; `LoadAsync` takes the
+   later of the latest valid checkpoint and the latest frozen month, so invalidation never makes a closed month be recomputed.
+   Closing/reopening bumps the org version from that month (also against a write racing the close). A checkpoint of a
+   closed month equals its frozen delta.
+8. **Pre-warm**: `BalanceCheckpointWarmupService` computes every org's checkpoints once per org-local month (on the 2nd,
    `Organization.BalanceWarmedMonth`), so the first read after a deploy or a month change is not a cold one.
 
 ## Known limits / follow-ups

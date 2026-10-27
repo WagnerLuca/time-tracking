@@ -50,34 +50,45 @@ public sealed class BalanceHarness(WebApplicationFactory<Program> factory)
 
     public static TimeTrackingDbContext Db(AsyncServiceScope scope) => scope.ServiceProvider.GetRequiredService<TimeTrackingDbContext>();
 
-    /// <summary>The reference: rows from the member's first finished entry (org-local) to today with initial overtime 0,
-    /// so a row's <see cref="DailyReportRow.CumulativeOvertime"/> is exactly the overtime sum a checkpoint stores.</summary>
+    /// <summary>The reference: rows from the member's first finished entry (org-local) to today with initial overtime 0 — days
+    /// of closed months as frozen (issue #81: they are taken as stored, the running sum continues from their stored sum), so a
+    /// row's <see cref="DailyReportRow.OvertimeDelta"/> is exactly the overtime sum a checkpoint stores. Also every frozen day of
+    /// the member (for figures before the first entry).</summary>
     public static async Task<Reference> ReferenceAsync(TimeTrackingDbContext db, int userId, int orgId)
     {
         var timeZone = await db.Organizations.IgnoreQueryFilters().AsNoTracking()
             .Where(o => o.Id == orgId).Select(o => o.TimeZone).FirstAsync();
         var clock = OrgClock.For(timeZone);
+        var frozen = await db.FrozenDays.AsNoTracking().Where(d => d.UserId == userId && d.OrganizationId == orgId)
+            .ToDictionaryAsync(d => d.Date);
         var first = await db.TimeEntries.AsNoTracking()
             .Where(e => e.UserId == userId && e.OrganizationId == orgId && !e.IsRunning)
             .MinAsync(e => (DateTime?)e.StartTime);
-        if (first == null) return new Reference(null, [], clock.Today());
+        if (first == null) return new Reference(null, [], clock.Today(), frozen);
         var firstDay = clock.LocalDate(first.Value);
         var rows = await DailyReportAggregator.BuildAsync(db, userId, orgId, firstDay, clock.Today(), 0);
-        return new Reference(firstDay, rows, clock.Today());
+        return new Reference(firstDay, rows, clock.Today(), frozen);
     }
 
-    public sealed record Reference(DateOnly? FirstDay, List<DailyReportRow> Rows, DateOnly Today)
+    public sealed record Reference(DateOnly? FirstDay, List<DailyReportRow> Rows, DateOnly Today, IReadOnlyDictionary<DateOnly, FrozenDay> Frozen)
     {
         private readonly Dictionary<DateOnly, DailyReportRow> _byDate = Rows.ToDictionary(r => r.Date);
 
         /// <summary>The overtime sum up to and including <paramref name="day"/> (0 before the first day).</summary>
         public double SumAt(DateOnly day) =>
-            _byDate.TryGetValue(day, out var r) ? r.CumulativeOvertime : (FirstDay == null || day < FirstDay ? 0 : Rows[^1].CumulativeOvertime);
+            _byDate.TryGetValue(day, out var r) ? r.OvertimeDelta ?? 0 : (FirstDay == null || day < FirstDay ? 0 : Rows[^1].OvertimeDelta ?? 0);
 
         public DailyReportRow? Row(DateOnly day) => _byDate.GetValueOrDefault(day);
 
-        /// <summary>The overall balance with <paramref name="initial"/> — the same expression the app evaluates.</summary>
-        public double Balance(double initial) => Rows.Count == 0 ? initial : initial + Rows[^1].CumulativeOvertime;
+        /// <summary>The cumulative balance the app shows for <paramref name="day"/>: a frozen day's stored figure, else
+        /// <paramref name="initial"/> + the sum (the initial overtime alone before the first day).</summary>
+        public double CumulativeAt(DateOnly day, double initial) =>
+            _byDate.TryGetValue(day, out var r) ? (r.Frozen ? r.CumulativeOvertime : initial + (r.OvertimeDelta ?? 0))
+            : Frozen.TryGetValue(day, out var f) ? f.CumulativeOvertime
+            : FirstDay == null || day < FirstDay ? initial : initial + SumAt(day);
+
+        /// <summary>The overall balance with <paramref name="initial"/> — the same expression the app evaluates (today is never frozen).</summary>
+        public double Balance(double initial) => Rows.Count == 0 ? initial : initial + (Rows[^1].OvertimeDelta ?? 0);
     }
 
     /// <summary>The stored checkpoints of the organizations that are valid right now (versions and algorithm match).</summary>
@@ -109,11 +120,13 @@ public sealed class BalanceHarness(WebApplicationFactory<Program> factory)
             var monthEnd = c.Month.AddMonths(1).AddDays(-1);
             var what = $"valid checkpoint org {c.OrganizationId} user {c.UserId} {c.Month:yyyy-MM} (v{c.Version}/o{c.OrgVersion}) — {because}";
             monthEnd.Should().BeBefore(reference.Today, what + ": only ended months");
-            c.FirstDay.Should().Be(reference.FirstDay, what + ": first day");
+            // After a closed month the balance starts from its frozen figures, whose first day was the one at freezing
+            if (!reference.Frozen.Keys.Any(d => d <= monthEnd))
+                c.FirstDay.Should().Be(reference.FirstDay, what + ": first day");
             var row = reference.Row(monthEnd);
             row.Should().NotBeNull(what + ": the reference has a row at the month end");
-            Math.Abs(c.OvertimeDelta - row!.CumulativeOvertime).Should().BeLessThanOrEqualTo(Exact,
-                $"{what}: stored {c.OvertimeDelta:R}, recomputed {row.CumulativeOvertime:R}");
+            Math.Abs(c.OvertimeDelta - (row!.OvertimeDelta ?? 0)).Should().BeLessThanOrEqualTo(Exact,
+                $"{what}: stored {c.OvertimeDelta:R}, recomputed {row.OvertimeDelta:R}");
         }
         // InMemory has no unique index: never two rows for one member and month
         valid.GroupBy(c => (c.OrganizationId, c.UserId, c.Month)).Should().OnlyContain(g => g.Count() == 1, because);

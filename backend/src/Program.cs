@@ -353,6 +353,9 @@ using (var scope = app.Services.CreateScope())
         // Demo data (users with known passwords!) only for the in-memory dev database or when asked for
         if (app.Configuration.GetValue<bool>("UseInMemoryDatabase") || app.Configuration.GetValue<bool>("SeedDemoData"))
             await DbSeeder.SeedAsync(context);
+
+        // Issue #81: months closed before frozen figures existed are frozen once, from the data as it is now
+        await FrozenFigures.FreezeUnfrozenAsync(context, services.GetRequiredService<ILogger<Program>>());
     }
     catch (Exception ex)
     {

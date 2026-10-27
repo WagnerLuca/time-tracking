@@ -40,10 +40,15 @@ public class ClosedPeriodService(TimeTrackingDbContext context)
         for (var attempt = 1; ; attempt++)
         {
             var already = (await ClosedPeriods.MonthsAsync(context, org.Id)).ToHashSet();
+            var months = new List<DateOnly>();
             for (var month = from; month <= to; month = month.AddMonths(1))
             {
                 if (already.Contains(month)) continue;
-                context.ClosedPeriods.Add(new ClosedPeriod { OrganizationId = org.Id, Month = month, ClosedAt = now, ClosedByUserId = callerUserId });
+                months.Add(month);
+                context.ClosedPeriods.Add(new ClosedPeriod
+                {
+                    OrganizationId = org.Id, Month = month, ClosedAt = now, ClosedByUserId = callerUserId, FrozenAt = now
+                });
                 context.ClosedPeriodEvents.Add(new ClosedPeriodEvent
                 {
                     OrganizationId = org.Id, Month = month, Kind = ClosedPeriodEventKind.Closed, UserId = callerUserId, At = now, Reason = reason
@@ -51,7 +56,12 @@ public class ClosedPeriodService(TimeTrackingDbContext context)
             }
             try
             {
-                await context.SaveChangesAsync();
+                // Closing freezes the months' figures (issue #81) in the same transaction
+                await InTransactionAsync(async () =>
+                {
+                    await context.SaveChangesAsync();
+                    await FrozenFigures.FreezeAsync(context, org, months, null);
+                });
                 break;
             }
             catch (DbUpdateException ex) when (DbErrors.IsUniqueViolation(ex) && attempt < 3)
@@ -61,6 +71,19 @@ public class ClosedPeriodService(TimeTrackingDbContext context)
             }
         }
         return ServiceResult.Ok(await StateAsync(org.Id, isAdmin: true));
+    }
+
+    /// <summary>Postgres: one transaction (a failure leaves nothing half closed or frozen); InMemory has none.</summary>
+    private async Task InTransactionAsync(Func<Task> work)
+    {
+        if (!context.Database.IsRelational())
+        {
+            await work();
+            return;
+        }
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        await work();
+        await transaction.CommitAsync();
     }
 
     public async Task<ServiceResult<ClosedPeriodsResponse>> ReopenAsync(string slug, int callerUserId, ReopenMonthRequest request)
@@ -80,7 +103,12 @@ public class ClosedPeriodService(TimeTrackingDbContext context)
             OrganizationId = org.Id, Month = month, Kind = ClosedPeriodEventKind.Reopened, UserId = callerUserId,
             At = DateTime.UtcNow, Reason = request.Reason.Trim()
         });
-        await context.SaveChangesAsync();
+        // Reopening drops the frozen figures: the month is live again
+        await InTransactionAsync(async () =>
+        {
+            await context.SaveChangesAsync();
+            await FrozenFigures.UnfreezeAsync(context, org.Id, month);
+        });
         return ServiceResult.Ok(await StateAsync(org.Id, isAdmin: true));
     }
 

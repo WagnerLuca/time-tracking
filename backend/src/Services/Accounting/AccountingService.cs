@@ -108,6 +108,14 @@ public class AccountingService(TimeTrackingDbContext context, PayrollExportServi
             .Select(e => e.StartTime)
             .ToListAsync();
         var failures = failureStarts.Select(s => ClosedPeriods.MonthOf(clock.LocalDate(s))).CountBy(m => m).ToDictionary();
+        // Closed months: the failure entries frozen with them
+        var closedMonths = closed.Select(c => c.Month).ToList();
+        if (closedMonths.Count > 0)
+            foreach (var f in await context.FrozenMonths.AsNoTracking()
+                         .Where(f => f.OrganizationId == org.Id && closedMonths.Contains(f.Month))
+                         .GroupBy(f => f.Month).Select(g => new { Month = g.Key, Count = g.Sum(f => f.FailureEntryCount) })
+                         .ToListAsync())
+                failures[f.Month] = f.Count;
         var pending = await ClosedPeriods.PendingRequestsPerMonthAsync(context, org, months);
 
         return ServiceResult.Ok(new AccountingMonthsResponse
@@ -145,11 +153,14 @@ public class AccountingService(TimeTrackingDbContext context, PayrollExportServi
         var balances = await VacationBalances.YearsAsync(context, org, ids, year, OrgClock.For(org).Today());
 
         var (yearStart, yearEnd) = (new DateOnly(year, 1, 1), new DateOnly(year, 12, 31));
-        var others = (await context.AbsenceDays.AsNoTracking()
-                .Where(a => a.OrganizationId == org.Id && ids.Contains(a.UserId) && a.Date >= yearStart && a.Date <= yearEnd
-                    && a.Type != AbsenceType.Vacation && (a.CustomType == null || !a.CustomType.CountsAsVacation))
-                .Select(a => new { a.UserId, a.Type, a.IsHalfDay })
+        var live = (await context.AbsenceDays.AsNoTracking()
+                .Where(a => a.OrganizationId == org.Id && ids.Contains(a.UserId) && a.Date >= yearStart && a.Date <= yearEnd)
+                .Select(a => new { a.UserId, a.Date, a.Type, CountsAsVacation = a.CustomType != null && a.CustomType.CountsAsVacation, a.IsHalfDay })
                 .ToListAsync())
+            .Select(a => new FrozenFigures.Absence(a.UserId, a.Date, a.Type, a.CountsAsVacation, a.IsHalfDay ? 0.5 : 1.0, 0));
+        // Closed months as frozen
+        var others = FrozenFigures.Overlay(live, await FrozenFigures.AbsencesAsync(context, org.Id, ids, yearStart, yearEnd))
+            .Where(a => a.Type != AbsenceType.Vacation && !a.CountsAsVacation)
             .ToLookup(a => a.UserId);
 
         return ServiceResult.Ok(new VacationOverviewResponse
@@ -172,8 +183,8 @@ public class AccountingService(TimeTrackingDbContext context, PayrollExportServi
                     Taken = b.Taken,
                     Planned = b.Planned,
                     Remaining = b.Remaining,
-                    SickDays = days.Where(a => a.Type == AbsenceType.SickDay).Sum(a => a.IsHalfDay ? 0.5 : 1.0),
-                    OtherAbsenceDays = days.Where(a => a.Type != AbsenceType.SickDay).Sum(a => a.IsHalfDay ? 0.5 : 1.0)
+                    SickDays = days.Where(a => a.Type == AbsenceType.SickDay).Sum(a => a.Days),
+                    OtherAbsenceDays = days.Where(a => a.Type != AbsenceType.SickDay).Sum(a => a.Days)
                 };
             }).ToList()
         });

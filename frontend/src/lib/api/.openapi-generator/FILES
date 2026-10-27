@@ -55,6 +55,7 @@ docs/EffectivePermissionsResponse.md
 docs/ExportImportApi.md
 docs/ExportRequest.md
 docs/ForgotPasswordRequest.md
+docs/FrozenDayResponse.md
 docs/GroupApi.md
 docs/GroupDetailResponse.md
 docs/GroupMemberResponse.md

@@ -2,7 +2,7 @@ import type { de } from './de';
 
 export const en: typeof de = {
 	title: 'Closed periods',
-	intro: 'Close months, e.g. after payroll. Members and group leads can then change nothing there any more — no entries, absences, imports, work schedules or terminal punches. Admins can still correct, but must give a reason; every such change shows in the history and the log.',
+	intro: 'Close months, e.g. after payroll. Members and group leads can then change nothing there any more — no entries, absences, imports, work schedules or terminal punches. Admins can still correct, but must give a reason; every such change shows in the history and the log. The figures of the month (target, worked, overtime, balance, absences) are frozen when it is closed: later changes of holidays, absence types, the time zone, work schedules or the initial overtime no longer change them — only open months. An admin correction with a reason updates the frozen figures.',
 	rules: 'Only months that have ended can be closed. The automatic stop of forgotten timers at business day end and the core-hours check keep running.',
 	closed: 'Closed',
 	none: 'No month closed yet.',
@@ -19,7 +19,7 @@ export const en: typeof de = {
 	movedLink: 'Go to month closing',
 	reopen: 'Reopen',
 	reopenTitle: 'Reopen {month}?',
-	reopenMessage: 'Members and group leads can change it again afterwards. Reopening is logged with its reason.',
+	reopenMessage: 'Members and group leads can change it again afterwards. Reopening is logged with its reason. The frozen figures are dropped and computed from the current data again.',
 	reopenLabel: 'Reason',
 	reopened: '{month} is open again.',
 	audit: 'Log',

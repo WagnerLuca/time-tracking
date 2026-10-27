@@ -152,7 +152,8 @@ public class OrganizationService : IOrganizationService
         // Vacation balance of each member (current year incl. carry-over, in the org's time zone)
         var today = OrgClock.For(organization.TimeZone).Today();
         var memberIds = visibility.Ids(MemberInfo.VacationBalance).ToList();
-        var vacationByUser = await VacationBalances.YearsAsync(_context, org, memberIds, today.Year, today);
+        var vacationByUser = await VacationBalances.YearsAsync(_context, org, memberIds, today.Year, today,
+            anyClosedMonth: organization.ClosedMonths.Count > 0);
 
         // Group memberships for tag display (e.g. "Frontend Admin"): direct ones, then the
         // ancestors of those groups as inherited memberships ("über Team Küche")

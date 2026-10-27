@@ -16,6 +16,10 @@ public class ClosedPeriod
     public DateTime ClosedAt { get; set; }
     public int? ClosedByUserId { get; set; }
 
+    /// <summary>When the month's figures were frozen (<c>FrozenFigures</c>); null only for months closed before issue #81,
+    /// frozen once at startup.</summary>
+    public DateTime? FrozenAt { get; set; }
+
     public Organization Organization { get; set; } = null!;
 }
 

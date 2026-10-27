@@ -74,3 +74,42 @@ export function entryLock(
 	const day = orgDateKey(new Date(entry.startTime), org.timeZone);
 	return isClosedDay(day, closedMonthSet(org.closedMonths)) ? lockText(day) : '';
 }
+
+/** A day of a closed month as frozen when it was closed (issue #81, `GET …/members/{id}/frozen-days`). */
+export interface FrozenDayLike {
+	targetHours?: number;
+	creditHours?: number;
+	workedHours?: number;
+	status?: string | null;
+	holidayName?: string | null;
+	absenceType?: string | null;
+	absenceHalfDay?: boolean;
+}
+
+const STATUSES = new Set(['Worked', 'Missing', 'Holiday', 'Half Holiday', 'Vacation', 'Sick', 'Absent', 'Weekend', 'Day Off', 'Needs Correction']);
+
+/** A half holiday leaves half the target (a full one none) — the frozen day knows the remaining target, not the flag. */
+const halfHoliday = (f: FrozenDayLike) => !!f.holidayName && (f.targetHours ?? 0) > 0;
+
+/** The calendar's day type of a frozen day (same priority as `getDayType`: a holiday wins unless it is a half one). */
+export function frozenDayType(f: FrozenDayLike): 'holiday' | 'sick' | 'vacation' | 'other-absence' | null {
+	const absence = f.absenceType === 'SickDay' ? 'sick' : f.absenceType === 'Vacation' ? 'vacation' : f.absenceType ? 'other-absence' : null;
+	if (f.holidayName && !(absence && halfHoliday(f))) return 'holiday';
+	return absence;
+}
+
+/** The calendar's label of a frozen day (as `getDayTypeLabel`; a custom absence type's name is its status). */
+export function frozenDayLabel(f: FrozenDayLike): string {
+	const halfDay = ' ' + t('format.dayType.halfDay');
+	const halfSuffix = f.absenceHalfDay ? halfDay : '';
+	const absence =
+		f.absenceType === 'SickDay' ? t('format.dayType.sick')
+		: f.absenceType === 'Vacation' ? t('format.dayType.vacation')
+		: f.absenceType ? (f.status && !STATUSES.has(f.status) ? f.status : t('format.dayType.otherAbsence'))
+		: '';
+	if (f.holidayName) {
+		if (!halfHoliday(f)) return f.holidayName;
+		return absence ? `${f.holidayName}${halfDay} / ${absence}${halfSuffix}` : `${f.holidayName}${halfDay}`;
+	}
+	return absence ? absence + halfSuffix : '';
+}

@@ -32,7 +32,15 @@ public static class WorkingTimeAct
             .Where(e => e.UserId == userId && e.OrganizationId == orgId && !e.IsRunning && !e.IsFailure
                      && e.EndTime != null && e.StartTime >= fromUtc && e.StartTime < toUtc)
             .ToListAsync();
-        var byDay = entries.GroupBy(e => clock.LocalDate(e.StartTime)).ToDictionary(g => g.Key, g => g.ToList());
+        return Days(clock, entries, from, to);
+    }
+
+    /// <summary><see cref="DaysAsync"/> over already loaded entries (finished ones of the days from the day before
+    /// <paramref name="from"/> on; failure entries are skipped here).</summary>
+    public static List<ComplianceDayResponse> Days(OrgClock clock, IEnumerable<TimeEntry> entries, DateOnly from, DateOnly to)
+    {
+        var byDay = entries.Where(e => !e.IsRunning && !e.IsFailure && e.EndTime != null)
+            .GroupBy(e => clock.LocalDate(e.StartTime)).ToDictionary(g => g.Key, g => g.ToList());
 
         var days = new List<ComplianceDayResponse>();
         for (var day = from; day <= to; day = day.AddDays(1))
@@ -52,6 +60,25 @@ public static class WorkingTimeAct
             });
         }
         return days;
+    }
+
+    /// <summary>
+    /// The compliance findings: the Working Time Act days merged with the open core-hours violations, only days with a finding.
+    /// </summary>
+    public static List<ComplianceDayResponse> Findings(IEnumerable<ComplianceDayResponse> workingTimeDays,
+        IReadOnlyDictionary<DateOnly, CoreHours.Result> violations)
+    {
+        var days = workingTimeDays.ToDictionary(d => d.Date);
+        foreach (var (date, core) in violations)
+            days[date] = (days.GetValueOrDefault(date) ?? new ComplianceDayResponse { Date = date }) with
+            {
+                CoreHours = true,
+                CoreHoursIssues = CoreHours.IssueNames(core.Issues),
+                CoreHoursMissingMinutes = core.MissingMinutes,
+                CoreHoursWindow = core.Window.ToString(),
+                CoreHoursBackfilled = core.Backfilled
+            };
+        return days.Values.Where(d => d.DailyMax || d.RestPeriod || d.CoreHours).OrderBy(d => d.Date).ToList();
     }
 
     /// <summary>

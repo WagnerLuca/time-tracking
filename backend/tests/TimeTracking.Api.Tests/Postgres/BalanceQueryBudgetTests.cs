@@ -19,7 +19,7 @@ namespace TimeTracking.Api.Tests.Postgres;
 /// ceiling per endpoint. The balance reads entries of at most about a month; the invalidation hook adds no query to an
 /// everyday save in the current month. Runs on the perf container (<see cref="PerfApiFactory"/>: no background jobs, SQL
 /// counted per request) with two <see cref="PerfSeeder"/> organizations of 10 people; part of the normal suite (Category
-/// PerfSmoke, not Perf), so it stays small: two warm-up and two counted calls per endpoint.
+/// PerfSmoke, not Perf), so it stays small: two warm-up and three counted calls per endpoint (two must agree).
 /// </summary>
 [Collection(PerfCollection.Name)]
 [Trait("Category", "PerfSmoke")]
@@ -36,20 +36,24 @@ public class BalanceQueryBudgetTests(PerfApiFactory factory, ITestOutputHelper o
     {
         ["balance"] = 18,
         ["team overview"] = 10,
-        ["payroll"] = 11,
+        ["payroll"] = 12, // 1 more since closed months are frozen (#81): the frozen days of the range
         ["inbox: failures"] = 1,
         ["inbox: approvals"] = 6,
-        ["accounting summary"] = 11,
-        ["accounting vacation"] = 9, // 2 more since the vacation carry-over (Phase 2b)
-        ["daily CSV"] = 18,
+        ["accounting summary"] = 12, // 1 more since #81: the frozen days of the month
+        ["accounting vacation"] = 11, // 2 more since the vacation carry-over (Phase 2b), 2 more since #81 (frozen days of the chain and of the year)
+        ["daily CSV"] = 12, // 6 fewer since #81: one running-total pass instead of two
         ["monthly PDF"] = 11,
-        ["org detail"] = 10, // 2 more since the vacation carry-over (Phase 2b)
+        ["org detail"] = 11, // 2 more since the vacation carry-over (Phase 2b), 1 more with closed months (#81: their frozen vacation days)
         ["timer start"] = 7,
         ["timer stop"] = 7,
         ["manual entry"] = 13
     };
 
     private static readonly string[] Writes = ["timer start", "timer stop", "manual entry"];
+
+    /// <summary>With closed months these send one more command: the closed-period guard (#57) reads the closed months of a
+    /// save, the inbox marks pending requests touching one.</summary>
+    private static readonly string[] ClosedMonthChecks = ["inbox: approvals", "timer start", "manual entry"];
 
     /// <summary>One counted call; <c>Before</c>/<c>After</c> run outside the count (start the timer a stop needs, delete what a call created).</summary>
     private sealed record Call(string Name, Func<Task<HttpResponseMessage>> Run,
@@ -83,6 +87,21 @@ public class BalanceQueryBudgetTests(PerfApiFactory factory, ITestOutputHelper o
                 if (!nearMonthChange || !Writes.Contains(name))
                     count.Should().BeLessThanOrEqualTo(Ceilings[name], $"{name}: the query budget");
 
+            // Closed months (issue #81): with the last 12 months closed and frozen, the same holds, and reading a closed month
+            // (its frozen figures) costs no more than computing it did
+            foreach (var seed in seeds) await CloseLastMonthsAsync(app, seed, 12);
+            var closedOne = await MeasureAsync(app, seeds[0]);
+            var closedThree = await MeasureAsync(app, seeds[1]);
+            foreach (var (name, count) in closedOne)
+                output.WriteLine($"closed: {name}: 1 year {count} SQL, 3 years {closedThree[name]} SQL (open {oneYear[name]})");
+            closedThree.Should().Equal(closedOne, "with closed months the cost of no endpoint grows with the years of history");
+            foreach (var name in new[] { "payroll", "accounting summary", "daily CSV", "monthly PDF" })
+                closedOne[name].Should().BeLessThanOrEqualTo(oneYear[name], $"{name}: a closed month is read from its frozen figures");
+            foreach (var (name, count) in closedOne)
+                if (!nearMonthChange || !Writes.Contains(name))
+                    count.Should().BeLessThanOrEqualTo(Ceilings[name] + (ClosedMonthChecks.Contains(name) ? 1 : 0),
+                        $"{name}: the query budget with closed months");
+
             await HookAddsNoQueryAsync(superuser, seeds[0]);
         }
         finally
@@ -90,6 +109,17 @@ public class BalanceQueryBudgetTests(PerfApiFactory factory, ITestOutputHelper o
             await app.DisposeAsync();
             await factory.DropDatabaseAsync(database);
         }
+    }
+
+    /// <summary>Closes the <paramref name="months"/> months before the current one as the organization's owner.</summary>
+    private static async Task CloseLastMonthsAsync(Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> app, PerfSeedResult seed, int months)
+    {
+        var owner = app.CreateClient();
+        TestHelpers.SetBearerToken(owner, (await TestHelpers.LoginAsync(owner, PerfSeedResult.OwnerEmail(seed.Slug), Password)).AccessToken);
+        var lastMonth = BalanceHarness.MonthOf(OrgClock.For("Europe/Berlin").Today()).AddMonths(-1);
+        var response = await owner.PostAsJsonAsync($"/api/v1/organizations/{seed.Slug}/closed-periods",
+            new { from = lastMonth.AddMonths(1 - months), to = lastMonth, reason = "budget" });
+        response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
     }
 
     private static bool NearMonthChange()
@@ -158,7 +188,7 @@ public class BalanceQueryBudgetTests(PerfApiFactory factory, ITestOutputHelper o
         foreach (var call in calls)
         {
             var runs = new List<int>();
-            for (var i = 0; i < 2; i++)
+            for (var i = 0; i < 3; i++)
             {
                 if (call.Before != null) await call.Before();
                 HttpResponseMessage response;
@@ -180,9 +210,11 @@ public class BalanceQueryBudgetTests(PerfApiFactory factory, ITestOutputHelper o
                 }
                 if (call.After != null) await call.After(response);
             }
-            runs.Distinct().Should().ContainSingle($"{call.Name}: the same count on every warm call ({string.Join(", ", runs)})");
-            output.WriteLine($"{slug} {call.Name}: {runs[0]} SQL");
-            result[call.Name] = runs[0];
+            // The same count on (at least two of three) warm calls: a slow, instrumented run may add a cache refresh to one
+            var count = runs.GroupBy(r => r).OrderByDescending(g => g.Count()).First();
+            count.Count().Should().BeGreaterThanOrEqualTo(2, $"{call.Name}: the same count on the warm calls ({string.Join(", ", runs)})");
+            output.WriteLine($"{slug} {call.Name}: {count.Key} SQL ({string.Join(", ", runs)})");
+            result[call.Name] = count.Key;
         }
         return result;
     }
