@@ -140,6 +140,8 @@ test('switching to English translates the Organigramm', async ({ page }) => {
 	await login(page, 'tom.weber@example.com');
 	await page.goto(`/organizations/${SLUG}/chart`);
 	await expect(page.getByRole('tree', { name: /Organigramm/ })).toBeVisible();
+	// On desktop the language toggle is in the user menu (it stays open while switching)
+	await page.getByRole('button', { name: 'Benutzermenü' }).click();
 	await page.getByRole('button', { name: 'EN', exact: true }).first().click();
 	await expect(page.getByRole('button', { name: 'Collapse all' })).toBeVisible();
 	await page.getByRole('button', { name: 'DE', exact: true }).first().click();

@@ -10,3 +10,7 @@ test-output.txt
 backend/logs/
 **/TestResults/
 backend/backend/
+
+# Third-party agent skills (npx skills add), kept local
+.claude/skills/
+skills-lock.json

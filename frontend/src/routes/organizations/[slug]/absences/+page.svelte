@@ -730,7 +730,7 @@
 															href="/organizations/{orgSlug}/members/{entry.span.userId}"
 															onclick={(e) => e.stopPropagation()}
 															onkeydown={(e) => e.stopPropagation()}
-															class="h-[16px] flex items-center text-[9px] leading-none px-1 border truncate no-underline text-base-content hover:brightness-95 transition-all {absenceChipClass(entry.span)} {shape}"
+															class="h-[16px] flex items-center text-[9px] leading-none px-1 border truncate no-underline text-base-content hover:brightness-95 transition-[filter] {absenceChipClass(entry.span)} {shape}"
 															style={absenceChipStyle(entry.span)}
 															title={spanTitle(entry.span)}
 														>{@render chipLabel()}</a>
@@ -854,7 +854,7 @@
 						{@const takenPct = total > 0 ? Math.min(100, (taken / total) * 100) : 0}
 						{@const plannedPct = total > 0 ? Math.min(100 - takenPct, (planned / total) * 100) : 0}
 						{@const pct = Math.round(takenPct + plannedPct)}
-						<a href="/organizations/{orgSlug}/members/{member.id}" class="flex items-start gap-3 p-3 bg-base-100 rounded-lg border border-base-300 hover:border-primary/30 hover:shadow-sm transition-all no-underline text-base-content">
+						<a href="/organizations/{orgSlug}/members/{member.id}" class="flex items-start gap-3 p-3 bg-base-100 rounded-lg border border-base-300 hover:border-primary/30 hover:shadow-sm transition-[border-color,box-shadow,background-color] no-underline text-base-content">
 							<div class="w-9 h-9 rounded-full bg-primary text-primary-content flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5" aria-hidden="true">
 								{getInitials(member.firstName, member.lastName)}
 							</div>

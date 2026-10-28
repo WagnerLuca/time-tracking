@@ -4,16 +4,30 @@
 	import { timer } from '$lib/stores/timer.svelte';
 	import { getOrgDetail } from '$lib/stores/orgDetail';
 	import { holidayApi, invitationsApi, timeTrackingApi, workScheduleApi } from '$lib/apiClient';
-	import { adminSteps, dismissChecklist, isDismissed, memberSteps, wasSeen, type Checklist, type Step } from '$lib/utils/onboarding';
+	import { adminSteps, dismissChecklist, isDismissed, markOpen, memberSteps, wasOpen, wasSeen, type Checklist, type Step } from '$lib/utils/onboarding';
 	import { t } from '$lib/i18n';
 
 	/** The dashboard's first-steps card: auto-ticked from real data, dismissible per user + org. */
 	let { slug, list }: { slug: string; list: Checklist } = $props();
 
-	let steps = $state<Step[]>([]);
+	let loaded = $state<Step[]>([]);
 	let hidden = $state(true);
+	let complete = $state(false);
 	const userId = $derived(auth.user?.id ?? 0);
+	// A timer started on the dashboard ticks its step right here
+	const steps = $derived(loaded.map((s) => (s.id === 'timer' && timer.current ? { ...s, done: true } : s)));
 	const done = $derived(steps.filter((s) => s.done).length);
+
+	// The last item ticked while the card is shown: the once-only "all done" moment
+	$effect(() => {
+		if (!hidden && steps.length > 0 && done === steps.length) untrack(finish);
+	});
+
+	function finish() {
+		if (complete) return;
+		complete = true;
+		dismissChecklist(userId, slug, list); // never again
+	}
 
 	$effect(() => {
 		const s = slug;
@@ -22,6 +36,7 @@
 
 	async function load(s: string) {
 		hidden = true;
+		complete = false;
 		if (!userId || isDismissed(userId, s, list)) return;
 		try {
 			if (list === 'member') {
@@ -29,16 +44,23 @@
 					workScheduleApi.apiV1OrganizationsSlugWorkScheduleGet(s).then((r) => !!r.data?.weeklyWorkHours).catch(() => false),
 					timeTrackingApi.apiV1TimeTrackingGet(undefined, undefined, undefined, 1).then((r) => (r.data.items?.length ?? 0) > 0)
 				]);
-				steps = memberSteps(s, { hasSchedule: schedule, hasEntries: entries || !!timer.current, sawTeamCalendar: wasSeen(userId, s, 'teamCalendar') });
+				loaded = memberSteps(s, { hasSchedule: schedule, hasEntries: entries || !!timer.current, sawTeamCalendar: wasSeen(userId, s, 'teamCalendar') });
 			} else {
 				const [org, invites, holidays] = await Promise.all([
 					getOrgDetail(s),
 					invitationsApi.apiV1OrganizationsSlugInvitationsGet(s).then((r) => r.data.length).catch(() => 0),
 					holidayApi.apiV1OrganizationsSlugHolidaysGet(s).then((r) => r.data.length)
 				]);
-				steps = adminSteps(s, { hasInvited: (org.members?.length ?? 0) > 1 || invites > 0, sawRules: wasSeen(userId, s, 'rules'), hasHolidays: holidays > 0 });
+				loaded = adminSteps(s, { hasInvited: (org.members?.length ?? 0) > 1 || invites > 0, sawRules: wasSeen(userId, s, 'rules'), hasHolidays: holidays > 0 });
 			}
-			hidden = steps.every((st) => st.done);
+			if (loaded.every((st) => st.done)) {
+				// Finished elsewhere since the card was last shown unfinished: celebrate once, else stay away
+				if (wasOpen(userId, s, list)) finish();
+				hidden = !complete;
+			} else {
+				hidden = false;
+				markOpen(userId, s, list);
+			}
 		} catch {
 			// Optional help only: no card when the facts cannot be loaded
 		}
@@ -59,6 +81,12 @@
 			</div>
 			<button type="button" class="btn btn-ghost btn-sm btn-square" aria-label={t('onboarding.dismiss')} title={t('onboarding.dismiss')} onclick={dismiss}>✕</button>
 		</div>
+		{#if complete}
+			<p class="onboarding-done m-0 mt-3 flex w-fit items-center gap-2 text-sm font-semibold text-primary" role="status">
+				<span class="grid size-8 place-items-center rounded-full bg-primary text-primary-content" aria-hidden="true">✓</span>
+				{t('onboarding.complete')}
+			</p>
+		{/if}
 		<ol class="m-0 mt-3 flex list-none flex-col gap-1 p-0">
 			{#each steps as step (step.id)}
 				<li>

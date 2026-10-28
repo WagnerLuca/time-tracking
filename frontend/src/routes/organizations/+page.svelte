@@ -144,7 +144,7 @@
 					{#each myOrgs as org (org.organizationId)}
 						<button
 							type="button"
-							class="text-left bg-base-100 rounded-xl border p-5 transition-all hover:shadow-md hover:border-primary {org.organizationId === orgContext.selectedOrgId ? 'border-primary' : 'border-base-300'}"
+							class="text-left bg-base-100 rounded-xl border p-5 transition-[border-color,box-shadow,background-color] hover:shadow-md hover:border-primary {org.organizationId === orgContext.selectedOrgId ? 'border-primary' : 'border-base-300'}"
 							onclick={() => openOrg(org)}
 						>
 							<div class="flex items-start justify-between gap-2">

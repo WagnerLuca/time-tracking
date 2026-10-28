@@ -865,7 +865,7 @@
 							<span class="w-5 text-xs text-base-content/70 shrink-0 text-right">{day.dayOfMonth}</span>
 							<span class="w-2 h-2 rounded-full shrink-0 {dt.dot}" title={day.dayTypeLabel || undefined}></span>
 							<div class="flex-1 h-1.5 bg-base-200 rounded-full overflow-hidden">
-								<div class="h-full {day.workedMinutes > day.targetMinutes && day.targetMinutes > 0 ? 'bg-success' : 'bg-primary'} rounded-full transition-all duration-300" style="width: {barWidth(day.workedMinutes, day.targetMinutes)}%"></div>
+								<div class="h-full {day.workedMinutes > day.targetMinutes && day.targetMinutes > 0 ? 'bg-success' : 'bg-primary'} rounded-full transition-[width] duration-300 ease-out" style="width: {barWidth(day.workedMinutes, day.targetMinutes)}%"></div>
 							</div>
 							<span class="text-xs text-base-content/70 min-w-[36px] text-right">{formatHours(day.workedMinutes)}</span>
 							{#if day.targetMinutes > 0}
@@ -944,7 +944,7 @@
 				<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
 					{#each yearMonths as mo (mo.month)}
 						{@const isCurrent = mo.month === new Date().getMonth() && currentYear === new Date().getFullYear()}
-						<button type="button" class="bg-base-100 border rounded-lg p-3 cursor-pointer text-left transition-all w-full min-w-0 hover:border-primary/30 hover:shadow-md {isCurrent ? 'border-primary shadow-[0_0_0_1px] shadow-primary' : 'border-base-300'}" onclick={() => openMonth(mo.month)}>
+						<button type="button" class="bg-base-100 border rounded-lg p-3 cursor-pointer text-left transition-[border-color,box-shadow,background-color] w-full min-w-0 hover:border-primary/30 hover:shadow-md {isCurrent ? 'border-primary shadow-[0_0_0_1px] shadow-primary' : 'border-base-300'}" onclick={() => openMonth(mo.month)}>
 							<div class="flex flex-wrap justify-between items-center gap-1 mb-2">
 								<span class="font-semibold text-sm text-base-content">{mo.name}</span>
 								{#if mo.workedMinutes > 0 || mo.creditedMinutes > 0}
@@ -952,7 +952,7 @@
 								{/if}
 							</div>
 							<div class="h-1.5 bg-base-200 rounded-full overflow-hidden mb-2">
-								<div class="h-full {mo.workedMinutes > mo.targetMinutes && mo.targetMinutes > 0 ? 'bg-success' : 'bg-primary'} rounded-full transition-all duration-300" style="width: {barWidth(mo.workedMinutes, mo.targetMinutes)}%"></div>
+								<div class="h-full {mo.workedMinutes > mo.targetMinutes && mo.targetMinutes > 0 ? 'bg-success' : 'bg-primary'} rounded-full transition-[width] duration-300 ease-out" style="width: {barWidth(mo.workedMinutes, mo.targetMinutes)}%"></div>
 							</div>
 							<div class="text-sm text-base-content/70 mb-1.5">
 								<span class="font-semibold">{formatHours(mo.workedMinutes)}</span>

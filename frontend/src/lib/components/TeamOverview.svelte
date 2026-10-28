@@ -128,7 +128,7 @@
 							</div>
 							<div class="min-w-0 flex-1">
 								<div class="flex items-center gap-1.5 font-semibold text-sm">
-									<span class="truncate">{m.firstName} {m.lastName}</span>
+									<span class="truncate" title="{m.firstName} {m.lastName}">{m.firstName} {m.lastName}</span>
 									{#if (m.failureCount ?? 0) > 0}
 										<span class="badge badge-warning badge-sm shrink-0" title={t('dashboard.team.failures', { count: m.failureCount ?? 0 })} aria-label={t('dashboard.team.failures', { count: m.failureCount ?? 0 })}>!</span>
 									{/if}

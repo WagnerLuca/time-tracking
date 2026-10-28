@@ -49,3 +49,6 @@ export const markSeen = (userId: number, slug: string, what: 'teamCalendar' | 'r
 export const wasSeen = (userId: number, slug: string, what: 'teamCalendar' | 'rules') => read(key(userId, slug, `seen-${what}`));
 export const dismissChecklist = (userId: number, slug: string, list: Checklist) => write(key(userId, slug, `dismissed-${list}`));
 export const isDismissed = (userId: number, slug: string, list: Checklist) => read(key(userId, slug, `dismissed-${list}`));
+/** The card was shown unfinished once: finishing it later earns the one-time "all done" moment. */
+export const markOpen = (userId: number, slug: string, list: Checklist) => write(key(userId, slug, `open-${list}`));
+export const wasOpen = (userId: number, slug: string, list: Checklist) => read(key(userId, slug, `open-${list}`));

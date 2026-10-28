@@ -131,7 +131,7 @@
 					{@const overview = overviewByUser.get(member.id!)}
 					<li>
 						<a
-							class="group flex items-center gap-3 sm:gap-4 p-3.5 bg-base-100 border border-base-300 rounded-xl transition-all hover:border-primary/30 hover:shadow-md no-underline text-base-content"
+							class="group flex items-start sm:items-center gap-3 sm:gap-4 p-3.5 bg-base-100 border border-base-300 rounded-xl transition-[border-color,box-shadow,background-color] hover:border-primary/30 hover:shadow-md no-underline text-base-content"
 							href="/organizations/{orgSlug}/members/{member.id}"
 						>
 							<div class="relative shrink-0">
@@ -148,7 +148,7 @@
 									{/if}
 									<GroupTags groups={member.groups} />
 								</div>
-								{#if member.email}<div class="text-sm text-base-content/70 mt-0.5 truncate">{member.email}</div>{/if}
+								{#if member.email}<div class="text-sm text-base-content/70 mt-0.5 truncate" title={member.email}>{member.email}</div>{/if}
 								<div class="flex gap-x-3 gap-y-1 mt-1.5 flex-wrap items-center text-xs text-base-content/70">
 									{#if member.role}<span class="badge badge-sm uppercase tracking-wide {roleBadge(member.role)}">{roleLabel(member.role)}</span>{/if}
 									{#if member.isAccountant}<span class="badge badge-sm badge-accent uppercase tracking-wide" data-testid="accountant-badge">{t('accounting.role')}</span>{/if}
@@ -167,7 +167,7 @@
 									{/if}
 								</div>
 							</div>
-							<svg class="w-5 h-5 text-base-content/20 group-hover:text-primary transition-colors shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
+							<svg class="w-5 h-5 text-base-content/20 group-hover:text-primary transition-colors shrink-0 self-center" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/></svg>
 						</a>
 					</li>
 				{/each}

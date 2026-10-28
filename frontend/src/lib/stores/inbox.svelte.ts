@@ -61,6 +61,12 @@ function createInbox() {
 		ownOpen = ownOpen.filter((r) => r.id !== req.id);
 	}
 
+	/** Accepts or declines a request to approve; its row leaves the list at once (and folds away on /inbox). */
+	async function respond(req: Pick<OrgRequestResponse, 'id' | 'organizationSlug'>, accept: boolean, reason?: string) {
+		await requestsApi.apiV1OrganizationsSlugRequestsIdPut(req.organizationSlug!, req.id!, { accept, reason });
+		toApprove = toApprove.filter((r) => r.id !== req.id);
+	}
+
 	function reset() {
 		toApprove = [];
 		decisions = [];
@@ -84,6 +90,7 @@ function createInbox() {
 		markRead,
 		dismissDecisions,
 		withdraw,
+		respond,
 		reset
 	};
 }

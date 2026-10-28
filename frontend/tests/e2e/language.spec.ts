@@ -16,7 +16,9 @@ test('language: DE → EN → DE without raw keys, English survives a reload', a
 	await expect(nav.getByRole('link', { name: 'Verlauf' })).toBeVisible();
 	await expectNoRawKeys(page);
 
-	await page.locator('button[lang="en"]').first().click();
+	// On desktop the language toggle is in the user menu
+	await page.getByRole('button', { name: 'Benutzermenü' }).click();
+	await page.getByRole('menu').locator('button[lang="en"]').click();
 	await expect(nav.getByRole('link', { name: 'History' })).toBeVisible();
 	await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 	await expectNoRawKeys(page);
@@ -25,7 +27,8 @@ test('language: DE → EN → DE without raw keys, English survives a reload', a
 	await expect(nav.getByRole('link', { name: 'History' })).toBeVisible();
 	await expectNoRawKeys(page);
 
-	await page.locator('button[lang="de"]').first().click();
+	await page.getByRole('button', { name: 'User menu' }).click();
+	await page.getByRole('menu').locator('button[lang="de"]').click();
 	await expect(nav.getByRole('link', { name: 'Verlauf' })).toBeVisible();
 	await expect(page.locator('html')).toHaveAttribute('lang', 'de');
 	await expectNoRawKeys(page);
