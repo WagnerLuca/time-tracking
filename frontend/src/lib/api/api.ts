@@ -228,6 +228,24 @@ export interface ApiKeyResponse {
     'lastUsedAt'?: string | null;
 }
 /**
+ * An appointment as the caller may see it: TimeTracking.Api.Models.Dtos.AppointmentResponse.Note is null when the note is hidden  (`AppointmentNotes`), TimeTracking.Api.Models.Dtos.AppointmentResponse.StartTime/TimeTracking.Api.Models.Dtos.AppointmentResponse.EndTime (\"HH:mm\") null = all day.
+ */
+export interface AppointmentResponse {
+    'id'?: number;
+    'userId'?: number;
+    'date'?: string;
+    'startTime'?: string | null;
+    'endTime'?: string | null;
+    'allDay'?: boolean;
+    'note'?: string | null;
+    /**
+     * Whether the caller may edit/delete it (own, or org admin / group admin who may approve the member\'s absences).
+     */
+    'canEdit'?: boolean;
+    'createdAt'?: string;
+    'createdByUserId'?: number | null;
+}
+/**
  * Generic success/failure response for auth operations.
  */
 export interface AuthResponse {
@@ -384,6 +402,10 @@ export interface ComplianceDayResponse {
      * With TimeTracking.Api.Models.Dtos.ComplianceDayResponse.CoreHours: flagged by a backfill when core hours were switched on (never notified).
      */
     'coreHoursBackfilled'?: boolean;
+    /**
+     * With TimeTracking.Api.Models.Dtos.ComplianceDayResponse.CoreHours: planned appointments that were counted as covered (\"HH:mm-HH:mm\" or \"allDay\").
+     */
+    'coreHoursAppointments'?: Array<string> | null;
 }
 /**
  * A group\'s core working hours override (null on the group = inherit from the organization).
@@ -1442,6 +1464,14 @@ export interface PersonalAbsence {
     'isHalfDay'?: boolean;
     'note'?: string | null;
 }
+export interface PersonalAppointment {
+    'organization'?: string | null;
+    'date'?: string;
+    'startTime'?: string | null;
+    'endTime'?: string | null;
+    'note'?: string | null;
+    'createdAt'?: string;
+}
 export interface PersonalCard {
     'organization'?: string | null;
     'cardHint'?: string | null;
@@ -1473,6 +1503,10 @@ export interface PersonalDataExport {
      * Per-year vacation entitlements and adjustments set by admins (null entitlement = inherited).
      */
     'vacationYears': Array<PersonalVacationYear> | null;
+    /**
+     * Planned appointments of the team calendar (start/end null = all day).
+     */
+    'appointments': Array<PersonalAppointment> | null;
     'requests': Array<PersonalRequest> | null;
     'notifications': Array<PersonalNotification> | null;
     'entryChanges': Array<PersonalEntryChange> | null;
@@ -1725,6 +1759,16 @@ export const RuleMode = {
 export type RuleMode = typeof RuleMode[keyof typeof RuleMode];
 
 
+/**
+ * Create or replace an appointment. `UserId` (create only) defaults to the caller; times \"HH:mm\", both left out = all day.
+ */
+export interface SaveAppointmentRequest {
+    'date'?: string;
+    'startTime'?: string | null;
+    'endTime'?: string | null;
+    'note'?: string | null;
+    'userId'?: number | null;
+}
 /**
  * Grant or revoke the accounting role (docs/ACCOUNTING_ROLE_PLAN.md).
  */
@@ -4885,6 +4929,391 @@ export class ApiKeysApi extends BaseAPI {
      */
     public apiV1TerminalPunchPost(xApiKey?: string, punchRequest?: PunchRequest, options?: RawAxiosRequestConfig) {
         return ApiKeysApiFp(this.configuration).apiV1TerminalPunchPost(xApiKey, punchRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * AppointmentsApi - axios parameter creator
+ */
+export const AppointmentsApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary The visible appointments in [from, to] (note null where hidden), optionally of one member or a group and its sub-groups.
+         * @param {string} slug 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {number} [userId] 
+         * @param {number} [groupId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAppointmentsGet: async (slug: string, from?: string, to?: string, userId?: number, groupId?: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAppointmentsGet', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/appointments`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (from !== undefined) {
+                localVarQueryParameter['from'] = (from as any instanceof Date) ?
+                    (from as any).toISOString().substring(0,10) :
+                    from;
+            }
+
+            if (to !== undefined) {
+                localVarQueryParameter['to'] = (to as any instanceof Date) ?
+                    (to as any).toISOString().substring(0,10) :
+                    to;
+            }
+
+            if (userId !== undefined) {
+                localVarQueryParameter['userId'] = userId;
+            }
+
+            if (groupId !== undefined) {
+                localVarQueryParameter['groupId'] = groupId;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Delete an appointment.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAppointmentsIdDelete: async (slug: string, id: number, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAppointmentsIdDelete', 'slug', slug)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAppointmentsIdDelete', 'id', id)
+            const localVarPath = `/api/v1/organizations/{slug}/appointments/{id}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Change an appointment (date, times, note; the owner stays).
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {SaveAppointmentRequest} [saveAppointmentRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAppointmentsIdPut: async (slug: string, id: number, saveAppointmentRequest?: SaveAppointmentRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAppointmentsIdPut', 'slug', slug)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAppointmentsIdPut', 'id', id)
+            const localVarPath = `/api/v1/organizations/{slug}/appointments/{id}`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)))
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(saveAppointmentRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Add an appointment for yourself, or (org admin / group admin approving absences) for a member.
+         * @param {string} slug 
+         * @param {SaveAppointmentRequest} [saveAppointmentRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAppointmentsPost: async (slug: string, saveAppointmentRequest?: SaveAppointmentRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'slug' is not null or undefined
+            assertParamExists('apiV1OrganizationsSlugAppointmentsPost', 'slug', slug)
+            const localVarPath = `/api/v1/organizations/{slug}/appointments`
+                .replace(`{${"slug"}}`, encodeURIComponent(String(slug)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(saveAppointmentRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * AppointmentsApi - functional programming interface
+ */
+export const AppointmentsApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = AppointmentsApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary The visible appointments in [from, to] (note null where hidden), optionally of one member or a group and its sub-groups.
+         * @param {string} slug 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {number} [userId] 
+         * @param {number} [groupId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAppointmentsGet(slug: string, from?: string, to?: string, userId?: number, groupId?: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<AppointmentResponse>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAppointmentsGet(slug, from, to, userId, groupId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AppointmentsApi.apiV1OrganizationsSlugAppointmentsGet']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Delete an appointment.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAppointmentsIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAppointmentsIdDelete(slug, id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AppointmentsApi.apiV1OrganizationsSlugAppointmentsIdDelete']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Change an appointment (date, times, note; the owner stays).
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {SaveAppointmentRequest} [saveAppointmentRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAppointmentsIdPut(slug: string, id: number, saveAppointmentRequest?: SaveAppointmentRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AppointmentResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAppointmentsIdPut(slug, id, saveAppointmentRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AppointmentsApi.apiV1OrganizationsSlugAppointmentsIdPut']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Add an appointment for yourself, or (org admin / group admin approving absences) for a member.
+         * @param {string} slug 
+         * @param {SaveAppointmentRequest} [saveAppointmentRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async apiV1OrganizationsSlugAppointmentsPost(slug: string, saveAppointmentRequest?: SaveAppointmentRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AppointmentResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.apiV1OrganizationsSlugAppointmentsPost(slug, saveAppointmentRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AppointmentsApi.apiV1OrganizationsSlugAppointmentsPost']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * AppointmentsApi - factory interface
+ */
+export const AppointmentsApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = AppointmentsApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary The visible appointments in [from, to] (note null where hidden), optionally of one member or a group and its sub-groups.
+         * @param {string} slug 
+         * @param {string} [from] 
+         * @param {string} [to] 
+         * @param {number} [userId] 
+         * @param {number} [groupId] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAppointmentsGet(slug: string, from?: string, to?: string, userId?: number, groupId?: number, options?: RawAxiosRequestConfig): AxiosPromise<Array<AppointmentResponse>> {
+            return localVarFp.apiV1OrganizationsSlugAppointmentsGet(slug, from, to, userId, groupId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Delete an appointment.
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAppointmentsIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.apiV1OrganizationsSlugAppointmentsIdDelete(slug, id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Change an appointment (date, times, note; the owner stays).
+         * @param {string} slug 
+         * @param {number} id 
+         * @param {SaveAppointmentRequest} [saveAppointmentRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAppointmentsIdPut(slug: string, id: number, saveAppointmentRequest?: SaveAppointmentRequest, options?: RawAxiosRequestConfig): AxiosPromise<AppointmentResponse> {
+            return localVarFp.apiV1OrganizationsSlugAppointmentsIdPut(slug, id, saveAppointmentRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Add an appointment for yourself, or (org admin / group admin approving absences) for a member.
+         * @param {string} slug 
+         * @param {SaveAppointmentRequest} [saveAppointmentRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        apiV1OrganizationsSlugAppointmentsPost(slug: string, saveAppointmentRequest?: SaveAppointmentRequest, options?: RawAxiosRequestConfig): AxiosPromise<AppointmentResponse> {
+            return localVarFp.apiV1OrganizationsSlugAppointmentsPost(slug, saveAppointmentRequest, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * AppointmentsApi - object-oriented interface
+ */
+export class AppointmentsApi extends BaseAPI {
+    /**
+     * 
+     * @summary The visible appointments in [from, to] (note null where hidden), optionally of one member or a group and its sub-groups.
+     * @param {string} slug 
+     * @param {string} [from] 
+     * @param {string} [to] 
+     * @param {number} [userId] 
+     * @param {number} [groupId] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAppointmentsGet(slug: string, from?: string, to?: string, userId?: number, groupId?: number, options?: RawAxiosRequestConfig) {
+        return AppointmentsApiFp(this.configuration).apiV1OrganizationsSlugAppointmentsGet(slug, from, to, userId, groupId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Delete an appointment.
+     * @param {string} slug 
+     * @param {number} id 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAppointmentsIdDelete(slug: string, id: number, options?: RawAxiosRequestConfig) {
+        return AppointmentsApiFp(this.configuration).apiV1OrganizationsSlugAppointmentsIdDelete(slug, id, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Change an appointment (date, times, note; the owner stays).
+     * @param {string} slug 
+     * @param {number} id 
+     * @param {SaveAppointmentRequest} [saveAppointmentRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAppointmentsIdPut(slug: string, id: number, saveAppointmentRequest?: SaveAppointmentRequest, options?: RawAxiosRequestConfig) {
+        return AppointmentsApiFp(this.configuration).apiV1OrganizationsSlugAppointmentsIdPut(slug, id, saveAppointmentRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Add an appointment for yourself, or (org admin / group admin approving absences) for a member.
+     * @param {string} slug 
+     * @param {SaveAppointmentRequest} [saveAppointmentRequest] 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     */
+    public apiV1OrganizationsSlugAppointmentsPost(slug: string, saveAppointmentRequest?: SaveAppointmentRequest, options?: RawAxiosRequestConfig) {
+        return AppointmentsApiFp(this.configuration).apiV1OrganizationsSlugAppointmentsPost(slug, saveAppointmentRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

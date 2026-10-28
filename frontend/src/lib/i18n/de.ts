@@ -28,6 +28,7 @@ import { de as orgChart } from './messages/orgChart/de';
 import { de as pwa } from './messages/pwa/de';
 import { de as accounting } from './messages/accounting/de';
 import { de as vacation } from './messages/vacation/de';
+import { de as appointments } from './messages/appointments/de';
 
 /** German is the default and the fallback for any missing English string. */
 export const de = {
@@ -60,7 +61,8 @@ export const de = {
 	orgChart,
 	pwa,
 	accounting,
-	vacation
+	vacation,
+	appointments
 };
 
 export type Dictionary = typeof de;

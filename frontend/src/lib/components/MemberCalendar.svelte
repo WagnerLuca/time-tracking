@@ -148,6 +148,10 @@
 				minutes: day.coreHoursMissingMinutes ?? 0
 			}));
 		if (day.coreHours && day.coreHoursBackfilled) parts.push(t('calendar.compliance.coreHoursBackfilled'));
+		if (day.coreHoursAppointments?.length)
+			parts.push(t('calendar.compliance.coreHoursAppointments', {
+				ranges: day.coreHoursAppointments.map((r) => (r === 'allDay' ? t('calendar.compliance.allDay') : r.replace('-', '–'))).join(', ')
+			}));
 		return parts.join(' ');
 	}
 

@@ -46,7 +46,9 @@ export const de = {
 		AbsenceNotes: 'Notizen zu Abwesenheiten',
 		VacationBalance: 'Resturlaub',
 		WorkSchedule: 'Arbeitszeitmodell (Sollstunden)',
-		TrackedTime: 'Erfasste Zeiten und Saldo'
+		TrackedTime: 'Erfasste Zeiten und Saldo',
+		Appointments: 'Termine (Zeitraum)',
+		AppointmentNotes: 'Termin-Notizen'
 	},
 	short: {
 		Member: 'Name',
@@ -59,7 +61,9 @@ export const de = {
 		AbsenceNotes: 'Notizen',
 		VacationBalance: 'Resturlaub',
 		WorkSchedule: 'Sollstunden',
-		TrackedTime: 'Zeiten und Saldo'
+		TrackedTime: 'Zeiten und Saldo',
+		Appointments: 'Termine',
+		AppointmentNotes: 'Termin-Notizen'
 	},
 	present: 'Anwesend',
 	absent: 'Nicht eingestempelt'

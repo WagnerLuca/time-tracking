@@ -4,6 +4,8 @@ export const de = {
 		dailyMax: 'Arbeitszeitgesetz: {hours} h an diesem Tag (mehr als 10 h).',
 		restPeriod: 'Arbeitszeitgesetz: nur {hours} h Ruhezeit davor (weniger als 11 h).',
 		coreHours: 'Kernarbeitszeit {window} nicht eingehalten: {issues} ({minutes} min nicht abgedeckt).',
+		coreHoursAppointments: 'Termin {ranges} berücksichtigt.',
+		allDay: 'ganztägig',
 		coreHoursBackfilled: 'Nachträglich markiert, als die Kernarbeitszeit eingeschaltet wurde.',
 		issues: { late: 'später begonnen', early: 'früher beendet', gap: 'Lücke', missing: 'keine Zeit erfasst' }
 	},

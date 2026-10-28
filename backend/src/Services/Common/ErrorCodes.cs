@@ -152,6 +152,8 @@ public static class ErrorCodes
         ["A pause rule with this threshold already exists."] = "pauseRule.exists",
         ["Pause rule not found."] = "pauseRule.notFound",
         ["Group not found."] = "group.notFound",
+        ["Appointment not found."] = "appointment.notFound",
+        ["You can only manage your own appointments."] = "appointment.forbidden",
         ["Unknown kind of information."] = "visibility.unknownKind",
         ["User is already in this group."] = "group.alreadyMember",
         ["Member not found in group."] = "group.memberNotFound",

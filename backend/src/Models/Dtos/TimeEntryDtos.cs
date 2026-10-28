@@ -207,4 +207,6 @@ public record ComplianceDayResponse
     public string? CoreHoursWindow { get; init; }
     /// <summary>With <see cref="CoreHours"/>: flagged by a backfill when core hours were switched on (never notified).</summary>
     public bool CoreHoursBackfilled { get; init; }
+    /// <summary>With <see cref="CoreHours"/>: planned appointments that were counted as covered ("HH:mm-HH:mm" or "allDay").</summary>
+    public List<string>? CoreHoursAppointments { get; init; }
 }

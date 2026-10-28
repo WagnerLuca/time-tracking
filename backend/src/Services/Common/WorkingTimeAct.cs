@@ -76,7 +76,8 @@ public static class WorkingTimeAct
                 CoreHoursIssues = CoreHours.IssueNames(core.Issues),
                 CoreHoursMissingMinutes = core.MissingMinutes,
                 CoreHoursWindow = core.Window.ToString(),
-                CoreHoursBackfilled = core.Backfilled
+                CoreHoursBackfilled = core.Backfilled,
+                CoreHoursAppointments = core.Appointments is { Count: > 0 } a ? [.. a] : null
             };
         return days.Values.Where(d => d.DailyMax || d.RestPeriod || d.CoreHours).OrderBy(d => d.Date).ToList();
     }

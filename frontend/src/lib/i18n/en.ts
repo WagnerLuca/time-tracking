@@ -29,6 +29,7 @@ import { en as orgChart } from './messages/orgChart/en';
 import { en as pwa } from './messages/pwa/en';
 import { en as accounting } from './messages/accounting/en';
 import { en as vacation } from './messages/vacation/en';
+import { en as appointments } from './messages/appointments/en';
 import type { Dictionary } from './de';
 
 export const en: Dictionary = {
@@ -61,5 +62,6 @@ export const en: Dictionary = {
 	orgChart,
 	pwa,
 	accounting,
-	vacation
+	vacation,
+	appointments
 };

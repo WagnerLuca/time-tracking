@@ -132,6 +132,13 @@ export const en: typeof de = {
 		requiresApproval: 'Absences need approval in this organization. Please submit a request.',
 		unknownType: 'Unknown or inactive absence type.'
 	},
+	appointment: {
+		times: 'Enter a start and an end (end after start) or choose “All day”.',
+		noteTooLong: 'The note can be at most 200 characters long.',
+		date: 'The date is invalid.',
+		notFound: 'Appointment not found.',
+		forbidden: 'You are not allowed to edit this appointment.'
+	},
 	absenceType: {
 		nameTaken: 'An absence type with this name already exists.',
 		notFound: 'Absence type not found.'
