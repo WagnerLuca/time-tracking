@@ -23,7 +23,7 @@ public class PayrollExportTests : IClassFixture<TimeTrackingApiFactory>
         var (member, m) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "payroll-m@test.com", "=Evil", "Zed");
         (await TestHelpers.AddMemberAsync(_factory, owner, org.Slug, m)).EnsureSuccessStatusCode();
 
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/members/{m.User.Id}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/members/{m.User.Id}/work-schedule/change",
             new { validFrom = "2026-01-01", weeklyWorkHours = 40 })).EnsureSuccessStatusCode();
         // Mon 14 Sep 2026: 8 h gross − 30 min pause = 7,5 h; Tue vacation, Wed sick
         (await member.PostAsJsonAsync("/api/v1/TimeTracking/manual", new

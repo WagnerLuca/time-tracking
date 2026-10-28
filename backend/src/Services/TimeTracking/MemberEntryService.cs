@@ -105,33 +105,54 @@ public class MemberEntryService(TimeTrackingDbContext context, ILogger<MemberEnt
     /// <summary>Days in [from, to] (default: the current local month) that break the Working Time Act or miss the core hours.</summary>
     public async Task<ServiceResult<List<ComplianceDayResponse>>> GetComplianceAsync(string slug, int callerUserId, int memberId, DateOnly? from, DateOnly? to)
     {
+        var (org, first, last, error) = await RangeForAsync(slug, callerUserId, memberId, from, to);
+        if (error != null) return ServiceResult.Fail<List<ComplianceDayResponse>>(error.Value.Type, error.Value.Message);
+
+        // Closed months: the findings frozen with them (FrozenFigures)
+        return ServiceResult.Ok(await FrozenFigures.ComplianceAsync(context, org!, memberId, first, last, async () =>
+            WorkingTimeAct.Findings(await WorkingTimeAct.DaysAsync(context, memberId, org!.Id, first, last),
+                await CoreHours.OpenViolationsAsync(context, memberId, org.Id, first, last))));
+    }
+
+    /// <summary>The member's frozen days (closed months) in [from, to] (default: the current local month).</summary>
+    public async Task<ServiceResult<List<FrozenDayResponse>>> GetFrozenDaysAsync(string slug, int callerUserId, int memberId, DateOnly? from, DateOnly? to)
+    {
+        var (org, first, last, error) = await RangeForAsync(slug, callerUserId, memberId, from, to);
+        if (error != null) return ServiceResult.Fail<List<FrozenDayResponse>>(error.Value.Type, error.Value.Message);
+        var days = (await FrozenFigures.DaysAsync(context, OrgClock.For(org), org!.Id, [memberId], first, last)).GetValueOrDefault(memberId);
+        return ServiceResult.Ok((days?.Values ?? Enumerable.Empty<FrozenDay>()).OrderBy(d => d.Date).Select(d => new FrozenDayResponse
+        {
+            Date = d.Date,
+            TargetHours = d.DayTargetHours,
+            CreditHours = d.CreditHours,
+            WorkedHours = d.NetWorkedHours,
+            Status = d.Status,
+            HolidayName = d.HolidayName,
+            AbsenceType = d.AbsenceType?.ToString(),
+            AbsenceHalfDay = d.AbsenceHalfDay
+        }).ToList());
+    }
+
+    /// <summary>The org and range [from, to] (default: the current local month) for a member whose tracked time the caller may see.</summary>
+    private async Task<(Organization? Org, DateOnly From, DateOnly To, (ServiceErrorType Type, string Message)? Error)> RangeForAsync(
+        string slug, int callerUserId, int memberId, DateOnly? from, DateOnly? to)
+    {
         var org = await context.FindOrgBySlugAsync(slug);
-        if (org == null) return ServiceResult.NotFound<List<ComplianceDayResponse>>("Organization not found");
+        if (org == null) return (null, default, default, (ServiceErrorType.NotFound, "Organization not found"));
         switch ((await MemberVisibility.ForCallerAsync(context, org, callerUserId)).Check(memberId, MemberInfo.TrackedTime))
         {
             case ServiceErrorType.NotFound:
-                return ServiceResult.NotFound<List<ComplianceDayResponse>>("Member not found in this organization.");
+                return (org, default, default, (ServiceErrorType.NotFound, "Member not found in this organization."));
             case ServiceErrorType.Forbidden:
-                return ServiceResult.Forbidden<List<ComplianceDayResponse>>("You do not have permission to see this member's working times.");
+                return (org, default, default, (ServiceErrorType.Forbidden, "You do not have permission to see this member's working times."));
         }
 
         var today = OrgClock.For(org).Today();
         var first = from ?? new DateOnly(today.Year, today.Month, 1);
         var last = to ?? first.AddMonths(1).AddDays(-1);
         if (EntryTimes.ValidateRange(first, last) is { } rangeError)
-            return ServiceResult.BadRequest<List<ComplianceDayResponse>>(rangeError);
-
-        var days = (await WorkingTimeAct.DaysAsync(context, memberId, org.Id, first, last)).ToDictionary(d => d.Date);
-        foreach (var (date, core) in await CoreHours.OpenViolationsAsync(context, memberId, org.Id, first, last))
-            days[date] = (days.GetValueOrDefault(date) ?? new ComplianceDayResponse { Date = date }) with
-            {
-                CoreHours = true,
-                CoreHoursIssues = CoreHours.IssueNames(core.Issues),
-                CoreHoursMissingMinutes = core.MissingMinutes,
-                CoreHoursWindow = core.Window.ToString(),
-                CoreHoursBackfilled = core.Backfilled
-            };
-        return ServiceResult.Ok(days.Values.Where(d => d.DailyMax || d.RestPeriod || d.CoreHours).OrderBy(d => d.Date).ToList());
+            return (org, first, last, (ServiceErrorType.BadRequest, rangeError));
+        return (org, first, last, null);
     }
 
     private async Task<TimeEntryResponse> RespondAsync(TimeEntry entry, Organization org)

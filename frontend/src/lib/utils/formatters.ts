@@ -57,9 +57,10 @@ export function formatHours(minutes: number | undefined | null): string {
 	const abs = Math.round(Math.abs(minutes));
 	const h = Math.floor(abs / 60);
 	const m = abs % 60;
-	if (m === 0) return `${sign}${h}h`;
+	const hours = formatNumber(h); // 9.999h / 9,999h
+	if (m === 0) return `${sign}${hours}h`;
 	if (h === 0) return `${sign}${m}m`;
-	return `${sign}${h}h ${m}m`;
+	return `${sign}${hours}h ${m}m`;
 }
 
 /**
@@ -257,7 +258,9 @@ export function parseRequestData(type: string | null | undefined, data: string |
  * Get initials from a first and last name.
  */
 export function getInitials(first: string | null | undefined, last: string | null | undefined): string {
-	return ((first?.[0] ?? '') + (last?.[0] ?? '')).toUpperCase() || '?';
+	// The first letter, not the first UTF-16 unit: "🦊 Fox" must not give half an emoji
+	const letter = (s: string | null | undefined) => s?.match(/\p{L}/u)?.[0] ?? '';
+	return (letter(first) + letter(last)).toUpperCase() || '?';
 }
 
 /**

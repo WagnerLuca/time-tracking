@@ -85,3 +85,44 @@ test('closed periods: admin closes last month, member is locked out, admin edits
 		await request.delete(`${API}/organizations/${SLUG}/members/${tomId}/entries/${entryId}`, { headers });
 	}
 });
+
+/**
+ * #81: a closed month's figures are frozen. A holiday added after closing does not show on Tom's calendar for that month
+ * (target, label) — it shows once the month is reopened. A month long ago, so no other spec is affected; cleaned up after.
+ */
+test('closed periods: a closed month is frozen, a later holiday shows only after reopening', async ({ page, request }) => {
+	const SLUG = 'mueller-software';
+	const headers = { Authorization: `Bearer ${await apiToken(request, 'anna.schmidt@example.com')}` };
+	const now = new Date();
+	const target = new Date(now.getFullYear(), now.getMonth() - 14, 10);
+	while (target.getDay() === 0 || target.getDay() === 6) target.setDate(target.getDate() + 1);
+	const pad = (n: number) => String(n).padStart(2, '0');
+	const month = `${target.getFullYear()}-${pad(target.getMonth() + 1)}`;
+	const day = `${month}-${pad(target.getDate())}`;
+	const name = `E2E Eingefroren ${Date.now()}`;
+
+	const closed = await request.post(`${API}/organizations/${SLUG}/closed-periods`, { headers, data: { from: `${month}-01`, to: `${month}-01`, reason: 'E2E' } });
+	expect(closed.ok(), await closed.text()).toBeTruthy();
+	let holidayId: number | undefined;
+	let open = false;
+	try {
+		const holiday = await request.post(`${API}/organizations/${SLUG}/holidays`, { headers, data: { name, date: day } });
+		expect(holiday.ok(), await holiday.text()).toBeTruthy();
+		holidayId = (await holiday.json()).id;
+
+		await login(page, 'tom.weber@example.com');
+		await page.goto(`/history?date=${day}`);
+		const cell = page.locator(`[data-day="${day}"]`);
+		await expect(cell.getByTestId('closed-lock')).toHaveCount(1);
+		await expect(cell).not.toHaveAttribute('title', new RegExp(name));
+
+		const reopened = await request.post(`${API}/organizations/${SLUG}/closed-periods/reopen`, { headers, data: { month: `${month}-01`, reason: 'E2E' } });
+		expect(reopened.ok(), await reopened.text()).toBeTruthy();
+		open = true;
+		await page.reload();
+		await expect(page.locator(`[data-day="${day}"]`)).toHaveAttribute('title', new RegExp(name));
+	} finally {
+		if (!open) await request.post(`${API}/organizations/${SLUG}/closed-periods/reopen`, { headers, data: { month: `${month}-01`, reason: 'E2E aufräumen' } });
+		if (holidayId) await request.delete(`${API}/organizations/${SLUG}/holidays/${holidayId}`, { headers });
+	}
+});

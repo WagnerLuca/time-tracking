@@ -118,28 +118,11 @@ public record AbsenceRequestData
 }
 
 /// <summary>
-/// JSON payload for WorkScheduleChange request data.
-/// Mirrors CreateWorkScheduleRequest so the approved schedule can be created directly.
+/// JSON payload for WorkScheduleChange request data (issue #82): "a new schedule from <see cref="ValidFrom"/>" with its
+/// targets; approving applies it like a direct change (an existing future schedule is replaced). Older requests' ValidTo is ignored.
 /// </summary>
-public record WorkScheduleChangeRequestData
+public record WorkScheduleChangeRequestData : ScheduleTargets
 {
     /// <summary>First day the new schedule is effective.</summary>
     public DateOnly ValidFrom { get; init; }
-
-    /// <summary>Last day the schedule is effective. Null = open-ended.</summary>
-    public DateOnly? ValidTo { get; init; }
-
-    /// <summary>Total weekly work hours.</summary>
-    public double? WeeklyWorkHours { get; init; }
-
-    /// <summary>If true, distribute WeeklyWorkHours evenly across Mon–Fri.</summary>
-    public bool DistributeEvenly { get; init; } = true;
-
-    public double? TargetMon { get; init; }
-    public double? TargetTue { get; init; }
-    public double? TargetWed { get; init; }
-    public double? TargetThu { get; init; }
-    public double? TargetFri { get; init; }
-    public double? TargetSat { get; init; }
-    public double? TargetSun { get; init; }
 }

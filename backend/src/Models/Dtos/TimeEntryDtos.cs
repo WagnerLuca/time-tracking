@@ -168,6 +168,24 @@ public record TimeEntryFieldChangeResponse
     public string? NewValue { get; init; }
 }
 
+/// <summary>A day of a closed month as frozen when it was closed (issue #81): what the calendar shows for it.</summary>
+public record FrozenDayResponse
+{
+    public DateOnly Date { get; init; }
+    /// <summary>The schedule's target less the holiday credit.</summary>
+    public double TargetHours { get; init; }
+    /// <summary>Hours an absence took off the target.</summary>
+    public double CreditHours { get; init; }
+    /// <summary>Net worked hours.</summary>
+    public double WorkedHours { get; init; }
+    /// <summary>Report status (Worked, Missing, Holiday, Half Holiday, Vacation, Sick, a custom type's name, Weekend, Day Off, Needs Correction).</summary>
+    public required string Status { get; init; }
+    public string? HolidayName { get; init; }
+    /// <summary>SickDay, Vacation or Other.</summary>
+    public string? AbsenceType { get; init; }
+    public bool AbsenceHalfDay { get; init; }
+}
+
 /// <summary>A day that breaks the Working Time Act (see WorkingTimeAct) or misses the core working hours (see CoreHours).</summary>
 public record ComplianceDayResponse
 {
@@ -189,4 +207,6 @@ public record ComplianceDayResponse
     public string? CoreHoursWindow { get; init; }
     /// <summary>With <see cref="CoreHours"/>: flagged by a backfill when core hours were switched on (never notified).</summary>
     public bool CoreHoursBackfilled { get; init; }
+    /// <summary>With <see cref="CoreHours"/>: planned appointments that were counted as covered ("HH:mm-HH:mm" or "allDay").</summary>
+    public List<string>? CoreHoursAppointments { get; init; }
 }

@@ -61,4 +61,17 @@ public class MemberEntriesController(MemberEntryService service) : OrganizationB
         if (userId == null) return Unauthorized();
         return ToResponse(await service.GetComplianceAsync(slug, userId.Value, memberId, from, to));
     }
+
+    /// <summary>
+    /// The member's days of closed months in [from, to] (default: current month) as frozen when the month was closed (issue #81):
+    /// the calendar shows these targets/credits instead of computing them. Open days are not listed. Same access as compliance.
+    /// </summary>
+    [HttpGet("frozen-days")]
+    [ProducesResponseType(typeof(List<FrozenDayResponse>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFrozenDays(string slug, int memberId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to)
+    {
+        var userId = GetCurrentUserId();
+        if (userId == null) return Unauthorized();
+        return ToResponse(await service.GetFrozenDaysAsync(slug, userId.Value, memberId, from, to));
+    }
 }

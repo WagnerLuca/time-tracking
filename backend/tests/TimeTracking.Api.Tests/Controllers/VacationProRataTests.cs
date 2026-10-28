@@ -149,7 +149,7 @@ public class VacationProRataTests : IClassFixture<TimeTrackingApiFactory>
     {
         var (owner, member, slug, _, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, "vn-halves", new { });
         var year = DateTime.UtcNow.Year + 1;
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/change",
             new { validFrom = $"{year}-01-01", weeklyWorkHours = 40, distributeEvenly = true })).EnsureSuccessStatusCode();
         var day = new DateOnly(year, 3, 2);
         while (day.DayOfWeek != DayOfWeek.Tuesday) day = day.AddDays(1);

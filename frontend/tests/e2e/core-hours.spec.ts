@@ -56,7 +56,7 @@ test('core hours: enable in settings, a missed window gets a calendar marker', a
 	const end = `${e.hour}:${e.minute}`;
 
 	// Every day is a working day, so the check also applies on a weekend run
-	const schedule = await request.post(`${API}/organizations/${slug}/work-schedules`, {
+	const schedule = await request.post(`${API}/organizations/${slug}/work-schedule/change`, {
 		headers,
 		data: { validFrom: today, distributeEvenly: false, targetMon: 8, targetTue: 8, targetWed: 8, targetThu: 8, targetFri: 8, targetSat: 8, targetSun: 8 }
 	});

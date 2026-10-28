@@ -57,6 +57,9 @@ public class TimeTrackingDbContext : DbContext
     public DbSet<GroupMembershipPeriod> GroupMembershipPeriods { get; set; }
     public DbSet<DayOffExclusion> DayOffExclusions { get; set; }
     public DbSet<CompanyLeave> CompanyLeaves { get; set; }
+    public DbSet<FrozenMonth> FrozenMonths { get; set; }
+    public DbSet<FrozenDay> FrozenDays { get; set; }
+    public DbSet<Appointment> Appointments { get; set; }
 
     /// <summary>
     /// Saves, and records every change a user made to a finished time entry in
@@ -77,11 +80,18 @@ public class TimeTrackingDbContext : DbContext
         // the version in the same transaction (see BalanceInvalidation)
         var balance = await Services.BalanceInvalidation.CollectAsync(this, cancellationToken);
         int saved;
+        _refreeze = null;
         if (balance == null)
+        {
             saved = await SaveWithHistoryAsync(acceptAllChangesOnSuccess, cancellationToken);
+            await RefreezeAsync(cancellationToken);
+        }
         else if (!Database.IsRelational())
+        {
             // After the closed-period guard: a refused save must leave no bump behind in the context
             saved = await SaveWithHistoryAsync(acceptAllChangesOnSuccess, cancellationToken, balance.ApplyTrackedAsync);
+            await RefreezeAsync(cancellationToken);
+        }
         else
         {
             await using var transaction = Database.CurrentTransaction == null
@@ -89,6 +99,8 @@ public class TimeTrackingDbContext : DbContext
                 : null;
             saved = await SaveWithHistoryAsync(acceptAllChangesOnSuccess, cancellationToken);
             await balance.ApplySqlAsync(this, cancellationToken);
+            // After the bumps: the re-frozen month continues from checkpoints that are still valid
+            await RefreezeAsync(cancellationToken);
             if (transaction != null) await transaction.CommitAsync(cancellationToken);
         }
         if (notifications.Count > 0) _push!.Enqueue(notifications.Select(Services.PushTexts.From));
@@ -99,6 +111,17 @@ public class TimeTrackingDbContext : DbContext
             finally { _syncingLeaves = false; }
         }
         return saved;
+    }
+
+    /// <summary>Closed member-months an admin changed in the current save (from the closed-period guard).</summary>
+    private IReadOnlyCollection<(int OrgId, int UserId, DateOnly Month)>? _refreeze;
+
+    /// <summary>Issue #81: an admin's change inside a closed month updates that member's frozen figures, in the same save.</summary>
+    private async Task RefreezeAsync(CancellationToken cancellationToken)
+    {
+        if (_refreeze is not { Count: > 0 } touched) return;
+        _refreeze = null;
+        await Services.FrozenFigures.RefreezeAsync(this, touched, cancellationToken);
     }
 
     /// <summary>A plain save without any hook — only for derived data that is not a balance input (balance checkpoints).</summary>
@@ -117,7 +140,9 @@ public class TimeTrackingDbContext : DbContext
         }
 
         // Closed months (issue #57): throws for members, lets admins through with a reason
-        var closed = await Services.ClosedPeriods.GuardAsync(this, _rls.AuthenticatedUserId, _rls.ChangeReason, cancellationToken);
+        var admin = await Services.ClosedPeriods.GuardAsync(this, _rls.AuthenticatedUserId, _rls.ChangeReason, cancellationToken);
+        _refreeze = admin?.Months;
+        var closed = admin?.Entries;
         if (afterGuard != null) await afterGuard(this, cancellationToken);
         var pending = TimeEntryHistory.Capture(this, EntryChangeKindOverride);
         if (pending.Count == 0) return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
@@ -719,6 +744,27 @@ public class TimeTrackingDbContext : DbContext
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        // Frozen figures of closed months (Services/Common/FrozenFigures.cs, issue #81; RLS like TimeEntries)
+        modelBuilder.Entity<FrozenMonth>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.OrganizationId, e.UserId, e.Month }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.Property(e => e.TimeZone).HasMaxLength(100);
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<FrozenDay>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.OrganizationId, e.UserId, e.Date }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+            entity.Property(e => e.Status).HasMaxLength(200);
+            entity.Property(e => e.HolidayName).HasMaxLength(200);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
         // Per-year vacation entitlement/adjustment (Services/Common/VacationBalances.cs; RLS like AbsenceDays).
         // Kept with the anonymized account like absences; gone with the organization.
         modelBuilder.Entity<VacationYear>(entity =>
@@ -730,6 +776,20 @@ public class TimeTrackingDbContext : DbContext
             entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<User>().WithMany().HasForeignKey(e => e.UpdatedByUserId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasQueryFilter(e => e.Organization.IsActive);
+        });
+
+        // Planned appointments (#83, information only; RLS like TimeEntries). Gone with the organization;
+        // account deletion removes them.
+        modelBuilder.Entity<Appointment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Note).HasMaxLength(Appointment.NoteMaxLength);
+            entity.HasIndex(e => new { e.OrganizationId, e.Date });
+            entity.HasIndex(e => new { e.UserId, e.Date });
+            entity.HasOne(e => e.Organization).WithMany().HasForeignKey(e => e.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>().WithMany().HasForeignKey(e => e.CreatedByUserId).OnDelete(DeleteBehavior.SetNull);
             entity.HasQueryFilter(e => e.Organization.IsActive);
         });
 

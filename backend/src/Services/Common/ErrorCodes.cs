@@ -145,7 +145,6 @@ public static class ErrorCodes
         ["The vacation adjustment must be between -365 and 365 days."] = "vacation.adjustmentRange",
         ["The note may have at most 500 characters."] = "vacation.noteTooLong",
         ["The core hours tolerance must be between 0 and 120 minutes."] = "group.coreHoursTolerance",
-        ["Work schedule not found"] = "schedule.notFound",
         ["Initial overtime is disabled for this organization."] = "overtime.initialDisabled",
         ["Initial overtime requires admin approval. Please submit a request."] = "overtime.initialRequiresApproval",
         ["A holiday already exists on this date."] = "holiday.exists",
@@ -162,6 +161,8 @@ public static class ErrorCodes
         ["A pause rule with this threshold already exists."] = "pauseRule.exists",
         ["Pause rule not found."] = "pauseRule.notFound",
         ["Group not found."] = "group.notFound",
+        ["Appointment not found."] = "appointment.notFound",
+        ["You can only manage your own appointments."] = "appointment.forbidden",
         ["Unknown kind of information."] = "visibility.unknownKind",
         ["User is already in this group."] = "group.alreadyMember",
         ["Member not found in group."] = "group.memberNotFound",
@@ -209,7 +210,6 @@ public static class ErrorCodes
         if (message.EndsWith(" require two-factor authentication. Leave them first, or ask an admin to turn the requirement off.")) return "account.twoFactorRequiredByOrgs";
         if (message.StartsWith("Unknown time zone ")) return "org.unknownTimeZone";
         if (message.StartsWith("The scan time must lie between ")) return "terminal.scannedAtOutOfRange";
-        if (message.StartsWith("This schedule overlaps with an existing one ")) return "schedule.overlap";
         // OrgRuleHelper.EnforceAllowed / WorkScheduleService.CheckRuleMode ("<feature> is/are disabled…")
         if (message.EndsWith(" is disabled in this organization.") || message.EndsWith(" are disabled for this organization.")) return "org.featureDisabled";
         if (message.Contains(" require admin approval") || message.Contains(" requires admin approval")) return "org.featureRequiresApproval";

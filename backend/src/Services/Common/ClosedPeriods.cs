@@ -49,11 +49,15 @@ public static class ClosedPeriods
 
     private sealed record Touch(int OrgId, int UserId, string Kind, object Entity, DateTime? StartUtc, DateOnly From, DateOnly? To);
 
+    /// <summary>What an admin's save inside closed months changes: its time entries (for the history flag) and every closed
+    /// member-month it touches (re-frozen in the same save, <see cref="FrozenFigures.RefreezeAsync"/>).</summary>
+    internal sealed record AdminChanges(IReadOnlySet<TimeEntry> Entries, IReadOnlyCollection<(int OrgId, int UserId, DateOnly Month)> Months);
+
     /// <summary>
-    /// Checks the pending changes; returns the time entries an admin changes inside closed months
-    /// (for the history flag) and stages one AdminChange event per organization and month.
+    /// Checks the pending changes; returns what an admin changes inside closed months
+    /// and stages one AdminChange event per organization and month.
     /// </summary>
-    internal static async Task<IReadOnlySet<TimeEntry>?> GuardAsync(
+    internal static async Task<AdminChanges?> GuardAsync(
         TimeTrackingDbContext db, int? callerId, string? reason, CancellationToken ct)
     {
         var touches = Collect(db);
@@ -108,7 +112,16 @@ public static class ClosedPeriods
                 Summary = string.Join(",", group.DistinctBy(h => h.Touch.Entity).GroupBy(h => h.Touch.Kind).Select(k => $"{k.Key}:{k.Count()}"))
             });
         }
-        return hits.Select(h => h.Touch.Entity).OfType<TimeEntry>().ToHashSet();
+        // Every closed month a change touches (a schedule's range may span several) is re-frozen
+        var months = hits.SelectMany(h =>
+            {
+                var from = h.Touch.StartUtc is { } s ? zones[h.Touch.OrgId].LocalDate(s) : h.Touch.From;
+                var to = h.Touch.StartUtc != null ? from : h.Touch.To;
+                return closed[h.Touch.OrgId].Where(m => FirstClosed([m], from, to) != null)
+                    .Select(m => (h.Touch.OrgId, h.Touch.UserId, m));
+            })
+            .ToHashSet();
+        return new AdminChanges(hits.Select(h => h.Touch.Entity).OfType<TimeEntry>().ToHashSet(), months);
     }
 
     /// <summary>The days each pending change touches: added → new values, deleted → old values, changed → both.</summary>
@@ -284,7 +297,7 @@ public static class ClosedPeriods
                     break;
                 case RequestType.WorkScheduleChange when r.RequestData != null:
                     if (JsonSerializer.Deserialize<WorkScheduleChangeRequestData>(r.RequestData, RequestDataJson) is { } schedule)
-                        ranges.Add((schedule.ValidFrom, schedule.ValidTo));
+                        ranges.Add((schedule.ValidFrom, null));
                     break;
                 case RequestType.CsvImport when r.RequestData != null:
                     foreach (var row in JsonSerializer.Deserialize<CsvImportRequestData>(r.RequestData, RequestDataJson)?.Entries ?? [])

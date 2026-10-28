@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { closedMonthSet, entryLock, formatMonth, isClosedDay, lastClosableMonth, monthKey, monthsBetween, orgDateKey } from './closedPeriods';
+import { closedMonthSet, entryLock, formatMonth, frozenDayLabel, frozenDayType, isClosedDay, lastClosableMonth, monthKey, monthsBetween, orgDateKey } from './closedPeriods';
+import { locale } from '$lib/stores/locale.svelte';
 
 describe('closed periods', () => {
 	it('matches days against closed months', () => {
@@ -43,5 +44,24 @@ describe('closed periods', () => {
 		expect(lastClosableMonth(new Date(lateSeptember), 'Europe/Berlin')).toBe('2026-09');
 		// Already the new year in Tokyo
 		expect(lastClosableMonth(new Date('2025-12-31T16:00:00Z'), 'Asia/Tokyo')).toBe('2025-12');
+	});
+
+	it('gives a frozen day the calendar day type and label of when it was closed', () => {
+		locale.set('de');
+		expect(frozenDayType({ holidayName: 'Neujahr', targetHours: 0 })).toBe('holiday');
+		expect(frozenDayType({ holidayName: 'Heiligabend', targetHours: 4, absenceType: 'Vacation' })).toBe('vacation');
+		expect(frozenDayType({ holidayName: 'Neujahr', targetHours: 0, absenceType: 'SickDay' })).toBe('holiday');
+		expect(frozenDayType({ absenceType: 'SickDay' })).toBe('sick');
+		expect(frozenDayType({ absenceType: 'Other', status: 'Dienstreise' })).toBe('other-absence');
+		expect(frozenDayType({ status: 'Worked' })).toBeNull();
+
+		expect(frozenDayLabel({ holidayName: 'Neujahr', targetHours: 0 })).toBe('Neujahr');
+		expect(frozenDayLabel({ holidayName: 'Heiligabend', targetHours: 4 })).toBe('Heiligabend (halber Tag)');
+		expect(frozenDayLabel({ holidayName: 'Heiligabend', targetHours: 4, absenceType: 'Vacation', absenceHalfDay: true }))
+			.toBe('Heiligabend (halber Tag) / Urlaub (halber Tag)');
+		expect(frozenDayLabel({ absenceType: 'Other', status: 'Dienstreise' })).toBe('Dienstreise');
+		expect(frozenDayLabel({ absenceType: 'Other', status: 'Absent' })).toBe('Sonstige Abwesenheit');
+		expect(frozenDayLabel({ absenceType: 'SickDay', absenceHalfDay: true })).toBe('Krankheitstag (halber Tag)');
+		expect(frozenDayLabel({ status: 'Missing' })).toBe('');
 	});
 });

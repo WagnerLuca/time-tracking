@@ -153,7 +153,8 @@ public class OrganizationService : IOrganizationService
         // Vacation balance of each member (current year incl. carry-over, in the org's time zone)
         var today = OrgClock.For(organization.TimeZone).Today();
         var memberIds = visibility.Ids(MemberInfo.VacationBalance).ToList();
-        var vacationByUser = await VacationBalances.YearsAsync(_context, org, memberIds, today.Year, today);
+        var vacationByUser = await VacationBalances.YearsAsync(_context, org, memberIds, today.Year, today,
+            anyClosedMonth: organization.ClosedMonths.Count > 0);
 
         // Group memberships for tag display (e.g. "Frontend Admin"): direct ones, then the
         // ancestors of those groups as inherited memberships ("über Team Küche")
@@ -475,6 +476,7 @@ public class OrganizationService : IOrganizationService
         membership.PersonnelNumber = null;
         // Leaving ends group roles too (they must not come back on rejoining) and frees the cards
         _context.BadgeCards.RemoveRange(_context.BadgeCards.Where(c => c.UserId == userId && c.OrganizationId == org.Id));
+        _context.Appointments.RemoveRange(_context.Appointments.Where(a => a.UserId == userId && a.OrganizationId == org.Id));
         _context.GroupMembers.RemoveRange(_context.GroupMembers.Where(gm => gm.UserId == userId && gm.Group.OrganizationId == org.Id));
 
         _logger.LogInformation("Member {UserId} removed from org {OrgId} by user {CallerId}", userId, org.Id, callerUserId);

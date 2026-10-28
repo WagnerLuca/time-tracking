@@ -75,6 +75,11 @@ public class PostgresApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddSingleton<IEmailSender>(Mail);
             services.RemoveAll<IPushSender>();
             services.AddSingleton<IPushSender>(Push);
+            // The minute loop (auto-stop + core-hours checks of every org's last days at the real "now") would check the test
+            // orgs' days on its own and race the tests that call CloseOverdueEntriesAsync / CoreHours.CheckDueAsync directly
+            foreach (var job in services.Where(d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)
+                                                    && d.ImplementationType == typeof(FailureEntryService)).ToList())
+                services.Remove(job);
         });
     }
 

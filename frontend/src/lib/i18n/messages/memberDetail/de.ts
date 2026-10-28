@@ -9,7 +9,6 @@ export const de = {
 	absenceTypesFailed: 'Die Abwesenheitsarten konnten nicht geladen werden.',
 	permissionsFailed: 'Die Berechtigungen konnten nicht geladen werden.',
 	overviewFailed: 'Die Zeitübersicht konnte nicht geladen werden.',
-	scheduleFailed: 'Das Arbeitszeitmodell konnte nicht geladen werden.',
 	header: {
 		joined: 'Beigetreten am {date}',
 		you: 'Du',

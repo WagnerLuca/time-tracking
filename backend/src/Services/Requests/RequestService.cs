@@ -89,6 +89,19 @@ public class RequestService : IRequestService
             // The request is still recorded for a complete audit trail.
             var autoApprove = request.Type == RequestType.RequestAbsence
                 && await EffectiveRuleResolver.CanApproveAbsencesAsync(_context, org.Id, userId);
+            // A schedule change request is "a new schedule from a day" (issue #82): today at the earliest, valid targets
+            if (request.Type == RequestType.WorkScheduleChange)
+            {
+                WorkScheduleChangeRequestData? schedule = null;
+                try { schedule = request.RequestData == null ? null : JsonSerializer.Deserialize<WorkScheduleChangeRequestData>(request.RequestData, RequestDataJson); }
+                catch (JsonException) { }
+                if (schedule == null)
+                    return ServiceResult.BadRequest<OrgRequestResponse>("Its data is invalid.");
+                if (schedule.ValidFrom < OrgClock.For(org).Today())
+                    return ServiceResult.BadRequest<OrgRequestResponse>(WorkScheduleService.StartBeforeToday, "schedule.startBeforeToday");
+                if (WorkSchedulePlan.ValidateTargets(schedule) is { } invalid)
+                    return ServiceResult.BadRequest<OrgRequestResponse>(invalid.Message, invalid.Code);
+            }
             // A running timer is stopped, not edited (and the closed-month guard lets a stop through)
             if (request.Type == RequestType.EditPastEntry && request.RelatedEntityId is { } entryId
                 && await _context.TimeEntries.AnyAsync(e => e.Id == entryId && e.IsRunning))
@@ -589,7 +602,7 @@ public class RequestService : IRequestService
                 {
                     var scheduleData = JsonSerializer.Deserialize<WorkScheduleChangeRequestData>(orgRequest.RequestData, RequestDataJson);
                     if (scheduleData != null
-                        && await ApplyWorkScheduleChangeAsync(orgRequest.UserId, org.Id, scheduleData) is { } scheduleError)
+                        && await ApplyWorkScheduleChangeAsync(orgRequest.UserId, org, scheduleData) is { } scheduleError)
                         return scheduleError;
                 }
                 break;
@@ -674,49 +687,10 @@ public class RequestService : IRequestService
         }
     }
 
-    /// <summary>Stages the new period like a direct creation (same overlap rule, open predecessor auto-closed); returns why it cannot be applied.</summary>
-    private async Task<string?> ApplyWorkScheduleChangeAsync(
-        int userId, int orgId, WorkScheduleChangeRequestData data)
-    {
-        if (data.ValidTo is { } validTo && validTo < data.ValidFrom)
-            return "Its data is invalid.";
-        if (await WorkScheduleService.CheckOverlapAsync(_context, userId, orgId, data.ValidFrom, data.ValidTo) is { } overlap)
-            return overlap;
-
-        var schedule = new WorkSchedule
-        {
-            UserId = userId,
-            OrganizationId = orgId,
-            ValidFrom = data.ValidFrom,
-            ValidTo = data.ValidTo,
-            WeeklyWorkHours = data.WeeklyWorkHours
-        };
-
-        if (data.WeeklyWorkHours.HasValue && data.DistributeEvenly)
-        {
-            var daily = Math.Round(data.WeeklyWorkHours.Value / 5.0, 2);
-            schedule.TargetMon = daily;
-            schedule.TargetTue = daily;
-            schedule.TargetWed = daily;
-            schedule.TargetThu = daily;
-            schedule.TargetFri = daily;
-        }
-        else
-        {
-            schedule.TargetMon = data.TargetMon ?? 0;
-            schedule.TargetTue = data.TargetTue ?? 0;
-            schedule.TargetWed = data.TargetWed ?? 0;
-            schedule.TargetThu = data.TargetThu ?? 0;
-            schedule.TargetFri = data.TargetFri ?? 0;
-            schedule.TargetSat = data.TargetSat ?? 0;
-            schedule.TargetSun = data.TargetSun ?? 0;
-        }
-
-        await WorkScheduleService.InheritContractAsync(_context, schedule, null);
-        await WorkScheduleService.CloseOpenScheduleAsync(_context, userId, orgId, data.ValidFrom);
-        _context.WorkSchedules.Add(schedule);
-        return null;
-    }
+    /// <summary>Stages "new schedule from a day" like an admin's direct change (an existing future one is replaced); returns why it cannot be applied.</summary>
+    private async Task<string?> ApplyWorkScheduleChangeAsync(int userId, Organization org, WorkScheduleChangeRequestData data) =>
+        (await WorkSchedulePlan.StageChangeAsync(_context, userId, org.Id, data.ValidFrom, data, replaceFuture: true,
+            OrgClock.For(org).Today()))?.Message;
 
     private async Task ApplyCsvImportAsync(int userId, Organization org, List<CsvImportEntry> entries)
     {

@@ -306,8 +306,8 @@ public sealed class BalancePropertyRunner
             var rows = await scope.ServiceProvider.GetRequiredService<PayrollExportService>().RowsAsync(org, from, to);
             foreach (var ((user, _), (reference, initial)) in pairs)
             {
-                var period = reference.Rows.Where(r => r.Date >= from && r.Date <= to).ToList();
-                var balance = period.Count == 0 && (reference.FirstDay == null || reference.FirstDay > to) ? initial : initial + reference.SumAt(to);
+                var period = reference.Rows.Where(r => r.Date >= from && r.Date <= to && r.Counted).ToList();
+                var balance = reference.CumulativeAt(to, initial);
                 var what = $"month {from:yyyy-MM} user {user} org {orgId}";
                 var t = totals[user];
                 Math.Abs(t.Balance - balance).Should().BeLessThanOrEqualTo(BalanceHarness.Exact, $"TotalsAsync balance {what}: {t.Balance:R} vs {balance:R}\n{Context}");
@@ -337,7 +337,7 @@ public sealed class BalancePropertyRunner
                 $"{what}: overall {overall:R} vs {reference.Balance(initial):R}\n{Context}");
             rows.Select(r => r.Date).Should().Equal(reference.Rows.Where(r => r.Date >= from).Select(r => r.Date), $"{what}: days\n{Context}");
             foreach (var r in rows)
-                Math.Abs(r.CumulativeOvertime - (initial + reference.Row(r.Date)!.CumulativeOvertime)).Should().BeLessThanOrEqualTo(BalanceHarness.Exact,
+                Math.Abs(r.CumulativeOvertime - reference.CumulativeAt(r.Date, initial)).Should().BeLessThanOrEqualTo(BalanceHarness.Exact,
                     $"{what}: row {r.Date}\n{Context}");
         }
     }

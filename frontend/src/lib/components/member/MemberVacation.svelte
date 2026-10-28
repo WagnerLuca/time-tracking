@@ -102,8 +102,8 @@
 			<p class="text-xs text-base-content/70 m-0 mb-2" data-testid="vacation-carry-line">{line}</p>
 		{/each}
 		<div class="w-full bg-base-200 rounded-full h-2.5 overflow-hidden flex" role="img" aria-label={t('memberDetail.vacation.barLabel', { taken: formatNumber(taken), planned: formatNumber(planned), total: formatNumber(allowed) })}>
-			<div class="h-2.5 transition-all {barClass}" style="width: {takenPct}%"></div>
-			<div class="h-2.5 transition-all {barClass} opacity-40" style="width: {plannedPct}%"></div>
+			<div class="h-2.5 transition-[width] duration-300 ease-out {barClass}" style="width: {takenPct}%"></div>
+			<div class="h-2.5 transition-[width] duration-300 ease-out {barClass} opacity-40" style="width: {plannedPct}%"></div>
 		</div>
 		<div class="flex gap-x-4 gap-y-1 mt-2 text-xs text-base-content/70 flex-wrap">
 			<span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm {barClass}"></span> {t('memberDetail.vacation.legendTaken')}</span>

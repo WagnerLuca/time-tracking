@@ -32,7 +32,7 @@ public class HalfDayEdgeCaseTests : IClassFixture<TimeTrackingApiFactory>
         await TestHelpers.CreateOrganizationAsync(client, slug.Replace("-", " "), slug);
 
         // Set up 40h/week even distribution (8h Mon-Fri)
-        var scheduleResp = await client.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedules", new
+        var scheduleResp = await client.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedule/change", new
         {
             validFrom = "2026-01-01",
             weeklyWorkHours = 40.0,

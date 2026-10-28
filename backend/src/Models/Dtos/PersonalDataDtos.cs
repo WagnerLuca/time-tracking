@@ -16,6 +16,8 @@ public record PersonalDataExport
     public required List<PersonalAbsence> Absences { get; init; }
     /// <summary>Per-year vacation entitlements and adjustments set by admins (null entitlement = inherited).</summary>
     public required List<PersonalVacationYear> VacationYears { get; init; }
+    /// <summary>Planned appointments of the team calendar (start/end null = all day).</summary>
+    public required List<PersonalAppointment> Appointments { get; init; }
     public required List<PersonalRequest> Requests { get; init; }
     public required List<PersonalNotification> Notifications { get; init; }
     public required List<PersonalEntryChange> EntryChanges { get; init; }
@@ -36,3 +38,5 @@ public record PersonalRequest(string Organization, string Type, string Status, s
 public record PersonalEntryChange(int TimeEntryId, DateTime ChangedAt, string Kind, bool ChangedByYou, string Changes, string? Reason = null);
 public record PersonalNotification(string Title, string Message, DateTime CreatedAt, bool IsRead);
 public record PersonalPushDevice(string PushService, string? UserAgent, string Locale, DateTime CreatedAt, DateTime LastUsedAt);
+
+public record PersonalAppointment(string Organization, DateOnly Date, TimeOnly? StartTime, TimeOnly? EndTime, string? Note, DateTime CreatedAt);

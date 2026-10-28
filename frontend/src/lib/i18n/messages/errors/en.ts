@@ -134,6 +134,13 @@ export const en: typeof de = {
 		requiresApproval: 'Absences need approval in this organization. Please submit a request.',
 		unknownType: 'Unknown or inactive absence type.'
 	},
+	appointment: {
+		times: 'Enter a start and an end (end after start) or choose “All day”.',
+		noteTooLong: 'The note can be at most 200 characters long.',
+		date: 'The date is invalid.',
+		notFound: 'Appointment not found.',
+		forbidden: 'You are not allowed to edit this appointment.'
+	},
 	absenceType: {
 		nameTaken: 'An absence type with this name already exists.',
 		notFound: 'Absence type not found.'
@@ -147,9 +154,18 @@ export const en: typeof de = {
 		wrongEmail: 'This invitation was sent to a different email address. Sign in with that address to accept it.'
 	},
 	schedule: {
-		vacationDaysRange: 'Vacation days per year: 0 to 365.',
-		notFound: 'Work schedule not found.',
-		overlap: 'This period overlaps an existing work schedule. Only one may apply at a time.'
+		beforeCurrent: 'A change must start after the current work schedule\'s first day. Otherwise correct the current one.',
+		futureExists: 'A work schedule is already planned. Replace or discard it first.',
+		correctionClosed: 'The current work schedule reaches into a closed month. Change it from a later day instead.',
+		startBeforeToday: 'A new work schedule can start today at the earliest.',
+		startInClosedMonth: 'The new work schedule would start in a closed month.',
+		startAfterToday: 'The current work schedule cannot start after today.',
+		beforePrevious: 'The current work schedule must start after the previous one\'s first day.',
+		noCurrent: 'There is no current work schedule.',
+		noFuture: 'There is no planned work schedule.',
+		weeklyRange: 'Weekly hours must be between 0 and 80.',
+		dailyRange: 'The daily target must be between 0 and 24 hours.',
+		vacationDaysRange: 'Vacation days per year: 0 to 365.'
 	},
 	overtime: {
 		initialDisabled: 'Initial overtime is disabled in this organization.',

@@ -12,7 +12,7 @@
 	import { locale, type Locale } from '$lib/stores/locale.svelte';
 	import { toast } from '$lib/stores/toast.svelte';
 	import { t } from '$lib/i18n';
-	import SchedulePeriodEditor from '$lib/components/SchedulePeriodEditor.svelte';
+	import WorkSchedulePlan from '$lib/components/WorkSchedulePlan.svelte';
 	import AppSettings from '$lib/components/AppSettings.svelte';
 	import InitialOvertimeEditor from '$lib/components/InitialOvertimeEditor.svelte';
 	import Modal from '$lib/components/Modal.svelte';
@@ -584,10 +584,9 @@
 				<div class="alert alert-error text-sm mb-5">{scheduleError}</div>
 			{:else if currentSchedule}
 				{#key orgContext.selectedOrgSlug}
-					<SchedulePeriodEditor
+					<WorkSchedulePlan
 						class="mb-5"
 						orgSlug={orgContext.selectedOrgSlug}
-						editable={currentSchedule.workScheduleChangeMode === 'Allowed'}
 						mode={currentSchedule.workScheduleChangeMode}
 						onchanged={() => orgContext.selectedOrgSlug && loadSchedule(orgContext.selectedOrgSlug)}
 					/>

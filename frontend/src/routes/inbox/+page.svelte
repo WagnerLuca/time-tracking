@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { fade, slide } from 'svelte/transition';
+	import { prefersReducedMotion } from 'svelte/motion';
+	import { quintOut } from 'svelte/easing';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { orgContext } from '$lib/stores/orgContext.svelte';
 	import { inbox } from '$lib/stores/inbox.svelte';
@@ -20,6 +23,13 @@
 	import { isOrgAdmin } from '$lib/utils/orgRules';
 
 	let respondingId = $state<number | null>(null);
+
+	/** A decided request's row folds away (height + opacity), so the list visibly gets shorter. */
+	function collapse(node: Element) {
+		if (prefersReducedMotion.current) return fade(node, { duration: 150 }); // Svelte transitions ignore the CSS reduced-motion rule
+		const s = slide(node, { duration: 200, easing: quintOut });
+		return { ...s, css: (t: number, u: number) => `${(s.css?.(t, u) ?? '').replace(/opacity:[^;]*;/, '')}opacity: ${t};` }; // slide's own fade only starts at the very end
+	}
 	let decliningId = $state<number | null>(null);
 	let withdrawingId = $state<number | null>(null);
 
@@ -72,7 +82,7 @@
 		const name = `${req.userFirstName ?? ''} ${req.userLastName ?? ''}`.trim();
 		respondingId = req.id;
 		try {
-			await requestsApi.apiV1OrganizationsSlugRequestsIdPut(req.organizationSlug, req.id, { accept, reason });
+			await inbox.respond(req, accept, reason);
 			invalidateOrgDetail(req.organizationSlug); // e.g. vacation counts, new members
 			toast.success(accept ? t('inbox.approve.accepted', { name }) : t('inbox.approve.declined', { name }));
 			decliningId = null;
@@ -164,12 +174,12 @@
 	{/if}
 
 	{#if inbox.toApprove.length > 0}
-		<section aria-labelledby="inbox-approve" data-testid="inbox-approve">
+		<section aria-labelledby="inbox-approve" data-testid="inbox-approve" out:collapse>
 			<h2 id="inbox-approve" class="text-base font-semibold mb-2">{t('inbox.approve.title')} <span class="badge badge-error badge-sm">{inbox.toApprove.length}</span></h2>
-			<ul class="flex flex-col gap-3 m-0 p-0 list-none">
+			<ul class="flex flex-col space-y-3 m-0 p-0 list-none">
 				{#each inbox.toApprove as req (req.id)}
 					{@const closedLead = !!req.closedMonth && !isOrgAdmin(orgContext.organizations.find((o) => o.organizationId === req.organizationId)?.role)}
-					<li class="card bg-base-100 border border-base-300 p-4" data-testid="inbox-item">
+					<li class="card bg-base-100 border border-base-300 p-4" data-testid="inbox-item" out:collapse>
 						<div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
 							<span class="font-semibold">{req.userFirstName} {req.userLastName} · <span class="text-primary">{formatRequestType(req.type)}</span></span>
 							<span class="text-xs text-base-content/70">{formatTimeAgo(req.createdAt)}</span>

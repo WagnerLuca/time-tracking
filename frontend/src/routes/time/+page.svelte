@@ -176,13 +176,14 @@
 		pending = true;
 		try {
 			await action();
-			await loadWeek();
-			loadBalance();
 		} catch (err) {
 			toast.error(err, fallback);
+			return;
 		} finally {
-			pending = false;
+			pending = false; // before reloading, so the button morphs right away
 		}
+		await loadWeek();
+		loadBalance();
 	}
 
 	function handleStart() {
@@ -270,15 +271,11 @@
 		{/if}
 
 		<div class="mb-4">
-			{#if timer.current}
-				<button type="button" class="btn btn-error btn-lg min-w-40 text-lg font-bold" onclick={handleStop} disabled={pending}>
-					{pending ? t('timer.stopping') : t('timer.stop')}
-				</button>
-			{:else}
-				<button type="button" class="btn btn-success btn-lg min-w-40 text-lg font-bold" onclick={handleStart} disabled={pending || !timer.loaded}>
-					{pending ? t('timer.starting') : t('timer.start')}
-				</button>
-			{/if}
+			<!-- One button that morphs Start ↔ Stop (timer-toggle in components.css) -->
+			<button type="button" class="btn btn-lg min-w-40 text-lg font-bold timer-toggle {timer.current ? 'btn-error' : 'btn-success'}" onclick={timer.current ? handleStop : handleStart} disabled={pending || !timer.loaded}>
+				<span aria-hidden={!!timer.current}>{pending ? t('timer.starting') : t('timer.start')}</span>
+				<span aria-hidden={!timer.current}>{pending ? t('timer.stopping') : t('timer.stop')}</span>
+			</button>
 		</div>
 
 		<div class="w-full max-w-[360px] mx-auto">
@@ -349,7 +346,7 @@
 							{#if targetPct > 0}
 								<div class="absolute top-0 bottom-0 w-0.5 bg-base-content/30 z-[1]" style="left: {targetPct}%"></div>
 							{/if}
-							<div class="h-full {isToday(day.date) ? 'bg-success' : 'bg-primary'} rounded transition-all duration-300" style="width: {pct}%"></div>
+							<div class="h-full {isToday(day.date) ? 'bg-success' : 'bg-primary'} rounded transition-[width] duration-300 ease-out" style="width: {pct}%"></div>
 						</div>
 						<span class="text-right text-sm text-base-content/70 tabular-nums whitespace-nowrap">
 							{formatHoursDecimal(day.minutes)}{#if day.targetMinutes > 0}<span class="text-base-content/70 font-normal text-xs"> / {formatHoursDecimal(day.targetMinutes)}</span>{/if}

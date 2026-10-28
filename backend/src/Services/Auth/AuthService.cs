@@ -243,6 +243,8 @@ public class AuthService : IAuthService
         _context.GroupMembers.RemoveRange(_context.GroupMembers.Where(gm => gm.UserId == userId));
         _context.UserTokens.RemoveRange(_context.UserTokens.Where(t => t.UserId == userId));
         _context.PushSubscriptions.RemoveRange(_context.PushSubscriptions.Where(s => s.UserId == userId));
+        // Planned appointments are no figure anybody needs later, and their notes may be personal
+        _context.Appointments.RemoveRange(_context.Appointments.IgnoreQueryFilters().Where(a => a.UserId == userId));
         await RevokeAllSessionsAsync(user);
         await _context.SaveChangesAsync();
         _cache.Remove(Filters.ActiveUserFilter.CacheKey(userId));
@@ -341,6 +343,11 @@ public class AuthService : IAuthService
                 .Where(v => v.UserId == userId)
                 .OrderBy(v => v.Organization.Name).ThenBy(v => v.Year)
                 .Select(v => new PersonalVacationYear(v.Organization.Name, v.Year, v.Entitlement, v.Adjustment, v.AdjustmentNote, v.UpdatedAt))
+                .ToListAsync(),
+            Appointments = await _context.Appointments.IgnoreQueryFilters().AsNoTracking()
+                .Where(a => a.UserId == userId)
+                .OrderBy(a => a.Date).ThenBy(a => a.StartTime)
+                .Select(a => new PersonalAppointment(a.Organization.Name, a.Date, a.StartTime, a.EndTime, a.Note, a.CreatedAt))
                 .ToListAsync(),
             Requests = await _context.OrgRequests.IgnoreQueryFilters().AsNoTracking()
                 .Where(r => r.UserId == userId)

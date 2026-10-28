@@ -56,7 +56,11 @@ public enum MemberInfo
     /// <summary>Work schedule (target hours).</summary>
     WorkSchedule = 512,
     /// <summary>Tracked times and everything derived from them (balance, reports, compliance).</summary>
-    TrackedTime = 1024
+    TrackedTime = 1024,
+    /// <summary>Planned appointments ("Termine", #83): the time slot.</summary>
+    Appointments = 2048,
+    /// <summary>The title/note of an appointment that is visible anyway.</summary>
+    AppointmentNotes = 4096
 }
 
 public class Organization
@@ -160,8 +164,12 @@ public class Organization
     /// <summary>Member visibility matrix, column "outside own groups".</summary>
     public MemberInfo VisibleOutsideGroups { get; set; } = DefaultVisibility;
 
-    /// <summary>New organizations: colleagues appear with email and groups, absences and times stay private.</summary>
-    public const MemberInfo DefaultVisibility = MemberInfo.Member | MemberInfo.Email | MemberInfo.Groups | MemberInfo.AbsenceNotes;
+    /// <summary>
+    /// New organizations: colleagues appear with email, groups and appointment slots (the team calendar's
+    /// point), absences, appointment notes and times stay private.
+    /// </summary>
+    public const MemberInfo DefaultVisibility = MemberInfo.Member | MemberInfo.Email | MemberInfo.Groups | MemberInfo.AbsenceNotes
+                                                | MemberInfo.Appointments;
     
     /// <summary>
     /// Default vacation days per year for new members.

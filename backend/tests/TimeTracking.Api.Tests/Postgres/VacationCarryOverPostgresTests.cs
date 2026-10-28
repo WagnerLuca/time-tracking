@@ -200,6 +200,6 @@ public class VacationCarryOverPostgresTests
 
         l.Should().Be(s, "30 members cost as many queries as 5");
         c.Should().Be(l, "a 6-year chain costs as many queries as one year");
-        s.Years.Should().BeLessThanOrEqualTo(5, "YearsAsync: memberships, holidays, schedules, vacation days, rows");
+        s.Years.Should().BeLessThanOrEqualTo(6, "YearsAsync: memberships, holidays, schedules, frozen days, vacation days, rows");
     }
 }

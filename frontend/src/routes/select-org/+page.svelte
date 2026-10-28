@@ -43,7 +43,7 @@
 			{:else}
 				<div class="flex flex-col gap-2 mb-6">
 					{#each orgContext.organizations as org (org.organizationId)}
-						<button type="button" class="flex items-center justify-between px-5 py-4 bg-base-200/50 border-2 border-base-300 rounded-xl cursor-pointer transition-all text-left w-full hover:border-primary hover:bg-primary/5" onclick={() => selectOrg(org.organizationId!)}>
+						<button type="button" class="flex items-center justify-between px-5 py-4 bg-base-200/50 border-2 border-base-300 rounded-xl cursor-pointer transition-[border-color,box-shadow,background-color] text-left w-full hover:border-primary hover:bg-primary/5" onclick={() => selectOrg(org.organizationId!)}>
 							<div class="flex flex-col gap-0.5">
 								<span class="font-semibold text-base">{org.name}</span>
 								<span class="text-xs text-base-content/70 uppercase font-medium tracking-wider">{roleLabel(org.role)}</span>

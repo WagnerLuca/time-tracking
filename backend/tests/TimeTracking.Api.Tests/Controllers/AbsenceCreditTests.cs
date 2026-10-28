@@ -22,7 +22,7 @@ public class AbsenceCreditTests : IClassFixture<TimeTrackingApiFactory>
         var (owner, login) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, $"{prefix}@credit.test");
         var org = await TestHelpers.CreateOrganizationAsync(owner, $"{prefix} Org", $"{prefix}-org");
         (await owner.PutAsJsonAsync($"/api/v1/Organizations/{org.Slug}/settings", new { csvImportMode = 2, defaultVacationDays = 20 })).EnsureSuccessStatusCode();
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{org.Slug}/work-schedule/change",
             new { validFrom = "2026-01-01", weeklyWorkHours = 40, distributeEvenly = true })).EnsureSuccessStatusCode();
         return (owner, org.Slug, login.User.Id);
     }

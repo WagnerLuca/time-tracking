@@ -215,7 +215,7 @@ public class RequestsControllerTests : IClassFixture<TimeTrackingApiFactory>
 
         var requestData = System.Text.Json.JsonSerializer.Serialize(new
         {
-            validFrom = "2026-03-01",
+            validFrom = DateTime.UtcNow.AddDays(7).ToString("yyyy-MM-dd"),
             weeklyWorkHours = 40.0,
             distributeEvenly = true
         });

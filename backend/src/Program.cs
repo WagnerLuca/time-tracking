@@ -162,15 +162,16 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<ITotpService, TotpService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
-// Email: SMTP when Email:Smtp:Host is set, otherwise mails (with their links) go to the log
+// Email: SMTP when configured; otherwise either log or discard mail according to configuration.
 var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>() ?? new EmailSettings();
-// The log fallback writes whole mails — reset and invitation links included — so it is
-// development-only; a real deployment must configure SMTP
-if (string.IsNullOrWhiteSpace(emailSettings.Smtp.Host) && !isDevOrTest)
-    throw new InvalidOperationException("Email:Smtp:Host is not configured. Set Email__Smtp__Host (and credentials) so password reset and invitation mails can be sent.");
 builder.Services.AddSingleton(emailSettings);
 if (string.IsNullOrWhiteSpace(emailSettings.Smtp.Host))
-    builder.Services.AddSingleton<IEmailSender, LogEmailSender>();
+{
+    if (emailSettings.LogWhenSmtpUnconfigured)
+        builder.Services.AddSingleton<IEmailSender, LogEmailSender>();
+    else
+        builder.Services.AddSingleton<IEmailSender, DiscardEmailSender>();
+}
 else
     builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
@@ -187,6 +188,7 @@ builder.Services.AddScoped<IRequestService, RequestService>();
 builder.Services.AddScoped<IHolidayService, HolidayService>();
 builder.Services.AddScoped<CompanyLeaveService>();
 builder.Services.AddScoped<IAbsenceDayService, AbsenceDayService>();
+builder.Services.AddScoped<AppointmentService>();
 builder.Services.AddScoped<IWorkScheduleService, WorkScheduleService>();
 builder.Services.AddScoped<IPauseRuleService, PauseRuleService>();
 builder.Services.AddScoped<IGroupService, GroupService>();
@@ -354,6 +356,12 @@ using (var scope = app.Services.CreateScope())
         // Demo data (users with known passwords!) only for the in-memory dev database or when asked for
         if (app.Configuration.GetValue<bool>("UseInMemoryDatabase") || app.Configuration.GetValue<bool>("SeedDemoData"))
             await DbSeeder.SeedAsync(context);
+
+        // Issue #81: months closed before frozen figures existed are frozen once, from the data as it is now
+        await FrozenFigures.FreezeUnfrozenAsync(context, services.GetRequiredService<ILogger<Program>>());
+        // Issue #82: work schedules in the model (contiguous periods, one future one at most) — after the freeze, so closed
+        // months keep their figures; idempotent, logs what it changed
+        await WorkSchedulePlan.NormalizeAllAsync(context, services.GetRequiredService<ILogger<Program>>());
     }
     catch (Exception ex)
     {

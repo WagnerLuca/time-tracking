@@ -41,6 +41,10 @@ describe('formatters', () => {
 		expect(formatHours(-90)).toBe('-1h 30m');
 		// fractional minutes (running timers) are rounded, never "1h 60m"
 		expect(formatHours(119.7)).toBe('2h');
+		// thousands get the locale's separator (9.999h / 9,999h)
+		expect(formatHours(-9999 * 60 - 45)).toBe('-9.999h 45m');
+		locale.set('en');
+		expect(formatHours(1284 * 60)).toBe('1,284h');
 	});
 
 	it('formatDelta always carries a sign', () => {
@@ -235,6 +239,11 @@ describe('formatters: domain labels', () => {
 		expect(getInitials(undefined, 'Schmidt')).toBe('S');
 		expect(getInitials('', '')).toBe('?');
 		expect(getInitials(null, undefined)).toBe('?');
+		// letters, not UTF-16 units: no half emoji, any script
+		expect(getInitials('🦊', 'Fox')).toBe('F');
+		expect(getInitials('👩🏽‍💻 Priya', 'Raghunathan')).toBe('PR');
+		expect(getInitials('Đặng Thị', 'Ngọc Hân')).toBe('ĐN');
+		expect(getInitials('نور الهدى', 'عبد الرحمن')).toBe('نع');
 	});
 
 	it('barWidth is capped at 100 and handles a zero target', () => {

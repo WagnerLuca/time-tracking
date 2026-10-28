@@ -26,7 +26,7 @@ public class DaysOffTests : IClassFixture<TimeTrackingApiFactory>
         var ownerId = (await owner.GetFromJsonAsync<JsonElement>($"/api/v1/Organizations/{slug}")).GetProperty("members")
             .EnumerateArray().Single(m => m.GetProperty("id").GetInt32() != memberId).GetProperty("id").GetInt32();
         foreach (var id in new[] { ownerId, memberId })
-            (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{id}/work-schedules",
+            (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{id}/work-schedule/change",
                 new { validFrom = "2025-01-01", weeklyWorkHours = 40, distributeEvenly = true })).EnsureSuccessStatusCode();
         return (owner, member, slug, ownerId, memberId);
     }
@@ -65,7 +65,7 @@ public class DaysOffTests : IClassFixture<TimeTrackingApiFactory>
     {
         var (owner, member, slug, _, memberId) = await OrgAsync("do-schedule");
         // From July the member works in Berlin: a new contract period with its own region
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/change",
             new { validFrom = "2026-07-01", weeklyWorkHours = 40, distributeEvenly = true, holidayRegion = "de-be" })).EnsureSuccessStatusCode();
 
         var dates = Dates(await DaysAsync(member, slug, "2026-01-01", "2026-12-31"));
@@ -82,14 +82,14 @@ public class DaysOffTests : IClassFixture<TimeTrackingApiFactory>
     {
         var (owner, member, slug, _, memberId) = await OrgAsync("do-self");
         (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/settings", new { workScheduleChangeMode = 2 })).EnsureSuccessStatusCode();
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/change",
             new { validFrom = "2026-02-01", weeklyWorkHours = 40, distributeEvenly = true, holidayRegion = "DE-BE" })).EnsureSuccessStatusCode();
 
-        // The member's own new period ignores a region and keeps the previous period's
-        var own = await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedules",
-            new { validFrom = "2026-03-01", weeklyWorkHours = 30, distributeEvenly = true, holidayRegion = "DE-BY" });
+        // The member's own new period (from tomorrow) ignores a region and keeps the previous period's
+        var own = await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedule/change",
+            new { validFrom = DateTime.UtcNow.AddDays(2).ToString("yyyy-MM-dd"), weeklyWorkHours = 30, distributeEvenly = true, holidayRegion = "DE-BY" });
         own.EnsureSuccessStatusCode();
-        (await own.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("holidayRegion").GetString().Should().Be("DE-BE");
+        (await own.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("future").GetProperty("holidayRegion").GetString().Should().Be("DE-BE");
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public class DaysOffTests : IClassFixture<TimeTrackingApiFactory>
         var (owner, _, slug, _, memberId) = await OrgAsync("do-halfvac", region: null);
         var year = DateTime.UtcNow.Year;
         // Every day a working day, so 24.12. is one whatever weekday it is this year
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/change",
             new { validFrom = $"{year}-01-01", distributeEvenly = false, targetMon = 8, targetTue = 8, targetWed = 8, targetThu = 8,
                   targetFri = 8, targetSat = 8, targetSun = 8 })).EnsureSuccessStatusCode();
         (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/holidays",
@@ -221,7 +221,7 @@ public class DaysOffTests : IClassFixture<TimeTrackingApiFactory>
         foreach (var response in new[]
                  {
                      await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/settings", new { holidayRegion = "DE-XX" }),
-                     await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedules",
+                     await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/change",
                          new { validFrom = "2026-05-01", weeklyWorkHours = 40, distributeEvenly = true, holidayRegion = "XX" })
                  })
         {

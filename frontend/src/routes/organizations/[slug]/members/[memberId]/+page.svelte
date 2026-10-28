@@ -11,14 +11,13 @@
 	import { canGrantAccountant, isOrgAdmin } from '$lib/utils/orgRules';
 	import { canSee } from '$lib/utils/visibility';
 	import MemberCalendar from '$lib/components/MemberCalendar.svelte';
-	import SchedulePeriodEditor from '$lib/components/SchedulePeriodEditor.svelte';
+	import WorkSchedulePlan from '$lib/components/WorkSchedulePlan.svelte';
 	import InitialOvertimeEditor from '$lib/components/InitialOvertimeEditor.svelte';
 	import MemberHeader from '$lib/components/member/MemberHeader.svelte';
 	import MemberSummary from '$lib/components/member/MemberSummary.svelte';
 	import MemberReports from '$lib/components/member/MemberReports.svelte';
 	import MemberAbsences from '$lib/components/member/MemberAbsences.svelte';
 	import MemberPermissions from '$lib/components/member/MemberPermissions.svelte';
-	import MemberSchedule from '$lib/components/member/MemberSchedule.svelte';
 	import MemberVacation from '$lib/components/member/MemberVacation.svelte';
 	import MemberCards from '$lib/components/member/MemberCards.svelte';
 	import MemberPersonnelNumber from '$lib/components/member/MemberPersonnelNumber.svelte';
@@ -48,8 +47,6 @@
 	let absenceTypes = $state<AbsenceTypeDefinitionResponse[]>([]);
 	let memberPerms = $state<EffectivePermissionsResponse | null>(null);
 	let schedule = $state<WorkScheduleResponse | null>(null);
-	let scheduleLoading = $state(false);
-	let scheduleError = $state('');
 
 	let myRole = $derived(org?.members?.find((m) => m.id === auth.user?.id)?.role ?? null);
 	let isAdmin = $derived(isOrgAdmin(myRole));
@@ -141,17 +138,13 @@
 		overviewLoading = false;
 	}
 
+	/** The current schedule carries the initial overtime; the schedule card loads its own data (and shows its errors). */
 	async function loadSchedule() {
-		scheduleLoading = true;
-		scheduleError = '';
 		try {
 			const { data } = await workScheduleApi.apiV1OrganizationsSlugMembersMemberIdWorkScheduleGet(orgSlug, memberId);
 			schedule = data;
-		} catch (err) {
+		} catch {
 			schedule = null;
-			if (getErrorStatus(err) !== 404) scheduleError = extractErrorMessage(err, t('memberDetail.scheduleFailed'));
-		} finally {
-			scheduleLoading = false;
 		}
 	}
 </script>
@@ -208,7 +201,7 @@
 		{/if}
 
 		{#if canViewSchedule}
-			<MemberSchedule class="mb-5" {schedule} loading={scheduleLoading} error={scheduleError} />
+			<WorkSchedulePlan class="mb-5" {orgSlug} {memberId} {isAdmin} onchanged={async () => { await loadSchedule(); await calendar?.reloadBalance(); }} />
 		{/if}
 		{#if isSelf || isAdmin}
 			<!-- The starting overtime balance is payroll data: the person and admins only -->
@@ -223,9 +216,6 @@
 				<MemberAccountant {orgSlug} {member} onchanged={reloadOrg} />
 			{/if}
 			<MemberCards {orgSlug} {memberId} onchanged={reloadOrg} />
-		{/if}
-		{#if canViewSchedule}
-			<SchedulePeriodEditor class="mb-5" {orgSlug} {memberId} editable={isAdmin} onchanged={loadSchedule} />
 		{/if}
 	{/if}
 </div>

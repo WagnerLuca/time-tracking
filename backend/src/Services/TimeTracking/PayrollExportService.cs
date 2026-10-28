@@ -80,12 +80,21 @@ public class PayrollExportService(TimeTrackingDbContext context, ILogger<Payroll
         var fromUtc = clock.StartOfDayUtc(from);
         var toUtc = clock.StartOfDayUtc(to.AddDays(1));
 
-        var members = await context.UserOrganizations.AsNoTracking()
+        // Closed months as frozen (FrozenFigures): their members, hours, absences and failure entries as when they were closed
+        var frozen = await FrozenFigures.DaysAsync(context, clock, org.Id, null, from, to);
+        var frozenMonths = frozen.SelectMany(u => u.Value.Keys.Select(d => (u.Key, ClosedPeriods.MonthOf(d)))).ToHashSet();
+        var closedMonths = frozenMonths.Select(m => m.Item2).ToHashSet();
+        bool IsFrozen(int userId, DateOnly day) => frozenMonths.Contains((userId, ClosedPeriods.MonthOf(day)));
+        // Members of a closed month are the ones frozen with it; live members only count for open days
+        var hasOpenDays = false;
+        for (var month = ClosedPeriods.MonthOf(from); month <= to; month = month.AddMonths(1))
+            hasOpenDays |= !closedMonths.Contains(month);
+
+        var members = !hasOpenDays ? [] : await context.UserOrganizations.AsNoTracking()
             .Include(uo => uo.User)
             .Where(uo => uo.OrganizationId == org.Id && uo.User.IsActive)
             .ToListAsync();
-        var activeIds = members.Select(m => m.UserId).ToHashSet();
-        var withActivity = await context.TimeEntries.AsNoTracking()
+        var withActivity = !hasOpenDays ? [] : await context.TimeEntries.AsNoTracking()
             .Where(e => e.OrganizationId == org.Id && !e.IsRunning && e.StartTime >= fromUtc && e.StartTime < toUtc)
             .Select(e => e.UserId)
             .Union(context.AbsenceDays.AsNoTracking()
@@ -93,40 +102,51 @@ public class PayrollExportService(TimeTrackingDbContext context, ILogger<Payroll
                 .Select(a => a.UserId))
             .Distinct()
             .ToListAsync();
-        var formerIds = withActivity.Where(id => !activeIds.Contains(id)).ToList();
-        if (formerIds.Count > 0)
+        var listed = members.Select(m => m.UserId).ToHashSet();
+        var otherIds = withActivity.Concat(frozen.Keys).Where(id => !listed.Contains(id)).Distinct().ToList();
+        if (otherIds.Count > 0)
             members.AddRange(await context.UserOrganizations.AsNoTracking().IgnoreQueryFilters()
                 .Include(uo => uo.User)
-                .Where(uo => uo.OrganizationId == org.Id && formerIds.Contains(uo.UserId))
+                .Where(uo => uo.OrganizationId == org.Id && otherIds.Contains(uo.UserId))
                 .ToListAsync());
         members = members.OrderBy(uo => uo.User.LastName).ThenBy(uo => uo.User.FirstName).ToList();
-        var absences = (await context.AbsenceDays.AsNoTracking()
-                .Include(a => a.CustomType)
-                .Where(a => a.OrganizationId == org.Id && a.Date >= from && a.Date <= to)
-                .ToListAsync())
+        var ids = members.Select(m => m.UserId).ToList();
+
+        var live = !hasOpenDays ? [] : await context.AbsenceDays.AsNoTracking()
+            .Where(a => a.OrganizationId == org.Id && a.Date >= from && a.Date <= to)
+            .Select(a => new { a.UserId, a.Date, a.Type, CountsAsVacation = a.CustomType != null && a.CustomType.CountsAsVacation, a.IsHalfDay })
+            .ToListAsync();
+        var absences = live
+            .Where(a => !IsFrozen(a.UserId, a.Date))
+            .Select(a => (UserId: a.UserId, a.Type, Vacation: a.Type == AbsenceType.Vacation || a.CountsAsVacation, Days: a.IsHalfDay ? 0.5 : 1.0))
+            .Concat(frozen.SelectMany(u => u.Value.Values.Where(d => d.AbsenceType != null)
+                .Select(d => (UserId: u.Key, Type: d.AbsenceType!.Value, Vacation: d.CountsAsVacation, Days: d.AbsenceHalfDay ? 0.5 : 1.0))))
             .ToLookup(a => a.UserId);
-        var failures = await context.TimeEntries.AsNoTracking()
-            .Where(e => e.OrganizationId == org.Id && e.IsFailure && e.StartTime >= fromUtc && e.StartTime < toUtc)
-            .GroupBy(e => e.UserId)
-            .Select(g => new { UserId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(f => f.UserId, f => f.Count);
+        var failures = (!hasOpenDays ? [] : await context.TimeEntries.AsNoTracking()
+                .Where(e => e.OrganizationId == org.Id && e.IsFailure && e.StartTime >= fromUtc && e.StartTime < toUtc)
+                .Select(e => new { e.UserId, e.StartTime })
+                .ToListAsync())
+            .Where(e => !IsFrozen(e.UserId, clock.LocalDate(e.StartTime)))
+            .Select(e => (e.UserId, Count: 1))
+            .Concat(frozen.SelectMany(u => u.Value.Values.Select(d => (u.Key, d.FailureCount))))
+            .GroupBy(e => e.Item1)
+            .ToDictionary(g => g.Key, g => g.Sum(e => e.Item2));
 
         // Hours of every member in four queries (not six per member): the same rows as BuildAsync from each member's first entry
         var hours = await DailyReportAggregator.TotalsAsync(context, org,
-            members.ToDictionary(m => m.UserId, m => m.InitialOvertimeHours), from, to, failureCounts: false);
+            members.ToDictionary(m => m.UserId, m => m.InitialOvertimeHours), from, to, failureCounts: false, frozenDays: frozen);
 
         var rows = new List<PayrollRow>();
         foreach (var member in members)
         {
             var (target, worked, overtime, balance, _) = hours[member.UserId];
             var memberAbsences = absences[member.UserId].ToList();
-            static double Days(IEnumerable<AbsenceDay> days) => days.Sum(a => a.IsHalfDay ? 0.5 : 1.0);
-            var vacation = Days(memberAbsences.Where(a => a.Type == AbsenceType.Vacation || a.CustomType?.CountsAsVacation == true));
-            var sick = Days(memberAbsences.Where(a => a.Type == AbsenceType.SickDay));
-            var other = Days(memberAbsences) - vacation - sick;
+            var vacation = memberAbsences.Where(a => a.Vacation).Sum(a => a.Days);
+            var sick = memberAbsences.Where(a => a.Type == AbsenceType.SickDay).Sum(a => a.Days);
+            var other = memberAbsences.Sum(a => a.Days) - vacation - sick;
             rows.Add(new PayrollRow(member.UserId, member.PersonnelNumber, $"{member.User.FirstName} {member.User.LastName}", member.User.Email,
                 Math.Round(target, 2), Math.Round(worked, 2), Math.Round(overtime, 2), Math.Round(balance, 2),
-                vacation, sick, other, failures.GetValueOrDefault(member.UserId), IsFormerMember: !activeIds.Contains(member.UserId)));
+                vacation, sick, other, failures.GetValueOrDefault(member.UserId), IsFormerMember: !(member.IsActive && member.User.IsActive)));
         }
         return rows;
     }

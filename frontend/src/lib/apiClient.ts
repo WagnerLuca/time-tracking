@@ -7,7 +7,7 @@ import { formatMonth } from '$lib/utils/closedPeriods';
 import { t } from '$lib/i18n';
 import { installRefreshInterceptor, type RefreshedTokens } from '$lib/authRefresh';
 import { network, offlineError } from '$lib/pwa/network.svelte';
-import { Configuration, AbsenceDayApi, AccountingApi, ApiKeysApi, AuthApi, ClosedPeriodsApi, CompanyLeaveApi, ExportImportApi, GroupApi, HolidayApi, InvitationsApi, MemberEntriesApi, NotificationsApi, OrganizationsApi, PauseRulesApi, PushApi, ReportsApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
+import { Configuration, AbsenceDayApi, AccountingApi, ApiKeysApi, AppointmentsApi, AuthApi, ClosedPeriodsApi, CompanyLeaveApi, ExportImportApi, GroupApi, HolidayApi, InvitationsApi, MemberEntriesApi, NotificationsApi, OrganizationsApi, PauseRulesApi, PushApi, ReportsApi, RequestsApi, TimeTrackingApi, WorkScheduleApi } from '$lib/api';
 
 // Detect base URL: browser uses current hostname, SSR uses Docker service name
 const getApiBaseUrl = (): string => {
@@ -160,4 +160,5 @@ export const memberEntriesApi = new MemberEntriesApi(config, undefined, axiosIns
 export const closedPeriodsApi = new ClosedPeriodsApi(config, undefined, axiosInstance);
 export const pushApi = new PushApi(config, undefined, axiosInstance);
 export const accountingApi = new AccountingApi(config, undefined, axiosInstance);
+export const appointmentsApi = new AppointmentsApi(config, undefined, axiosInstance);
 export const companyLeaveApi = new CompanyLeaveApi(config, undefined, axiosInstance);

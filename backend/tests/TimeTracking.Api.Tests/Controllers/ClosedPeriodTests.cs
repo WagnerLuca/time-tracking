@@ -127,10 +127,13 @@ public class ClosedPeriodTests : IClassFixture<TimeTrackingApiFactory>
         {
             new { date = LastMonth.AddDays(21).ToString("yyyy-MM-dd"), startTime = "08:00", endTime = "16:00", pauseMinutes = 30, description = "Imported" }
         }));
-        await ShouldBeClosedAsync(await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedules",
-            new { validFrom = LastMonth.AddDays(1).ToString("yyyy-MM-dd"), weeklyWorkHours = 30.0, distributeEvenly = true }));
+        // A member's schedule change starts today at the earliest (issue #82), so it never reaches the closed month
+        var refusedSchedule = await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedule/change",
+            new { validFrom = LastMonth.AddDays(1).ToString("yyyy-MM-dd"), weeklyWorkHours = 30.0, distributeEvenly = true });
+        refusedSchedule.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await refusedSchedule.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("schedule.startBeforeToday");
         // A schedule from next month on leaves the closed month alone
-        (await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedules",
+        (await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedule/change",
             new { validFrom = LastMonth.AddMonths(2).ToString("yyyy-MM-dd"), weeklyWorkHours = 30.0, distributeEvenly = true })).EnsureSuccessStatusCode();
 
         // Asking instead does not work either
@@ -228,27 +231,30 @@ public class ClosedPeriodTests : IClassFixture<TimeTrackingApiFactory>
     }
 
     [Fact]
-    public async Task WorkSchedules_OnlyChangesReachingIntoAClosedMonthAreRefused()
+    public async Task WorkSchedules_NeverStartInOrCorrectIntoAClosedMonth_ReachingIntoOneNeedsAReason()
     {
         var (owner, member, slug, _, memberId) = await SetupAsync("cp-sched");
-        var schedules = $"/api/v1/organizations/{slug}/work-schedules";
-        var old = await member.PostAsJsonAsync(schedules, new { validFrom = LastMonth.AddMonths(-2).ToString("yyyy-MM-dd"), weeklyWorkHours = 40.0, distributeEvenly = true });
-        old.EnsureSuccessStatusCode();
-        var oldId = (await old.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+        var admin = $"/api/v1/organizations/{slug}/members/{memberId}/work-schedule";
+        (await owner.PostAsJsonAsync($"{admin}/change", new { validFrom = LastMonth.AddMonths(-2).ToString("yyyy-MM-dd"), weeklyWorkHours = 40.0, distributeEvenly = true }))
+            .EnsureSuccessStatusCode();
         (await CloseAsync(owner, slug, LastMonth, LastMonth)).EnsureSuccessStatusCode();
 
-        await ShouldBeClosedAsync(await member.PutAsJsonAsync($"{schedules}/{oldId}", new { weeklyWorkHours = 20.0, distributeEvenly = true }));
-        await ShouldBeClosedAsync(await member.PutAsJsonAsync($"{schedules}/{oldId}", new { validTo = LastMonth.AddDays(9).ToString("yyyy-MM-dd") }));
-        await ShouldBeClosedAsync(await member.DeleteAsync($"{schedules}/{oldId}"));
-        // Ending the old period after the closed month (a new one from then on) is fine
-        (await member.PostAsJsonAsync(schedules, new { validFrom = LastMonth.AddMonths(2).ToString("yyyy-MM-dd"), weeklyWorkHours = 30.0, distributeEvenly = true }))
+        // The current period reaches into the closed month: no correction, not even with a reason
+        var correct = await owner.SendAsync(WithReason(HttpMethod.Put, $"{admin}/current", new { weeklyWorkHours = 20.0, distributeEvenly = true }, "Tippfehler"));
+        correct.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await correct.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("schedule.correctionClosed");
+        // No change starts in it either
+        var inClosed = await owner.SendAsync(WithReason(HttpMethod.Post, $"{admin}/change",
+            new { validFrom = LastMonth.AddDays(9).ToString("yyyy-MM-dd"), weeklyWorkHours = 20.0, distributeEvenly = true }, "Vertrag rückwirkend"));
+        inClosed.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await inClosed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("schedule.startInClosedMonth");
+        // One from an open day before it reaches into it: members never could, an admin needs a reason
+        var before = new { validFrom = LastMonth.AddMonths(-1).AddDays(3).ToString("yyyy-MM-dd"), weeklyWorkHours = 20.0, distributeEvenly = true };
+        await ShouldBeClosedAsync(await owner.PostAsJsonAsync($"{admin}/change", before), "period.reasonRequired");
+        (await owner.SendAsync(WithReason(HttpMethod.Post, $"{admin}/change", before, "Vertrag rückwirkend"))).EnsureSuccessStatusCode();
+        // A member's change from today on leaves the closed month alone
+        (await member.PostAsJsonAsync($"/api/v1/organizations/{slug}/work-schedule/change", new { weeklyWorkHours = 30.0, distributeEvenly = true }))
             .EnsureSuccessStatusCode();
-        // Moving the start of the old period inside the months before the closed one too
-        (await member.PutAsJsonAsync($"{schedules}/{oldId}", new { validFrom = LastMonth.AddMonths(-2).AddDays(3).ToString("yyyy-MM-dd") }))
-            .StatusCode.Should().Be(HttpStatusCode.OK);
-        // An admin with a reason may
-        (await owner.SendAsync(WithReason(HttpMethod.Put, $"/api/v1/organizations/{slug}/members/{memberId}/work-schedules/{oldId}",
-            new { weeklyWorkHours = 20.0, distributeEvenly = true }, "Vertrag rückwirkend"))).EnsureSuccessStatusCode();
     }
 
     [Fact]

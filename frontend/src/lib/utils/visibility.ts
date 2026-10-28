@@ -7,7 +7,8 @@ import { t } from '$lib/i18n';
  */
 export const VISIBILITY_KINDS = [
 	'Member', 'Email', 'Groups', 'Presence', 'Vacation', 'SickDays', 'OtherAbsences',
-	'AbsenceNotes', 'VacationBalance', 'WorkSchedule', 'TrackedTime'
+	'AbsenceNotes', 'VacationBalance', 'WorkSchedule', 'TrackedTime',
+	'Appointments', 'AppointmentNotes'
 ] as const;
 export type VisibilityKind = (typeof VISIBILITY_KINDS)[number];
 export type Column = 'inGroups' | 'outsideGroups';

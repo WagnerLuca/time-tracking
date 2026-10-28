@@ -4,6 +4,7 @@ export const en: typeof de = {
 	memberTitle: 'First steps',
 	adminTitle: 'Set up your organization',
 	progress: '{done} of {total} done',
+	complete: 'All done – enjoy!',
 	dismiss: 'Hide checklist',
 	done: 'done',
 	steps: {

@@ -27,7 +27,7 @@ public class DaysOffPostgresTests
     {
         var (owner, member, slug, _, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, "pg-daysoff",
             new { holidayRegion = "DE-BW" }, "pg.test");
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/change",
             new { validFrom = $"{Year - 1}-01-01", weeklyWorkHours = 40, distributeEvenly = true })).EnsureSuccessStatusCode();
         var group = await TestHelpers.CreateGroupAsync(owner, slug, "Lager", new { holidayRegion = "DE-BE" });
 

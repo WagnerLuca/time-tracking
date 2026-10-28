@@ -22,7 +22,7 @@ public class CompanyLeaveTests : IClassFixture<TimeTrackingApiFactory>
     {
         var (owner, member, slug, _, memberId) = await TestHelpers.OrgWithMemberAsync(_factory, prefix,
             new { holidayRegion = "DE" });
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{memberId}/work-schedule/change",
             new { validFrom = $"{Year - 1}-01-01", weeklyWorkHours = 40, distributeEvenly = true })).EnsureSuccessStatusCode();
         (await owner.PutAsJsonAsync($"/api/v1/Organizations/{slug}/members/{memberId}/vacation-days", new { days = 2 }))
             .EnsureSuccessStatusCode();
@@ -112,7 +112,7 @@ public class CompanyLeaveTests : IClassFixture<TimeTrackingApiFactory>
         var (owner, _, slug, memberId) = await OrgAsync("cl-group");
         var (newcomer, login) = await TestHelpers.CreateAuthenticatedUserAsync(_factory, "cl-group-new@t.test");
         (await TestHelpers.AddMemberAsync(_factory, owner, slug, login)).EnsureSuccessStatusCode();
-        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{login.User.Id}/work-schedules",
+        (await owner.PostAsJsonAsync($"/api/v1/organizations/{slug}/members/{login.User.Id}/work-schedule/change",
             new { validFrom = $"{Year - 1}-01-01", weeklyWorkHours = 40, distributeEvenly = true })).EnsureSuccessStatusCode();
         var group = await TestHelpers.CreateGroupAsync(owner, slug, "Werkstatt", new { }, (memberId, "Member"));
         await CreateAsync(owner, slug, $"{Year}-08-03", $"{Year}-08-14", group);

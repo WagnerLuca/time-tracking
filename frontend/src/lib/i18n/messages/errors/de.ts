@@ -139,6 +139,13 @@ export const de = {
 		requiresApproval: 'Abwesenheiten müssen in dieser Organisation genehmigt werden. Bitte stelle eine Anfrage.',
 		unknownType: 'Unbekannte oder inaktive Abwesenheitsart.'
 	},
+	appointment: {
+		times: 'Gib Beginn und Ende an (Ende nach dem Beginn) oder wähle „Ganztägig“.',
+		noteTooLong: 'Die Notiz darf höchstens 200 Zeichen lang sein.',
+		date: 'Das Datum ist ungültig.',
+		notFound: 'Termin nicht gefunden.',
+		forbidden: 'Diesen Termin darfst du nicht bearbeiten.'
+	},
 	absenceType: {
 		nameTaken: 'Eine Abwesenheitsart mit diesem Namen gibt es bereits.',
 		notFound: 'Abwesenheitsart nicht gefunden.'
@@ -152,9 +159,18 @@ export const de = {
 		wrongEmail: 'Diese Einladung wurde an eine andere E-Mail-Adresse geschickt. Melde dich mit dieser Adresse an, um sie anzunehmen.'
 	},
 	schedule: {
-		vacationDaysRange: 'Urlaubstage pro Jahr: 0 bis 365.',
-		notFound: 'Arbeitszeitmodell nicht gefunden.',
-		overlap: 'Dieser Zeitraum überschneidet sich mit einem bestehenden Arbeitszeitmodell. Es darf immer nur eines gelten.'
+		beforeCurrent: 'Eine Änderung muss nach dem ersten Tag des aktuellen Arbeitszeitmodells beginnen. Korrigiere sonst das aktuelle.',
+		futureExists: 'Es gibt schon ein geplantes Arbeitszeitmodell. Ersetze oder verwirf es zuerst.',
+		correctionClosed: 'Das aktuelle Arbeitszeitmodell reicht in einen abgeschlossenen Monat. Ändere es stattdessen ab einem späteren Tag.',
+		startBeforeToday: 'Ein neues Arbeitszeitmodell kann frühestens heute beginnen.',
+		startInClosedMonth: 'Das neue Arbeitszeitmodell würde in einem abgeschlossenen Monat beginnen.',
+		startAfterToday: 'Das aktuelle Arbeitszeitmodell kann nicht nach heute beginnen.',
+		beforePrevious: 'Das aktuelle Arbeitszeitmodell muss nach dem ersten Tag des vorherigen beginnen.',
+		noCurrent: 'Es gibt kein aktuelles Arbeitszeitmodell.',
+		noFuture: 'Es gibt kein geplantes Arbeitszeitmodell.',
+		weeklyRange: 'Die Wochenstunden müssen zwischen 0 und 80 liegen.',
+		dailyRange: 'Das Soll pro Tag muss zwischen 0 und 24 Stunden liegen.',
+		vacationDaysRange: 'Urlaubstage pro Jahr: 0 bis 365.'
 	},
 	overtime: {
 		initialDisabled: 'Anfangsüberstunden sind in dieser Organisation deaktiviert.',

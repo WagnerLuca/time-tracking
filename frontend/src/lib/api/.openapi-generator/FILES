@@ -23,11 +23,14 @@ docs/AdminCreateAbsenceDayRequest.md
 docs/AdminNotificationResponse.md
 docs/ApiKeyResponse.md
 docs/ApiKeysApi.md
+docs/AppointmentResponse.md
+docs/AppointmentsApi.md
 docs/AuthApi.md
 docs/AuthResponse.md
 docs/BadgeCardResponse.md
 docs/BalanceResponse.md
 docs/ChangePasswordRequest.md
+docs/ChangeWorkScheduleRequest.md
 docs/CloseMonthsRequest.md
 docs/ClosedPeriodEventResponse.md
 docs/ClosedPeriodsApi.md
@@ -36,6 +39,7 @@ docs/CompanyLeaveApi.md
 docs/CompanyLeaveResponse.md
 docs/ComplianceDayResponse.md
 docs/CoreHoursMode.md
+docs/CorrectWorkScheduleRequest.md
 docs/CreateAbsenceDayRequest.md
 docs/CreateAbsenceRangeRequest.md
 docs/CreateApiKeyRequest.md
@@ -48,7 +52,6 @@ docs/CreateMemberEntryRequest.md
 docs/CreateOrgRequestRequest.md
 docs/CreateOrganizationRequest.md
 docs/CreatePauseRuleRequest.md
-docs/CreateWorkScheduleRequest.md
 docs/CreatedApiKeyResponse.md
 docs/DayBalance.md
 docs/DayOffResponse.md
@@ -59,6 +62,7 @@ docs/EffectivePermissionsResponse.md
 docs/ExportImportApi.md
 docs/ExportRequest.md
 docs/ForgotPasswordRequest.md
+docs/FrozenDayResponse.md
 docs/GroupApi.md
 docs/GroupDetailResponse.md
 docs/GroupMemberResponse.md
@@ -111,6 +115,7 @@ docs/PauseRulesApi.md
 docs/PayrollExportRequest.md
 docs/PeriodBalance.md
 docs/PersonalAbsence.md
+docs/PersonalAppointment.md
 docs/PersonalCard.md
 docs/PersonalDataExport.md
 docs/PersonalEntryChange.md
@@ -141,6 +146,7 @@ docs/RequestsApi.md
 docs/ResetPasswordRequest.md
 docs/RespondToOrgRequestRequest.md
 docs/RuleMode.md
+docs/SaveAppointmentRequest.md
 docs/SetAccountantRequest.md
 docs/SetEmploymentRequest.md
 docs/SetExclusionsRequest.md
@@ -181,7 +187,6 @@ docs/UpdateOrganizationSettingsRequest.md
 docs/UpdatePauseRuleRequest.md
 docs/UpdateProfileRequest.md
 docs/UpdateTimeEntryRequest.md
-docs/UpdateWorkScheduleRequest.md
 docs/UpsertAbsenceTypeDefinitionRequest.md
 docs/UserInfo.md
 docs/UserNotificationResponse.md
@@ -193,6 +198,7 @@ docs/VerifyEmailRequest.md
 docs/VisibilityRuleRequest.md
 docs/VisibilityRuleResponse.md
 docs/WorkScheduleApi.md
+docs/WorkSchedulePlanResponse.md
 docs/WorkScheduleResponse.md
 git_push.sh
 index.ts

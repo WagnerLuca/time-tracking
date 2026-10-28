@@ -47,7 +47,9 @@ export const en: typeof de = {
 		AbsenceNotes: 'Notes on absences',
 		VacationBalance: 'Remaining vacation',
 		WorkSchedule: 'Work schedule (target hours)',
-		TrackedTime: 'Tracked times and balance'
+		TrackedTime: 'Tracked times and balance',
+		Appointments: 'Appointments (time slot)',
+		AppointmentNotes: 'Appointment notes'
 	},
 	short: {
 		Member: 'name',
@@ -60,7 +62,9 @@ export const en: typeof de = {
 		AbsenceNotes: 'notes',
 		VacationBalance: 'remaining vacation',
 		WorkSchedule: 'target hours',
-		TrackedTime: 'times and balance'
+		TrackedTime: 'times and balance',
+		Appointments: 'appointments',
+		AppointmentNotes: 'appointment notes'
 	},
 	present: 'Present',
 	absent: 'Not clocked in'

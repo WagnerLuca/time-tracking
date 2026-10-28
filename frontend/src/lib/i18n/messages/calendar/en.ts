@@ -5,6 +5,8 @@ export const en: typeof de = {
 		dailyMax: 'Working Time Act: {hours} h on this day (more than 10 h).',
 		restPeriod: 'Working Time Act: only {hours} h of rest before (less than 11 h).',
 		coreHours: 'Core working hours {window} missed: {issues} ({minutes} min not covered).',
+		coreHoursAppointments: 'Appointment {ranges} taken into account.',
+		allDay: 'all day',
 		coreHoursBackfilled: 'Flagged afterwards, when core working hours were switched on.',
 		issues: { late: 'late start', early: 'early leave', gap: 'gap', missing: 'no time tracked' }
 	},
