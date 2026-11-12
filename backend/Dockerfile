@@ -1,5 +1,5 @@
 # Build stage - Build the application
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS builder
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS builder
 # Set the working directory
 WORKDIR /app
 # Copy project file
